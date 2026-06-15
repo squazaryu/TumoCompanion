@@ -14,13 +14,21 @@
       "tintColor": "F36E12",
       "category": "utilities",
       "screenshotURLs": [],
-      "version": "0.9.5",
-      "versionDate": "2026-06-15",
-      "versionDescription": "Fix: BLE file-write pacing (large app installs no longer silently fail) + install failures now verified by md5 and reported, not hidden behind a fake success.",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.5/UnleashedCompanion-unsigned.ipa",
-      "size": 2366083,
+      "version": "0.9.6",
+      "versionDate": "2026-06-16",
+      "versionDescription": "Protected apps moved to their own screen (lock.shield row in Updates). Unprotect is now a deliberate left-swipe instead of a one-tap minus, so apps can't be unprotected by accident.",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.6/UnleashedCompanion-unsigned.ipa",
+      "size": 2370552,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "0.9.6",
+          "date": "2026-06-16",
+          "localizedDescription": "Protected apps moved to their own screen (lock.shield row in Updates). Unprotect is now a deliberate left-swipe instead of a one-tap minus, so apps can't be unprotected by accident.",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.6/UnleashedCompanion-unsigned.ipa",
+          "size": 2370552,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "0.9.5",
           "date": "2026-06-15",
