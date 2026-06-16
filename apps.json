@@ -14,13 +14,21 @@
       "tintColor": "F36E12",
       "category": "utilities",
       "screenshotURLs": [],
-      "version": "0.9.11",
+      "version": "0.9.12",
       "versionDate": "2026-06-16",
-      "versionDescription": "BLE: reattach to a Flipper the system still holds (it stops advertising while connected) instead of a scan that finds nothing \u2014 fixes 'rescan doesn't see Flipper until I toggle its BLE'. Reattach on foreground + remember last device. Sber relay: clear 'set device_id' message instead of cryptic 405 when device_id is empty; trust-OK log lines no longer shown as errors. Tab labels no longer truncate (Screen).",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.11/UnleashedCompanion-unsigned.ipa",
-      "size": 2431349,
+      "versionDescription": "Fix file installs over BLE: writes are now confirmation-driven (send next chunk only after the Flipper acks the previous) instead of blasting frames, which was overrunning the link and dropping it mid-upload ('not connected'). Progress now tracks real acks. Screen tab renamed View so it fits.",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.12/UnleashedCompanion-unsigned.ipa",
+      "size": 2434500,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "0.9.12",
+          "date": "2026-06-16",
+          "localizedDescription": "Fix file installs over BLE: writes are now confirmation-driven (send next chunk only after the Flipper acks the previous) instead of blasting frames, which was overrunning the link and dropping it mid-upload ('not connected'). Progress now tracks real acks. Screen tab renamed View so it fits.",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.12/UnleashedCompanion-unsigned.ipa",
+          "size": 2434500,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "0.9.11",
           "date": "2026-06-16",
