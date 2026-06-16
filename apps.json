@@ -14,13 +14,21 @@
       "tintColor": "F36E12",
       "category": "utilities",
       "screenshotURLs": [],
-      "version": "0.9.22",
+      "version": "0.9.23",
       "versionDate": "2026-06-16",
-      "versionDescription": "Tab bar shift in dark theme fixed: the forced color scheme is now applied at the UIWindow level (overrideUserInterfaceStyle) before first layout, instead of SwiftUI's late .preferredColorScheme which re-laid-out the tab bar (and shifted labels) when the app theme differed from the system theme.",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.22/UnleashedCompanion-unsigned.ipa",
-      "size": 3932791,
+      "versionDescription": "Edit text files on the Flipper (like the App Store app): tap a text file in Files to open a monospaced editor, or swipe \u2192 Edit on any file. Reads fresh over BLE, writes the whole file back on Save and verifies by md5; binary/too-large files are detected and refused.",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.23/UnleashedCompanion-unsigned.ipa",
+      "size": 3959858,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "0.9.23",
+          "date": "2026-06-16",
+          "localizedDescription": "Edit text files on the Flipper (like the App Store app): tap a text file in Files to open a monospaced editor, or swipe \u2192 Edit on any file. Reads fresh over BLE, writes the whole file back on Save and verifies by md5; binary/too-large files are detected and refused.",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.23/UnleashedCompanion-unsigned.ipa",
+          "size": 3959858,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "0.9.22",
           "date": "2026-06-16",
