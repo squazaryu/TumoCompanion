@@ -14,13 +14,21 @@
       "tintColor": "F36E12",
       "category": "utilities",
       "screenshotURLs": [],
-      "version": "0.9.19",
+      "version": "0.9.20",
       "versionDate": "2026-06-16",
-      "versionDescription": "Flipper-triggered AI Radar: long-press OK on the Flipper's AI Dashboard sends ai_dashboard/refresh over the App Bridge; the phone fetches usage from the Mac and streams it back to the Flipper (Flipper\u2192phone\u2192Mac\u2192phone\u2192Flipper), no manual phone tap. Claude 'stale' marker when its OAuth token is expired so a cached 100% isn't shown as current.",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.19/UnleashedCompanion-unsigned.ipa",
-      "size": 2474945,
+      "versionDescription": "AI Radar refresh works backgrounded/locked \u2014 same bluetooth-central path as Sber Relay (my earlier 'foreground only' note was wrong). Added a background-task assertion so the fetch + BLE write-back finishes when woken by the Flipper's event. Needs the phone on the same network as the Mac.",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.20/UnleashedCompanion-unsigned.ipa",
+      "size": 2475329,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "0.9.20",
+          "date": "2026-06-16",
+          "localizedDescription": "AI Radar refresh works backgrounded/locked \u2014 same bluetooth-central path as Sber Relay (my earlier 'foreground only' note was wrong). Added a background-task assertion so the fetch + BLE write-back finishes when woken by the Flipper's event. Needs the phone on the same network as the Mac.",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.20/UnleashedCompanion-unsigned.ipa",
+          "size": 2475329,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "0.9.19",
           "date": "2026-06-16",
