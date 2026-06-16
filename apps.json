@@ -14,13 +14,21 @@
       "tintColor": "F36E12",
       "category": "utilities",
       "screenshotURLs": [],
-      "version": "0.9.14",
+      "version": "0.9.15",
       "versionDate": "2026-06-16",
-      "versionDescription": "Kill the multi-minute install hang: a write-stall watchdog detects a wedged BLE link in 8s (Flipper stops acking mid-upload) and forces a reconnect instead of waiting out the 300s RPC timeout; the write queue is flushed so retries aren't poisoned by a stuck in-flight chunk.",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.14/UnleashedCompanion-unsigned.ipa",
-      "size": 2432429,
+      "versionDescription": "Implement Flipper's BLE serial flow control (the thing the official app does and we didn't): honor the flow-control characteristic credit (1024B RPC buffer, refilled on buffer-empty notify), write .withoutResponse in <=486B chunks gated by canSendWriteWithoutResponse. This is the real fix for file installs over BLE \u2014 no more overrun/wedge/md5-mismatch.",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.15/UnleashedCompanion-unsigned.ipa",
+      "size": 2433489,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "0.9.15",
+          "date": "2026-06-16",
+          "localizedDescription": "Implement Flipper's BLE serial flow control (the thing the official app does and we didn't): honor the flow-control characteristic credit (1024B RPC buffer, refilled on buffer-empty notify), write .withoutResponse in <=486B chunks gated by canSendWriteWithoutResponse. This is the real fix for file installs over BLE \u2014 no more overrun/wedge/md5-mismatch.",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.15/UnleashedCompanion-unsigned.ipa",
+          "size": 2433489,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "0.9.14",
           "date": "2026-06-16",
