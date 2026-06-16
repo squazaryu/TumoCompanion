@@ -14,13 +14,21 @@
       "tintColor": "F36E12",
       "category": "utilities",
       "screenshotURLs": [],
-      "version": "0.9.7",
+      "version": "0.9.8",
       "versionDate": "2026-06-16",
-      "versionDescription": "Device info screen (model, firmware, region, radio stack, battery + full property dump) like the official app. Auto-sync: installed-apps list refreshes itself after any install/update/upload/delete.",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.7/UnleashedCompanion-unsigned.ipa",
-      "size": 2402202,
+      "versionDescription": "Fix: updates failing with 'Flipper not connected' while BLE shows connected. RPC now waits for the link to reach ready (covers connect\u2192ready gap + reconnect blips) instead of failing instantly; status dot is now yellow until truly ready; clearer message if not ready.",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.8/UnleashedCompanion-unsigned.ipa",
+      "size": 2405529,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "0.9.8",
+          "date": "2026-06-16",
+          "localizedDescription": "Fix: updates failing with 'Flipper not connected' while BLE shows connected. RPC now waits for the link to reach ready (covers connect\u2192ready gap + reconnect blips) instead of failing instantly; status dot is now yellow until truly ready; clearer message if not ready.",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.8/UnleashedCompanion-unsigned.ipa",
+          "size": 2405529,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "0.9.7",
           "date": "2026-06-16",
