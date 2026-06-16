@@ -14,13 +14,21 @@
       "tintColor": "F36E12",
       "category": "utilities",
       "screenshotURLs": [],
-      "version": "0.9.17",
+      "version": "0.9.18",
       "versionDate": "2026-06-16",
-      "versionDescription": "Bring AI Radar back \u2014 as a read-only iOS view. The Mac bridge stays the data collector (it needs the codex/claude CLIs); iOS reads the Flipper's /ext/apps_data/ai_dashboard/usage.txt over BLE and shows the same per-provider usage the on-device app does. New Device \u2192 AI Radar screen.",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.17/UnleashedCompanion-unsigned.ipa",
-      "size": 2464060,
+      "versionDescription": "AI Radar over the network: iOS now pulls usage from the Mac AI Radar Bridge app and writes usage.txt to the Flipper itself (Mac \u2192 phone \u2192 Flipper). Set the bridge URL on the AI Radar screen; empty still reads usage.txt straight off the Flipper.",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.18/UnleashedCompanion-unsigned.ipa",
+      "size": 2467592,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "0.9.18",
+          "date": "2026-06-16",
+          "localizedDescription": "AI Radar over the network: iOS now pulls usage from the Mac AI Radar Bridge app and writes usage.txt to the Flipper itself (Mac \u2192 phone \u2192 Flipper). Set the bridge URL on the AI Radar screen; empty still reads usage.txt straight off the Flipper.",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.18/UnleashedCompanion-unsigned.ipa",
+          "size": 2467592,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "0.9.17",
           "date": "2026-06-16",
