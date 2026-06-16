@@ -14,13 +14,21 @@
       "tintColor": "F36E12",
       "category": "utilities",
       "screenshotURLs": [],
-      "version": "0.9.9",
+      "version": "0.9.10",
       "versionDate": "2026-06-16",
-      "versionDescription": "Real-time install progress (per-file name + byte bar, no more guessing if it hung). Install now retries each app up to 3x, waiting for BLE to reconnect after a blip, fixing 'Flipper not connected' mid/after install. Marauder tab renamed WiFi so the label fits.",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.9/UnleashedCompanion-unsigned.ipa",
-      "size": 2420041,
+      "versionDescription": "Select menu in Updates is now a full-width tappable row (whole cell responds, not just the text) with a chevron affordance.",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.10/UnleashedCompanion-unsigned.ipa",
+      "size": 2424662,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "0.9.10",
+          "date": "2026-06-16",
+          "localizedDescription": "Select menu in Updates is now a full-width tappable row (whole cell responds, not just the text) with a chevron affordance.",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.10/UnleashedCompanion-unsigned.ipa",
+          "size": 2424662,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "0.9.9",
           "date": "2026-06-16",
