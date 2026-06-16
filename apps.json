@@ -14,13 +14,21 @@
       "tintColor": "F36E12",
       "category": "utilities",
       "screenshotURLs": [],
-      "version": "0.9.23",
+      "version": "0.9.24",
       "versionDate": "2026-06-16",
-      "versionDescription": "Edit text files on the Flipper (like the App Store app): tap a text file in Files to open a monospaced editor, or swipe \u2192 Edit on any file. Reads fresh over BLE, writes the whole file back on Save and verifies by md5; binary/too-large files are detected and refused.",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.23/UnleashedCompanion-unsigned.ipa",
-      "size": 3959858,
+      "versionDescription": "Restore sub/nfc/rfid swipe actions (Edit moved to long-press context menu; tap-to-edit now only for plain-text files). Fix the stale Flipper bridge: on launch a system-held connection from the previous app process is force-disconnected and reconnected fresh (its RPC session was dead), so reconnect works without toggling the Flipper's Bluetooth.",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.24/UnleashedCompanion-unsigned.ipa",
+      "size": 3961231,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "0.9.24",
+          "date": "2026-06-16",
+          "localizedDescription": "Restore sub/nfc/rfid swipe actions (Edit moved to long-press context menu; tap-to-edit now only for plain-text files). Fix the stale Flipper bridge: on launch a system-held connection from the previous app process is force-disconnected and reconnected fresh (its RPC session was dead), so reconnect works without toggling the Flipper's Bluetooth.",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.24/UnleashedCompanion-unsigned.ipa",
+          "size": 3961231,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "0.9.23",
           "date": "2026-06-16",
