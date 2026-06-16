@@ -14,13 +14,21 @@
       "tintColor": "F36E12",
       "category": "utilities",
       "screenshotURLs": [],
-      "version": "0.9.8",
+      "version": "0.9.9",
       "versionDate": "2026-06-16",
-      "versionDescription": "Fix: updates failing with 'Flipper not connected' while BLE shows connected. RPC now waits for the link to reach ready (covers connect\u2192ready gap + reconnect blips) instead of failing instantly; status dot is now yellow until truly ready; clearer message if not ready.",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.8/UnleashedCompanion-unsigned.ipa",
-      "size": 2405529,
+      "versionDescription": "Real-time install progress (per-file name + byte bar, no more guessing if it hung). Install now retries each app up to 3x, waiting for BLE to reconnect after a blip, fixing 'Flipper not connected' mid/after install. Marauder tab renamed WiFi so the label fits.",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.9/UnleashedCompanion-unsigned.ipa",
+      "size": 2420041,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "0.9.9",
+          "date": "2026-06-16",
+          "localizedDescription": "Real-time install progress (per-file name + byte bar, no more guessing if it hung). Install now retries each app up to 3x, waiting for BLE to reconnect after a blip, fixing 'Flipper not connected' mid/after install. Marauder tab renamed WiFi so the label fits.",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.9/UnleashedCompanion-unsigned.ipa",
+          "size": 2420041,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "0.9.8",
           "date": "2026-06-16",
