@@ -14,13 +14,21 @@
       "tintColor": "F36E12",
       "category": "utilities",
       "screenshotURLs": [],
-      "version": "0.9.16",
+      "version": "0.9.17",
       "versionDate": "2026-06-16",
-      "versionDescription": "Fix tab bar (dock) rendering crooked/truncated on first paint: removed the custom UITabBarAppearance font that broke layout metrics until a re-layout. Back to native rendering; Bridge tab renamed Relay so every label fits at the default size.",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.16/UnleashedCompanion-unsigned.ipa",
-      "size": 2431178,
+      "versionDescription": "Bring AI Radar back \u2014 as a read-only iOS view. The Mac bridge stays the data collector (it needs the codex/claude CLIs); iOS reads the Flipper's /ext/apps_data/ai_dashboard/usage.txt over BLE and shows the same per-provider usage the on-device app does. New Device \u2192 AI Radar screen.",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.17/UnleashedCompanion-unsigned.ipa",
+      "size": 2464060,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "0.9.17",
+          "date": "2026-06-16",
+          "localizedDescription": "Bring AI Radar back \u2014 as a read-only iOS view. The Mac bridge stays the data collector (it needs the codex/claude CLIs); iOS reads the Flipper's /ext/apps_data/ai_dashboard/usage.txt over BLE and shows the same per-provider usage the on-device app does. New Device \u2192 AI Radar screen.",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.17/UnleashedCompanion-unsigned.ipa",
+          "size": 2464060,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "0.9.16",
           "date": "2026-06-16",
