@@ -14,13 +14,21 @@
       "tintColor": "F36E12",
       "category": "utilities",
       "screenshotURLs": [],
-      "version": "0.9.24",
-      "versionDate": "2026-06-16",
-      "versionDescription": "Restore sub/nfc/rfid swipe actions (Edit moved to long-press context menu; tap-to-edit now only for plain-text files). Fix the stale Flipper bridge: on launch a system-held connection from the previous app process is force-disconnected and reconnected fresh (its RPC session was dead), so reconnect works without toggling the Flipper's Bluetooth.",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.24/UnleashedCompanion-unsigned.ipa",
-      "size": 3961231,
+      "version": "0.9.25",
+      "versionDate": "2026-06-17",
+      "versionDescription": "Sber: log in directly in the app \u2014 new 'Log in with Sber' button in the Relay tab runs the real OAuth (auth-code + PKCE, companionapp:// redirect) in a WKWebView with the Russian Trusted CA injected, exchanges the code, stores the token, and auto-refreshes after. No more Home Assistant token-copying. Manual JSON paste kept as fallback.",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.25/UnleashedCompanion-unsigned.ipa",
+      "size": 3984201,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "0.9.25",
+          "date": "2026-06-17",
+          "localizedDescription": "Sber: log in directly in the app \u2014 new 'Log in with Sber' button in the Relay tab runs the real OAuth (auth-code + PKCE, companionapp:// redirect) in a WKWebView with the Russian Trusted CA injected, exchanges the code, stores the token, and auto-refreshes after. No more Home Assistant token-copying. Manual JSON paste kept as fallback.",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.25/UnleashedCompanion-unsigned.ipa",
+          "size": 3984201,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "0.9.24",
           "date": "2026-06-16",
