@@ -14,13 +14,21 @@
       "tintColor": "F36E12",
       "category": "utilities",
       "screenshotURLs": [],
-      "version": "0.9.29",
+      "version": "0.9.30",
       "versionDate": "2026-06-18",
-      "versionDescription": "Phase 3: Backup & Restore (Device \u2192 Backup & Restore). Pick SD folders, back them up to a timestamped zip on the phone over BLE (apps/update unticked by default), share or restore any backup back to the Flipper with intermediate dirs created.",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.29/UnleashedCompanion-unsigned.ipa",
-      "size": 2090358,
+      "versionDescription": "Phase 4: Remotes \u2014 favorite saved .sub files (Files \u2192 long-press \u2192 Add to Remotes) and fire them with big one-tap buttons from Device \u2192 Remotes. BadUSB/text editing already covered by the file editor (long-press \u2192 Edit text).",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.30/UnleashedCompanion-unsigned.ipa",
+      "size": 2109453,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "0.9.30",
+          "date": "2026-06-18",
+          "localizedDescription": "Phase 4: Remotes \u2014 favorite saved .sub files (Files \u2192 long-press \u2192 Add to Remotes) and fire them with big one-tap buttons from Device \u2192 Remotes. BadUSB/text editing already covered by the file editor (long-press \u2192 Edit text).",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.30/UnleashedCompanion-unsigned.ipa",
+          "size": 2109453,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "0.9.29",
           "date": "2026-06-18",
