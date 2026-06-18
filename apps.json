@@ -14,13 +14,21 @@
       "tintColor": "F36E12",
       "category": "utilities",
       "screenshotURLs": [],
-      "version": "0.9.25",
-      "versionDate": "2026-06-17",
-      "versionDescription": "Sber: log in directly in the app \u2014 new 'Log in with Sber' button in the Relay tab runs the real OAuth (auth-code + PKCE, companionapp:// redirect) in a WKWebView with the Russian Trusted CA injected, exchanges the code, stores the token, and auto-refreshes after. No more Home Assistant token-copying. Manual JSON paste kept as fallback.",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.25/UnleashedCompanion-unsigned.ipa",
-      "size": 3984201,
+      "version": "0.9.26",
+      "versionDate": "2026-06-18",
+      "versionDescription": "Move the built-in app launcher (Sub-GHz/NFC/RFID/IR/BadUSB/GPIO) from Files to the View (screen mirror) tab. Fix version: IPA now carries the real CFBundleShortVersionString (was pinned at 0.9.4 \u2014 Feather showed it). New 4 app icons (Orange/Mono/Green/Purple) with light/dark/tinted appearance variants for iOS 26 Liquid Glass.",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.26/UnleashedCompanion-unsigned.ipa",
+      "size": 1998869,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "0.9.26",
+          "date": "2026-06-18",
+          "localizedDescription": "Move the built-in app launcher (Sub-GHz/NFC/RFID/IR/BadUSB/GPIO) from Files to the View (screen mirror) tab. Fix version: IPA now carries the real CFBundleShortVersionString (was pinned at 0.9.4 \u2014 Feather showed it). New 4 app icons (Orange/Mono/Green/Purple) with light/dark/tinted appearance variants for iOS 26 Liquid Glass.",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.26/UnleashedCompanion-unsigned.ipa",
+          "size": 1998869,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "0.9.25",
           "date": "2026-06-17",
