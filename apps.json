@@ -14,13 +14,21 @@
       "tintColor": "F36E12",
       "category": "utilities",
       "screenshotURLs": [],
-      "version": "0.9.28",
+      "version": "0.9.29",
       "versionDate": "2026-06-18",
-      "versionDescription": "Phase 2: Siri/Shortcuts \u2014 toggle/on/off the Sber relay by voice via the cloud (works without the Flipper). Background check for new all-the-plugins releases with a local notification when a new pack drops.",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.28/UnleashedCompanion-unsigned.ipa",
-      "size": 2042951,
+      "versionDescription": "Phase 3: Backup & Restore (Device \u2192 Backup & Restore). Pick SD folders, back them up to a timestamped zip on the phone over BLE (apps/update unticked by default), share or restore any backup back to the Flipper with intermediate dirs created.",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.29/UnleashedCompanion-unsigned.ipa",
+      "size": 2090358,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "0.9.29",
+          "date": "2026-06-18",
+          "localizedDescription": "Phase 3: Backup & Restore (Device \u2192 Backup & Restore). Pick SD folders, back them up to a timestamped zip on the phone over BLE (apps/update unticked by default), share or restore any backup back to the Flipper with intermediate dirs created.",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.29/UnleashedCompanion-unsigned.ipa",
+          "size": 2090358,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "0.9.28",
           "date": "2026-06-18",
