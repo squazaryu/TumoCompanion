@@ -14,13 +14,21 @@
       "tintColor": "F36E12",
       "category": "utilities",
       "screenshotURLs": [],
-      "version": "0.9.34",
+      "version": "0.9.35",
       "versionDate": "2026-06-18",
-      "versionDescription": "Icons reworked: 4 DISTINCT designs (Device/Radar/Key/Bolt), not just recolors. Each ships light, dark and tinted appearance variants so iOS 26 applies Liquid Glass adapted to the system light/dark theme. Settings labels updated to the motif names.",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.34/UnleashedCompanion-unsigned.ipa",
-      "size": 3219529,
+      "versionDescription": "New Dolphin app icon (original cyan cetacean silhouette) as a 5th choice alongside Device/Radar/Key/Bolt \u2014 each with light/dark/tinted for Liquid Glass. Pick it in Settings \u2192 App icon.",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.35/UnleashedCompanion-unsigned.ipa",
+      "size": 3290077,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "0.9.35",
+          "date": "2026-06-18",
+          "localizedDescription": "New Dolphin app icon (original cyan cetacean silhouette) as a 5th choice alongside Device/Radar/Key/Bolt \u2014 each with light/dark/tinted for Liquid Glass. Pick it in Settings \u2192 App icon.",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.35/UnleashedCompanion-unsigned.ipa",
+          "size": 3290077,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "0.9.34",
           "date": "2026-06-18",
