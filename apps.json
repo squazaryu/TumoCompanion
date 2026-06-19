@@ -14,13 +14,21 @@
       "tintColor": "F36E12",
       "category": "utilities",
       "screenshotURLs": [],
-      "version": "0.9.38",
+      "version": "0.9.39",
       "versionDate": "2026-06-19",
-      "versionDescription": "Full-duplex Claude Buddy: the iPhone now bridges the REAL claude_buddy.fap on the Flipper to a Mac relay daemon \u2014 its serial is piped both ways over the AI Radar Bridge (notifications shown on Buddy + Buddy buttons type into Claude Code). No more flaky direct USB/BLE bridge. Enable in Settings -> Claude Buddy passthrough.",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.38/UnleashedCompanion-unsigned.ipa",
-      "size": 3407725,
+      "versionDescription": "Fix Claude Buddy passthrough corruption: while the Buddy app owns the Flipper serial channel, RPC is now hard-disabled (no writes, no parsing) so background features can't interleave protobuf with Buddy JSON. That interleaving was what showed up as Cyrillic glyphs instead of the command and crashed the .fap (furi_check). Buttons + notifications now run clean.",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.39/UnleashedCompanion-unsigned.ipa",
+      "size": 3408426,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "0.9.39",
+          "date": "2026-06-19",
+          "localizedDescription": "Fix Claude Buddy passthrough corruption: while the Buddy app owns the Flipper serial channel, RPC is now hard-disabled (no writes, no parsing) so background features can't interleave protobuf with Buddy JSON. That interleaving was what showed up as Cyrillic glyphs instead of the command and crashed the .fap (furi_check). Buttons + notifications now run clean.",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.39/UnleashedCompanion-unsigned.ipa",
+          "size": 3408426,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "0.9.38",
           "date": "2026-06-19",
