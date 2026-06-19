@@ -14,13 +14,21 @@
       "tintColor": "F36E12",
       "category": "utilities",
       "screenshotURLs": [],
-      "version": "0.9.37",
+      "version": "0.9.38",
       "versionDate": "2026-06-19",
-      "versionDescription": "Claude Buddy over App Bridge: new BuddyRelay polls the Mac (AI Radar Bridge /buddy queue) and forwards Claude Code notifications to the Flipper companion as pager/notify frames \u2014 coexists with the iPhone BLE link. Toggle in Settings \u2192 Claude Buddy. (Mac side: AIRadarBridge /buddy endpoint.)",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.37/UnleashedCompanion-unsigned.ipa",
-      "size": 3403549,
+      "versionDescription": "Full-duplex Claude Buddy: the iPhone now bridges the REAL claude_buddy.fap on the Flipper to a Mac relay daemon \u2014 its serial is piped both ways over the AI Radar Bridge (notifications shown on Buddy + Buddy buttons type into Claude Code). No more flaky direct USB/BLE bridge. Enable in Settings -> Claude Buddy passthrough.",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.38/UnleashedCompanion-unsigned.ipa",
+      "size": 3407725,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "0.9.38",
+          "date": "2026-06-19",
+          "localizedDescription": "Full-duplex Claude Buddy: the iPhone now bridges the REAL claude_buddy.fap on the Flipper to a Mac relay daemon \u2014 its serial is piped both ways over the AI Radar Bridge (notifications shown on Buddy + Buddy buttons type into Claude Code). No more flaky direct USB/BLE bridge. Enable in Settings -> Claude Buddy passthrough.",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.38/UnleashedCompanion-unsigned.ipa",
+          "size": 3407725,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "0.9.37",
           "date": "2026-06-19",
