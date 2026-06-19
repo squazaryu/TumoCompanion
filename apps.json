@@ -14,13 +14,21 @@
       "tintColor": "F36E12",
       "category": "utilities",
       "screenshotURLs": [],
-      "version": "0.9.41",
-      "versionDate": "2026-06-19",
-      "versionDescription": "Claude Buddy passthrough is now self-arming and safe to leave ON. It pauses RPC (Device/Files/View) ONLY while the Claude Buddy app is actually the live serial peer on the Flipper (detected from its JSON stream); otherwise RPC works normally and nothing is written to the link. Fixes: no Device Info / screen / files + periodic disconnects that happened when the toggle was left on without the Buddy app open. App Bridge (AI Radar, Relay) is unaffected either way.",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.41/UnleashedCompanion-unsigned.ipa",
-      "size": 3414086,
+      "version": "0.9.42",
+      "versionDate": "2026-06-20",
+      "versionDescription": "App Bridge v2 (FAB2) support: the app now probes runtime/capabilities on connect and auto-upgrades to FAB2 framing (16-byte header, request ids, 160-byte chunking) when the firmware supports it, falling back to FAB1 otherwise. Fully backward compatible \u2014 no change on current 87.12 firmware; auto-switches once you flash an App Bridge v2 build. Decoder accepts both FAB1 and FAB2.",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.42/UnleashedCompanion-unsigned.ipa",
+      "size": 3419749,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "0.9.42",
+          "date": "2026-06-20",
+          "localizedDescription": "App Bridge v2 (FAB2) support: the app now probes runtime/capabilities on connect and auto-upgrades to FAB2 framing (16-byte header, request ids, 160-byte chunking) when the firmware supports it, falling back to FAB1 otherwise. Fully backward compatible \u2014 no change on current 87.12 firmware; auto-switches once you flash an App Bridge v2 build. Decoder accepts both FAB1 and FAB2.",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.42/UnleashedCompanion-unsigned.ipa",
+          "size": 3419749,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "0.9.41",
           "date": "2026-06-19",
