@@ -14,13 +14,21 @@
       "tintColor": "F36E12",
       "category": "utilities",
       "screenshotURLs": [],
-      "version": "0.9.43",
+      "version": "0.9.44",
       "versionDate": "2026-06-20",
-      "versionDescription": "Show negotiated App Bridge version in Settings (v1/FAB1 vs v2/FAB2) so it's visible in-app instead of only in OSLog. Settings -> bottom: 'App Bridge: v1 (FAB1)' on current firmware, turns green 'v2 (FAB2)' once you connect to an App Bridge v2 firmware.",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.43/UnleashedCompanion-unsigned.ipa",
-      "size": 3423245,
+      "versionDescription": "UI redesign (1/n): new card-based design system (Theme: cards, status pills, pill buttons) and a fully refactored Relay tab \u2014 premium card layout, real On/Off/Toggle controls (no more 'Test' buttons), Sber account card with status pill + collapsible manual-token, Home Assistant card, styled activity feed, and the raw frame sender tucked into a Developer disclosure.",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.44/UnleashedCompanion-unsigned.ipa",
+      "size": 3458928,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "0.9.44",
+          "date": "2026-06-20",
+          "localizedDescription": "UI redesign (1/n): new card-based design system (Theme: cards, status pills, pill buttons) and a fully refactored Relay tab \u2014 premium card layout, real On/Off/Toggle controls (no more 'Test' buttons), Sber account card with status pill + collapsible manual-token, Home Assistant card, styled activity feed, and the raw frame sender tucked into a Developer disclosure.",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.44/UnleashedCompanion-unsigned.ipa",
+          "size": 3458928,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "0.9.43",
           "date": "2026-06-20",
