@@ -14,13 +14,21 @@
       "tintColor": "F36E12",
       "category": "utilities",
       "screenshotURLs": [],
-      "version": "0.9.45",
+      "version": "0.9.46",
       "versionDate": "2026-06-20",
-      "versionDescription": "UI redesign (2/n): new premium Home dashboard (replaces the Device list) \u2014 connection hero card with v1/v2 App Bridge pill, nearby Flippers, Claude Buddy status, and a card grid for Device info / Installed apps / Updates / AI Radar / Backup / Remotes. Tabs renamed/cleaned (Home, Files, Screen, Relay, WiFi). Files: long-press \u2192 'Move to\u2026' with a folder picker to move files/folders between directories (new FlipperStorage.move via storage rename RPC).",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.45/UnleashedCompanion-unsigned.ipa",
-      "size": 3509876,
+      "versionDescription": "UI redesign (3/n): Flipper battery on the Home hero card \u2014 live from the standard BLE Battery Service (0x180F notify), colored battery glyph + %. AI Radar screen restyled to the card design (Source card with auto-discovery + updated pill, per-provider cards with usage bars and a source/stale pill).",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.46/UnleashedCompanion-unsigned.ipa",
+      "size": 3513434,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "0.9.46",
+          "date": "2026-06-20",
+          "localizedDescription": "UI redesign (3/n): Flipper battery on the Home hero card \u2014 live from the standard BLE Battery Service (0x180F notify), colored battery glyph + %. AI Radar screen restyled to the card design (Source card with auto-discovery + updated pill, per-provider cards with usage bars and a source/stale pill).",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.46/UnleashedCompanion-unsigned.ipa",
+          "size": 3513434,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "0.9.45",
           "date": "2026-06-20",
