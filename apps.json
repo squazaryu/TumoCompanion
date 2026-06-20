@@ -14,13 +14,21 @@
       "tintColor": "F36E12",
       "category": "utilities",
       "screenshotURLs": [],
-      "version": "0.9.44",
+      "version": "0.9.45",
       "versionDate": "2026-06-20",
-      "versionDescription": "UI redesign (1/n): new card-based design system (Theme: cards, status pills, pill buttons) and a fully refactored Relay tab \u2014 premium card layout, real On/Off/Toggle controls (no more 'Test' buttons), Sber account card with status pill + collapsible manual-token, Home Assistant card, styled activity feed, and the raw frame sender tucked into a Developer disclosure.",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.44/UnleashedCompanion-unsigned.ipa",
-      "size": 3458928,
+      "versionDescription": "UI redesign (2/n): new premium Home dashboard (replaces the Device list) \u2014 connection hero card with v1/v2 App Bridge pill, nearby Flippers, Claude Buddy status, and a card grid for Device info / Installed apps / Updates / AI Radar / Backup / Remotes. Tabs renamed/cleaned (Home, Files, Screen, Relay, WiFi). Files: long-press \u2192 'Move to\u2026' with a folder picker to move files/folders between directories (new FlipperStorage.move via storage rename RPC).",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.45/UnleashedCompanion-unsigned.ipa",
+      "size": 3509876,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "0.9.45",
+          "date": "2026-06-20",
+          "localizedDescription": "UI redesign (2/n): new premium Home dashboard (replaces the Device list) \u2014 connection hero card with v1/v2 App Bridge pill, nearby Flippers, Claude Buddy status, and a card grid for Device info / Installed apps / Updates / AI Radar / Backup / Remotes. Tabs renamed/cleaned (Home, Files, Screen, Relay, WiFi). Files: long-press \u2192 'Move to\u2026' with a folder picker to move files/folders between directories (new FlipperStorage.move via storage rename RPC).",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.45/UnleashedCompanion-unsigned.ipa",
+          "size": 3509876,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "0.9.44",
           "date": "2026-06-20",
