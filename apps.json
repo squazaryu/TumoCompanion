@@ -14,13 +14,21 @@
       "tintColor": "F36E12",
       "category": "utilities",
       "screenshotURLs": [],
-      "version": "0.9.47",
+      "version": "0.9.48",
       "versionDate": "2026-06-20",
-      "versionDescription": "UI redesign (4/n): compact Home tool tiles (3-col, smaller, shorter labels) and WiFi/Marauder tab restyled to cards with a clear 'reads saved scan logs' explainer (saved-scans card, log-files card, credentials/APs/summary cards).",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.47/UnleashedCompanion-unsigned.ipa",
-      "size": 3522284,
+      "versionDescription": "Relay state + reliability: shows the relay's current On/Off state via the HA REST API (add a long-lived token + entity id under Home Assistant \u2192 'Show on/off state'); state refreshes after each command. Fixes the 'doesn't work the first time' issue \u2014 HA webhook calls now retry once with a longer timeout on a cold mDNS/DNS resolve.",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.48/UnleashedCompanion-unsigned.ipa",
+      "size": 3546613,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "0.9.48",
+          "date": "2026-06-20",
+          "localizedDescription": "Relay state + reliability: shows the relay's current On/Off state via the HA REST API (add a long-lived token + entity id under Home Assistant \u2192 'Show on/off state'); state refreshes after each command. Fixes the 'doesn't work the first time' issue \u2014 HA webhook calls now retry once with a longer timeout on a cold mDNS/DNS resolve.",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.48/UnleashedCompanion-unsigned.ipa",
+          "size": 3546613,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "0.9.47",
           "date": "2026-06-20",
