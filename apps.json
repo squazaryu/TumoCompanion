@@ -14,13 +14,21 @@
       "tintColor": "F36E12",
       "category": "utilities",
       "screenshotURLs": [],
-      "version": "0.9.51",
+      "version": "0.9.52",
       "versionDate": "2026-06-20",
-      "versionDescription": "WiFi: structured Marauder data. New 802.11 pcap parser (radiotap-aware) pulls saved sniff captures from the Flipper over BLE and shows Networks \u2192 the clients connected to each (with MAC vendor from OUI), plus unassociated clients; text scan logs still parse APs + Evil Portal creds (now with vendor). ESP32 Firmware moved from WiFi to a Home tile.",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.51/UnleashedCompanion-unsigned.ipa",
-      "size": 3632308,
+      "versionDescription": "WiFi: pick a log file manually. The toolbar now has a file browser (folder icon) that opens an SD file picker starting at Marauder's save folder (/ext/apps_data/marauder) \u2014 navigate anywhere and tap any file (.pcap/.log/.csv/.txt or other) to analyze it. The refresh icon still auto-scans the known folders.",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.52/UnleashedCompanion-unsigned.ipa",
+      "size": 3668446,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "0.9.52",
+          "date": "2026-06-20",
+          "localizedDescription": "WiFi: pick a log file manually. The toolbar now has a file browser (folder icon) that opens an SD file picker starting at Marauder's save folder (/ext/apps_data/marauder) \u2014 navigate anywhere and tap any file (.pcap/.log/.csv/.txt or other) to analyze it. The refresh icon still auto-scans the known folders.",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.52/UnleashedCompanion-unsigned.ipa",
+          "size": 3668446,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "0.9.51",
           "date": "2026-06-20",
