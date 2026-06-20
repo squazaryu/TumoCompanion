@@ -14,13 +14,21 @@
       "tintColor": "F36E12",
       "category": "utilities",
       "screenshotURLs": [],
-      "version": "0.9.46",
+      "version": "0.9.47",
       "versionDate": "2026-06-20",
-      "versionDescription": "UI redesign (3/n): Flipper battery on the Home hero card \u2014 live from the standard BLE Battery Service (0x180F notify), colored battery glyph + %. AI Radar screen restyled to the card design (Source card with auto-discovery + updated pill, per-provider cards with usage bars and a source/stale pill).",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.46/UnleashedCompanion-unsigned.ipa",
-      "size": 3513434,
+      "versionDescription": "UI redesign (4/n): compact Home tool tiles (3-col, smaller, shorter labels) and WiFi/Marauder tab restyled to cards with a clear 'reads saved scan logs' explainer (saved-scans card, log-files card, credentials/APs/summary cards).",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.47/UnleashedCompanion-unsigned.ipa",
+      "size": 3522284,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "0.9.47",
+          "date": "2026-06-20",
+          "localizedDescription": "UI redesign (4/n): compact Home tool tiles (3-col, smaller, shorter labels) and WiFi/Marauder tab restyled to cards with a clear 'reads saved scan logs' explainer (saved-scans card, log-files card, credentials/APs/summary cards).",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v0.9.47/UnleashedCompanion-unsigned.ipa",
+          "size": 3522284,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "0.9.46",
           "date": "2026-06-20",
