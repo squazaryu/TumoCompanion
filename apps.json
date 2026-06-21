@@ -14,13 +14,21 @@
       "tintColor": "F36E12",
       "category": "utilities",
       "screenshotURLs": [],
-      "version": "1.1.1",
+      "version": "1.1.2",
       "versionDate": "2026-06-21",
-      "versionDescription": "Fix FAB2 request correlation, strict frame validation and firmware error handling. Add crash-recoverable tumoflip SD package updates with exact firmware/API checks, verified staging, reversible cleanup and rollback.",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.1.1/UnleashedCompanion-unsigned.ipa",
-      "size": 3864187,
+      "versionDescription": "Critical package-updater fix: rollback no longer deletes untouched staged targets, and active Flipper apps are stopped and verified idle before activation. Adds a regression test for the hardware-reproduced ARF Tools data-loss scenario.",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.1.2/UnleashedCompanion-unsigned.ipa",
+      "size": 3865498,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.1.2",
+          "date": "2026-06-21",
+          "localizedDescription": "Critical package-updater fix: rollback no longer deletes untouched staged targets, and active Flipper apps are stopped and verified idle before activation. Adds a regression test for the hardware-reproduced ARF Tools data-loss scenario.",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.1.2/UnleashedCompanion-unsigned.ipa",
+          "size": 3865498,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.1.1",
           "date": "2026-06-21",
