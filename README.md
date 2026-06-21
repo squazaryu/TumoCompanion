@@ -19,6 +19,7 @@
 ## Contents
 
 - [Install](#install-feather--altstore)
+- [Screenshots](#screenshots)
 - [Features](#features)
 - [App Bridge (FAB1 / FAB2)](#app-bridge-fab1--fab2)
 - [Firmware packages (atomic updater)](#firmware-packages-atomic-updater)
@@ -35,6 +36,17 @@ https://raw.githubusercontent.com/squazaryu/unleashed-companion/main/apps.json
 ```
 
 > Unsigned IPA, sideloaded. Built for the **[tumoflip](https://github.com/squazaryu/tumoflip)** firmware (Unleashed-based — its App Bridge BLE service is what most of the integrations talk to). Works as a plain BLE file/screen client on stock firmware too.
+
+## Screenshots
+
+<p align="center">
+  <img src="screenshots/onboarding.png" width="200" alt="Onboarding">
+  <img src="screenshots/home.png" width="200" alt="Home dashboard">
+  <img src="screenshots/relay.png" width="200" alt="Relay control">
+  <img src="screenshots/settings.png" width="200" alt="Settings — themes & app icons">
+</p>
+
+<sub>Onboarding · Home dashboard · Relay control · Settings (themes + 5 app icons). Home/Relay are shown without a Flipper paired — the live-data screens (device info, files, screen mirror, WiFi/Marauder, AI Radar, Claude Buddy) look best on a connected device.</sub>
 
 ## Features
 
