@@ -14,13 +14,21 @@
       "tintColor": "F36E12",
       "category": "utilities",
       "screenshotURLs": [],
-      "version": "1.0.0",
-      "versionDate": "2026-06-20",
-      "versionDescription": "1.0.0 (build 87) \u2014 Relay state fix. The Sber relay doesn't report a reliable steady state to HA (switch.rele_1 reverts to off seconds after an on command; the template switch sticks on), so the on/off pill now follows your last command \u2014 from the app or the Flipper \u2014 and is persisted across launches, instead of being overwritten by an unreliable HA read. 'Test read state' in Relay Settings is now a comparison-only diagnostic.",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.0.0/UnleashedCompanion-unsigned.ipa",
-      "size": 3683151,
+      "version": "1.1.0",
+      "versionDate": "2026-06-21",
+      "versionDescription": "1.1.0 \u2014 two engineering issues landed.\n\n#7 App Bridge FAB2 request/response: sendAppBridge is no longer fire-and-forget. New async request API correlates replies by monotonic nonzero request id, reassembles ordered response chunks (<=512B), rejects duplicate/out-of-order/mixed/oversized/trailing frames, surfaces firmware errors as typed Swift errors, and cleans up pending requests on timeout or disconnect. The v2 capability probe is now strict (only a matching runtime/capabilities response negotiates v2; unknown capability keys preserved). FAB1 fallback and event-driven Relay/AI Radar unchanged. 17 unit tests.\n\n#8 Atomic tumoflip package updater (Updates -> Firmware packages): installs Base/ARF/Module One/Protocol Pack SD files from the latest tumoflip release. Manifest (schema v2) validation, path-safety, staging under /ext/.tumoflip, on-device MD5 verify, atomic same-volume activation with a transaction journal, full rollback on any failure, and host-side legacy cleanup only after verified replacement. Byte source is a published tumoflip-packages.zip (firmware release tooling added). 14 unit tests.",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.1.0/UnleashedCompanion-unsigned.ipa",
+      "size": 3814855,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.1.0",
+          "date": "2026-06-21",
+          "localizedDescription": "1.1.0 \u2014 two engineering issues landed.\n\n#7 App Bridge FAB2 request/response: sendAppBridge is no longer fire-and-forget. New async request API correlates replies by monotonic nonzero request id, reassembles ordered response chunks (<=512B), rejects duplicate/out-of-order/mixed/oversized/trailing frames, surfaces firmware errors as typed Swift errors, and cleans up pending requests on timeout or disconnect. The v2 capability probe is now strict (only a matching runtime/capabilities response negotiates v2; unknown capability keys preserved). FAB1 fallback and event-driven Relay/AI Radar unchanged. 17 unit tests.\n\n#8 Atomic tumoflip package updater (Updates -> Firmware packages): installs Base/ARF/Module One/Protocol Pack SD files from the latest tumoflip release. Manifest (schema v2) validation, path-safety, staging under /ext/.tumoflip, on-device MD5 verify, atomic same-volume activation with a transaction journal, full rollback on any failure, and host-side legacy cleanup only after verified replacement. Byte source is a published tumoflip-packages.zip (firmware release tooling added). 14 unit tests.",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.1.0/UnleashedCompanion-unsigned.ipa",
+          "size": 3814855,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.0.0",
           "date": "2026-06-20",
