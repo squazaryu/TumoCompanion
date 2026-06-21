@@ -16,6 +16,16 @@
 
 ---
 
+## Contents
+
+- [Install](#install-feather--altstore)
+- [Features](#features)
+- [App Bridge (FAB1 / FAB2)](#app-bridge-fab1--fab2)
+- [Firmware packages (atomic updater)](#firmware-packages-atomic-updater)
+- [How the relay state works](#how-the-relay-state-works)
+- [Privacy](#privacy)
+- [Requirements](#requirements)
+
 ## Install (Feather / AltStore)
 
 Add the source, then install — Feather signs it with your own certificate and auto-updates on each release:
@@ -57,13 +67,26 @@ https://raw.githubusercontent.com/squazaryu/unleashed-companion/main/apps.json
 - Mic button toggles Claude Code's in-app dictation (⌘D), layout-independent.
 
 ### 🔔 Quality of life
-- App Bridge **v2 (FAB2)** negotiated automatically, with v1 fallback.
-- Correlated FAB2 requests with strict frame validation, ordered chunk
-  reassembly, typed firmware errors, and timeout/disconnect cleanup.
-- Transactional tumoflip SD package updates with manifest validation, staging,
-  on-device hash checks, reversible cleanup, recovery, and rollback.
 - **all-the-plugins** auto-updater and ~daily background notifications for new plugin packs and ESP32 firmware (local only, no account).
 - Card-based UI, 5 app icons, light/dark themes, Live Activity for install progress.
+
+## App Bridge (FAB1 / FAB2)
+
+Most integrations talk to a small BLE service in the [tumoflip](https://github.com/squazaryu/tumoflip) firmware. The app negotiates the wire version automatically and shows it in Settings (`v2 (FAB2)` / `v1 (FAB1)`):
+
+- **FAB2** — correlated request/response. Each request carries a monotonic, nonzero id; replies are matched back to it; ordered chunks are reassembled (≤ 512 B); frames are strictly validated (lengths, flags, reserved byte, UTF-8, exact size); firmware errors surface as typed errors; pending requests are cleaned up on timeout or disconnect. v2 is enabled only on a valid `runtime/capabilities` response, and unknown capability keys are preserved.
+- **FAB1** — legacy single-frame fallback used for unsolicited events (the Relay and AI Radar event path), so stock / older firmware keeps working.
+
+## Firmware packages (atomic updater)
+
+**Updates → Firmware packages** installs the Base / ARF / Module One / Protocol Pack files from the latest [tumoflip](https://github.com/squazaryu/tumoflip) release onto the Flipper SD as one **crash-consistent transaction**:
+
+- the release manifest (schema v2) is validated and every target path is sanitised;
+- each file is staged, SHA-256-checked on download and MD5-verified on the device before any live path is touched;
+- activation is write-ahead journalled into dual, checksummed state slots — the Flipper's `storage rename` is copy + remove (not atomic), so an interrupted install is recovered or fully rolled back;
+- replaced files and legacy cleanup are reversible, and the connected firmware's target / API / version must match the manifest before any FAP/FAL is written.
+
+> Needs a firmware release that publishes `tumoflip-packages.zip`; until then the screen shows “no install archive yet”. Firmware (DFU) flashing is a separate, explicit step and is not done here.
 
 ## How the relay state works
 
