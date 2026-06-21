@@ -14,13 +14,21 @@
       "tintColor": "F36E12",
       "category": "utilities",
       "screenshotURLs": [],
-      "version": "1.1.0",
+      "version": "1.1.1",
       "versionDate": "2026-06-21",
-      "versionDescription": "1.1.0 \u2014 two engineering issues landed.\n\n#7 App Bridge FAB2 request/response: sendAppBridge is no longer fire-and-forget. New async request API correlates replies by monotonic nonzero request id, reassembles ordered response chunks (<=512B), rejects duplicate/out-of-order/mixed/oversized/trailing frames, surfaces firmware errors as typed Swift errors, and cleans up pending requests on timeout or disconnect. The v2 capability probe is now strict (only a matching runtime/capabilities response negotiates v2; unknown capability keys preserved). FAB1 fallback and event-driven Relay/AI Radar unchanged. 17 unit tests.\n\n#8 Atomic tumoflip package updater (Updates -> Firmware packages): installs Base/ARF/Module One/Protocol Pack SD files from the latest tumoflip release. Manifest (schema v2) validation, path-safety, staging under /ext/.tumoflip, on-device MD5 verify, atomic same-volume activation with a transaction journal, full rollback on any failure, and host-side legacy cleanup only after verified replacement. Byte source is a published tumoflip-packages.zip (firmware release tooling added). 14 unit tests.",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.1.0/UnleashedCompanion-unsigned.ipa",
-      "size": 3814855,
+      "versionDescription": "Fix FAB2 request correlation, strict frame validation and firmware error handling. Add crash-recoverable tumoflip SD package updates with exact firmware/API checks, verified staging, reversible cleanup and rollback.",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.1.1/UnleashedCompanion-unsigned.ipa",
+      "size": 3864187,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.1.1",
+          "date": "2026-06-21",
+          "localizedDescription": "Fix FAB2 request correlation, strict frame validation and firmware error handling. Add crash-recoverable tumoflip SD package updates with exact firmware/API checks, verified staging, reversible cleanup and rollback.",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.1.1/UnleashedCompanion-unsigned.ipa",
+          "size": 3864187,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.1.0",
           "date": "2026-06-21",
