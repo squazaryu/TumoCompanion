@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/unleashed-companion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/unleashed-companion/main/screenshots/onboarding.png"
       ],
-      "version": "1.1.7",
+      "version": "1.1.8",
       "versionDate": "2026-06-22",
-      "versionDescription": "1.1.7 \u2014 Firmware packages: Up to date / Update available status. The screen now shows, per group (Base/ARF/Module One/Protocol Packs) and overall, whether your installed packages match the latest release \u2014 compared by content hash against the on-device install ledger, mirroring the ESP32 updater. Works from the manifest alone (no package zip needed); groups read 'Not installed' until a real install runs.",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.1.7/UnleashedCompanion-unsigned.ipa",
-      "size": 3885100,
+      "versionDescription": "1.1.8 \u2014 card design system on the remaining utility screens (issue #3). Settings, Backup & Restore, and Remotes are now built from the shared SectionCard/CardScroll components (matching Home/Relay/AI Radar); the Screen-mirror controls get a card surface. Updates keeps its native List (multi-select with swipe-to-protect + bottom install bar \u2014 where a card pass would regress UX). No logic changes; 75 tests green.",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.1.8/UnleashedCompanion-unsigned.ipa",
+      "size": 3894730,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.1.8",
+          "date": "2026-06-22",
+          "localizedDescription": "1.1.8 \u2014 card design system on the remaining utility screens (issue #3). Settings, Backup & Restore, and Remotes are now built from the shared SectionCard/CardScroll components (matching Home/Relay/AI Radar); the Screen-mirror controls get a card surface. Updates keeps its native List (multi-select with swipe-to-protect + bottom install bar \u2014 where a card pass would regress UX). No logic changes; 75 tests green.",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.1.8/UnleashedCompanion-unsigned.ipa",
+          "size": 3894730,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.1.7",
           "date": "2026-06-22",
