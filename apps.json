@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/unleashed-companion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/unleashed-companion/main/screenshots/onboarding.png"
       ],
-      "version": "1.1.18",
-      "versionDate": "2026-06-23",
-      "versionDescription": "1.1.18 \u2014 Firmware packages install now drives the Live Activity too. The lock-screen banner and Dynamic Island (already used for plugin installs) now also appear when installing FW packages, showing the live per-file progress ('Preparing \u2026' / 'Installing \u2026') with a progress bar \u2014 so you can watch a long BLE install from the lock screen without keeping the app foreground. Ends cleanly on success, dismisses immediately on failure. 83 tests green.",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.1.18/UnleashedCompanion-unsigned.ipa",
-      "size": 4010217,
+      "version": "1.1.19",
+      "versionDate": "2026-06-24",
+      "versionDescription": "1.1.19 \u2014 Home-screen widgets. Four new widgets backed by a shared App Group the app keeps up to date: (1) Flipper status \u2014 battery, connected/offline, firmware, device name; (2) AI Radar \u2014 provider usage bars from your bridge; (3) Sber relay \u2014 current on/off state with On/Off/Toggle buttons that drive the real relay (HA\u2192Sber failover) via deep link; (4) Quick actions \u2014 one-tap deep links to Files, Screen, Relay, WiFi. The install Live Activity (now also for FW packages, from 1.1.18) stays. Deep-link scheme unleashed:// added with tab routing. 83 tests green.",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.1.19/UnleashedCompanion-unsigned.ipa",
+      "size": 4110961,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.1.19",
+          "date": "2026-06-24",
+          "localizedDescription": "1.1.19 \u2014 Home-screen widgets. Four new widgets backed by a shared App Group the app keeps up to date: (1) Flipper status \u2014 battery, connected/offline, firmware, device name; (2) AI Radar \u2014 provider usage bars from your bridge; (3) Sber relay \u2014 current on/off state with On/Off/Toggle buttons that drive the real relay (HA\u2192Sber failover) via deep link; (4) Quick actions \u2014 one-tap deep links to Files, Screen, Relay, WiFi. The install Live Activity (now also for FW packages, from 1.1.18) stays. Deep-link scheme unleashed:// added with tab routing. 83 tests green.",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.1.19/UnleashedCompanion-unsigned.ipa",
+          "size": 4110961,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.1.18",
           "date": "2026-06-23",
