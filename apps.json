@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/unleashed-companion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/unleashed-companion/main/screenshots/onboarding.png"
       ],
-      "version": "1.1.21",
+      "version": "1.1.22",
       "versionDate": "2026-06-24",
-      "versionDescription": "1.1.21 \u2014 New icons, folder creation, widget fix. (1) App icons: new full-bleed artwork (no border under iOS's mask) \u2014 primary follows the system (light/dark), plus Settings \u2192 App icon styles: Light, Dark, Liquid Glass, Liquid Glass \u00b7 Dark. (2) Files: 'New folder\u2026' in the toolbar menu \u2014 create folders on the SD (e.g. an Archive to tidy Module One installs). (3) Widgets: app + widget now resolve the real App Group from the provisioning profile so home-screen widgets get live data even when a sideload signer rewrites the group id; Settings \u2192 About shows a 'Widgets: shared \u2713 / unavailable' indicator. 83 tests green.",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.1.21/UnleashedCompanion-unsigned.ipa",
-      "size": 21448977,
+      "versionDescription": "1.1.22 \u2014 Widget App Group fix (build-side). The unsigned IPA now ad-hoc-embeds the com.apple.security.application-groups entitlement into both the app and the widget extension, so a re-signer (Feather/AltStore/Sideloadly) reads it from the existing signature and carries the App Group into its own signature \u2014 previously there was nothing for it to carry, so widgets had no shared container ('Widgets: unavailable'). Combined with the runtime group resolution from 1.1.21, the home-screen widgets should now get live data. Check Settings \u2192 About: 'Widgets: shared \u2713'. No app-code changes.",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.1.22/UnleashedCompanion-unsigned.ipa",
+      "size": 21491886,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.1.22",
+          "date": "2026-06-24",
+          "localizedDescription": "1.1.22 \u2014 Widget App Group fix (build-side). The unsigned IPA now ad-hoc-embeds the com.apple.security.application-groups entitlement into both the app and the widget extension, so a re-signer (Feather/AltStore/Sideloadly) reads it from the existing signature and carries the App Group into its own signature \u2014 previously there was nothing for it to carry, so widgets had no shared container ('Widgets: unavailable'). Combined with the runtime group resolution from 1.1.21, the home-screen widgets should now get live data. Check Settings \u2192 About: 'Widgets: shared \u2713'. No app-code changes.",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.1.22/UnleashedCompanion-unsigned.ipa",
+          "size": 21491886,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.1.21",
           "date": "2026-06-24",
