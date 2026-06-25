@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/unleashed-companion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/unleashed-companion/main/screenshots/onboarding.png"
       ],
-      "version": "1.1.24",
-      "versionDate": "2026-06-24",
-      "versionDescription": "1.1.24 \u2014 Widgets trimmed for Feather. Since Feather doesn't register App Groups, the data-backed widgets (Flipper status, AI Radar) could never get a shared container, so they're removed from the widget gallery to avoid showing blank/offline. Shipped widgets now only need deep links: Quick Actions (Files/Screen/Relay/WiFi) and Relay (On/Off/Toggle buttons), plus the install Live Activity \u2014 all work under Feather. The relay widget shows on/off state only if a shared container exists (SideStore/AltStore); under Feather it shows controls only. Removed the now-irrelevant App Group indicator from Settings. 83 tests green.",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.1.24/UnleashedCompanion-unsigned.ipa",
-      "size": 24543951,
+      "version": "1.1.25",
+      "versionDate": "2026-06-25",
+      "versionDescription": "1.1.25 \u2014 Stable WiFi overview (no more re-analysis on every visit). The aggregated Marauder overview is now cached: re-entering the WiFi tab or relaunching the app shows the last overview instantly instead of re-reading all 200+ files over BLE. On appear it only lists the folders and re-analyzes when the file set or filter actually changed (content fingerprint); the \u21bb button and the Analyze button still force a full re-scan. The cached overview is also shown immediately on launch. 83 tests green.",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.1.25/UnleashedCompanion-unsigned.ipa",
+      "size": 24564318,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.1.25",
+          "date": "2026-06-25",
+          "localizedDescription": "1.1.25 \u2014 Stable WiFi overview (no more re-analysis on every visit). The aggregated Marauder overview is now cached: re-entering the WiFi tab or relaunching the app shows the last overview instantly instead of re-reading all 200+ files over BLE. On appear it only lists the folders and re-analyzes when the file set or filter actually changed (content fingerprint); the \u21bb button and the Analyze button still force a full re-scan. The cached overview is also shown immediately on launch. 83 tests green.",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.1.25/UnleashedCompanion-unsigned.ipa",
+          "size": 24564318,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.1.24",
           "date": "2026-06-24",
