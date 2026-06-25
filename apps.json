@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/unleashed-companion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/unleashed-companion/main/screenshots/onboarding.png"
       ],
-      "version": "1.1.25",
+      "version": "1.1.26",
       "versionDate": "2026-06-25",
-      "versionDescription": "1.1.25 \u2014 Stable WiFi overview (no more re-analysis on every visit). The aggregated Marauder overview is now cached: re-entering the WiFi tab or relaunching the app shows the last overview instantly instead of re-reading all 200+ files over BLE. On appear it only lists the folders and re-analyzes when the file set or filter actually changed (content fingerprint); the \u21bb button and the Analyze button still force a full re-scan. The cached overview is also shown immediately on launch. 83 tests green.",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.1.25/UnleashedCompanion-unsigned.ipa",
-      "size": 24564318,
+      "versionDescription": "1.1.26 \u2014 WiFi analysis is manual + scoped. Entering the WiFi tab no longer rebuilds anything \u2014 it just lists files and shows the cached overview. Building/rebuilding happens only when you tap Analyze (or \u21bb). New Scope control \u2014 Latest / 5 / 20 / All \u2014 lets you analyze just the newest captures instead of all 200+ (newest is by Marauder's filename index, since the Flipper FS has no real file dates). The button shows the scoped file count and turns into 'Rebuild' once an overview exists; a hint appears when the filter/scope changed so you know to rebuild. 83 tests green.",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.1.26/UnleashedCompanion-unsigned.ipa",
+      "size": 24580051,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.1.26",
+          "date": "2026-06-25",
+          "localizedDescription": "1.1.26 \u2014 WiFi analysis is manual + scoped. Entering the WiFi tab no longer rebuilds anything \u2014 it just lists files and shows the cached overview. Building/rebuilding happens only when you tap Analyze (or \u21bb). New Scope control \u2014 Latest / 5 / 20 / All \u2014 lets you analyze just the newest captures instead of all 200+ (newest is by Marauder's filename index, since the Flipper FS has no real file dates). The button shows the scoped file count and turns into 'Rebuild' once an overview exists; a hint appears when the filter/scope changed so you know to rebuild. 83 tests green.",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.1.26/UnleashedCompanion-unsigned.ipa",
+          "size": 24580051,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.1.25",
           "date": "2026-06-25",
