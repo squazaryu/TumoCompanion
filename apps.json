@@ -21,17 +21,17 @@
       ],
       "version": "1.1.33",
       "versionDate": "2026-06-26",
-      "versionDescription": "Files bulk move and ESP32 version manager. Files now supports Select mode with multi-select bulk moves into any folder. ESP32 Firmware now groups staged Marauder builds by board key, shows active and archived versions, and lets older builds be restored before flashing. C5/WROOM modules keep separate versioned folders. 92 tests green.",
+      "versionDescription": "Files bulk move/delete and ESP32 version manager. Files now supports Select mode with multi-select bulk moves and bulk delete. ESP32 Firmware groups staged Marauder builds by board key, shows active and archived versions, and lets older builds be restored before flashing. C5/WROOM modules keep separate versioned folders. 92 tests green.",
       "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.1.33/UnleashedCompanion-unsigned.ipa",
-      "size": 24844837,
+      "size": 24850425,
       "minOSVersion": "17.0",
       "versions": [
         {
           "version": "1.1.33",
           "date": "2026-06-26",
-          "localizedDescription": "Files bulk move and ESP32 version manager. Files now supports Select mode with multi-select bulk moves into any folder. ESP32 Firmware now groups staged Marauder builds by board key, shows active and archived versions, and lets older builds be restored before flashing. C5/WROOM modules keep separate versioned folders. 92 tests green.",
+          "localizedDescription": "Files bulk move/delete and ESP32 version manager. Files now supports Select mode with multi-select bulk moves and bulk delete. ESP32 Firmware groups staged Marauder builds by board key, shows active and archived versions, and lets older builds be restored before flashing. C5/WROOM modules keep separate versioned folders. 92 tests green.",
           "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.1.33/UnleashedCompanion-unsigned.ipa",
-          "size": 24844837,
+          "size": 24850425,
           "minOSVersion": "17.0"
         },
         {
