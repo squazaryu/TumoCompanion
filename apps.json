@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/unleashed-companion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/unleashed-companion/main/screenshots/onboarding.png"
       ],
-      "version": "1.1.30",
+      "version": "1.1.31",
       "versionDate": "2026-06-26",
-      "versionDescription": "1.1.30 \u2014 WiFi Mapper GPS placeholder fix. GeoJSON points at 0,0 are now treated as ESP32/Marauder 'GPS has no fix' placeholders and are hidden instead of being plotted on the map. This prevents old and new WiFi Mapper exports with no GPS fix from appearing at the wrong location. 87 tests green.",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.1.30/UnleashedCompanion-unsigned.ipa",
-      "size": 24724374,
+      "versionDescription": "WiFi Mapper AP location estimates. The Marauder WiFi Mapper screen now groups repeated observations by BSSID, estimates approximate AP locations from RSSI-weighted scan points, shows confidence/radius markers on the map, and adds Seen/APs/Both map layers. GPS no-fix points remain filtered out. 90 tests green.",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.1.31/UnleashedCompanion-unsigned.ipa",
+      "size": 24767180,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.1.31",
+          "date": "2026-06-26",
+          "localizedDescription": "WiFi Mapper AP location estimates. The Marauder WiFi Mapper screen now groups repeated observations by BSSID, estimates approximate AP locations from RSSI-weighted scan points, shows confidence/radius markers on the map, and adds Seen/APs/Both map layers. GPS no-fix points remain filtered out. 90 tests green.",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.1.31/UnleashedCompanion-unsigned.ipa",
+          "size": 24767180,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.1.30",
           "date": "2026-06-26",
