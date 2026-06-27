@@ -6,7 +6,7 @@
 
 **A native iOS companion for Flipper Zero** — BLE/USB SD file access, screen mirror, Sub-GHz/NFC, a Sber smart-relay failsafe, Marauder log analysis, ESP32 firmware flashing, and live Claude Code status on your Flipper.
 
-![version](https://img.shields.io/badge/version-1.1.34-F36E12)
+![version](https://img.shields.io/badge/version-1.1.35-F36E12)
 ![platform](https://img.shields.io/badge/iOS-17%2B-black?logo=apple)
 ![SwiftUI](https://img.shields.io/badge/SwiftUI-5.9-orange?logo=swift)
 ![transport](https://img.shields.io/badge/transport-BLE%20%2B%20USB%20SD-blue?logo=bluetooth)
@@ -53,6 +53,7 @@ https://raw.githubusercontent.com/squazaryu/unleashed-companion/main/apps.json
 ### 📱 Device & files
 - Connect over Bluetooth LE for live control, App Bridge, screen mirror and RPC actions.
 - Browse the SD card over **BLE or USB SD Mode**, **create folders**, upload files and whole folders, multi-select and move items in bulk; one-tap macOS-junk cleanup (`._*`, `.DS_Store`).
+- USB SD Mode uses iOS file-provider access: select the Flipper SD card folder in Files once, then the app will try to restore that USB channel on later launches.
 - **Screen mirror** with live remote control (D-pad / OK / Back).
 - Full **Device Info** (hardware, firmware, radio stack, battery) at a glance.
 
