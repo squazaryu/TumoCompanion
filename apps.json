@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/unleashed-companion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/unleashed-companion/main/screenshots/onboarding.png"
       ],
-      "version": "1.2.4",
+      "version": "1.2.5",
       "versionDate": "2026-06-29",
-      "versionDescription": "1.2.4 \u2014 Legacy-duplicate cleanup, unprotect, and a minimal App Updates screen. After a routed all-the-plugins app installs and verifies at its Module One path, the old pre-routing copy at the source path is removed ONLY when its md5 exactly matches what was just installed; a copy that differs is kept for manual review (could be your custom/older build). The install summary now reports removed duplicates and files kept for review. Protected apps can now be unprotected: swipe a built-in tumoflip protection to lift it (and Re-protect anytime) so all-the-plugins can manage that app. The App Updates screen was reworked to be minimal \u2014 status + actions up top, with verification, cleanup and protected-review tucked into collapsible sections and all secondary navigation grouped under More.",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.2.4/UnleashedCompanion-unsigned.ipa",
-      "size": 25085076,
+      "versionDescription": "1.2.5 \u2014 Routing map cleanup. Removed three inert Module One routing entries (infrared, ibutton, wifi_mapper) that all-the-plugins never ships \u2014 infrared/ibutton are core firmware apps and wifi_mapper is a protected tumoflip custom, so those entries never fired. No functional change to installs; this just keeps the map honest with the new routing-drift CI.",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.2.5/UnleashedCompanion-unsigned.ipa",
+      "size": 25085453,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.2.5",
+          "date": "2026-06-29",
+          "localizedDescription": "1.2.5 \u2014 Routing map cleanup. Removed three inert Module One routing entries (infrared, ibutton, wifi_mapper) that all-the-plugins never ships \u2014 infrared/ibutton are core firmware apps and wifi_mapper is a protected tumoflip custom, so those entries never fired. No functional change to installs; this just keeps the map honest with the new routing-drift CI.",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.2.5/UnleashedCompanion-unsigned.ipa",
+          "size": 25085453,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.2.4",
           "date": "2026-06-29",
