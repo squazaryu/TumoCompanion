@@ -1,0 +1,68 @@
+name: Routing drift check
+
+# Watches xMasterX/all-the-plugins for Module One FAPs that aren't in the app's routing
+# map, and for map entries whose upstream app disappeared. See issue #11.
+
+on:
+  schedule:
+    - cron: "17 6 * * *"   # daily, 06:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write   # commit the refreshed upstream snapshot
+  issues: write     # open / update / close the tracking issue
+
+concurrency:
+  group: routing-drift
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ISSUE_TITLE: "Module One routing drift"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check routing drift
+        id: drift
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 scripts/check_routing_drift.py
+
+      - name: Commit refreshed snapshot
+        run: |
+          git config user.name "routing-drift-bot"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add routing/upstream_snapshot.json
+          if ! git diff --cached --quiet; then
+            git commit -m "ci: update upstream routing snapshot [skip ci]"
+            git push
+          fi
+
+      - name: Find existing tracking issue
+        id: issue
+        run: |
+          NUM=$(gh issue list --state open --json number,title \
+                --jq "[.[] | select(.title==env.ISSUE_TITLE)][0].number // empty")
+          echo "number=$NUM" >> "$GITHUB_OUTPUT"
+
+      - name: Open or update drift issue
+        if: steps.drift.outputs.drift == 'true'
+        run: |
+          if [ -n "${{ steps.issue.outputs.number }}" ]; then
+            gh issue edit "${{ steps.issue.outputs.number }}" --body-file routing-drift-report.md
+          else
+            gh issue create --title "$ISSUE_TITLE" --body-file routing-drift-report.md
+          fi
+
+      - name: Close drift issue when clean
+        if: steps.drift.outputs.drift == 'false' && steps.issue.outputs.number != ''
+        run: |
+          gh issue comment "${{ steps.issue.outputs.number }}" --body-file routing-drift-report.md
+          gh issue close "${{ steps.issue.outputs.number }}"
