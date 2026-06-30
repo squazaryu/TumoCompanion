@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/unleashed-companion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/unleashed-companion/main/screenshots/onboarding.png"
       ],
-      "version": "1.2.7",
+      "version": "1.2.8",
       "versionDate": "2026-06-30",
-      "versionDescription": "1.2.7 \u2014 Fix Firmware packages install showing 'Flipper not connected' while connected over BLE. Installing over BLE drives RPC, which reports not-ready in two cases the screen didn't surface clearly: the link is still finishing connecting (connected but not yet ready), or Claude Buddy passthrough is holding the serial channel. Install now waits up to 8s for the link to reach ready and, if it still can't proceed, shows the actual reason \u2014 'wait for Connected & ready' or 'Claude Buddy passthrough is active \u2014 turn it off in Settings' \u2014 instead of the generic 'Flipper is not connected'.",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.2.7/UnleashedCompanion-unsigned.ipa",
-      "size": 25089306,
+      "versionDescription": "1.2.8 \u2014 Declutter App Updates + protect esp32_wifi_marauder (#13). The main Updates screen now shows far fewer cards at once: the scan-mismatch warning is folded into the changed-apps card instead of its own banner, and the last install's signature verification + legacy-duplicate cleanup are merged into one collapsible 'Last run' card (auto-expanded only when something needs attention). The inline Protected review card is gone from the main screen \u2014 it now lives as a 'Needs review' section at the top of Protected Apps, with clearer per-item wording (e.g. 'GPIO -> ESP32 Wi-Fi (tumoflip route)'). Also: esp32_wifi_marauder is now a protected app (it overlaps the canonical Module One ESP32 Wi-Fi path) instead of being silently auto-installed.",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.2.8/UnleashedCompanion-unsigned.ipa",
+      "size": 25090418,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.2.8",
+          "date": "2026-06-30",
+          "localizedDescription": "1.2.8 \u2014 Declutter App Updates + protect esp32_wifi_marauder (#13). The main Updates screen now shows far fewer cards at once: the scan-mismatch warning is folded into the changed-apps card instead of its own banner, and the last install's signature verification + legacy-duplicate cleanup are merged into one collapsible 'Last run' card (auto-expanded only when something needs attention). The inline Protected review card is gone from the main screen \u2014 it now lives as a 'Needs review' section at the top of Protected Apps, with clearer per-item wording (e.g. 'GPIO -> ESP32 Wi-Fi (tumoflip route)'). Also: esp32_wifi_marauder is now a protected app (it overlaps the canonical Module One ESP32 Wi-Fi path) instead of being silently auto-installed.",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.2.8/UnleashedCompanion-unsigned.ipa",
+          "size": 25090418,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.2.7",
           "date": "2026-06-30",
