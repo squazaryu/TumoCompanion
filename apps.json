@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/unleashed-companion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/unleashed-companion/main/screenshots/onboarding.png"
       ],
-      "version": "1.4.1",
+      "version": "1.4.2",
       "versionDate": "2026-07-05",
-      "versionDescription": "Rename App Store to Apps Market. Fix icons/screenshots being invisible in dark mode \u2014 they're monochrome 1-bit bitmaps (matching the Flipper's own screen), now rendered as templates that adapt automatically: black on light theme, white on dark theme.",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.4.1/UnleashedCompanion-unsigned.ipa",
-      "size": 25363884,
+      "versionDescription": "Apps Market polish: crisp pixel-art icon/screenshot rendering (no more blur), no background chip behind icons, opens on Recent (newest) instead of the single Featured pick, and two new top-level filters \u2014 All (alphabetical browse of the whole catalog) and Installed (cross-references what's actually on your connected Flipper's SD).",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.4.2/UnleashedCompanion-unsigned.ipa",
+      "size": 25370702,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.4.2",
+          "date": "2026-07-05",
+          "localizedDescription": "Apps Market polish: crisp pixel-art icon/screenshot rendering (no more blur), no background chip behind icons, opens on Recent (newest) instead of the single Featured pick, and two new top-level filters \u2014 All (alphabetical browse of the whole catalog) and Installed (cross-references what's actually on your connected Flipper's SD).",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.4.2/UnleashedCompanion-unsigned.ipa",
+          "size": 25370702,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.4.1",
           "date": "2026-07-05",
