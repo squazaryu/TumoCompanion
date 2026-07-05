@@ -1,5 +1,5 @@
 {
-  "release_tag": "2jul2026",
+  "release_tag": "5jul2026p2",
   "stems": {
     "24cxxprog": "GPIO",
     "4inrow": "Games",
@@ -159,6 +159,7 @@
     "minesweeper_redux": "Games",
     "montyhall": "Games",
     "morse_code": "Media",
+    "morse_master": "Media",
     "multi_converter": "Tools",
     "multi_counter": "Tools",
     "music_beeper": "Media",
