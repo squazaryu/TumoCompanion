@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/unleashed-companion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/unleashed-companion/main/screenshots/onboarding.png"
       ],
-      "version": "1.4.2",
+      "version": "1.4.3",
       "versionDate": "2026-07-05",
-      "versionDescription": "Apps Market polish: crisp pixel-art icon/screenshot rendering (no more blur), no background chip behind icons, opens on Recent (newest) instead of the single Featured pick, and two new top-level filters \u2014 All (alphabetical browse of the whole catalog) and Installed (cross-references what's actually on your connected Flipper's SD).",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.4.2/UnleashedCompanion-unsigned.ipa",
-      "size": 25370702,
+      "versionDescription": "Show per-app file size in the Community apps (all-the-plugins) update list, next to each row's NEW/UPD badge \u2014 matches Firmware packages, which already shows per-file size once a group is expanded.",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.4.3/UnleashedCompanion-unsigned.ipa",
+      "size": 25372379,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.4.3",
+          "date": "2026-07-05",
+          "localizedDescription": "Show per-app file size in the Community apps (all-the-plugins) update list, next to each row's NEW/UPD badge \u2014 matches Firmware packages, which already shows per-file size once a group is expanded.",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.4.3/UnleashedCompanion-unsigned.ipa",
+          "size": 25372379,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.4.2",
           "date": "2026-07-05",
