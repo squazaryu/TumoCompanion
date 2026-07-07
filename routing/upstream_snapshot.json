@@ -1,5 +1,5 @@
 {
-  "release_tag": "5jul2026p2",
+  "release_tag": "7jul2026",
   "stems": {
     "24cxxprog": "GPIO",
     "4inrow": "Games",
@@ -311,6 +311,7 @@
     "wolfenduino": "Games",
     "ws2812b_tester_app": "GPIO",
     "xbox_controller": "Infrared",
+    "xiaomi_filter_reset": "NFC",
     "xinput_controller": "USB",
     "yatzee": "Games",
     "zero_tracker": "Media",
