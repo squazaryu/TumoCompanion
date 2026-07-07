@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/unleashed-companion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/unleashed-companion/main/screenshots/onboarding.png"
       ],
-      "version": "1.5.3",
+      "version": "1.5.4",
       "versionDate": "2026-07-07",
-      "versionDescription": "Fix: Tumoflip BLE transfer-activity indicator could miss the whole install if it started during the brief ready\u2192FAB2-negotiated window (issue #18)",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.5.3/UnleashedCompanion-unsigned.ipa",
-      "size": 25448384,
+      "versionDescription": "Fix: v1.5.3's transfer-activity fix could stall every BLE install by 3s on firmware without App Bridge, and left a wider double-tap re-entrancy window; both fixed",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.5.4/UnleashedCompanion-unsigned.ipa",
+      "size": 25448951,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.5.4",
+          "date": "2026-07-07",
+          "localizedDescription": "Fix: v1.5.3's transfer-activity fix could stall every BLE install by 3s on firmware without App Bridge, and left a wider double-tap re-entrancy window; both fixed",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.5.4/UnleashedCompanion-unsigned.ipa",
+          "size": 25448951,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.5.3",
           "date": "2026-07-07",
