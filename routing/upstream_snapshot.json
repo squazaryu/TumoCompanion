@@ -1,5 +1,5 @@
 {
-  "release_tag": "7jul2026",
+  "release_tag": "9jul2026",
   "stems": {
     "24cxxprog": "GPIO",
     "4inrow": "Games",
@@ -115,6 +115,7 @@
     "gpio_timelapse": "GPIO",
     "gpioreader2": "GPIO",
     "gps_nmea": "GPIO",
+    "gps_rpc": "Tools",
     "gps_track": "GPIO",
     "hangman": "Games",
     "hc_sr04": "GPIO",
