@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/unleashed-companion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/unleashed-companion/main/screenshots/onboarding.png"
       ],
-      "version": "1.6.4",
+      "version": "1.6.5",
       "versionDate": "2026-07-11",
-      "versionDescription": "FAP API compatibility guard. Community apps and FW Packages now validate FAP/FAL metadata against the connected Flipper before installation, separate and disable incompatible entries, keep bulk selection on compatible apps only, show full API diagnostics, and require a fresh BLE identity when installing binaries through USB SD Mode.",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.6.4/UnleashedCompanion-unsigned.ipa",
-      "size": 25688890,
+      "versionDescription": "All The Plugins protection hardening. Removed the obsolete BLE Killer denylist entry, expanded protection to the full Tumoflip custom-app set, and now discovers, validates, and protects dependent FAL binaries under apps_data (including TOTP and Sub-GHz protocol families) together with their owning apps.",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.6.5/UnleashedCompanion-unsigned.ipa",
+      "size": 25737866,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.6.5",
+          "date": "2026-07-11",
+          "localizedDescription": "All The Plugins protection hardening. Removed the obsolete BLE Killer denylist entry, expanded protection to the full Tumoflip custom-app set, and now discovers, validates, and protects dependent FAL binaries under apps_data (including TOTP and Sub-GHz protocol families) together with their owning apps.",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.6.5/UnleashedCompanion-unsigned.ipa",
+          "size": 25737866,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.6.4",
           "date": "2026-07-11",
