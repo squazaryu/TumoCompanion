@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/unleashed-companion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/unleashed-companion/main/screenshots/onboarding.png"
       ],
-      "version": "1.6.10",
-      "versionDate": "2026-07-11",
-      "versionDescription": "Fix TumoCard NFC smoke by keeping every iPhone SELECT within the CoreNFC AID allowlist; firmware fail-closed coverage remains in the macOS CCID smoke.",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.6.10/UnleashedCompanion-unsigned.ipa",
-      "size": 24422314,
+      "version": "1.6.11",
+      "versionDate": "2026-07-12",
+      "versionDescription": "Relay: auto-discover Home Assistant over Bonjour (_home-assistant._tcp) \u2014 leave the HA URL empty and the relay finds HA on your network and survives DHCP IP changes; pinned URLs still honored (issue #2).",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.6.11/UnleashedCompanion-unsigned.ipa",
+      "size": 24432052,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.6.11",
+          "date": "2026-07-12",
+          "localizedDescription": "Relay: auto-discover Home Assistant over Bonjour (_home-assistant._tcp) \u2014 leave the HA URL empty and the relay finds HA on your network and survives DHCP IP changes; pinned URLs still honored (issue #2).",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.6.11/UnleashedCompanion-unsigned.ipa",
+          "size": 24432052,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.6.10",
           "date": "2026-07-11",
