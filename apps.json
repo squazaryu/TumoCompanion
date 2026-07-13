@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/unleashed-companion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/unleashed-companion/main/screenshots/onboarding.png"
       ],
-      "version": "1.6.15",
+      "version": "1.6.16",
       "versionDate": "2026-07-13",
-      "versionDescription": "Automatically attach the open TumoFabric Counter screen to sessions started on Flipper, without creating idle sessions.",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.6.15/UnleashedCompanion-unsigned.ipa",
-      "size": 24523067,
+      "versionDescription": "Recognize t-flppr-fw stable firmware builds while preserving legacy tmwhflpprarf and t-dev package routing.",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.6.16/UnleashedCompanion-unsigned.ipa",
+      "size": 24525069,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.6.16",
+          "date": "2026-07-13",
+          "localizedDescription": "Recognize t-flppr-fw stable firmware builds while preserving legacy tmwhflpprarf and t-dev package routing.",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.6.16/UnleashedCompanion-unsigned.ipa",
+          "size": 24525069,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.6.15",
           "date": "2026-07-13",
