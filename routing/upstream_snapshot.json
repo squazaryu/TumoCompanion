@@ -1,5 +1,5 @@
 {
-  "release_tag": "10jul2026",
+  "release_tag": "14jul2026",
   "stems": {
     "24cxxprog": "GPIO",
     "4inrow": "Games",
@@ -197,6 +197,7 @@
     "pc_monitor": "Bluetooth",
     "picopass": "NFC",
     "pinball0": "Games",
+    "pocketlab": "Tools",
     "pocsag_pager": "Sub-GHz",
     "pokemon": "GPIO",
     "pomodoro_timer": "Tools",
