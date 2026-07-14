@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/unleashed-companion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/unleashed-companion/main/screenshots/onboarding.png"
       ],
-      "version": "1.6.18",
+      "version": "1.6.19",
       "versionDate": "2026-07-14",
-      "versionDescription": "Adds the TumoSurvey network explorer dashboard with automatic survey sessions, live network and security insights, channel analytics, iPhone-GPS mapping, saved maps, and shareable reports.",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.6.18/UnleashedCompanion-unsigned.ipa",
-      "size": 24631664,
+      "versionDescription": "Adds TumoSpectrum signal analysis with report history, timing statistics, histograms, comparisons, and BLE report import from t-dev-089-037-050.",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.6.19/UnleashedCompanion-unsigned.ipa",
+      "size": 24722619,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.6.19",
+          "date": "2026-07-14",
+          "localizedDescription": "Adds TumoSpectrum signal analysis with report history, timing statistics, histograms, comparisons, and BLE report import from t-dev-089-037-050.",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.6.19/UnleashedCompanion-unsigned.ipa",
+          "size": 24722619,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.6.18",
           "date": "2026-07-14",
