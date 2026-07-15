@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/unleashed-companion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/unleashed-companion/main/screenshots/onboarding.png"
       ],
-      "version": "1.6.24",
+      "version": "1.6.25",
       "versionDate": "2026-07-15",
-      "versionDescription": "Stop during an All-The-Plugins install now leaves the in-flight app fully working. Each FAP is written to a temp file and only swapped into place after it's md5-verified, so pressing Stop (or a dropped link) mid-write discards the temp and the app keeps its previous, working version \u2014 never a half-written/broken FAP. Also hardens installs against mid-write link drops for the same reason.",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.6.24/UnleashedCompanion-unsigned.ipa",
-      "size": 24839549,
+      "versionDescription": "Firmware Packages safety fix: package discovery now selects the exact release matching the connected Flipper firmware version, bypasses stale GitHub/asset caches, and revalidates the release immediately before installation. USB SD Mode still transfers files quickly but now requires a fresh BLE device identity and enforces the same firmware version/API/target/origin checks as BLE. Package ZIP caching is keyed by content-addressed release_id, preventing stale package-only assets from being reused under the same firmware tag.",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.6.25/UnleashedCompanion-unsigned.ipa",
+      "size": 24842265,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.6.25",
+          "date": "2026-07-15",
+          "localizedDescription": "Firmware Packages safety fix: package discovery now selects the exact release matching the connected Flipper firmware version, bypasses stale GitHub/asset caches, and revalidates the release immediately before installation. USB SD Mode still transfers files quickly but now requires a fresh BLE device identity and enforces the same firmware version/API/target/origin checks as BLE. Package ZIP caching is keyed by content-addressed release_id, preventing stale package-only assets from being reused under the same firmware tag.",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.6.25/UnleashedCompanion-unsigned.ipa",
+          "size": 24842265,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.6.24",
           "date": "2026-07-15",
