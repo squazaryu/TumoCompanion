@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/unleashed-companion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/unleashed-companion/main/screenshots/onboarding.png"
       ],
-      "version": "1.6.21",
+      "version": "1.6.22",
       "versionDate": "2026-07-15",
-      "versionDescription": "TumoSpectrum 2.0 capture-set reports, timing inference charts, and strict schema-2 validation.",
-      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.6.21/UnleashedCompanion-unsigned.ipa",
-      "size": 24769136,
+      "versionDescription": "TumoSpectrum Phase B: bounded bit-field map, counter/checksum candidates and practical capture-set visualization.",
+      "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.6.22/UnleashedCompanion-unsigned.ipa",
+      "size": 24807484,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.6.22",
+          "date": "2026-07-15",
+          "localizedDescription": "TumoSpectrum Phase B: bounded bit-field map, counter/checksum candidates and practical capture-set visualization.",
+          "downloadURL": "https://github.com/squazaryu/unleashed-companion/releases/download/v1.6.22/UnleashedCompanion-unsigned.ipa",
+          "size": 24807484,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.6.21",
           "date": "2026-07-15",
