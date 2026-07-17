@@ -31,7 +31,12 @@ targets:
     sources:
       - path: Sources
       - path: Resources
+        excludes:
+          - DolphinPacks
         optional: true
+      - path: Resources/DolphinPacks
+        type: folder
+        buildPhase: resources
     dependencies:
       - package: SwiftProtobuf
       - package: ZIPFoundation

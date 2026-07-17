@@ -27,15 +27,6 @@ EOF
 echo "==> Regenerating project (XcodeGen)"
 xcodegen generate
 
-echo "==> Stamping the public app name"
-# Keep the internal target and .app bundle name stable for update compatibility.
-plutil -replace CFBundleDisplayName -string "TumoCompanion" Resources/Info.plist
-# Feather reads the IPA's own CFBundleShortVersionString — keep it in sync with
-# MARKETING_VERSION (it was pinned at 0.9.4 and never moved).
-BUILDNUM=$(awk -F'"' '/CURRENT_PROJECT_VERSION:/{print $2; exit}' project.yml)
-plutil -replace CFBundleShortVersionString -string "$VERSION" Resources/Info.plist
-plutil -replace CFBundleVersion -string "${BUILDNUM:-1}" Resources/Info.plist
-
 echo "==> Resolving Swift packages"
 "$XCODE" -resolvePackageDependencies \
   -project UnleashedCompanion.xcodeproj -scheme UnleashedCompanion >/dev/null
