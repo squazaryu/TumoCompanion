@@ -376,6 +376,27 @@ final class TumoflipInstallerTests: XCTestCase {
         XCTAssertEqual(fs.writeCount, countAfterFirst, "no-op must not write")
     }
 
+    func testRepeatInstallExecutesPendingCleanup() async throws {
+        let bytes = Data("canonical".utf8)
+        let canonical = "/ext/apps/Module One/Diagnostics/cockpit.fap"
+        let legacy = "/ext/apps/Module One/Diagnostics/module_one_cockpit.fap"
+        let p = plan(
+            [file("cockpit", canonical, bytes)],
+            cleanup: [.init(canonical: canonical, legacy: legacy)],
+            groups: ["module_one"])
+        let fs = FakeFS()
+        let inst = TumoflipInstaller(fs: fs, source: FakeSource(data: ["cockpit": bytes]))
+
+        _ = try await inst.install(p)
+        fs.files[legacy] = Data("legacy".utf8)
+
+        let outcome = try await inst.install(p)
+
+        XCTAssertEqual(outcome, .installed(files: 1, legacyMovedAside: 1))
+        XCTAssertEqual(fs.files[canonical], bytes)
+        XCTAssertNil(fs.files[legacy], "pending cleanup must prevent the already-installed fast path")
+    }
+
     func testIncrementalGroupInstallSameRelease() async throws {
         let base = Data("base".utf8), arf = Data("arf".utf8)
         let fs = FakeFS()
