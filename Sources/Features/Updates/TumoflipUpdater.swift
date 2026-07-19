@@ -244,12 +244,16 @@ struct TumoflipInstaller {
     }
 
     /// True only when every file in the plan is recorded in the ledger with the SAME
-    /// content hash AND still verifies on the device — so an exact repeat is a no-op,
-    /// but a missing/changed file (or a different group) is not.
+    /// content hash, still verifies on the device, and no declared legacy path remains.
+    /// This keeps exact repeats as no-ops while allowing cleanup-only manifest updates
+    /// to run even when the canonical package files are already current.
     private func allInstalled(_ plan: TumoflipInstallPlan, _ state: TumoflipState) async -> Bool {
         for f in plan.files {
             guard let e = state.ledger[f.target], e.sha256 == f.sha256 else { return false }
             guard await fs.deviceMD5(f.target) == e.md5 else { return false }
+        }
+        for cleanup in plan.cleanup where await fs.exists(cleanup.legacy) {
+            return false
         }
         return true
     }
