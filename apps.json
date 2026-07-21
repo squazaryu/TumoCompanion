@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.7.6",
-      "versionDate": "2026-07-20",
-      "versionDescription": "Fix BLE package transfers and run pending legacy cleanup even when current FW Package files are already installed.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.7.6/TumoCompanion-unsigned.ipa",
-      "size": 29211199,
+      "version": "1.7.7",
+      "versionDate": "2026-07-21",
+      "versionDescription": "Recognize FW Packages bundled by matching Tumoflip firmware, repair stale package diagnostics, and avoid false missing-file results during brief BLE/RPC interruptions.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.7.7/TumoCompanion-unsigned.ipa",
+      "size": 29223825,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.7.7",
+          "date": "2026-07-21",
+          "localizedDescription": "Recognize FW Packages bundled by matching Tumoflip firmware, repair stale package diagnostics, and avoid false missing-file results during brief BLE/RPC interruptions.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.7.7/TumoCompanion-unsigned.ipa",
+          "size": 29223825,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.7.6",
           "date": "2026-07-20",
