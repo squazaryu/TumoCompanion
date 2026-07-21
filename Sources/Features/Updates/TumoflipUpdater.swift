@@ -368,6 +368,77 @@ struct TumoflipInstaller {
         return verified == plan.files.count ? .upToDate : .updateAvailable
     }
 
+    /// Refresh package status and safely adopt files installed by a full firmware
+    /// resource sync. Adoption is allowed only for a complete group whose manifest
+    /// supplies an expected MD5 for every target and whose device hashes all match.
+    /// Legacy manifests remain ledger-only. Pending cleanup always means update.
+    func reconcileStatus(manifest: TumoflipManifest) async throws -> [String: GroupStatus] {
+        var state = try await loadState() ?? TumoflipState()
+        let originalLedger = state.ledger
+        var statuses: [String: GroupStatus] = [:]
+        var currentGroups = Set<String>()
+
+        for group in TumoflipManifest.knownGroups {
+            guard let plan = try? TumoflipInstallPlan.make(manifest: manifest, groups: [group]),
+                  !plan.files.isEmpty else {
+                statuses[group] = .empty
+                continue
+            }
+
+            let cleanupPending = await hasPendingCleanup(plan)
+            let ledgerStatus = Self.groupStatus(for: group, manifest: manifest, ledger: state.ledger)
+            if ledgerStatus == .upToDate, !cleanupPending {
+                statuses[group] = .upToDate
+                currentGroups.insert(group)
+                continue
+            }
+
+            // No presence-only fallback: without a complete expected-MD5 set, keep
+            // the historical conservative ledger result.
+            guard plan.files.allSatisfy({ $0.md5 != nil }) else {
+                statuses[group] = cleanupPending ? .updateAvailable : ledgerStatus
+                continue
+            }
+
+            var allMatch = !cleanupPending
+            for file in plan.files {
+                guard let expected = file.md5,
+                      await fs.deviceMD5(file.target) == expected else {
+                    allMatch = false
+                    break
+                }
+            }
+            guard allMatch else {
+                statuses[group] = .updateAvailable
+                continue
+            }
+
+            for file in plan.files {
+                state.ledger[file.target] = .init(
+                    sha256: file.sha256, md5: file.md5!, releaseId: manifest.releaseId)
+            }
+            statuses[group] = .upToDate
+            currentGroups.insert(group)
+        }
+
+        guard state.ledger != originalLedger else { return statuses }
+
+        // Keep the compatibility projection aligned with every complete group, not
+        // merely the last group encountered during adoption. Write it before the
+        // authoritative ledger so a projection failure leaves adoption retryable.
+        if !currentGroups.isEmpty {
+            let plan = try TumoflipInstallPlan.make(manifest: manifest, groups: currentGroups)
+            try await refreshCompatibilityState(manifest: manifest, plan: plan)
+        }
+        try await saveState(&state)
+        return statuses
+    }
+
+    private func hasPendingCleanup(_ plan: TumoflipInstallPlan) async -> Bool {
+        for cleanup in plan.cleanup where await fs.exists(cleanup.legacy) { return true }
+        return false
+    }
+
     @discardableResult
     /// `progress(done, total, label)` — `done`/`total` step over staging (first half)
     /// then activation (second half), `label` names the current file/action.

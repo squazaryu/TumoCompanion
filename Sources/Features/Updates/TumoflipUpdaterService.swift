@@ -174,18 +174,22 @@ final class TumoflipUpdater: ObservableObject {
         return .notInstalled
     }
 
-    /// Compare the on-device install ledger to the latest manifest, per group. Best-effort
-    /// (empty ledger if the Flipper is unreachable); content-hash based, not tag based.
+    /// Compare the durable ledger to the latest manifest and, when the manifest has
+    /// expected MD5s, safely adopt complete firmware-bundled groups from the device.
     func refreshStatus() async {
         guard let manifest else { return }
         transferChannel = activeChannel
         let inst = TumoflipInstaller(fs: activeFS(), source: ZipPackageSource(entries: [:]))
-        let ledger = (try? await inst.currentLedger()) ?? [:]
-        var computed: [String: TumoflipInstaller.GroupStatus] = [:]
-        for group in TumoflipManifest.knownGroups {
-            computed[group] = TumoflipInstaller.groupStatus(for: group, manifest: manifest, ledger: ledger)
+        do {
+            groupStatus = try await inst.reconcileStatus(manifest: manifest)
+        } catch {
+            // Preserve the conservative ledger snapshot if device verification or
+            // reconciliation persistence is unavailable.
+            let ledger = (try? await inst.currentLedger()) ?? [:]
+            groupStatus = Dictionary(uniqueKeysWithValues: TumoflipManifest.knownGroups.map {
+                ($0, TumoflipInstaller.groupStatus(for: $0, manifest: manifest, ledger: ledger))
+            })
         }
-        groupStatus = computed
         lastVerifiedOnDevice = false
     }
 
