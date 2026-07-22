@@ -41,12 +41,14 @@ final class PluginProtectionPolicyTests: XCTestCase {
     func testBuiltInListCoversTumoflipAppsAndRetiresBleKiller() {
         let expected: Set<String> = [
             "ai_dashboard", "app_bridge_terminal", "arf_frequency_analyzer",
-            "arf_subghz_full", "ble_gatt_lab", "claude_buddy", "esp32_wifi_marauder",
+            "arf_subghz_full", "ble_gatt_lab", "claude_buddy", "claude_remote_ble",
+            "esp32_wifi_marauder",
             "field_logger", "flipper_companion", "flipper_relay",
             "module_one_cockpit", "module_one_sensor_logger", "nfc_ccid_bridge",
             "protocol_compiler", "proto_pirate",
             "quac", "rolljam", "runtime_trace_viewer", "signal_workbench",
-            "subghz_bruteforcer", "subghz_protocols", "subghz_raw_edit", "totp",
+            "subghz_bruteforcer", "subghz_protocols", "subghz_raw_edit",
+            "subghz_wardriving", "totp",
             "tumo_acceptance_suite", "tumo_ir_lab", "tumo_macro_deck", "tumocard_os",
             "tumofabric_node", "tumoflip_packages", "tumoflip_xremote",
             "tumokey_phase_a", "tumomodule_runtime", "tumonet_bench", "tumonet_gateway",
@@ -57,6 +59,19 @@ final class PluginProtectionPolicyTests: XCTestCase {
 
         XCTAssertTrue(expected.isSubset(of: PluginUpdater.builtInExcluded))
         XCTAssertFalse(PluginUpdater.builtInExcluded.contains("ble_killer"))
+    }
+
+    func testAllThePluginsCannotOverwriteWardrivingOrDuplicateClaudeBuddy() {
+        XCTAssertTrue(PluginProtectionPolicy.isProtected(
+            name: "subghz_wardriving",
+            remotePath: "/ext/apps/Sub-GHz/subghz_wardriving.fap",
+            excluded: PluginUpdater.builtInExcluded,
+            unprotectedBuiltIns: []))
+        XCTAssertTrue(PluginProtectionPolicy.isProtected(
+            name: "claude_remote_ble",
+            remotePath: "/ext/apps/Bluetooth/claude_remote_ble.fap",
+            excluded: PluginUpdater.builtInExcluded,
+            unprotectedBuiltIns: []))
     }
 
     func testCatalogCannotOverwriteProtectedClaudeBuddy() {
