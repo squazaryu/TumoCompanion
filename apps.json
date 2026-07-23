@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.7.10",
+      "version": "1.7.11",
       "versionDate": "2026-07-23",
-      "versionDescription": "FW Packages now explains cleanup-only drift: current apps remain Up to date while obsolete duplicate paths are shown as Cleanup required and removed by the normal group install.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.7.10/TumoCompanion-unsigned.ipa",
-      "size": 29241254,
+      "versionDescription": "FW Packages now has a separate Clean up action for obsolete duplicate paths. It verifies current replacements, avoids package downloads and reinstalls, and uses transactional rollback on failure.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.7.11/TumoCompanion-unsigned.ipa",
+      "size": 29274763,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.7.11",
+          "date": "2026-07-23",
+          "localizedDescription": "FW Packages now has a separate Clean up action for obsolete duplicate paths. It verifies current replacements, avoids package downloads and reinstalls, and uses transactional rollback on failure.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.7.11/TumoCompanion-unsigned.ipa",
+          "size": 29274763,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.7.10",
           "date": "2026-07-23",
