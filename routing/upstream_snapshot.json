@@ -1,5 +1,5 @@
 {
-  "release_tag": "22jul2026p2",
+  "release_tag": "23jul2026p3",
   "stems": {
     "24cxxprog": "GPIO",
     "4inrow": "Games",
@@ -165,6 +165,7 @@
     "morse_flipper": "Tools",
     "morse_master": "Media",
     "morse_trainer": "Games",
+    "mp3_player": "Media",
     "multi_converter": "Tools",
     "multi_counter": "Tools",
     "music_beeper": "Media",
