@@ -1,5 +1,5 @@
 {
-  "release_tag": "23jul2026p3",
+  "release_tag": "25jul2026",
   "stems": {
     "24cxxprog": "GPIO",
     "4inrow": "Games",
@@ -182,7 +182,6 @@
     "nfc_rfid_detector": "Tools",
     "nfc_stock_manager": "NFC",
     "nickname_generator": "Tools",
-    "nightstand": "Tools",
     "nrf24_batch": "GPIO",
     "nrf24_mouse_jacker": "GPIO",
     "nrf24_mouse_jacker_ms": "GPIO",
