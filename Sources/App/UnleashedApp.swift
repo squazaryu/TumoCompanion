@@ -69,7 +69,20 @@ struct RootView: View {
     @State private var tab = 0
     @State private var homePath: [HomeTileID] = []
 
+    @ViewBuilder
     var body: some View {
+#if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-fw-packages-action-bar-qa") {
+            FWPackagesActionBarQAView()
+        } else {
+            appContent
+        }
+#else
+        appContent
+#endif
+    }
+
+    private var appContent: some View {
         tabs
             .fullScreenCover(isPresented: Binding(
                 get: { !settings.onboardingDone },

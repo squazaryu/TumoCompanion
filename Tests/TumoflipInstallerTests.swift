@@ -528,6 +528,99 @@ final class TumoflipInstallerTests: XCTestCase {
         XCTAssertNil(state?.txn)
     }
 
+    func testCleanupLegacyStopBeforeFirstMoveLeavesDeviceUntouched() async throws {
+        let canonicalBytes = Data("canonical".utf8)
+        let legacyBytes = Data("legacy".utf8)
+        let canonical = "/ext/apps/new.fap"
+        let legacy = "/ext/apps/old.fap"
+        let p = plan(
+            [bundledFile("new", canonical, canonicalBytes)],
+            cleanup: [.init(canonical: canonical, legacy: legacy)]
+        )
+        let fs = FakeFS()
+        fs.files[canonical] = canonicalBytes
+        fs.files[legacy] = legacyBytes
+        let installer = TumoflipInstaller(fs: fs, source: FakeSource(data: [:]))
+
+        await assertThrows(
+            {
+                try await installer.cleanupLegacy(
+                    p,
+                    isStopRequested: { true }
+                )
+            },
+            .cancelled
+        )
+
+        XCTAssertEqual(fs.files[canonical], canonicalBytes)
+        XCTAssertEqual(fs.files[legacy], legacyBytes)
+        let state = await fs.readState()
+        XCTAssertNil(state?.txn)
+    }
+
+    func testCleanupLegacyStopRollsBackEarlierMoves() async throws {
+        let canonicalA = "/ext/apps/new-a.fap"
+        let canonicalB = "/ext/apps/new-b.fap"
+        let legacyA = "/ext/apps/old-a.fap"
+        let legacyB = "/ext/apps/old-b.fap"
+        let canonicalBytesA = Data("canonical-a".utf8)
+        let canonicalBytesB = Data("canonical-b".utf8)
+        let legacyBytesA = Data("legacy-a".utf8)
+        let legacyBytesB = Data("legacy-b".utf8)
+        let p = plan(
+            [
+                bundledFile("new-a", canonicalA, canonicalBytesA),
+                bundledFile("new-b", canonicalB, canonicalBytesB),
+            ],
+            cleanup: [
+                .init(canonical: canonicalA, legacy: legacyA),
+                .init(canonical: canonicalB, legacy: legacyB),
+            ]
+        )
+        let fs = FakeFS()
+        fs.files[canonicalA] = canonicalBytesA
+        fs.files[canonicalB] = canonicalBytesB
+        fs.files[legacyA] = legacyBytesA
+        fs.files[legacyB] = legacyBytesB
+        let installer = TumoflipInstaller(fs: fs, source: FakeSource(data: [:]))
+        let stop: @Sendable () -> Bool = { fs.files[legacyA] == nil }
+
+        await assertThrows(
+            {
+                try await installer.cleanupLegacy(
+                    p,
+                    isStopRequested: stop
+                )
+            },
+            .cancelled
+        )
+
+        XCTAssertEqual(fs.files[legacyA], legacyBytesA)
+        XCTAssertEqual(fs.files[legacyB], legacyBytesB)
+        let state = await fs.readState()
+        XCTAssertNil(state?.txn)
+    }
+
+    func testCleanupSelectionAggregatesPendingGroupsInCanonicalOrder() {
+        let base = TumoflipManifest.CleanupEntry(
+            canonical: "/ext/apps/base.fap",
+            legacy: "/ext/apps/base-old.fap"
+        )
+        let module = TumoflipManifest.CleanupEntry(
+            canonical: "/ext/apps/module.fap",
+            legacy: "/ext/apps/module-old.fap"
+        )
+
+        let selection = TumoflipUpdater.cleanupSelection(from: [
+            "module_one": [module],
+            "base": [base],
+            "arf": [],
+        ])
+
+        XCTAssertEqual(selection.groups, ["base", "module_one"])
+        XCTAssertEqual(selection.entries, [base, module])
+    }
+
     func testMissingLegacyCleanupIsIgnored() async throws {
         let bytes = Data("canonical".utf8)
         let canonical = "/ext/apps/ARF Tools/arf_car_emulate.fap"
@@ -1020,9 +1113,9 @@ final class TumoflipInstallerTests: XCTestCase {
 
     // MARK: - shared assertions
 
-    private func assertThrows(_ expr: () async throws -> TumoflipInstaller.Outcome,
-                              _ expected: TumoflipInstallError,
-                              file: StaticString = #filePath, line: UInt = #line) async {
+    private func assertThrows<T>(_ expr: () async throws -> T,
+                                 _ expected: TumoflipInstallError,
+                                 file: StaticString = #filePath, line: UInt = #line) async {
         do { _ = try await expr(); XCTFail("expected \(expected)", file: file, line: line) }
         catch { XCTAssertEqual(error as? TumoflipInstallError, expected, file: file, line: line) }
     }

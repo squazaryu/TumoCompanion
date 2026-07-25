@@ -97,6 +97,11 @@ final class TumoflipUpdater: ObservableObject {
         case done(String), failed(String)
     }
 
+    struct CleanupSelection: Equatable {
+        let groups: Set<String>
+        let entries: [TumoflipManifest.CleanupEntry]
+    }
+
     @Published private(set) var phase: Phase = .idle
     @Published private(set) var manifest: TumoflipManifest?
     @Published private(set) var releaseTag = ""
@@ -175,6 +180,20 @@ final class TumoflipUpdater: ObservableObject {
     }
     func cleanupEntries(_ group: String) -> [TumoflipManifest.CleanupEntry] {
         pendingCleanup[group] ?? []
+    }
+
+    nonisolated static func cleanupSelection(
+        from pending: [String: [TumoflipManifest.CleanupEntry]]
+    ) -> CleanupSelection {
+        let groups = Set(TumoflipManifest.knownGroups.filter {
+            pending[$0]?.isEmpty == false
+        })
+        let entries = TumoflipManifest.knownGroups.flatMap { pending[$0] ?? [] }
+        return CleanupSelection(groups: groups, entries: entries)
+    }
+
+    var cleanupFileCount: Int {
+        Self.cleanupSelection(from: pendingCleanup).entries.count
     }
 
     func setManualChannelOverride(_ channel: TumoflipFirmwareChannel) {
@@ -354,10 +373,8 @@ final class TumoflipUpdater: ObservableObject {
 
     /// Download the package zip, check device compatibility, stage + verify + atomically
     /// activate the selected groups onto the Flipper, rolling back on any failure.
-    /// Set by the Stop button. The installer polls this at file/op boundaries; a stop
-    /// during a FW install throws into the transactional rollback, restoring the prior
-    /// working state (all-or-nothing — a firmware package set installs whole or not at
-    /// all, so a partial set is never left behind).
+    /// Set by the Stop button. Install and cleanup poll this only at safe operation
+    /// boundaries; either transaction rolls back to the prior working state.
     @Published private(set) var stopRequested = false
     private let stopToken = StopToken()
     func requestStop() { stopRequested = true; stopToken.stop() }
@@ -403,6 +420,7 @@ final class TumoflipUpdater: ObservableObject {
 
             phase = .downloading
             let source = try await packageSource()
+            if stopToken.isStopped { throw TumoflipInstallError.cancelled }
 
             // Issue #19: reject any selected FAP/FAL whose embedded `.fapmeta` is
             // incompatible with the CONNECTED firmware. Read fresh device_info now and
@@ -426,7 +444,10 @@ final class TumoflipUpdater: ObservableObject {
                 files(group).contains { !effectiveExclusions.contains($0.target) }
             })
             let plan = try TumoflipInstallPlan.make(
-                manifest: manifest, groups: groups, excluding: effectiveExclusions)
+                manifest: manifest,
+                groups: groups,
+                excluding: effectiveExclusions
+            ).installationOnly
             guard !plan.files.isEmpty else { phase = .failed("No compatible files selected."); return }
 
             // A running external app may keep its own FAP open. Stop it before any
@@ -456,9 +477,8 @@ final class TumoflipUpdater: ObservableObject {
             switch outcome {
             case .alreadyInstalled:
                 phase = .done("Already installed — nothing to do.")
-            case let .installed(files, legacy):
-                let extra = legacy > 0 ? ", \(legacy) legacy moved aside" : ""
-                phase = .done("Installed \(files) file\(files == 1 ? "" : "s")\(extra).")
+            case let .installed(files, _):
+                phase = .done("Installed \(files) file\(files == 1 ? "" : "s").")
             }
             live.finish(installed: 2 * plan.files.count, total: 2 * plan.files.count)
             await refreshStatus()
@@ -479,16 +499,18 @@ final class TumoflipUpdater: ObservableObject {
         }
     }
 
-    /// Remove legacy duplicates reported by reconciliation without downloading the
-    /// package archive or reinstalling any canonical FAP.
-    func cleanUp(_ group: String) async {
+    /// Remove every currently pending legacy duplicate in one standalone transaction,
+    /// without downloading the package archive or reinstalling a canonical FAP.
+    func cleanUpPending() async {
         guard let manifest else { return }
-        let entries = cleanupEntries(group)
-        guard !entries.isEmpty else {
+        let selection = Self.cleanupSelection(from: pendingCleanup)
+        guard !selection.entries.isEmpty else {
             phase = .done("No legacy files remain.")
             return
         }
 
+        stopRequested = false
+        stopToken.reset()
         beginTransactionGuards()
         defer { endTransactionGuards() }
         let live = InstallActivityController()
@@ -509,7 +531,19 @@ final class TumoflipUpdater: ObservableObject {
             }
             try await checkCompatibility(manifest)
 
-            let plan = try TumoflipInstallPlan.make(manifest: manifest, groups: [group])
+            let fullPlan = try TumoflipInstallPlan.make(
+                manifest: manifest,
+                groups: selection.groups
+            )
+            let pendingLegacyPaths = Set(selection.entries.map(\.legacy))
+            let plan = TumoflipInstallPlan(
+                releaseId: fullPlan.releaseId,
+                groups: fullPlan.groups,
+                files: fullPlan.files,
+                cleanup: fullPlan.cleanup.filter {
+                    pendingLegacyPaths.contains($0.legacy)
+                }
+            )
             guard !plan.cleanup.isEmpty else {
                 phase = .done("No legacy files remain.")
                 await refreshStatus()
@@ -519,8 +553,8 @@ final class TumoflipUpdater: ObservableObject {
                 try await ensureLoaderIdle()
             }
 
-            phase = .cleaning(done: 0, total: entries.count, file: "Starting…")
-            live.start(total: entries.count, title: "Cleaning firmware packages")
+            phase = .cleaning(done: 0, total: selection.entries.count, file: "Starting…")
+            live.start(total: selection.entries.count, title: "Cleaning firmware packages")
             let transferReporter = TransferActivityReporter(channel: channel)
             _ = await transferReporter.prepare()
             transferReporter.begin("firmware package cleanup")
@@ -530,7 +564,10 @@ final class TumoflipUpdater: ObservableObject {
                 fs: fs,
                 source: ZipPackageSource(entries: [:])
             )
-            let removed = try await installer.cleanupLegacy(plan) {
+            let removed = try await installer.cleanupLegacy(
+                plan,
+                isStopRequested: { [stopToken] in stopToken.isStopped }
+            ) {
                 [weak self] done, total, file in
                 Task { @MainActor in
                     self?.phase = .cleaning(done: done, total: total, file: file)
@@ -538,11 +575,15 @@ final class TumoflipUpdater: ObservableObject {
                     transferReporter.progress(file, force: true)
                 }
             }
-            live.finish(installed: removed, total: entries.count)
+            live.finish(installed: removed, total: selection.entries.count)
             phase = .done(
                 removed == 0
                     ? "No legacy files remain."
                     : "Removed \(removed) legacy file\(removed == 1 ? "" : "s").")
+            await refreshStatus()
+        } catch TumoflipInstallError.cancelled {
+            phase = .done("Stopped — cleanup rolled back, nothing changed.")
+            live.cancel()
             await refreshStatus()
         } catch let error as TumoflipInstallError {
             phase = .failed(installErrorText(error))
@@ -835,3 +876,159 @@ final class TumoflipUpdater: ObservableObject {
         return error.localizedDescription
     }
 }
+
+#if DEBUG
+extension TumoflipUpdater {
+    enum ActionBarQAScenario: String, CaseIterable, Identifiable {
+        case both = "Both actions"
+        case install = "Install only"
+        case cleanup = "Cleanup only"
+        case installing = "Installing"
+        case cleaning = "Cleaning"
+
+        var id: String { rawValue }
+    }
+
+    static func actionBarQAFixture() -> TumoflipUpdater {
+        func file(_ source: String, _ target: String, bytes: Int) -> TumoflipManifest.PackageFile {
+            TumoflipManifest.PackageFile(
+                bytes: bytes,
+                sha256: String(repeating: "a", count: 64),
+                md5: String(repeating: "b", count: 32),
+                source: source,
+                target: target
+            )
+        }
+
+        let cockpit = file(
+            "apps/cockpit.fap",
+            "/ext/apps/Tools/cockpit.fap",
+            bytes: 118_000
+        )
+        let frequencyAnalyzer = file(
+            "apps/frequency_analyzer.fap",
+            "/ext/apps/Sub-GHz/frequency_analyzer.fap",
+            bytes: 142_000
+        )
+        let subGHzPlaylist = file(
+            "apps/subghz_playlist.fap",
+            "/ext/apps/Sub-GHz/subghz_playlist.fap",
+            bytes: 142_000
+        )
+        let xremote = file(
+            "apps/tumoflip_xremote.fap",
+            "/ext/apps/Module One/IR Blaster/tumoflip_xremote.fap",
+            bytes: 172_000
+        )
+        let moduleCockpit = file(
+            "apps/module_one_cockpit.fap",
+            "/ext/apps/Module One/module_one_cockpit.fap",
+            bytes: 112_000
+        )
+        let acRemote = file(
+            "apps/ac_remote.fap",
+            "/ext/apps/Module One/IR Blaster/.ac_remote.fap",
+            bytes: 108_000
+        )
+        let protocolPack = file(
+            "resources/protocol_pack.txt",
+            "/ext/subghz/assets/protocol_pack.txt",
+            bytes: 74_000
+        )
+        let cleanup = TumoflipManifest.CleanupEntry(
+            canonical: xremote.target,
+            legacy: "/ext/apps/Module One/legacy_xremote.fap"
+        )
+        let manifest = TumoflipManifest(
+            schema: 2,
+            releaseId: String(repeating: "c", count: 64),
+            firmware: .init(
+                api: "88.0",
+                name: "tumoflip",
+                version: "t-dev-089-041-022",
+                target: 7,
+                radioAddress: nil
+            ),
+            artifacts: [:],
+            packages: [
+                "base": [cockpit],
+                "arf": [frequencyAnalyzer, subGHzPlaylist],
+                "module_one": [xremote, moduleCockpit, acRemote],
+                "protocol_packs": [protocolPack],
+            ],
+            cleanup: [cleanup],
+            safety: nil
+        )
+        let identity = TumoflipDeviceIdentity(
+            firmwareVersion: manifest.firmware.version,
+            originFork: "tumoflip",
+            firmwareCommit: "b3add26",
+            firmwareCommitDirty: false,
+            firmwareAPI: manifest.firmware.api,
+            hardwareTarget: manifest.firmware.target
+        )
+
+        let updater = TumoflipUpdater()
+        updater.manifest = manifest
+        updater.releaseTag = manifest.firmware.version
+        updater.hasPackageZip = true
+        updater.groupStatus = [
+            "base": .upToDate,
+            "arf": .upToDate,
+            "module_one": .updateAvailable,
+            "protocol_packs": .upToDate,
+        ]
+        updater.fileStatus = [
+            cockpit.target: .upToDate,
+            frequencyAnalyzer.target: .upToDate,
+            subGHzPlaylist.target: .upToDate,
+            xremote.target: .needsUpdate,
+            moduleCockpit.target: .upToDate,
+            acRemote.target: .upToDate,
+            protocolPack.target: .upToDate,
+        ]
+        updater.deviceIdentity = identity
+        updater.firmwareRoute = TumoflipFirmwareRouter.route(
+            identity: identity,
+            manualOverride: nil
+        )
+        updater.compatibilityApiMajor = 88
+        updater.compatibilityTarget = 7
+        updater.compatibilityChecked = true
+        updater.setActionBarQAScenario(.both)
+        return updater
+    }
+
+    func setActionBarQAScenario(_ scenario: ActionBarQAScenario) {
+        let targets = Set(
+            TumoflipManifest.knownGroups.flatMap { manifest?.packages[$0] ?? [] }.map(\.target)
+        )
+        let cleanup = manifest?.cleanup ?? []
+        stopRequested = false
+        stopToken.reset()
+
+        switch scenario {
+        case .both:
+            excludedFiles = []
+            pendingCleanup = ["module_one": cleanup]
+            phase = .ready
+        case .install:
+            excludedFiles = []
+            pendingCleanup = [:]
+            phase = .ready
+        case .cleanup:
+            excludedFiles = targets
+            pendingCleanup = ["module_one": cleanup]
+            phase = .ready
+        case .installing:
+            excludedFiles = []
+            pendingCleanup = ["module_one": cleanup]
+            phase = .installing(done: 3, total: 8, file: "tumoflip_xremote.fap")
+        case .cleaning:
+            excludedFiles = []
+            pendingCleanup = ["module_one": cleanup]
+            phase = .cleaning(done: 1, total: 2, file: "legacy_xremote.fap")
+        }
+    }
+}
+#endif

@@ -154,6 +154,20 @@ final class TumoflipManifestTests: XCTestCase {
         XCTAssertEqual(plan.cleanup.count, 1)
     }
 
+    func testInstallationOnlyPlanNeverIncludesCleanup() throws {
+        let manifest = try decode(base())
+        let validated = try TumoflipInstallPlan.make(
+            manifest: manifest,
+            groups: ["base", "arf"]
+        )
+
+        let install = validated.installationOnly
+
+        XCTAssertEqual(install.files, validated.files)
+        XCTAssertEqual(install.groups, validated.groups)
+        XCTAssertTrue(install.cleanup.isEmpty)
+    }
+
     func testPlanExcludesDeselectedFiles() throws {
         let m = try decode(base())
         // Per-file deselection: keep both groups but drop the base file → only arf remains.

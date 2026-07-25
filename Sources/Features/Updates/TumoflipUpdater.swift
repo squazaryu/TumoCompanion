@@ -563,6 +563,7 @@ struct TumoflipInstaller {
     @discardableResult
     func cleanupLegacy(
         _ plan: TumoflipInstallPlan,
+        isStopRequested: @Sendable () -> Bool = { false },
         progress: ((Int, Int, String) -> Void)? = nil
     ) async throws -> Int {
         var state = try await loadState() ?? TumoflipState()
@@ -574,6 +575,7 @@ struct TumoflipInstaller {
         let filesByTarget = Dictionary(uniqueKeysWithValues: plan.files.map { ($0.target, $0) })
         var candidates: [TumoflipManifest.CleanupEntry] = []
         for entry in plan.cleanup where await fs.exists(entry.legacy) {
+            if isStopRequested() { throw TumoflipInstallError.cancelled }
             guard let canonical = filesByTarget[entry.canonical],
                   let expectedMD5 = canonical.md5 else {
                 throw TumoflipInstallError.incompatible(
@@ -612,6 +614,9 @@ struct TumoflipInstaller {
         do {
             try await fs.makeDirectory(rollbackPath)
             for index in journal.cleanups.indices {
+                // Stop only between complete cleanup operations. Any earlier moves are
+                // represented in the durable journal and are restored by rollback.
+                if isStopRequested() { throw TumoflipInstallError.cancelled }
                 let cleanup = journal.cleanups[index]
                 guard await fs.exists(cleanup.legacy) else { continue }
                 guard let md5 = await fs.deviceMD5(cleanup.legacy) else {
@@ -632,6 +637,7 @@ struct TumoflipInstaller {
                 )
             }
 
+            if isStopRequested() { throw TumoflipInstallError.cancelled }
             journal.phase = .committed
             state.txn = nil
             try await saveState(&state)

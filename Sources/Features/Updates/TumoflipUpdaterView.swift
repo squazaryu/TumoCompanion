@@ -11,7 +11,7 @@ struct TumoflipUpdaterView: View {
     @ObservedObject var updater: TumoflipUpdater
     @State private var expanded: Set<String> = []
     @State private var pendingOverride: TumoflipFirmwareChannel?
-    @State private var pendingCleanupGroup: String?
+    @State private var pendingCleanupCount: Int?
     @State private var showHelp = false
 
     private let groupLabels: [(key: String, title: String, icon: String)] = [
@@ -20,6 +20,11 @@ struct TumoflipUpdaterView: View {
         ("module_one", "Module One", "square.grid.2x2.fill"),
         ("protocol_packs", "Protocol Packs", "antenna.radiowaves.left.and.right"),
     ]
+
+    init(updater: TumoflipUpdater, initiallyExpanded: Set<String> = []) {
+        self.updater = updater
+        _expanded = State(initialValue: initiallyExpanded)
+    }
 
     var body: some View {
         CardScroll {
@@ -58,7 +63,7 @@ struct TumoflipUpdaterView: View {
                 }
             }
         }
-        .safeAreaInset(edge: .bottom) { installBar }
+        .safeAreaInset(edge: .bottom) { actionBar }
         .onAppear {
             if updater.manifest == nil {
                 Task { await updater.reload(recover: hasFileChannel) }
@@ -90,27 +95,31 @@ struct TumoflipUpdaterView: View {
         .confirmationDialog(
             "Remove legacy package files?",
             isPresented: Binding(
-                get: { pendingCleanupGroup != nil },
-                set: { if !$0 { pendingCleanupGroup = nil } }
+                get: { pendingCleanupCount != nil },
+                set: { if !$0 { pendingCleanupCount = nil } }
             ),
-            presenting: pendingCleanupGroup
-        ) { group in
-            let count = updater.cleanupEntries(group).count
+            presenting: pendingCleanupCount
+        ) { count in
             Button(
-                "Clean up \(count) file\(count == 1 ? "" : "s")",
+                "Clean Up \(count) file\(count == 1 ? "" : "s")",
                 role: .destructive
             ) {
-                pendingCleanupGroup = nil
-                Task { await updater.cleanUp(group) }
+                pendingCleanupCount = nil
+                Task { await updater.cleanUpPending() }
             }
             Button("Cancel", role: .cancel) {}
-        } message: { _ in
-            Text("Current apps will be verified first. Only obsolete duplicate paths will be removed.")
+        } message: { count in
+            Text("\(count) obsolete file\(count == 1 ? "" : "s") will be removed. Current apps are verified against the manifest first, and any failure rolls the cleanup back.")
         }
     }
 
     private var hasFileChannel: Bool {
-        transfer.activeChannel == .usb || ble.state == .ready || ble.state == .connected
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-fw-packages-action-bar-qa") {
+            return true
+        }
+        #endif
+        return transfer.activeChannel == .usb || ble.state == .ready || ble.state == .connected
     }
 
     private var groupsCard: some View {
@@ -232,6 +241,7 @@ struct TumoflipUpdaterView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(selectable == 0 || updater.busy || updater.validating)
+                .accessibilityIdentifier("fw-packages-select-\(g.key)")
 
                 Image(systemName: g.icon).foregroundStyle(.orange).frame(width: 22)
                 VStack(alignment: .leading, spacing: 2) {
@@ -240,7 +250,7 @@ struct TumoflipUpdaterView: View {
                         .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
                     if !cleanupEntries.isEmpty {
                         Label(
-                            "\(cleanupEntries.count) legacy \(cleanupEntries.count == 1 ? "file" : "files") to remove",
+                            "\(cleanupEntries.count) Cleanup required",
                             systemImage: "trash.circle.fill"
                         )
                         .font(.caption2)
@@ -264,6 +274,7 @@ struct TumoflipUpdaterView: View {
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.borderless)
+                    .accessibilityIdentifier("fw-packages-expand-\(g.key)")
                 }
             }
             if expanded.contains(g.key) {
@@ -286,6 +297,9 @@ struct TumoflipUpdaterView: View {
                             }
                             .tint(Theme.accent)
                             .disabled(updater.busy || updater.validating || updater.isFileBlocked(f.target))
+                            .accessibilityIdentifier(
+                                "fw-packages-file-\(g.key)-\(fileName(f.target))"
+                            )
                             .accessibilityLabel(fileName(f.target))
                             .accessibilityValue(fileStatusInfo(updater.status(file: f.target)).text)
                             if let reason = updater.blocked[f.target] {
@@ -318,24 +332,6 @@ struct TumoflipUpdaterView: View {
                         .accessibilityLabel("Cleanup required")
                         .accessibilityValue(entry.legacy)
                     }
-                    if !cleanupEntries.isEmpty {
-                        HStack {
-                            Spacer()
-                            Button {
-                                pendingCleanupGroup = g.key
-                            } label: {
-                                Label(
-                                    "Clean up \(cleanupEntries.count)",
-                                    systemImage: "trash"
-                                )
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-                            .tint(.orange)
-                            .disabled(updater.busy || !hasFileChannel)
-                        }
-                        .padding(.leading, 28)
-                    }
                 }
             }
             if g.key != groupLabels.last?.key { Divider() }
@@ -349,42 +345,31 @@ struct TumoflipUpdaterView: View {
 
     private var selectedFileCount: Int { updater.selectedFileCount }
 
-    @ViewBuilder private var installBar: some View {
-        if case .installing = updater.phase {
-            VStack(spacing: 6) {
-                Button(role: .destructive) { updater.requestStop() } label: {
-                    Label(updater.stopRequested ? "Stopping — rolling back…" : "Stop install",
-                          systemImage: "stop.circle.fill")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent).tint(.red)
-                .disabled(updater.stopRequested)
-            }
-            .padding()
-            .background(.bar)
-        } else if updater.manifest != nil, updater.hasPackageZip, selectedFileCount > 0, !updater.busy {
-            VStack(spacing: 6) {
-                if updater.selectedRequiresCompatibilityIdentity && !updater.hasFreshCompatibilityIdentity {
-                    Label("Connect Flipper over BLE to validate apps before installing via \(transfer.activeChannel.label).",
-                          systemImage: "antenna.radiowaves.left.and.right.slash")
-                        .font(.caption2).foregroundStyle(.red)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Button { Task { await updater.install() } } label: {
-                    Label("Install \(selectedFileCount) file\(selectedFileCount == 1 ? "" : "s")",
-                          systemImage: "square.and.arrow.down.on.square")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(Theme.accent)
-                .disabled(
-                    !hasFileChannel || updater.validating ||
-                    (updater.selectedRequiresCompatibilityIdentity && !updater.hasFreshCompatibilityIdentity))
-            }
-            .padding()
-            .background(.bar)
-        }
+    private var installActionCount: Int {
+        guard updater.manifest != nil, updater.hasPackageZip else { return 0 }
+        return selectedFileCount
+    }
+
+    private var installNeedsIdentity: Bool {
+        updater.selectedRequiresCompatibilityIdentity && !updater.hasFreshCompatibilityIdentity
+    }
+
+    private var actionBar: some View {
+        FWPackagesActionBar(
+            phase: updater.phase,
+            installCount: installActionCount,
+            cleanupCount: updater.cleanupFileCount,
+            canInstall: hasFileChannel && !updater.busy && !installNeedsIdentity,
+            canCleanUp: hasFileChannel && !updater.busy,
+            stopRequested: updater.stopRequested,
+            transferChannel: updater.transferChannel,
+            identityWarning: installNeedsIdentity
+                ? "Connect Flipper over BLE to validate apps before installing via \(transfer.activeChannel.label)."
+                : nil,
+            install: { Task { await updater.install() } },
+            cleanUp: { pendingCleanupCount = updater.cleanupFileCount },
+            stop: updater.requestStop
+        )
     }
 
     @ViewBuilder private var statusRow: some View {
@@ -510,14 +495,10 @@ struct TumoflipUpdaterView: View {
         switch status {
         case .upToDate:
             return ("Up to date", .green, "checkmark.circle.fill")
-        case .needsUpdate:
+        case .needsUpdate, .missing, .unknown, .validationError:
+            // Keep fail-closed transport/validation distinctions in the model while
+            // presenting the agreed three-state package-row vocabulary.
             return ("Needs update", .orange, "arrow.down.circle.fill")
-        case .missing:
-            return ("Missing", .secondary, "questionmark.folder.fill")
-        case .unknown:
-            return ("Unknown", .secondary, "questionmark.circle")
-        case .validationError:
-            return ("Validation error", .red, "exclamationmark.triangle.fill")
         }
     }
 
@@ -545,6 +526,177 @@ struct TumoflipUpdaterView: View {
         }
     }
 }
+
+struct FWPackagesActionBar: View {
+    let phase: TumoflipUpdater.Phase
+    let installCount: Int
+    let cleanupCount: Int
+    let canInstall: Bool
+    let canCleanUp: Bool
+    let stopRequested: Bool
+    let transferChannel: TransferChannel
+    let identityWarning: String?
+    let install: () -> Void
+    let cleanUp: () -> Void
+    let stop: () -> Void
+
+    @ViewBuilder
+    var body: some View {
+        switch phase {
+        case .downloading:
+            transactionBar(
+                title: "Downloading package archive",
+                detail: transferChannel.label,
+                progress: nil,
+                tint: Theme.accent,
+                stopTitle: "Stop install"
+            )
+        case .installing(let done, let total, let file):
+            transactionBar(
+                title: file,
+                detail: "\(done)/\(total) · \(transferChannel.label)",
+                progress: Double(min(done, total)) / Double(max(total, 1)),
+                tint: Theme.accent,
+                stopTitle: "Stop install"
+            )
+        case .cleaning(let done, let total, let file):
+            transactionBar(
+                title: file,
+                detail: "\(done)/\(total) · \(transferChannel.label)",
+                progress: Double(min(done, total)) / Double(max(total, 1)),
+                tint: .orange,
+                stopTitle: "Stop cleanup"
+            )
+        default:
+            if installCount > 0 || cleanupCount > 0 {
+                actionButtons
+            }
+        }
+    }
+
+    private var actionButtons: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if installCount > 0, let identityWarning {
+                Label(identityWarning, systemImage: "antenna.radiowaves.left.and.right.slash")
+                    .font(.caption2)
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            HStack(spacing: 10) {
+                if installCount > 0 {
+                    Button(action: install) {
+                        Label(
+                            "Install \(installCount)",
+                            systemImage: "square.and.arrow.down.on.square"
+                        )
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Theme.accent)
+                    .disabled(!canInstall)
+                    .accessibilityIdentifier("fw-packages-install-action")
+                    .accessibilityLabel(
+                        "Install \(installCount) file\(installCount == 1 ? "" : "s")"
+                    )
+                }
+                if cleanupCount > 0 {
+                    Button(role: .destructive, action: cleanUp) {
+                        Label("Clean Up \(cleanupCount)", systemImage: "trash")
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.orange)
+                    .disabled(!canCleanUp)
+                    .accessibilityIdentifier("fw-packages-cleanup-action")
+                    .accessibilityLabel(
+                        "Clean Up \(cleanupCount) file\(cleanupCount == 1 ? "" : "s")"
+                    )
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(.bar)
+    }
+
+    private func transactionBar(
+        title: String,
+        detail: String,
+        progress: Double?,
+        tint: Color,
+        stopTitle: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(stopRequested ? "Stopping — rolling back…" : title)
+                    .font(.callout.weight(.semibold))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer(minLength: 8)
+                Text(detail)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+                    .lineLimit(1)
+            }
+            Group {
+                if let progress {
+                    ProgressView(value: progress)
+                } else {
+                    ProgressView()
+                }
+            }
+            .tint(tint)
+            .accessibilityIdentifier("fw-packages-progress")
+
+            Button(role: .destructive, action: stop) {
+                Label(
+                    stopRequested ? "Stopping — rolling back…" : stopTitle,
+                    systemImage: "stop.circle.fill"
+                )
+                .frame(maxWidth: .infinity, minHeight: 44)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.red)
+            .disabled(stopRequested)
+            .accessibilityIdentifier("fw-packages-stop-action")
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(.bar)
+    }
+}
+
+#if DEBUG
+struct FWPackagesActionBarQAView: View {
+    @StateObject private var updater = TumoflipUpdater.actionBarQAFixture()
+    @State private var scenario: TumoflipUpdater.ActionBarQAScenario = .both
+
+    var body: some View {
+        NavigationStack {
+            TumoflipUpdaterView(
+                updater: updater,
+                initiallyExpanded: ["module_one"]
+            )
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Menu {
+                        ForEach(TumoflipUpdater.ActionBarQAScenario.allCases) { item in
+                            Button(item.rawValue) {
+                                scenario = item
+                                updater.setActionBarQAScenario(item)
+                            }
+                        }
+                    } label: {
+                        Label(scenario.rawValue, systemImage: "slider.horizontal.3")
+                    }
+                    .accessibilityIdentifier("fw-packages-qa-scenario")
+                }
+            }
+        }
+    }
+}
+#endif
 
 private struct TumoflipPackagesHelpView: View {
     @Environment(\.dismiss) private var dismiss
