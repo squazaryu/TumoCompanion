@@ -36,7 +36,7 @@ Add the source, then install — Feather signs it with your own certificate and 
 https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/apps.json
 ```
 
-> Unsigned IPA, sideloaded. Built for the **[tumoflip](https://github.com/squazaryu/tumoflip)** firmware (Unleashed-based — its App Bridge BLE service is what most of the integrations talk to). Works as a plain BLE file/screen client on stock firmware too.
+> Unsigned IPA, sideloaded. Built for the independent **[Tumoflip](https://github.com/squazaryu/tumoflip)** firmware — its App Bridge BLE service is what most integrations use. Works as a plain BLE file/screen client on stock firmware too.
 
 ## Screenshots
 
@@ -124,7 +124,7 @@ The Sber relay doesn't report a reliable *steady* state back to Home Assistant (
 
 The repository contains the complete SwiftUI application, widget extension,
 tests, Feather source metadata and release scripts. The internal Xcode target
-remains `UnleashedCompanion` to preserve the existing iOS update identity.
+remains unchanged internally to preserve the existing iOS update identity.
 
 Prerequisites: Xcode 16+, XcodeGen and Swift Protobuf.
 
@@ -138,7 +138,7 @@ your own certificate using Feather, SideStore, AltStore or Sideloadly.
 
 ## Requirements
 
-- iPhone on **iOS 17+**, a Flipper Zero, and (for most integrations) the **[tumoflip](https://github.com/squazaryu/tumoflip)** firmware (Unleashed-based) with App Bridge.
+- iPhone on **iOS 17+**, a Flipper Zero, and (for most integrations) the independent **[Tumoflip](https://github.com/squazaryu/tumoflip)** firmware with App Bridge.
 - Optional: a Mac running the AI Radar / Claude Buddy relay daemon for the Claude Code features and the HA relay bridge.
 
 ## Releases
