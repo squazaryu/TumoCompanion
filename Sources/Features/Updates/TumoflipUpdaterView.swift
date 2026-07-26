@@ -144,11 +144,6 @@ struct TumoflipUpdaterView: View {
         }
     }
 
-    /// A dirty commit or routing warning is worth surfacing without a tap; a clean auto-detected channel isn't.
-    private var channelNeedsAttention: Bool {
-        updater.firmwareRoute.warning != nil || updater.deviceIdentity?.firmwareCommitDirty == true
-    }
-
     private var channelCard: some View {
         CollapsibleCard(
             title: "Package channel",
@@ -157,8 +152,7 @@ struct TumoflipUpdaterView: View {
                 text: updater.firmwareRoute.channel.label,
                 color: channelColor(updater.firmwareRoute.channel),
                 systemImage: channelIcon(updater.firmwareRoute.channel)
-            )),
-            startExpanded: channelNeedsAttention
+            ))
         ) {
             VStack(alignment: .leading, spacing: 8) {
                 if updater.deviceIdentity?.firmwareCommitDirty == true {
@@ -248,6 +242,14 @@ struct TumoflipUpdaterView: View {
                     Text(g.title).font(.subheadline)
                     Text("\(sel)/\(selectable) compatible · \(byteStr(updater.bytes(g.key)))")
                         .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                    if let info = groupSummaryInfo(g.key) {
+                        Label(info.text, systemImage: info.icon)
+                            .font(.caption2)
+                            .foregroundStyle(info.color)
+                            .labelStyle(.titleAndIcon)
+                            .lineLimit(1)
+                            .accessibilityIdentifier("fw-packages-status-\(g.key)")
+                    }
                     if !cleanupEntries.isEmpty {
                         Label(
                             "\(cleanupEntries.count) Cleanup required",
@@ -257,10 +259,7 @@ struct TumoflipUpdaterView: View {
                         .foregroundStyle(.orange)
                         .labelStyle(.titleAndIcon)
                         .lineLimit(1)
-                    } else if let info = statusInfo(updater.status(g.key)) {
-                        Label(info.text, systemImage: info.icon)
-                            .font(.caption2).foregroundStyle(info.color)
-                            .labelStyle(.titleAndIcon).lineLimit(1)
+                        .accessibilityIdentifier("fw-packages-cleanup-status-\(g.key)")
                     }
                 }
                 Spacer()
@@ -514,6 +513,22 @@ struct TumoflipUpdaterView: View {
         case .stable: return "checkmark.seal.fill"
         case .dev: return "hammer.fill"
         }
+    }
+
+    /// Group summaries use the same per-target truth as the expanded FAP rows. Unknown,
+    /// missing, changed, and validation-error targets remain fail-closed as updates.
+    private func groupSummaryInfo(
+        _ group: String
+    ) -> (text: String, color: Color, icon: String)? {
+        let files = updater.files(group)
+        guard !files.isEmpty else { return nil }
+        let needsUpdate = files.lazy.filter {
+            updater.status(file: $0.target) != .upToDate
+        }.count
+        let badge: SourceBadge = needsUpdate == 0
+            ? .upToDate
+            : .updatesAvailable(needsUpdate, of: files.count)
+        return (badge.text, badge.color, badge.systemImage)
     }
 
     /// Display mapping for a group/overall status. `nil` for `.empty` (no badge).

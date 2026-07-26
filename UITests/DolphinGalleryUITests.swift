@@ -73,12 +73,39 @@ final class FWPackagesActionBarUITests: XCTestCase {
     }
 
     func testActionsFillBottomBarAndTransactionsReplaceThemWithProgress() throws {
+        let channel = app.buttons.matching(
+            NSPredicate(format: "label CONTAINS[c] %@", "PACKAGE CHANNEL")
+        ).firstMatch
+        XCTAssertTrue(channel.waitForExistence(timeout: 2))
+        XCTAssertFalse(
+            app.staticTexts["Installed"].exists,
+            "Package channel must start collapsed"
+        )
+        channel.tap()
+        XCTAssertTrue(
+            app.staticTexts["Installed"].waitForExistence(timeout: 2),
+            "Package channel metadata must remain available after expansion"
+        )
+        channel.tap()
+
         for group in ["base", "arf", "module_one", "protocol_packs"] {
             XCTAssertTrue(
                 app.buttons["fw-packages-expand-\(group)"].waitForExistence(timeout: 2),
                 "Every production package category must remain visible and expandable"
             )
         }
+        XCTAssertEqual(
+            app.staticTexts["fw-packages-status-base"].label,
+            "Up to date"
+        )
+        XCTAssertEqual(
+            app.staticTexts["fw-packages-status-module_one"].label,
+            "1 of 3 need updates"
+        )
+        XCTAssertEqual(
+            app.staticTexts["fw-packages-cleanup-status-module_one"].label,
+            "1 Cleanup required"
+        )
         XCTAssertTrue(
             app.switches[
                 "fw-packages-file-module_one-tumoflip_xremote.fap"
