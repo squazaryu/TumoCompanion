@@ -143,6 +143,18 @@ struct TumoflipInstallPlan: Equatable {
         return TumoflipHash.sha256(Data("\(g)::\(f)".utf8))
     }
 
+    /// Package installation and legacy cleanup are separate user transactions.
+    /// Build the full validated plan first, then remove cleanup operations from the
+    /// install transaction while keeping the same sanitised file selection.
+    var installationOnly: TumoflipInstallPlan {
+        TumoflipInstallPlan(
+            releaseId: releaseId,
+            groups: groups,
+            files: files,
+            cleanup: []
+        )
+    }
+
     /// Sanitise an `/ext` target path: must be absolute under `/ext/`, with no
     /// traversal (`..`), no `.` segments, and no empty components.
     static func sanitize(_ raw: String) throws -> String {

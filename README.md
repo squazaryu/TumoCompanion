@@ -6,7 +6,7 @@
 
 **A native iOS companion for Flipper Zero** — BLE/USB SD file access, screen mirror, Sub-GHz/NFC, a Sber smart-relay failsafe, Marauder log analysis, ESP32 firmware flashing, and live Claude Code status on your Flipper.
 
-![version](https://img.shields.io/badge/version-1.6.27-F36E12)
+![version](https://img.shields.io/badge/version-1.7.12-F36E12)
 ![platform](https://img.shields.io/badge/iOS-17%2B-black?logo=apple)
 ![SwiftUI](https://img.shields.io/badge/SwiftUI-5.9-orange?logo=swift)
 ![transport](https://img.shields.io/badge/transport-BLE%20%2B%20USB%20SD-blue?logo=bluetooth)
@@ -104,7 +104,8 @@ Most integrations talk to a small BLE service in the [tumoflip](https://github.c
 - the release manifest (schema v2) is validated and every target path is sanitised;
 - each file is staged, SHA-256-checked on download and MD5-verified on the device before any live path is touched;
 - activation is write-ahead journalled into dual, checksummed state slots — the Flipper's `storage rename` is copy + remove (not atomic), so an interrupted install is recovered or fully rolled back;
-- replaced files and legacy cleanup are reversible, and the connected firmware's target / API / version must match the manifest before any FAP/FAL is written.
+- **Install** and **Clean Up** are separate reversible transactions: installing never deletes legacy paths implicitly, while cleanup verifies the canonical replacement's on-device MD5 before removing an obsolete duplicate;
+- the connected firmware's target / API / version must match the manifest before any FAP/FAL is written.
 
 > Needs a firmware release that publishes `tumoflip-packages.zip`; until then the screen shows “no install archive yet”. Firmware (DFU) flashing is a separate, explicit step and is not done here.
 

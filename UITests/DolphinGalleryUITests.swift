@@ -58,3 +58,71 @@ final class DolphinGalleryUITests: XCTestCase {
         XCTAssertNotEqual(firstFrame, secondFrame, "The full-screen preview must advance frames")
     }
 }
+
+final class FWPackagesActionBarUITests: XCTestCase {
+    private var app: XCUIApplication!
+
+    override func setUpWithError() throws {
+        continueAfterFailure = false
+        app = XCUIApplication()
+        app.launchArguments = [
+            "-onboardingDone", "YES",
+            "-fw-packages-action-bar-qa",
+        ]
+        app.launch()
+    }
+
+    func testActionsFillBottomBarAndTransactionsReplaceThemWithProgress() throws {
+        for group in ["base", "arf", "module_one", "protocol_packs"] {
+            XCTAssertTrue(
+                app.buttons["fw-packages-expand-\(group)"].waitForExistence(timeout: 2),
+                "Every production package category must remain visible and expandable"
+            )
+        }
+        XCTAssertTrue(
+            app.switches[
+                "fw-packages-file-module_one-tumoflip_xremote.fap"
+            ].waitForExistence(timeout: 2),
+            "Expanded categories must retain their per-file selection toggles"
+        )
+
+        let install = app.buttons["fw-packages-install-action"]
+        let cleanup = app.buttons["fw-packages-cleanup-action"]
+        XCTAssertTrue(install.waitForExistence(timeout: 5))
+        XCTAssertTrue(cleanup.exists)
+        let splitInstallWidth = install.frame.width
+
+        selectScenario("Install only")
+        XCTAssertTrue(install.waitForExistence(timeout: 2))
+        XCTAssertFalse(cleanup.exists)
+        XCTAssertGreaterThan(
+            install.frame.width,
+            splitInstallWidth * 1.7,
+            "A single action should fill the pinned bar"
+        )
+
+        selectScenario("Cleanup only")
+        XCTAssertFalse(install.exists)
+        XCTAssertTrue(cleanup.waitForExistence(timeout: 2))
+
+        selectScenario("Cleaning")
+        XCTAssertFalse(install.exists)
+        XCTAssertFalse(cleanup.exists)
+        XCTAssertTrue(app.progressIndicators["fw-packages-progress"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["fw-packages-stop-action"].exists)
+
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = "FW Packages cleaning progress"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+
+    private func selectScenario(_ title: String) {
+        let menu = app.buttons["fw-packages-qa-scenario"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 2))
+        menu.tap()
+        let option = app.buttons[title]
+        XCTAssertTrue(option.waitForExistence(timeout: 2))
+        option.tap()
+    }
+}
