@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.7.12",
+      "version": "1.7.13",
       "versionDate": "2026-07-26",
-      "versionDescription": "FW Packages keeps all four expandable categories and per-FAP selectors while moving Install and Clean Up into a pinned bottom bar. Install and cleanup are separate rollback-safe transactions; cleanup verifies canonical MD5s and supports Stop with rollback.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.7.12/TumoCompanion-unsigned.ipa",
-      "size": 29282857,
+      "versionDescription": "FW Packages restores per-group update summaries from per-FAP device status and keeps Package channel collapsed by default. Cleanup required remains visible separately from update counts.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.7.13/TumoCompanion-unsigned.ipa",
+      "size": 29282478,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.7.13",
+          "date": "2026-07-26",
+          "localizedDescription": "FW Packages restores per-group update summaries from per-FAP device status and keeps Package channel collapsed by default. Cleanup required remains visible separately from update counts.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.7.13/TumoCompanion-unsigned.ipa",
+          "size": 29282478,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.7.12",
           "date": "2026-07-26",
