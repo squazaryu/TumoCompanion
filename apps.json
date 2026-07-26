@@ -9,7 +9,7 @@
       "bundleIdentifier": "com.tumoflip.unleashedcompanion",
       "developerName": "tumoflip",
       "subtitle": "Tumoflip companion for Flipper Zero",
-      "localizedDescription": "Native iOS companion for Flipper Zero running Tumoflip or Unleashed firmware. Includes BLE and USB SD file access, screen control, firmware and API-gated FAP installation, Dolphin Gallery, Sub-GHz and NFC workflows, TumoSurvey, Marauder analysis, ESP32 flashing and App Bridge integrations.",
+      "localizedDescription": "Native iOS companion for Flipper Zero running Tumoflip firmware. Includes BLE and USB SD file access, screen control, firmware and API-gated FAP installation, Dolphin Gallery, Sub-GHz and NFC workflows, TumoSurvey, Marauder analysis, ESP32 flashing and App Bridge integrations.",
       "iconURL": "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/icon.png",
       "tintColor": "F36E12",
       "category": "utilities",
@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.7.13",
+      "version": "1.7.14",
       "versionDate": "2026-07-26",
-      "versionDescription": "FW Packages restores per-group update summaries from per-FAP device status and keeps Package channel collapsed by default. Cleanup required remains visible separately from update counts.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.7.13/TumoCompanion-unsigned.ipa",
-      "size": 29282478,
+      "versionDescription": "Adds support for the standalone Tumoflip firmware identity t-flppr-fw-001 in Firmware Library and FW Packages while preserving exact version, API, origin, and legacy package validation.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.7.14/TumoCompanion-unsigned.ipa",
+      "size": 29282377,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.7.14",
+          "date": "2026-07-26",
+          "localizedDescription": "Adds support for the standalone Tumoflip firmware identity t-flppr-fw-001 in Firmware Library and FW Packages while preserving exact version, API, origin, and legacy package validation.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.7.14/TumoCompanion-unsigned.ipa",
+          "size": 29282377,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.7.13",
           "date": "2026-07-26",
