@@ -21,13 +21,21 @@ struct FirmwareRelease: Identifiable, Equatable {
 
     var versionLine: String {
         let numbers = version.split(whereSeparator: { !$0.isNumber })
+        if version.hasPrefix("t-flppr-fw-"), numbers.count == 1 {
+            return String(numbers[0])
+        }
+        if channel == .dev, version.hasPrefix("t-dev-"), numbers.count == 2 {
+            return String(numbers[0])
+        }
         guard numbers.count >= 2 else { return version }
         return "\(numbers[0])-\(numbers[1])"
     }
 
     var buildLabel: String {
         let numbers = version.split(whereSeparator: { !$0.isNumber })
-        guard channel == .dev, numbers.count >= 3 else { return "Release" }
+        guard channel == .dev else { return "Release" }
+        if numbers.count == 2 { return "Beta \(numbers[1])" }
+        guard numbers.count >= 3 else { return "Release" }
         return "Beta \(numbers[2])"
     }
 }

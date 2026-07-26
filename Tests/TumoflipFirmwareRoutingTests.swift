@@ -22,6 +22,16 @@ final class TumoflipFirmwareRoutingTests: XCTestCase {
         XCTAssertFalse(route.isManualOverride)
     }
 
+    func testStandaloneStableTumoflipVersionRoutesToStable() {
+        let identity = makeIdentity(version: "t-flppr-fw-001", origin: "tumoflip")
+        let route = TumoflipFirmwareRouter.route(identity: identity, manualOverride: nil)
+
+        XCTAssertEqual(route.channel, .stable)
+        XCTAssertEqual(route.detectedChannel, .stable)
+        XCTAssertNil(route.warning)
+        XCTAssertFalse(route.isManualOverride)
+    }
+
     func testLegacyStableTumoflipVersionStillRoutesToStable() {
         let identity = makeIdentity(version: "tmwhflpprarf089-034", origin: "tumoflip")
         let route = TumoflipFirmwareRouter.route(identity: identity, manualOverride: nil)

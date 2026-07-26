@@ -10,6 +10,45 @@ final class FirmwareCatalogTests: XCTestCase {
         XCTAssertEqual(releases.first?.updaterSHA256, String(repeating: "a", count: 64))
     }
 
+    func testCatalogRecognizesStandaloneStableRelease() throws {
+        let json = """
+        [
+          {
+            "tag_name": "v1.0.0",
+            "name": "t-flppr-fw-001",
+            "body": "Standalone stable release",
+            "published_at": "2026-07-26T12:00:00Z",
+            "prerelease": false,
+            "draft": false,
+            "assets": [
+              {
+                "name": "flipper-z-f7-update-t-flppr-fw-001.tgz",
+                "browser_download_url": "https://example.com/stable-001.tgz",
+                "size": 456,
+                "digest": "sha256:\(String(repeating: "b", count: 64))"
+              }
+            ]
+          }
+        ]
+        """
+
+        let releases = try FirmwareCatalog.decode(Data(json.utf8))
+
+        XCTAssertEqual(releases.map(\.version), ["t-flppr-fw-001"])
+        XCTAssertEqual(releases.map(\.channel), [.stable])
+        XCTAssertEqual(releases.first?.versionLine, "001")
+        XCTAssertEqual(releases.first?.buildLabel, "Release")
+    }
+
+    func testStandaloneDevGroupingUsesReleaseAndIteration() {
+        let dev = release(
+            version: "t-dev-002-003", channel: .dev,
+            date: "2026-07-26T12:00:00Z")
+
+        XCTAssertEqual(dev.versionLine, "002")
+        XCTAssertEqual(dev.buildLabel, "Beta 003")
+    }
+
     func testCatalogRejectsMismatchedPrereleaseChannel() throws {
         let changed = json.replacingOccurrences(
             of: "\"prerelease\": true",

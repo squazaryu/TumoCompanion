@@ -23,6 +23,7 @@ enum TumoflipFirmwareChannel: String, CaseIterable, Identifiable, Equatable {
     static func infer(version: String) -> TumoflipFirmwareChannel? {
         if version.hasPrefix("t-dev-") { return .dev }
         let stablePatterns = [
+            #"^t-flppr-fw-[0-9]{3}$"#,
             #"^t-flppr-fw-[0-9]{3}-[0-9]{3}$"#,
             #"^tmwhflpprarf[0-9]{3}-[0-9]{3}$"#,
         ]

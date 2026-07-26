@@ -6,7 +6,7 @@
 
 **A native iOS companion for Flipper Zero** — BLE/USB SD file access, screen mirror, Sub-GHz/NFC, a Sber smart-relay failsafe, Marauder log analysis, ESP32 firmware flashing, and live Claude Code status on your Flipper.
 
-![version](https://img.shields.io/badge/version-1.7.13-F36E12)
+![version](https://img.shields.io/badge/version-1.7.14-F36E12)
 ![platform](https://img.shields.io/badge/iOS-17%2B-black?logo=apple)
 ![SwiftUI](https://img.shields.io/badge/SwiftUI-5.9-orange?logo=swift)
 ![transport](https://img.shields.io/badge/transport-BLE%20%2B%20USB%20SD-blue?logo=bluetooth)
@@ -36,7 +36,7 @@ Add the source, then install — Feather signs it with your own certificate and 
 https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/apps.json
 ```
 
-> Unsigned IPA, sideloaded. Built for the **[tumoflip](https://github.com/squazaryu/tumoflip)** firmware (Unleashed-based — its App Bridge BLE service is what most of the integrations talk to). Works as a plain BLE file/screen client on stock firmware too.
+> Unsigned IPA, sideloaded. Built for the independent **[Tumoflip](https://github.com/squazaryu/tumoflip)** firmware — its App Bridge BLE service is what most integrations use. Works as a plain BLE file/screen client on stock firmware too.
 
 ## Screenshots
 
@@ -124,7 +124,7 @@ The Sber relay doesn't report a reliable *steady* state back to Home Assistant (
 
 The repository contains the complete SwiftUI application, widget extension,
 tests, Feather source metadata and release scripts. The internal Xcode target
-remains `UnleashedCompanion` to preserve the existing iOS update identity.
+remains unchanged internally to preserve the existing iOS update identity.
 
 Prerequisites: Xcode 16+, XcodeGen and Swift Protobuf.
 
@@ -138,7 +138,7 @@ your own certificate using Feather, SideStore, AltStore or Sideloadly.
 
 ## Requirements
 
-- iPhone on **iOS 17+**, a Flipper Zero, and (for most integrations) the **[tumoflip](https://github.com/squazaryu/tumoflip)** firmware (Unleashed-based) with App Bridge.
+- iPhone on **iOS 17+**, a Flipper Zero, and (for most integrations) the independent **[Tumoflip](https://github.com/squazaryu/tumoflip)** firmware with App Bridge.
 - Optional: a Mac running the AI Radar / Claude Buddy relay daemon for the Claude Code features and the HA relay bridge.
 
 ## Releases
