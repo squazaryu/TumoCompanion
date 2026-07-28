@@ -1,5 +1,5 @@
 {
-  "release_tag": "25jul2026p2",
+  "release_tag": "27jul2026",
   "stems": {
     "24cxxprog": "GPIO",
     "4inrow": "Games",
@@ -91,6 +91,7 @@
     "flipper_pong": "Games",
     "flipper_share": "Sub-GHz",
     "flipper_share_ir": "Infrared",
+    "flipper_share_nfc": "NFC",
     "flipper_spi_terminal": "GPIO",
     "flipper_wedge": "Tools",
     "flipper_xremote": "Infrared",
