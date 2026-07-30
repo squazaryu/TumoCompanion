@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.7.14",
-      "versionDate": "2026-07-26",
-      "versionDescription": "Adds support for the standalone Tumoflip firmware identity t-flppr-fw-001 in Firmware Library and FW Packages while preserving exact version, API, origin, and legacy package validation.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.7.14/TumoCompanion-unsigned.ipa",
-      "size": 29282377,
+      "version": "1.8.0",
+      "versionDate": "2026-07-30",
+      "versionDescription": "Removes unreliable Home Screen widgets, improves Live Activity accuracy, adds compact Claude Buddy BLE state, stabilizes package reconciliation and the Flipper transfer-wave indicator, fixes Info and Diagnostics layouts, and checks releases sooner while the app is active.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.8.0/TumoCompanion-unsigned.ipa",
+      "size": 29265655,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.8.0",
+          "date": "2026-07-30",
+          "localizedDescription": "Removes unreliable Home Screen widgets, improves Live Activity accuracy, adds compact Claude Buddy BLE state, stabilizes package reconciliation and the Flipper transfer-wave indicator, fixes Info and Diagnostics layouts, and checks releases sooner while the app is active.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.8.0/TumoCompanion-unsigned.ipa",
+          "size": 29265655,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.7.14",
           "date": "2026-07-26",
