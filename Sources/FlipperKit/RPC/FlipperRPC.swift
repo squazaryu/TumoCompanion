@@ -4,6 +4,7 @@ import SwiftProtobuf
 
 enum FlipperRPCError: Error, LocalizedError {
     case notReady
+    case serialOwnedByClaudeBuddy
     case status(PB_CommandStatus)
     case timeout
     case decode
@@ -11,6 +12,8 @@ enum FlipperRPCError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .notReady:        return "Flipper is not connected"
+        case .serialOwnedByClaudeBuddy:
+            return "Claude Buddy is using the Flipper serial channel. Close Buddy on the Flipper or wait for it to become idle."
         case .status(.errorContinuousCommandInterrupted):
             return "Another Flipper command interrupted the transfer. Wait for the connection to settle, then retry."
         case .status(let s):   return "Flipper error: \(s)"
@@ -81,6 +84,7 @@ final class FlipperRPC: ObservableObject {
     private var pending: [UInt32: Pending] = [:]
 
     private var stateCancellable: AnyCancellable?
+    private var ownerCancellable: AnyCancellable?
 
     init(ble: FlipperBLE = .shared) {
         self.ble = ble
@@ -92,6 +96,13 @@ final class FlipperRPC: ObservableObject {
         stateCancellable = ble.$state.sink { [weak self] state in
             if state != .ready { self?.failAllPending(FlipperRPCError.notReady) }
         }
+        ownerCancellable = ble.$serialOwner
+            .removeDuplicates()
+            .sink { [weak self] owner in
+                if owner == .claudeBuddy {
+                    self?.failAllPending(FlipperRPCError.serialOwnedByClaudeBuddy)
+                }
+            }
     }
 
     private func failAllPending(_ error: Error) {
@@ -148,7 +159,11 @@ final class FlipperRPC: ObservableObject {
             guard await ble.waitUntilReady() else { throw FlipperRPCError.notReady }
         }
         // Refuse RPC while the Buddy app owns the serial channel (see buddyMode).
-        guard !ble.buddyMode else { throw FlipperRPCError.notReady }
+        guard ble.serialOwner == .rpc else {
+            throw ble.serialOwner == .claudeBuddy
+                ? FlipperRPCError.serialOwnedByClaudeBuddy
+                : FlipperRPCError.notReady
+        }
 
         lock.lock()
         let id = nextCommandID
@@ -222,7 +237,7 @@ final class FlipperRPC: ObservableObject {
     /// (used for input events and stream start/stop which the Flipper answers
     /// with an Empty we don't need to block on).
     func send(_ configure: (inout PB_Main) -> Void) {
-        guard ble.state == .ready, !ble.buddyMode else { return }
+        guard ble.state == .ready, ble.serialOwner == .rpc else { return }
         var main = PB_Main()
         main.commandID = 0
         configure(&main)
@@ -232,9 +247,6 @@ final class FlipperRPC: ObservableObject {
     // MARK: - Receiving
 
     private func ingest(_ data: Data) {
-        // Buddy passthrough owns the serial channel — don't parse its JSON as RPC,
-        // and keep the RPC buffer empty so it starts clean when Buddy mode ends.
-        if ble.buddyMode { lock.lock(); rxBuffer.removeAll(); lock.unlock(); return }
         lock.lock()
         rxBuffer.append(data)
         var frames: [PB_Main] = []

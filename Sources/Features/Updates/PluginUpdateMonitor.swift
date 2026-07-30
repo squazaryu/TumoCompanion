@@ -1,97 +1,206 @@
-import Foundation
 import BackgroundTasks
+import Foundation
 import UserNotifications
 
-/// Background watcher for new releases across the repos we care about — the
-/// all-the-plugins pack AND the ESP32 Marauder firmware. Periodically (≈every 6h,
-/// the OS decides) it fetches each repo's latest release tag and posts a LOCAL
-/// notification when it changes, so the user hears about updates without opening
-/// the app. Local notifications + BGAppRefreshTask need no push/APNs entitlement,
-/// so this works fine with a personal developer-cert signed build.
+struct UpdateReleaseSource: Equatable {
+    let repo: String
+    let lastTagKey: String
+    let title: String
+    let body: (String) -> String
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.repo == rhs.repo
+            && lhs.lastTagKey == rhs.lastTagKey
+            && lhs.title == rhs.title
+    }
+}
+
+enum UpdateNotificationError: Error {
+    case notificationsDisabled
+}
+
+/// Watches release tags in two complementary ways:
+///
+/// - an immediate, throttled check whenever the app becomes active;
+/// - an opportunistic BGAppRefresh check when iOS grants background time.
+///
+/// BGAppRefresh's earliestBeginDate is not a delivery deadline, so the foreground
+/// check removes the common one-day delay. Guaranteed server-time alerts would still
+/// require a webhook + APNs backend.
 enum PluginUpdateMonitor {
     static let taskID = "com.tumoflip.unleashedcompanion.plugincheck"
+    static let foregroundCheckKey = "releaseMonitorLastForegroundCheck"
+    static let foregroundCheckInterval: TimeInterval = 20 * 60
 
-    private struct Source {
-        let repo: String
-        let lastTagKey: String
-        let title: String
-        let body: (String) -> String
-    }
-
-    private static let sources: [Source] = [
-        Source(repo: "xMasterX/all-the-plugins",
-               lastTagKey: "pluginLastNotifiedTag",
-               title: "New Flipper plugin pack",
-               body: { "all-the-plugins \($0) is available — open Updates to install the changes." }),
-        Source(repo: "justcallmekoko/ESP32Marauder",
-               lastTagKey: "esp32LastNotifiedTag",
-               title: "New ESP32 Marauder firmware",
-               body: { "ESP32Marauder \($0) is out — open Home → ESP32 Firmware to flash it." }),
+    static let sources: [UpdateReleaseSource] = [
+        UpdateReleaseSource(
+            repo: "xMasterX/all-the-plugins",
+            lastTagKey: "pluginLastNotifiedTag",
+            title: "New Flipper plugin pack",
+            body: {
+                "all-the-plugins \($0) is available — open Updates to install the changes."
+            }
+        ),
+        UpdateReleaseSource(
+            repo: "justcallmekoko/ESP32Marauder",
+            lastTagKey: "esp32LastNotifiedTag",
+            title: "New ESP32 Marauder firmware",
+            body: {
+                "ESP32Marauder \($0) is out — open Home → ESP32 Firmware to flash it."
+            }
+        ),
     ]
 
-    /// Register the BG handler — must run before the app finishes launching.
     static func register() {
         BGTaskScheduler.shared.register(forTaskWithIdentifier: taskID, using: nil) { task in
-            handle(task as! BGAppRefreshTask)
+            guard let refreshTask = task as? BGAppRefreshTask else {
+                task.setTaskCompleted(success: false)
+                return
+            }
+            handle(refreshTask)
         }
     }
 
-    /// Request notification permission, then schedule the first check. Safe to call
-    /// on every foreground: iOS only shows the system prompt when status is
-    /// notDetermined; once decided it returns silently (no guard flag needed — an old
-    /// guard flag was why the prompt never appeared on upgraded installs).
+    static func applicationDidBecomeActive() {
+        enableIfNeeded()
+        schedule()
+        Task { await checkForegroundIfNeeded() }
+    }
+
     static func enableIfNeeded() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in
-            schedule()
-        }
-    }
-
-    static func schedule() {
-        let req = BGAppRefreshTaskRequest(identifier: taskID)
-        req.earliestBeginDate = Date(timeIntervalSinceNow: 6 * 3600)   // ~every 6h, OS decides
-        try? BGTaskScheduler.shared.submit(req)
-    }
-
-    private static func handle(_ task: BGAppRefreshTask) {
-        schedule()   // chain the next one
-        let work = Task {
-            await check()
-            task.setTaskCompleted(success: true)
-        }
-        task.expirationHandler = { work.cancel() }
-    }
-
-    /// Check every source; notify on a changed tag. The first observation per
-    /// source is a silent baseline so we don't fire on initial install.
-    static func check() async {
-        let defaults = UserDefaults.standard
-        for s in sources {
-            guard let tag = try? await latestTag(s.repo) else { continue }
-            let last = defaults.string(forKey: s.lastTagKey)
-            if last == nil {
-                defaults.set(tag, forKey: s.lastTagKey)          // baseline, no notification
-            } else if tag != last {
-                defaults.set(tag, forKey: s.lastTagKey)
-                notify(source: s, tag: tag)
+        let center = UNUserNotificationCenter.current()
+        center.getNotificationSettings { settings in
+            guard settings.authorizationStatus == .notDetermined else {
+                schedule()
+                return
+            }
+            center.requestAuthorization(options: [.alert, .sound]) { _, _ in
+                schedule()
             }
         }
     }
 
+    static func schedule() {
+        let request = BGAppRefreshTaskRequest(identifier: taskID)
+        request.earliestBeginDate = Date(timeIntervalSinceNow: 60 * 60)
+        try? BGTaskScheduler.shared.submit(request)
+    }
+
+    static func checkForegroundIfNeeded(
+        now: Date = Date(),
+        defaults: UserDefaults = .standard
+    ) async {
+        let last = defaults.object(forKey: foregroundCheckKey) as? Date
+        guard last.map({ now.timeIntervalSince($0) >= foregroundCheckInterval }) ?? true else {
+            return
+        }
+        defaults.set(now, forKey: foregroundCheckKey)
+        _ = await check()
+    }
+
+    @discardableResult
+    static func check() async -> Bool {
+        await check(
+            defaults: .standard,
+            sources: sources,
+            latestTag: latestTag,
+            deliver: deliver
+        )
+    }
+
+    /// Injectable core used by unit tests. A changed tag is persisted only after the
+    /// notification request is accepted, so a temporary notification failure cannot
+    /// consume the release and postpone the alert until the next tag.
+    @discardableResult
+    static func check(
+        defaults: UserDefaults,
+        sources: [UpdateReleaseSource],
+        latestTag: (String) async throws -> String,
+        deliver: (UpdateReleaseSource, String) async throws -> Void
+    ) async -> Bool {
+        var allSucceeded = true
+        for source in sources {
+            do {
+                let tag = try await latestTag(source.repo)
+                let last = defaults.string(forKey: source.lastTagKey)
+                if last == nil {
+                    defaults.set(tag, forKey: source.lastTagKey)
+                } else if tag != last {
+                    try await deliver(source, tag)
+                    defaults.set(tag, forKey: source.lastTagKey)
+                }
+            } catch {
+                allSucceeded = false
+            }
+        }
+        return allSucceeded
+    }
+
+    private static func handle(_ task: BGAppRefreshTask) {
+        schedule()
+        let work = Task {
+            let success = await check()
+            task.setTaskCompleted(success: success)
+        }
+        task.expirationHandler = { work.cancel() }
+    }
+
     private static func latestTag(_ repo: String) async throws -> String {
-        var req = URLRequest(url: URL(string: "https://api.github.com/repos/\(repo)/releases/latest")!)
-        req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        let (data, _) = try await URLSession.shared.data(for: req)
-        guard let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let tag = obj["tag_name"] as? String else { throw URLError(.badServerResponse) }
+        var request = URLRequest(
+            url: URL(string: "https://api.github.com/repos/\(repo)/releases/latest")!,
+            cachePolicy: .reloadIgnoringLocalAndRemoteCacheData,
+            timeoutInterval: 30
+        )
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard (response as? HTTPURLResponse)?.statusCode == 200,
+              let object = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let tag = object["tag_name"] as? String,
+              !tag.isEmpty else {
+            throw URLError(.badServerResponse)
+        }
         return tag
     }
 
-    private static func notify(source s: Source, tag: String) {
+    private static func deliver(
+        source: UpdateReleaseSource,
+        tag: String
+    ) async throws {
+        let center = UNUserNotificationCenter.current()
+        let settings = await center.notificationSettings()
+        switch settings.authorizationStatus {
+        case .authorized, .provisional, .ephemeral:
+            break
+        default:
+            throw UpdateNotificationError.notificationsDisabled
+        }
+
         let content = UNMutableNotificationContent()
-        content.title = s.title
-        content.body = s.body(tag)
+        content.title = source.title
+        content.body = source.body(tag)
         content.sound = .default
-        let req = UNNotificationRequest(identifier: "\(s.repo)-\(tag)", content: content, trigger: nil)
-        UNUserNotificationCenter.current().add(req)
+        let request = UNNotificationRequest(
+            identifier: "\(source.repo)-\(tag)",
+            content: content,
+            trigger: nil
+        )
+        try await center.add(request)
+    }
+}
+
+/// Shows immediately-detected release notifications while TumoCompanion is open.
+final class UpdateNotificationPresenter: NSObject, UNUserNotificationCenterDelegate {
+    static let shared = UpdateNotificationPresenter()
+
+    func configure() {
+        UNUserNotificationCenter.current().delegate = self
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification
+    ) async -> UNNotificationPresentationOptions {
+        [.banner, .sound]
     }
 }

@@ -242,6 +242,8 @@ final class FirmwareLibrary: ObservableObject {
         let remoteRoot = "/ext/update/\(release.updateDirectoryName)"
         let activity = InstallActivityController()
         let reporter = TransferActivityReporter(channel: store.channel)
+        var activityCompleted = 0
+        var activityTotal = 1
         do {
             let archiveData = try await cachedArchive(for: release)
             phase = .verifying(version: release.version)
@@ -252,6 +254,7 @@ final class FirmwareLibrary: ObservableObject {
             let files = try FirmwareArchive.decode(
                 archiveData, expectedDirectory: release.updateDirectoryName)
             let ordered = files.filter { $0.name != "update.fuf" } + files.filter { $0.name == "update.fuf" }
+            activityTotal = max(1, ordered.count)
             let total = Int64(ordered.reduce(0) { $0 + $1.data.count })
             var completed: Int64 = 0
 
@@ -270,23 +273,42 @@ final class FirmwareLibrary: ObservableObject {
                 phase = .staging(
                     version: release.version, file: file.name,
                     doneBytes: completed, totalBytes: total)
-                activity.update(current: index + 1, total: ordered.count, name: file.name)
+                activity.update(current: index, total: ordered.count, detail: file.name)
                 reporter.progress(file.name, force: true)
                 let base = completed
                 try await stageFile(
                     file, tempPath: tempPath, finalPath: finalPath,
                     store: store, release: release, base: base, total: total)
                 completed += Int64(file.data.count)
+                activityCompleted = index + 1
+                activity.update(
+                    current: activityCompleted,
+                    total: ordered.count,
+                    detail: file.name
+                )
             }
 
-            activity.finish(installed: ordered.count, total: ordered.count)
+            activity.succeed(
+                completed: ordered.count,
+                total: ordered.count,
+                detail: "Firmware package staged"
+            )
             phase = .done("\(release.version) is ready in Archive > update.")
         } catch {
             try? await store.delete(remoteRoot, recursive: true)
-            activity.cancel()
             if UpdateTaskCancellation.isCancellation(error) {
+                activity.stop(
+                    completed: activityCompleted,
+                    total: activityTotal,
+                    detail: "Staging stopped"
+                )
                 phase = .ready
             } else {
+                activity.fail(
+                    completed: activityCompleted,
+                    total: activityTotal,
+                    detail: error.localizedDescription
+                )
                 phase = .failed(error.localizedDescription)
             }
         }

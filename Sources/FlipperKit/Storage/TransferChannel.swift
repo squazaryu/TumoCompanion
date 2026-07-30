@@ -35,6 +35,9 @@ protocol DeviceFileStore {
     func delete(_ path: String, recursive: Bool) async throws
     func move(_ from: String, to newPath: String) async throws
     func md5(_ path: String) async -> String?
+    /// MD5 with transport failures preserved. A missing file is nil; a dead BLE/USB
+    /// channel throws so reconciliation never turns a disconnect into a fake update.
+    func checkedMD5(_ path: String) async throws -> String?
     func exists(_ path: String) async -> Bool
     func uploadFolder(
         localURL: URL,
@@ -277,6 +280,15 @@ final class USBSDStorage: DeviceFileStore {
 
     func md5(_ path: String) async -> String? {
         guard let data = try? await read(path) else { return nil }
+        return Insecure.MD5.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    }
+
+    func checkedMD5(_ path: String) async throws -> String? {
+        let exists = try withAccess {
+            FileManager.default.fileExists(atPath: try localURL(for: path).path)
+        }
+        guard exists else { return nil }
+        let data = try await read(path)
         return Insecure.MD5.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 

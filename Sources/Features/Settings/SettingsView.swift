@@ -160,33 +160,12 @@ struct SettingsView: View {
                         if let u = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(u) }
                     }
                 }
-                Text("Heads-up when new ESP32 firmware or plugin packs are released — checked in the background (~daily). Local only; no account needed.")
+                Text("Checks when the app opens and whenever iOS grants background time. Background timing is controlled by iOS, so opening TumoCompanion is the fastest local-only refresh.")
                     .font(.caption2).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            SectionCard(title: "Diagnostics", systemImage: "stethoscope") {
-                NavigationLink {
-                    AppBridgeConsoleView()
-                } label: {
-                    Label("App Bridge Console", systemImage: "terminal")
-                }
-                NavigationLink {
-                    TumoVMNFCSmokeView()
-                } label: {
-                    Label("TumoVM NFC Smoke", systemImage: "wave.3.right.circle")
-                }
-                NavigationLink {
-                    TumoCardNFCSmokeView()
-                } label: {
-                    Label("TumoCard NFC Smoke", systemImage: "rectangle.stack.badge.person.crop")
-                }
-                NavigationLink {
-                    TumoFabricView()
-                } label: {
-                    Label("TumoFabric Counter", systemImage: "point.3.connected.trianglepath.dotted")
-                }
-            }
+            DiagnosticsCard()
 
             SectionCard(title: "About", systemImage: "info.circle") {
                 HStack {
@@ -197,10 +176,17 @@ struct SettingsView: View {
                         .foregroundStyle(ble.appBridgeV2 ? .green : .secondary)
                 }
                 Divider().opacity(0.4)
-                HStack {
-                    Text("Version").foregroundStyle(.secondary)
-                    Spacer()
-                    Text(BuildInfo.label).font(.system(.footnote, design: .monospaced)).textSelection(.enabled)
+                HStack(alignment: .top, spacing: 12) {
+                    Text("Version")
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: true, vertical: false)
+                    Text(BuildInfo.label)
+                        .font(.system(.footnote, design: .monospaced))
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                        .multilineTextAlignment(.trailing)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .layoutPriority(1)
+                        .textSelection(.enabled)
                 }
                 Divider().opacity(0.4)
                 Button { settings.onboardingDone = false } label: {
@@ -236,6 +222,111 @@ struct SettingsView: View {
                 if let err = err { iconError = err.localizedDescription }
                 else { iconError = nil; currentIcon = opt.alternateName }
             }
+        }
+    }
+}
+
+private enum DiagnosticHelpTopic: String, Identifiable {
+    case appBridge
+    case tumoVM
+    case tumoCard
+    case tumoFabric
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .appBridge: return "App Bridge Console"
+        case .tumoVM: return "TumoVM NFC Smoke"
+        case .tumoCard: return "TumoCard NFC Smoke"
+        case .tumoFabric: return "TumoFabric Counter"
+        }
+    }
+
+    var explanation: String {
+        switch self {
+        case .appBridge:
+            return "Sends manual App Bridge v2 (FAB2) commands and shows raw replies. Use it to diagnose the bridge protocol, capabilities and framing."
+        case .tumoVM:
+            return "Runs a small NFC transport and state-restoration check against TumoVM. It verifies that the NFC session can open, exchange data and return control safely."
+        case .tumoCard:
+            return "Checks the TumoCard application identifiers and the shared NFC/USB state. It is intended for protocol diagnostics, not for everyday card use."
+        case .tumoFabric:
+            return "Exercises a FAB2 session counter, sequence handling, replay protection and idempotency. It helps find duplicated or out-of-order bridge requests."
+        }
+    }
+}
+
+private struct DiagnosticsCard: View {
+    @State private var helpTopic: DiagnosticHelpTopic?
+
+    var body: some View {
+        CollapsibleCard(
+            title: "Diagnostics",
+            systemImage: "stethoscope",
+            startExpanded: false
+        ) {
+            diagnosticRow(
+                title: "App Bridge Console",
+                systemImage: "terminal",
+                help: .appBridge
+            ) { AppBridgeConsoleView() }
+            Divider().opacity(0.4)
+            diagnosticRow(
+                title: "TumoVM NFC Smoke",
+                systemImage: "wave.3.right.circle",
+                help: .tumoVM
+            ) { TumoVMNFCSmokeView() }
+            Divider().opacity(0.4)
+            diagnosticRow(
+                title: "TumoCard NFC Smoke",
+                systemImage: "rectangle.stack.badge.person.crop",
+                help: .tumoCard
+            ) { TumoCardNFCSmokeView() }
+            Divider().opacity(0.4)
+            diagnosticRow(
+                title: "TumoFabric Counter",
+                systemImage: "point.3.connected.trianglepath.dotted",
+                help: .tumoFabric
+            ) { TumoFabricView() }
+        }
+        .sheet(item: $helpTopic) { topic in
+            NavigationStack {
+                ScrollView {
+                    Text(topic.explanation)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding()
+                }
+                .navigationTitle(topic.title)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { helpTopic = nil }
+                    }
+                }
+            }
+            .presentationDetents([.medium])
+        }
+    }
+
+    private func diagnosticRow<Destination: View>(
+        title: String,
+        systemImage: String,
+        help: DiagnosticHelpTopic,
+        @ViewBuilder destination: () -> Destination
+    ) -> some View {
+        HStack(spacing: 12) {
+            NavigationLink(destination: destination()) {
+                Label(title, systemImage: systemImage)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            Button { helpTopic = help } label: {
+                Image(systemName: "questionmark.circle")
+                    .font(.title3)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(Theme.accent)
+            .accessibilityLabel("About \(title)")
         }
     }
 }

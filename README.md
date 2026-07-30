@@ -6,7 +6,7 @@
 
 **A native iOS companion for Flipper Zero** — BLE/USB SD file access, screen mirror, Sub-GHz/NFC, a Sber smart-relay failsafe, Marauder log analysis, ESP32 firmware flashing, and live Claude Code status on your Flipper.
 
-![version](https://img.shields.io/badge/version-1.7.14-F36E12)
+![version](https://img.shields.io/badge/version-1.8.0-F36E12)
 ![platform](https://img.shields.io/badge/iOS-17%2B-black?logo=apple)
 ![SwiftUI](https://img.shields.io/badge/SwiftUI-5.9-orange?logo=swift)
 ![transport](https://img.shields.io/badge/transport-BLE%20%2B%20USB%20SD-blue?logo=bluetooth)
@@ -87,7 +87,7 @@ https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/apps.json
 ### 🔔 Quality of life
 - **all-the-plugins** auto-updater and ~daily background notifications for new plugin packs and ESP32 firmware (local only, no account).
 - **Live Activity** for installs (plugin packs *and* firmware packages) — live per-file progress on the lock screen and Dynamic Island, with a screen-awake guard so a long BLE install isn't interrupted.
-- **Home-screen widgets** — Quick Actions (deep-link to Files / Screen / Relay / WiFi) and Relay controls. *(Live-data widgets — battery, AI Radar, relay state — need an App-Group-capable signer such as SideStore/AltStore; under Feather only the deep-link widgets are shown.)*
+- **Live Activity** — accurate install progress on the Lock Screen and Dynamic Island for firmware packages, firmware staging, and plugin installs.
 - Card-based UI; **4 app-icon styles** — Light, Dark, Liquid Glass, Liquid Glass · Dark — plus an **Auto** icon that follows the system appearance; light/dark themes.
 
 ## App Bridge (FAB1 / FAB2)
@@ -122,7 +122,7 @@ The Sber relay doesn't report a reliable *steady* state back to Home Assistant (
 
 ## Build from source
 
-The repository contains the complete SwiftUI application, widget extension,
+The repository contains the complete SwiftUI application, Live Activity extension,
 tests, Feather source metadata and release scripts. The internal Xcode target
 remains unchanged internally to preserve the existing iOS update identity.
 

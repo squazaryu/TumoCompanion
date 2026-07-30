@@ -1,8 +1,6 @@
 import Foundation
 import Combine
 import os
-import WidgetKit
-import UnleashedShared
 
 private let rlog = Logger(subsystem: "com.tumoflip.unleashedcompanion", category: "relay")
 
@@ -83,8 +81,6 @@ final class RelayExecutor: ObservableObject {
             let d = UserDefaults.standard
             if let s = relayState { d.set(s, forKey: "relayLastState") }
             else { d.removeObject(forKey: "relayLastState") }
-            SharedStore.saveRelay(.init(on: relayState, updated: Date()))
-            WidgetCenter.shared.reloadAllTimelines()
         }
     }
     @Published private(set) var stateError: String? // diagnostic from a manual HA read

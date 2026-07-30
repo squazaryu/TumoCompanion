@@ -104,10 +104,6 @@ struct PluginUpdatesDetailView: View {
             }
         }
         .onAppear { if case .idle = updater.phase, updater.updates.isEmpty { Task { await updater.check() } } }
-        .onChange(of: ble.state) { state in
-            guard state == .ready else { return }
-            Task { await updater.validateCompatibility() }
-        }
         .sheet(isPresented: $showReleasePicker) {
             NavigationStack { PluginReleasePickerView(updater: updater) }
         }

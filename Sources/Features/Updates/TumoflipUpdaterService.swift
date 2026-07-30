@@ -357,8 +357,8 @@ final class TumoflipUpdater: ObservableObject {
             manifest = m
             packageZipURL = selection.release.asset("tumoflip-packages.zip")
             hasPackageZip = packageZipURL != nil
-            phase = .ready
             await refreshStatus()
+            phase = .ready
             // FAP/FAL API validation needs the package zip; it's triggered from the FW
             // Packages detail screen (where the user installs) rather than here, so just
             // opening the Updates overview doesn't force a package download.
@@ -426,7 +426,7 @@ final class TumoflipUpdater: ObservableObject {
             // incompatible with the CONNECTED firmware. Read fresh device_info now and
             // gate BEFORE ensureLoaderIdle / staging / backup / cleanup, so nothing is
             // written for a rejected binary. Non-FAP data files keep their SHA/size checks.
-            let (devApi, devTarget) = await deviceApiTarget()
+            let (devApi, devTarget) = try await deviceApiTarget()
             compatibilityApiMajor = devApi
             compatibilityTarget = devTarget
             compatibilityChecked = true
@@ -469,7 +469,7 @@ final class TumoflipUpdater: ObservableObject {
             ) { [weak self] done, total, file in
                 Task { @MainActor in
                     self?.phase = .installing(done: done, total: total, file: file)
-                    live.update(current: done, total: total, name: file)
+                    live.update(current: done, total: total, detail: file)
                     transferReporter.progress(file)
                 }
             }
@@ -477,24 +477,45 @@ final class TumoflipUpdater: ObservableObject {
             switch outcome {
             case .alreadyInstalled:
                 phase = .done("Already installed — nothing to do.")
+                live.succeed(
+                    completed: 2 * plan.files.count,
+                    total: 2 * plan.files.count,
+                    detail: "Already installed"
+                )
             case let .installed(files, _):
                 phase = .done("Installed \(files) file\(files == 1 ? "" : "s").")
+                live.succeed(
+                    completed: 2 * plan.files.count,
+                    total: 2 * plan.files.count,
+                    detail: "Firmware packages installed"
+                )
             }
-            live.finish(installed: 2 * plan.files.count, total: 2 * plan.files.count)
             await refreshStatus()
         } catch TumoflipInstallError.cancelled {
             // Stop requested: the transaction rolled back, so the device is exactly as
             // before — every prior version intact and fully functional.
             phase = .done("Stopped — rolled back to the previous version, nothing changed.")
-            live.cancel()
+            live.stop(
+                completed: 0,
+                total: max(1, selectedFileCount * 2),
+                detail: "Rolled back"
+            )
             await refreshStatus()
         } catch let e as TumoflipInstallError {
             phase = .failed(installErrorText(e))
-            live.cancel()
+            live.fail(
+                completed: 0,
+                total: max(1, selectedFileCount * 2),
+                detail: installErrorText(e)
+            )
             await refreshStatus()
         } catch {
             phase = .failed(friendly(error))
-            live.cancel()
+            live.fail(
+                completed: 0,
+                total: max(1, selectedFileCount * 2),
+                detail: friendly(error)
+            )
             await refreshStatus()
         }
     }
@@ -571,11 +592,15 @@ final class TumoflipUpdater: ObservableObject {
                 [weak self] done, total, file in
                 Task { @MainActor in
                     self?.phase = .cleaning(done: done, total: total, file: file)
-                    live.update(current: done, total: total, name: file)
+                    live.update(current: done, total: total, detail: file)
                     transferReporter.progress(file, force: true)
                 }
             }
-            live.finish(installed: removed, total: selection.entries.count)
+            live.succeed(
+                completed: removed,
+                total: selection.entries.count,
+                detail: removed == 0 ? "Nothing to clean" : "Cleanup completed"
+            )
             phase = .done(
                 removed == 0
                     ? "No legacy files remain."
@@ -583,15 +608,27 @@ final class TumoflipUpdater: ObservableObject {
             await refreshStatus()
         } catch TumoflipInstallError.cancelled {
             phase = .done("Stopped — cleanup rolled back, nothing changed.")
-            live.cancel()
+            live.stop(
+                completed: 0,
+                total: selection.entries.count,
+                detail: "Cleanup rolled back"
+            )
             await refreshStatus()
         } catch let error as TumoflipInstallError {
             phase = .failed(installErrorText(error))
-            live.cancel()
+            live.fail(
+                completed: 0,
+                total: selection.entries.count,
+                detail: installErrorText(error)
+            )
             await refreshStatus()
         } catch {
             phase = .failed(friendly(error))
-            live.cancel()
+            live.fail(
+                completed: 0,
+                total: selection.entries.count,
+                detail: friendly(error)
+            )
             await refreshStatus()
         }
     }
@@ -635,7 +672,10 @@ final class TumoflipUpdater: ObservableObject {
 
     /// Read the connected Flipper's identity and reject incompatible packages.
     private func checkCompatibility(_ manifest: TumoflipManifest) async throws {
-        let info = (try? await FlipperSystem().deviceInfo()) ?? []
+        guard FlipperBLE.shared.serialOwner == .rpc else {
+            throw FlipperRPCError.serialOwnedByClaudeBuddy
+        }
+        let info = try await FlipperSystem().deviceInfo()
         let identity = TumoflipDeviceIdentity(deviceInfo: info)
         deviceIdentity = identity
         firmwareRoute = TumoflipFirmwareRouter.route(identity: identity, manualOverride: manualChannelOverride)
@@ -654,9 +694,14 @@ final class TumoflipUpdater: ObservableObject {
 
     /// Fresh device firmware API major + hardware target, read immediately before use.
     /// Both nil when the Flipper is unreachable (fail-closed at the call sites).
-    private func deviceApiTarget() async -> (api: Int?, target: Int?) {
-        guard FlipperBLE.shared.state == .ready else { return (nil, nil) }
-        let info = (try? await FlipperSystem().deviceInfo()) ?? []
+    private func deviceApiTarget() async throws -> (api: Int?, target: Int?) {
+        guard FlipperBLE.shared.state == .ready else {
+            throw FlipperRPCError.notReady
+        }
+        guard FlipperBLE.shared.serialOwner == .rpc else {
+            throw FlipperRPCError.serialOwnedByClaudeBuddy
+        }
+        let info = try await FlipperSystem().deviceInfo()
         let dict = Dictionary(info, uniquingKeysWith: { a, _ in a })
         return (dict["firmware_api_major"].flatMap(Int.init), dict["hardware_target"].flatMap(Int.init))
     }
@@ -716,7 +761,15 @@ final class TumoflipUpdater: ObservableObject {
         }
         validating = true
         defer { validating = false }
-        let (api, target) = await deviceApiTarget()
+        let api: Int?
+        let target: Int?
+        do {
+            (api, target) = try await deviceApiTarget()
+        } catch {
+            // Preserve the last valid result during a reconnect instead of showing
+            // every FAP as unknown or claiming the Flipper is disconnected.
+            return
+        }
         compatibilityApiMajor = api
         compatibilityTarget = target
         guard let source = try? await packageSource() else {

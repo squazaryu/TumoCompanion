@@ -1,7 +1,5 @@
 import SwiftUI
 import UIKit
-import WidgetKit
-import UnleashedShared
 
 @main
 struct UnleashedApp: App {
@@ -28,7 +26,11 @@ struct UnleashedApp: App {
         UITabBar.appearance().scrollEdgeAppearance = appearance
 
         // BG task handler must be registered before launch completes.
+        UpdateNotificationPresenter.shared.configure()
         PluginUpdateMonitor.register()
+        Task { @MainActor in
+            await InstallActivityController.dismissOrphanedActivities()
+        }
     }
 
     var body: some Scene {
@@ -46,13 +48,13 @@ struct UnleashedApp: App {
                 .tint(.orange)
                 .background(WindowStyleApplier(style: settings.appearance.uiStyle))
         }
-        .onChange(of: scenePhase) { phase in
+        .onChange(of: scenePhase) { _, phase in
             // Coming back to the foreground: reattach to the Flipper. A Flipper
             // stops advertising while connected, so this reattaches to the held
             // link instead of a scan that would never find it.
             if phase == .active {
                 ble.autoConnect()
-                PluginUpdateMonitor.enableIfNeeded()
+                PluginUpdateMonitor.applicationDidBecomeActive()
                 MacBridgeDiscovery.shared.start()
                 HomeAssistantDiscovery.shared.start()
                 BuddyRelay.shared.startIfEnabled()
@@ -74,6 +76,10 @@ struct RootView: View {
 #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("-fw-packages-action-bar-qa") {
             FWPackagesActionBarQAView()
+        } else if ProcessInfo.processInfo.arguments.contains("-device-info-layout-qa") {
+            DeviceInfoLayoutQAView()
+        } else if ProcessInfo.processInfo.arguments.contains("-live-activity-layout-qa") {
+            LiveActivityLayoutQAView()
         } else {
             appContent
         }
@@ -90,9 +96,6 @@ struct RootView: View {
                 OnboardingView { settings.onboardingDone = true }
             }
             .onOpenURL { handle($0) }
-            .onChange(of: ble.state) { _ in writeFlipperStatus() }
-            .onChange(of: ble.battery) { _ in writeFlipperStatus() }
-            .task { writeFlipperStatus() }
     }
 
     private var tabs: some View {
@@ -112,7 +115,7 @@ struct RootView: View {
         }
     }
 
-    /// Handle widget / Shortcut deep links: unleashed://<dest> and unleashed://relay/<action>.
+    /// Handle external / Shortcut deep links: unleashed://<dest> and unleashed://relay/<action>.
     /// Files / Relay / WiFi are no longer tabs, so they're pushed onto Home's stack.
     private func handle(_ url: URL) {
         guard url.scheme == "unleashed" else { return }
@@ -133,17 +136,33 @@ struct RootView: View {
         }
     }
 
-    /// Mirror live Flipper state into the App Group so the home-screen widgets show it.
-    /// Firmware/name are filled in by the device-info screen; preserved here.
-    private func writeFlipperStatus() {
-        let connected = ble.state == .ready || ble.state == .connected
-        let prev = SharedStore.flipper()
-        SharedStore.saveFlipper(.init(
-            connected: connected,
-            battery: ble.battery,
-            firmware: prev?.firmware ?? "",
-            name: prev?.name ?? "",
-            updated: Date()))
-        WidgetCenter.shared.reloadAllTimelines()
+}
+
+#if DEBUG
+private struct LiveActivityLayoutQAView: View {
+    @State private var controller = InstallActivityController()
+
+    var body: some View {
+        VStack(spacing: 18) {
+            Image(systemName: "square.and.arrow.down")
+                .font(.largeTitle)
+                .foregroundStyle(Theme.accent)
+            Text("Live Activity QA")
+                .font(.headline)
+            Text("Background the app to inspect Lock Screen and Dynamic Island progress.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding()
+        .task {
+            controller.start(total: 4, title: "Installing firmware packages")
+            controller.update(
+                current: 2,
+                total: 4,
+                detail: "tumoflip_xremote.fap"
+            )
+        }
     }
 }
+#endif
