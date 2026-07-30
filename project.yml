@@ -18,8 +18,8 @@ packages:
 
 settings:
   base:
-    MARKETING_VERSION: "1.7.14"
-    CURRENT_PROJECT_VERSION: "202"
+    MARKETING_VERSION: "1.8.0"
+    CURRENT_PROJECT_VERSION: "203"
     SWIFT_VERSION: "5.9"
     DEVELOPMENT_TEAM: ""
     CODE_SIGN_STYLE: Manual
@@ -104,8 +104,6 @@ targets:
     entitlements:
       path: Resources/UnleashedCompanion.entitlements
       properties:
-        com.apple.security.application-groups:
-          - group.com.tumoflip.unleashedcompanion
         com.apple.developer.nfc.readersession.formats:
           - TAG
     settings:
@@ -116,8 +114,8 @@ targets:
         ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS: "YES"
         ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: AppIcon-Mono AppIcon-Green AppIcon-Purple AppIcon-Dolphin
 
-  # Shared framework: holds the Live Activity attributes so the app and the widget
-  # extension reference the SAME type (cross-module ActivityKit matching needs it).
+  # Shared framework: holds the Live Activity attributes so the app and the extension
+  # reference the SAME type (cross-module ActivityKit matching needs it).
   UnleashedShared:
     type: framework
     platform: iOS
@@ -129,7 +127,7 @@ targets:
         GENERATE_INFOPLIST_FILE: "YES"
         SKIP_INSTALL: "NO"
 
-  # WidgetKit extension: Live Activity UI (install progress).
+  # WidgetKit extension retained only for Live Activity UI (install progress).
   UnleashedWidgets:
     type: app-extension
     platform: iOS
@@ -146,11 +144,6 @@ targets:
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
-    entitlements:
-      path: Widgets/UnleashedWidgets.entitlements
-      properties:
-        com.apple.security.application-groups:
-          - group.com.tumoflip.unleashedcompanion
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.tumoflip.unleashedcompanion.widgets

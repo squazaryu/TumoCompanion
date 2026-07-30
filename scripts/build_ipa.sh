@@ -64,12 +64,10 @@ if [ "$(plutil -extract CFBundlePackageType raw "$APP/Info.plist")" != "APPL" ];
   exit 1
 fi
 
-# Ad-hoc sign with the App Group entitlements EMBEDDED, so a re-signer (Feather /
-# AltStore / Sideloadly) reads `com.apple.security.application-groups` from the
-# existing signature and carries it into its own signature — without this the
-# home-screen widgets get no shared container ("Widgets: unavailable"). Sign nested
-# code first (frameworks, then the widget appex), then the outer app.
-echo "==> Embedding App Group entitlements (ad-hoc)"
+# Sign nested code first (shared framework, then the Live Activity extension),
+# followed by the outer app. Home Screen widgets and their App Group were removed;
+# the extension remains because ActivityKit renders Live Activities through it.
+echo "==> Ad-hoc signing nested code and app"
 APPEX="$APP/PlugIns/UnleashedWidgets.appex"
 if [ -d "$APP/Frameworks" ]; then
   for fw in "$APP/Frameworks/"*; do
@@ -77,13 +75,10 @@ if [ -d "$APP/Frameworks" ]; then
   done
 fi
 if [ -d "$APPEX" ]; then
-  codesign --force --sign - --timestamp=none \
-    --entitlements "$ROOT/Widgets/UnleashedWidgets.entitlements" "$APPEX"
-  echo "    widget appex app-groups: $(codesign -d --entitlements - "$APPEX" 2>/dev/null | grep -c application-groups)"
+  codesign --force --sign - --timestamp=none "$APPEX"
 fi
 codesign --force --sign - --timestamp=none \
   --entitlements "$ROOT/Resources/UnleashedCompanion.entitlements" "$APP"
-echo "    app app-groups: $(codesign -d --entitlements - "$APP" 2>/dev/null | grep -c application-groups)"
 
 echo "==> Packaging IPA from $APP"
 rm -rf build/ipa

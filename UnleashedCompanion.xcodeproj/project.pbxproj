@@ -22,6 +22,7 @@
 		19DFE5895853A9679A01976A /* USBStorageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCE7269E5AB13331C01704F7 /* USBStorageTests.swift */; };
 		1AE382BCB64AC41DE36D359F /* WiFiMapperLiveMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A84647765F90EDA3EED9B484 /* WiFiMapperLiveMapView.swift */; };
 		1D65DE3335571D6E326C95C1 /* FirmwareLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 856D8627B88920587D56B850 /* FirmwareLibrary.swift */; };
+		2066FEBC29259A4E4EE5964A /* TransferActivityReporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFAFC266DB9145E7CF8D0504 /* TransferActivityReporterTests.swift */; };
 		20E37F40F64BD3080356A54F /* MacBridgeDiscovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = C45488972BD725C3ECE8BDA8 /* MacBridgeDiscovery.swift */; };
 		26FF73B8130C693F08F1E0ED /* UpdatesCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECF30EB507BBE4F21FC1E85D /* UpdatesCoordinator.swift */; };
 		27599EE38999934EC1A45783 /* SberCloud.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76878DEC8BC405158A23294C /* SberCloud.swift */; };
@@ -35,6 +36,7 @@
 		345773BBA61CE3969A8F861D /* MediaRemoteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11F891A5C5257DF57F4A24F /* MediaRemoteView.swift */; };
 		3508D2DF378C22434730D556 /* RemotesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A0A014201261EED37823E5C /* RemotesView.swift */; };
 		358C8C06E879E7C1C092B49A /* InstallActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EA9037CE5911F4E4DF8951C /* InstallActivityAttributes.swift */; };
+		382D481F4B3744731A3527CE /* PluginUpdateMonitorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D74C1AC4E19C6F9FC21C9D8D /* PluginUpdateMonitorTests.swift */; };
 		3A33EB625F256D95748132BB /* LocationProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9E15B5C37393C6ADFB482C2 /* LocationProvider.swift */; };
 		3AE3A3C058B65ACBC7B6B3A4 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 89D1A875D2EC8E243C24C7DA /* ZIPFoundation */; };
 		3B8F9FDDE4E195CFAB92B2A1 /* InstallActivityController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7DFAFD2A63623B73457A3B2 /* InstallActivityController.swift */; };
@@ -57,6 +59,7 @@
 		5441B6081BFE2F6A4CCD4970 /* FlipperRPC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67C0B0C4BD832B6A0C849C3A /* FlipperRPC.swift */; };
 		54AD23ED5234F284C394FF85 /* TumoFabric.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE4449AEEFC4858417F6F97A /* TumoFabric.swift */; };
 		558EF6327C3F312D4C1A26B7 /* MarauderLiveAggregationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F246F25BA68E90EAD73408E /* MarauderLiveAggregationTests.swift */; };
+		55DF4154B997B215DD5CF9C6 /* InstallActivityAttributesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ECE4D716C1F73A551397D21 /* InstallActivityAttributesTests.swift */; };
 		561C47A5EC74F7DF05D11A2B /* HomeAssistantDiscoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D70BBAA6C69E3FCD8488170 /* HomeAssistantDiscoveryTests.swift */; };
 		56630654C5F12C545C47A195 /* AIRadarBridgeClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95FA4896B7AE237BFC022E1E /* AIRadarBridgeClient.swift */; };
 		58ADEF0B8E8D011FDB32D17F /* BridgeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A72EEDF7D1BE89A42EBAFB7D /* BridgeView.swift */; };
@@ -100,7 +103,6 @@
 		A2FA43CE0B4A58285A1A58DA /* TumoflipManifestTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4333919B345598E3C08BFCD /* TumoflipManifestTests.swift */; };
 		A30F13ACC0229564B37C93F9 /* TransferActivityReporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45807167A09B0989A1262077 /* TransferActivityReporter.swift */; };
 		A67E7F06A079691F84FE3B2A /* MarauderLiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C823E47E64B2DF1022C4964B /* MarauderLiveView.swift */; };
-		A6A4146361C6BD065E954831 /* SharedStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AE48B57CC481A536DB9AB49 /* SharedStore.swift */; };
 		A8BA58C91AF58AB4871C32C2 /* FlipperBackup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B35CB407A050A2BA05BFED2 /* FlipperBackup.swift */; };
 		A910F14D11CCC2B19261AB3F /* BackupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F48EA867BF44D4BC76EDE7E /* BackupView.swift */; };
 		A9DC9FF761C1761A9C3BF594 /* UpdatesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 263FF028D83D9F5E4C56E6CF /* UpdatesView.swift */; };
@@ -241,6 +243,7 @@
 		3AA09E6B23CF0D4774C8E449 /* TumoNet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoNet.swift; sourceTree = "<group>"; };
 		3B35CB407A050A2BA05BFED2 /* FlipperBackup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlipperBackup.swift; sourceTree = "<group>"; };
 		3B425A6BF85037300E8AFB83 /* gui.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = gui.pb.swift; sourceTree = "<group>"; };
+		3ECE4D716C1F73A551397D21 /* InstallActivityAttributesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstallActivityAttributesTests.swift; sourceTree = "<group>"; };
 		3F693046B543D525DC64F4D9 /* AIRadarRelay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIRadarRelay.swift; sourceTree = "<group>"; };
 		3FDC334B8785EB5B2A51B922 /* CatalogListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogListView.swift; sourceTree = "<group>"; };
 		406855A4F6EC92517E41CF68 /* FirmwareArchiveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirmwareArchiveTests.swift; sourceTree = "<group>"; };
@@ -263,11 +266,9 @@
 		5D5AA653C25A05CF91F348E8 /* TumoflipManifest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoflipManifest.swift; sourceTree = "<group>"; };
 		5DB011D9C22032D6D39A1ECF /* flipper.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = flipper.pb.swift; sourceTree = "<group>"; };
 		5F48EA867BF44D4BC76EDE7E /* BackupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupView.swift; sourceTree = "<group>"; };
-		606FC35F0A9328E214CDEE6B /* UnleashedWidgets.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = UnleashedWidgets.entitlements; sourceTree = "<group>"; };
 		61C88C49155B1D53CE4859BA /* TumoFabricView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoFabricView.swift; sourceTree = "<group>"; };
 		63CF454F5F1DBADC991DD631 /* FirmwareCatalogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirmwareCatalogTests.swift; sourceTree = "<group>"; };
 		67C0B0C4BD832B6A0C849C3A /* FlipperRPC.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlipperRPC.swift; sourceTree = "<group>"; };
-		6AE48B57CC481A536DB9AB49 /* SharedStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedStore.swift; sourceTree = "<group>"; };
 		6DB8FBDDFA1BA4791D40EADD /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		6E38D7DF4DD5D32376A5F7CC /* TumoSpectrumViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoSpectrumViewModel.swift; sourceTree = "<group>"; };
 		6EFC5D9580C2A7DD169D763E /* CatalogAppDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogAppDetailView.swift; sourceTree = "<group>"; };
@@ -332,6 +333,7 @@
 		CC55E01E623BEF12E94B15DA /* DolphinPreviews */ = {isa = PBXFileReference; lastKnownFileType = folder; name = DolphinPreviews; path = Resources/DolphinPreviews; sourceTree = SOURCE_ROOT; };
 		CFD10DB620EC18749FE46591 /* FirmwareLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirmwareLibraryView.swift; sourceTree = "<group>"; };
 		D40FDF9AC257DE97849E36E9 /* DolphinProfileService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DolphinProfileService.swift; sourceTree = "<group>"; };
+		D74C1AC4E19C6F9FC21C9D8D /* PluginUpdateMonitorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginUpdateMonitorTests.swift; sourceTree = "<group>"; };
 		DB003747D5AF7D07C4094F9F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		DC29E67F84F7B70C836FB6EB /* UnleashedTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = UnleashedTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		DCE61D0B4EB2C9925E58FA87 /* DevicesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevicesView.swift; sourceTree = "<group>"; };
@@ -353,6 +355,7 @@
 		FB7E01B87B6C90282CEE9FE0 /* SettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsStore.swift; sourceTree = "<group>"; };
 		FCB5C504F3756F796BB35073 /* DolphinGalleryUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DolphinGalleryUITests.swift; sourceTree = "<group>"; };
 		FCE7269E5AB13331C01704F7 /* USBStorageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = USBStorageTests.swift; sourceTree = "<group>"; };
+		FFAFC266DB9145E7CF8D0504 /* TransferActivityReporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferActivityReporterTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -613,11 +616,14 @@
 				406855A4F6EC92517E41CF68 /* FirmwareArchiveTests.swift */,
 				63CF454F5F1DBADC991DD631 /* FirmwareCatalogTests.swift */,
 				8D70BBAA6C69E3FCD8488170 /* HomeAssistantDiscoveryTests.swift */,
+				3ECE4D716C1F73A551397D21 /* InstallActivityAttributesTests.swift */,
 				8F246F25BA68E90EAD73408E /* MarauderLiveAggregationTests.swift */,
 				B3D4263C468870ABFDEB8589 /* PluginProtectionPolicyTests.swift */,
 				34BC23F6FD22122831005AA0 /* PluginSelectionPolicyTests.swift */,
+				D74C1AC4E19C6F9FC21C9D8D /* PluginUpdateMonitorTests.swift */,
 				0711A5F791B6D248100D3EBD /* ProtocolTests.swift */,
 				EDD681FE18BFDF3BD90EC71D /* RuntimeDiagnosticsTests.swift */,
+				FFAFC266DB9145E7CF8D0504 /* TransferActivityReporterTests.swift */,
 				985815E6A1B91675260A0A0D /* TumoFabricTests.swift */,
 				2E66A60CC5ADE5831A2D34FF /* TumoflipFirmwareRoutingTests.swift */,
 				A3CBD3609865B0C18EB48702 /* TumoflipInstallerTests.swift */,
@@ -714,7 +720,6 @@
 			isa = PBXGroup;
 			children = (
 				1EA9037CE5911F4E4DF8951C /* InstallActivityAttributes.swift */,
-				6AE48B57CC481A536DB9AB49 /* SharedStore.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -785,7 +790,6 @@
 			isa = PBXGroup;
 			children = (
 				972149B84383F12E16D90AB8 /* Info.plist */,
-				606FC35F0A9328E214CDEE6B /* UnleashedWidgets.entitlements */,
 				5122076A627322769B9B5014 /* UnleashedWidgets.swift */,
 			);
 			path = Widgets;
@@ -1003,7 +1007,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				358C8C06E879E7C1C092B49A /* InstallActivityAttributes.swift in Sources */,
-				A6A4146361C6BD065E954831 /* SharedStore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1028,11 +1031,14 @@
 				CCE4664E2C132A8662B2F7F3 /* FirmwareArchiveTests.swift in Sources */,
 				DBF198850F9BCC58CE887DCF /* FirmwareCatalogTests.swift in Sources */,
 				561C47A5EC74F7DF05D11A2B /* HomeAssistantDiscoveryTests.swift in Sources */,
+				55DF4154B997B215DD5CF9C6 /* InstallActivityAttributesTests.swift in Sources */,
 				558EF6327C3F312D4C1A26B7 /* MarauderLiveAggregationTests.swift in Sources */,
 				028086AFF37EFC8952E84483 /* PluginProtectionPolicyTests.swift in Sources */,
 				497514C65E0284BC9C754AC1 /* PluginSelectionPolicyTests.swift in Sources */,
+				382D481F4B3744731A3527CE /* PluginUpdateMonitorTests.swift in Sources */,
 				EAC0D7A0739C0B6EF7565475 /* ProtocolTests.swift in Sources */,
 				C390ACDEA69EE872DDF566E0 /* RuntimeDiagnosticsTests.swift in Sources */,
+				2066FEBC29259A4E4EE5964A /* TransferActivityReporterTests.swift in Sources */,
 				9570769329A543974A6E3501 /* TumoFabricTests.swift in Sources */,
 				B9D37723F9996CB284C2DB28 /* TumoNetTests.swift in Sources */,
 				BC76D387812E9C5E0D6DDF69 /* TumoSpectrumReportTests.swift in Sources */,
@@ -1228,7 +1234,7 @@
 				CODE_SIGNING_REQUIRED = NO;
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 202;
+				CURRENT_PROJECT_VERSION = 203;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -1248,7 +1254,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 1.7.14;
+				MARKETING_VERSION = 1.8.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -1281,7 +1287,6 @@
 		4C36611B3DB4F124F3578C8F /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = Widgets/UnleashedWidgets.entitlements;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Widgets/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../Frameworks";
@@ -1311,7 +1316,6 @@
 		5BE7382BEC0505C8FD536C0B /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = Widgets/UnleashedWidgets.entitlements;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Widgets/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../Frameworks";
@@ -1455,7 +1459,7 @@
 				CODE_SIGNING_REQUIRED = NO;
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 202;
+				CURRENT_PROJECT_VERSION = 203;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = "";
 				ENABLE_NS_ASSERTIONS = NO;
@@ -1469,7 +1473,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 1.7.14;
+				MARKETING_VERSION = 1.8.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";

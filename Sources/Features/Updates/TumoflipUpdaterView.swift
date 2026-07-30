@@ -69,10 +69,6 @@ struct TumoflipUpdaterView: View {
                 Task { await updater.reload(recover: hasFileChannel) }
             }
         }
-        .onChange(of: ble.state) { state in
-            guard state == .ready else { return }
-            Task { await updater.validateCompatibility() }
-        }
         .sheet(isPresented: $showHelp) { TumoflipPackagesHelpView() }
         .confirmationDialog(
             "Switch package channel?",

@@ -1,7 +1,5 @@
 import Foundation
 import SwiftUI
-import WidgetKit
-import UnleashedShared
 
 @MainActor
 final class DeviceInfoViewModel: ObservableObject {
@@ -32,23 +30,9 @@ final class DeviceInfoViewModel: ObservableObject {
             async let p = system.powerInfo()
             info = try await i
             power = try await p
-            mirrorToWidgets()
         } catch {
             self.error = error.localizedDescription
         }
-    }
-
-    /// Fill in firmware + device name for the Flipper-status widget, preserving the
-    /// live connection/battery fields written elsewhere.
-    private func mirrorToWidgets() {
-        let prev = SharedStore.flipper()
-        SharedStore.saveFlipper(.init(
-            connected: prev?.connected ?? true,
-            battery: prev?.battery,
-            firmware: value("firmware_version") ?? "",
-            name: value("hardware_name") ?? "Flipper",
-            updated: Date()))
-        WidgetCenter.shared.reloadAllTimelines()
     }
 
     // MARK: - Curated summary
@@ -283,11 +267,7 @@ struct DeviceInfoView: View {
     }
 
     private func infoRow(_ label: String, _ value: String) -> some View {
-        HStack {
-            Text(label).foregroundStyle(.secondary)
-            Spacer()
-            Text(value).multilineTextAlignment(.trailing).textSelection(.enabled)
-        }
+        DeviceInfoValueRow(label: label, value: value)
     }
 
     private func formatBytes(_ bytes: Int) -> String {
@@ -295,11 +275,81 @@ struct DeviceInfoView: View {
     }
 
     private func rawRow(_ key: String, _ value: String) -> some View {
-        HStack(alignment: .top) {
-            Text(key).font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
-            Spacer()
-            Text(value).font(.system(.caption2, design: .monospaced))
-                .multilineTextAlignment(.trailing).textSelection(.enabled)
+        DeviceInfoRawRow(key: key, value: value)
+    }
+}
+
+private struct DeviceInfoValueRow: View {
+    let label: String
+    let value: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Text(label)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: true, vertical: false)
+            Text(value)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .multilineTextAlignment(.trailing)
+                .fixedSize(horizontal: false, vertical: true)
+                .layoutPriority(1)
+                .textSelection(.enabled)
         }
     }
 }
+
+private struct DeviceInfoRawRow: View {
+    let key: String
+    let value: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Text(key)
+                .font(.system(.caption2, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: true, vertical: false)
+            Text(value)
+                .font(.system(.caption2, design: .monospaced))
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .multilineTextAlignment(.trailing)
+                .fixedSize(horizontal: false, vertical: true)
+                .layoutPriority(1)
+                .textSelection(.enabled)
+        }
+    }
+}
+
+#if DEBUG
+struct DeviceInfoLayoutQAView: View {
+    var body: some View {
+        NavigationStack {
+            CardScroll {
+                SectionCard(title: "Device", systemImage: "cpu") {
+                    DeviceInfoValueRow(label: "Model", value: "Flipper Zero v12")
+                    DeviceInfoValueRow(
+                        label: "Firmware",
+                        value: "TUMOFLIP t-dev-001-004 (f8bd0710df, 2026-07-29 23:58:41)"
+                    )
+                    DeviceInfoValueRow(label: "Region", value: "R04: WORLD")
+                }
+                CollapsibleCard(
+                    title: "All properties (3)",
+                    systemImage: "list.bullet.rectangle",
+                    startExpanded: true
+                ) {
+                    DeviceInfoRawRow(
+                        key: "firmware_version",
+                        value: "t-dev-001-004-f8bd0710df"
+                    )
+                    DeviceInfoRawRow(
+                        key: "firmware_build_date",
+                        value: "2026-07-29 23:58:41"
+                    )
+                }
+            }
+            .navigationTitle("Device info")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+}
+#endif

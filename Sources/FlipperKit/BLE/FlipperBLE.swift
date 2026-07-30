@@ -36,6 +36,14 @@ enum FlipperConnectionState: Equatable {
     case ready          // services + characteristics discovered, RPC usable
 }
 
+/// The serial/RPC pipe and App Bridge are independent BLE channels. Claude Buddy
+/// can temporarily own serial while App Bridge v2 remains fully connected.
+enum SerialChannelOwner: Equatable {
+    case unavailable
+    case rpc
+    case claudeBuddy
+}
+
 struct DiscoveredFlipper: Identifiable, Equatable {
     let id: UUID            // CBPeripheral.identifier
     var name: String
@@ -49,19 +57,28 @@ struct DiscoveredFlipper: Identifiable, Equatable {
 final class FlipperBLE: NSObject, ObservableObject {
     static let shared = FlipperBLE()
 
-    @Published private(set) var state: FlipperConnectionState = .disconnected
+    @Published private(set) var state: FlipperConnectionState = .disconnected {
+        didSet {
+            if state == .ready {
+                serialOwner = .rpc
+            } else {
+                serialOwner = .unavailable
+            }
+            queue.async { [weak self] in self?.serialRouteOwner = .rpc }
+        }
+    }
 
-    /// When true, the Claude Buddy app on the Flipper owns the serial channel
-    /// (raw newline-JSON), so RPC MUST stay off it — any RPC frame interleaved
-    /// with Buddy JSON shows as garbage (Cyrillic glyphs) and crashes the .fap
-    /// (furi_check). BuddyRelay sets this while passthrough is active.
-    var buddyMode = false
+    @Published private(set) var serialOwner: SerialChannelOwner = .unavailable
+    var buddyMode: Bool { serialOwner == .claudeBuddy }
     @Published private(set) var discovered: [DiscoveredFlipper] = []
     @Published private(set) var connectedName: String?
     @Published private(set) var supportsAppBridge = false
 
     /// Raw bytes arriving on the serial TX characteristic (RPC stream).
     let serialIn = PassthroughSubject<Data, Never>()
+    /// Raw newline-JSON routed only to Claude Buddy. Separating it at the BLE
+    /// boundary prevents the first Buddy frame from reaching the protobuf parser.
+    let buddySerialIn = PassthroughSubject<Data, Never>()
     /// Decoded App Bridge events (app_id, command, payload) coming from Flipper.
     let appBridgeIn = PassthroughSubject<AppBridgeFrame, Never>()
     /// True once the firmware answers our FAB2 probe (it spoke FAB2 back). Until
@@ -103,6 +120,8 @@ final class FlipperBLE: NSObject, ObservableObject {
         }
     }
     private let queue = DispatchQueue(label: "flipper.ble")
+    private var serialRouteOwner: SerialChannelOwner = .rpc
+    private var buddyDetectionEnabled = false
     private var pendingRestore: CBPeripheral?    // adopted in willRestoreState
     private var connectGen = 0                   // invalidates stale connect watchdogs
     // Ready watchdog (issue #10): bounds the "link connected but never reaches .ready"
@@ -125,6 +144,39 @@ final class FlipperBLE: NSObject, ObservableObject {
     }
 
     // MARK: - Public API
+
+    func setBuddyDetectionEnabled(_ enabled: Bool) {
+        queue.async { [weak self] in
+            guard let self else { return }
+            self.buddyDetectionEnabled = enabled
+            if !enabled { self.setSerialRouteOnBLEQueue(.rpc) }
+        }
+    }
+
+    func claimSerialForClaudeBuddy() {
+        queue.async { [weak self] in
+            self?.setSerialRouteOnBLEQueue(.claudeBuddy)
+        }
+    }
+
+    func releaseSerialFromClaudeBuddy() {
+        queue.async { [weak self] in
+            self?.setSerialRouteOnBLEQueue(.rpc)
+        }
+    }
+
+    private func setSerialRouteOnBLEQueue(_ owner: SerialChannelOwner) {
+        serialRouteOwner = owner
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.serialOwner = self.state == .ready ? owner : .unavailable
+        }
+    }
+
+    private static func looksLikeBuddyFrame(_ data: Data) -> Bool {
+        guard let text = String(data: data, encoding: .utf8) else { return false }
+        return text.contains("{\"v\":")
+    }
 
     /// Wait up to `timeout` seconds for the link to reach `.ready`. Returns true
     /// once ready, false on timeout. This tolerates the brief `.connected →
@@ -714,7 +766,16 @@ extension FlipperBLE: CBPeripheralDelegate {
         guard let data = characteristic.value else { return }
         switch characteristic.uuid {
         case FlipperUUID.serialTx:
-            serialIn.send(data)
+            if buddyDetectionEnabled && (
+                serialRouteOwner == .claudeBuddy || Self.looksLikeBuddyFrame(data)
+            ) {
+                if serialRouteOwner != .claudeBuddy {
+                    setSerialRouteOnBLEQueue(.claudeBuddy)
+                }
+                buddySerialIn.send(data)
+            } else {
+                serialIn.send(data)
+            }
         case FlipperUUID.serialFlow:
             // Flipper freed its RX buffer → refill our send credit and continue.
             if let credit = Self.parseFlowControl(data) { setTxCredit(credit) }

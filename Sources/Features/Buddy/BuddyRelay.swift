@@ -15,7 +15,7 @@ import Combine
 /// both ways). Once the stream goes quiet for `activeWindow` ⇒ disarm (RPC resumes).
 /// While disarmed the channel is left entirely to RPC and nothing is written to it.
 ///
-///   Flipper TX (buttons)  → ble.serialIn → POST /buddy/up   → daemon → keystrokes
+///   Flipper TX (buttons)  → ble.buddySerialIn → POST /buddy/up → daemon → keystrokes
 ///   daemon (notify/menu)  → GET /buddy/down → ble.writeSerialRaw → Flipper RX → screen
 @MainActor
 final class BuddyRelay: ObservableObject {
@@ -35,6 +35,7 @@ final class BuddyRelay: ObservableObject {
     private let ble = FlipperBLE.shared
     private var downTimer: Timer?
     private var uplink: AnyCancellable?
+    private var connectionObserver: AnyCancellable?
     private var lastBuddySeen: Date?
     private let activeWindow: TimeInterval = 6        // disarm after this much silence
 
@@ -48,18 +49,30 @@ final class BuddyRelay: ObservableObject {
 
     private func start() {
         stop(resetState: false)
+        ble.setBuddyDetectionEnabled(true)
         // Listen but DON'T pause RPC yet — only when the fap actually starts talking.
-        uplink = ble.serialIn.sink { [weak self] data in
+        uplink = ble.buddySerialIn.sink { [weak self] data in
             Task { @MainActor in self?.onSerial(data) }
         }
+        connectionObserver = ble.$state
+            .removeDuplicates()
+            .sink { [weak self] state in
+                guard state != .ready else { return }
+                Task { @MainActor in
+                    self?.lastBuddySeen = nil
+                    self?.disarm()
+                }
+            }
         downTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
             Task { @MainActor in await self?.tick() }
         }
     }
 
     private func stop(resetState: Bool = true) {
+        ble.setBuddyDetectionEnabled(false)
         downTimer?.invalidate(); downTimer = nil
         uplink?.cancel(); uplink = nil
+        connectionObserver?.cancel(); connectionObserver = nil
         disarm()
         if resetState { lastBuddySeen = nil }
     }
@@ -96,13 +109,13 @@ final class BuddyRelay: ObservableObject {
 
     private func arm() {
         active = true
-        ble.buddyMode = true                  // pause RPC: the fap owns the serial channel
+        ble.claimSerialForClaudeBuddy()
         Task { await post("/buddy/reset", body: nil) }   // drop stale bytes both ends
     }
 
     private func disarm() {
         active = false
-        ble.buddyMode = false                 // hand the serial channel back to RPC
+        ble.releaseSerialFromClaudeBuddy()
     }
 
     private func looksLikeBuddy(_ data: Data) -> Bool {

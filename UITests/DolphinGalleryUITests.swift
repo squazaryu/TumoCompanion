@@ -153,3 +153,61 @@ final class FWPackagesActionBarUITests: XCTestCase {
         option.tap()
     }
 }
+
+final class QualityPassUITests: XCTestCase {
+    func testLongFirmwareVersionWrapsWithoutClipping() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-onboardingDone", "YES",
+            "-device-info-layout-qa",
+        ]
+        app.launch()
+
+        let firmware = app.staticTexts[
+            "TUMOFLIP t-dev-001-004 (f8bd0710df, 2026-07-29 23:58:41)"
+        ]
+        XCTAssertTrue(firmware.waitForExistence(timeout: 3))
+        XCTAssertGreaterThan(
+            firmware.frame.height,
+            app.staticTexts["Flipper Zero v12"].frame.height,
+            "The complete firmware identity should wrap instead of being clipped"
+        )
+
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = "Device info long firmware identity"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+
+    func testDiagnosticsStartsCollapsedAndEveryRowHasHelp() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-onboardingDone", "YES"]
+        app.launch()
+        app.tabBars.buttons["Settings"].tap()
+
+        let diagnostics = app.buttons.matching(
+            NSPredicate(format: "label CONTAINS[c] %@", "DIAGNOSTICS")
+        ).firstMatch
+        for _ in 0..<4 where !diagnostics.isHittable { app.swipeUp() }
+        XCTAssertTrue(diagnostics.waitForExistence(timeout: 3))
+        XCTAssertFalse(app.buttons["App Bridge Console"].exists)
+
+        diagnostics.tap()
+        for title in [
+            "App Bridge Console",
+            "TumoVM NFC Smoke",
+            "TumoCard NFC Smoke",
+            "TumoFabric Counter",
+        ] {
+            XCTAssertTrue(app.buttons["About \(title)"].exists)
+        }
+
+        app.buttons["About App Bridge Console"].tap()
+        XCTAssertTrue(app.navigationBars["App Bridge Console"].waitForExistence(timeout: 3))
+        XCTAssertTrue(
+            app.staticTexts.matching(
+                NSPredicate(format: "label CONTAINS[c] %@", "manual App Bridge v2")
+            ).firstMatch.exists
+        )
+    }
+}

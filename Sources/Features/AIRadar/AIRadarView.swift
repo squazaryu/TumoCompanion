@@ -1,25 +1,8 @@
 import SwiftUI
-import WidgetKit
-import UnleashedShared
 
 @MainActor
 final class AIRadarViewModel: ObservableObject {
-    @Published var snapshot = AISnapshot() {
-        didSet { Self.mirrorToWidgets(snapshot) }
-    }
-
-    /// Push the latest provider usage into the App Group so the AI Radar widget shows
-    /// it. Keeps the last non-empty data if a refresh yields nothing.
-    static func mirrorToWidgets(_ snap: AISnapshot) {
-        guard !snap.providers.isEmpty else { return }
-        let providers = snap.providers.map {
-            SharedStore.RadarProvider(id: $0.id, name: $0.name, icon: $0.icon,
-                                      shortLabel: $0.short.label, shortUsed: $0.short.used,
-                                      shortReset: $0.short.reset, weeklyUsed: $0.weekly.used)
-        }
-        SharedStore.saveRadar(.init(providers: providers, updatedAt: snap.updatedAt))
-        WidgetCenter.shared.reloadAllTimelines()
-    }
+    @Published var snapshot = AISnapshot()
     @Published var loading = false
     @Published var error: String?
     @Published var pushedToFlipper = false

@@ -493,10 +493,14 @@ final class PluginUpdater: ObservableObject {
     /// Fresh device firmware API major + hardware target (both nil when unreachable). A
     /// stale cached identity is NEVER used as the install-time identity — this always
     /// reads device_info over a BLE-ready link.
-    private func deviceApiTarget() async -> (api: Int?, target: Int?) {
-        guard FlipperBLE.shared.state == .ready, let info = try? await FlipperSystem().deviceInfo() else {
-            return (nil, nil)
+    private func deviceApiTarget() async throws -> (api: Int?, target: Int?) {
+        guard FlipperBLE.shared.state == .ready else {
+            throw FlipperRPCError.notReady
         }
+        guard FlipperBLE.shared.serialOwner == .rpc else {
+            throw FlipperRPCError.serialOwnedByClaudeBuddy
+        }
+        let info = try await FlipperSystem().deviceInfo()
         let dict = Dictionary(info, uniquingKeysWith: { a, _ in a })
         return (dict["firmware_api_major"].flatMap(Int.init), dict["hardware_target"].flatMap(Int.init))
     }
@@ -517,9 +521,9 @@ final class PluginUpdater: ObservableObject {
     func validateCompatibility() async {
         guard !catalogMeta.isEmpty else { classifications = [:]; return }
         // Don't re-classify while an install is in flight. A long install drops &
-        // re-establishes BLE per app; each `ble.state` blip re-fires this via the
-        // detail/Updates `.task(id: ble.state)` hooks, and during the reconnect
-        // `deviceApiTarget()` reports (nil,nil) → every app flips to .unvalidated →
+        // re-establishes BLE per app; each `ble.state` blip can re-fire centralized
+        // revalidation, and during the reconnect an unavailable identity used to
+        // flip every app to .unvalidated →
         // the category list collapses to just "incompatible" and back, thrashing the
         // card heights mid-animation (visible z-fight) and contending with the
         // transfer over RPC (issue #21). install() runs its own inline gate, so
@@ -527,7 +531,15 @@ final class PluginUpdater: ObservableObject {
         if case .installing = phase { return }
         validating = true
         defer { validating = false }
-        let (api, target) = await deviceApiTarget()
+        let api: Int?
+        let target: Int?
+        do {
+            (api, target) = try await deviceApiTarget()
+        } catch {
+            // Keep the last known classification during a transient reconnect.
+            // Install performs the same read again and remains fail-closed.
+            return
+        }
         deviceApiMajor = api
         deviceTarget = target
         classifications = PluginSelectionPolicy.classify(catalogMeta, deviceApiMajor: api, deviceTarget: target)
@@ -643,6 +655,24 @@ final class PluginUpdater: ObservableObject {
         let storage = activeStorage
         var result: [ProtectedPluginReview] = []
         for f in items {
+            let deviceMD5: String?
+            do {
+                deviceMD5 = try await storage.checkedMD5(f.targetPath)
+            } catch {
+                protectedReviews = sortProtected(items.map {
+                    ProtectedPluginReview(
+                        remotePath: $0.remotePath,
+                        targetPath: $0.targetPath,
+                        name: $0.name,
+                        category: $0.category,
+                        pack: $0.pack,
+                        newMD5: $0.newMD5,
+                        deviceMD5: nil,
+                        deviceKnown: false,
+                        size: $0.size)
+                })
+                return
+            }
             result.append(ProtectedPluginReview(
                 remotePath: f.remotePath,
                 targetPath: f.targetPath,
@@ -650,7 +680,7 @@ final class PluginUpdater: ObservableObject {
                 category: f.category,
                 pack: f.pack,
                 newMD5: f.newMD5,
-                deviceMD5: await storage.md5(f.targetPath),
+                deviceMD5: deviceMD5,
                 deviceKnown: true,
                 size: f.size))
         }
@@ -673,7 +703,13 @@ final class PluginUpdater: ObservableObject {
                 return
             }
             phase = .scanning(i + 1, items.count)
-            let dev = await storage.md5(f.targetPath)
+            let dev: String?
+            do {
+                dev = try await storage.checkedMD5(f.targetPath)
+            } catch {
+                phase = .failed(error.localizedDescription)
+                return
+            }
             if dev != f.newMD5 {
                 var u = PluginUpdate(remotePath: f.remotePath, name: f.name, category: f.category,
                                      pack: f.pack, newMD5: f.newMD5, oldMD5: dev, size: f.size)
@@ -738,12 +774,25 @@ final class PluginUpdater: ObservableObject {
             phase = .failed("Flipper isn't ready — wait for the green “Connected & ready” status, select USB SD, then retry.")
             return
         }
+        guard ble().serialOwner != .claudeBuddy else {
+            phase = .failed(
+                FlipperRPCError.serialOwnedByClaudeBuddy.localizedDescription
+            )
+            return
+        }
 
         // Issue #19: reject any selected FAP/FAL whose embedded `.fapmeta` is
         // incompatible with the connected firmware. Read fresh device_info and gate
         // BEFORE the first storage write below, so nothing is written for a rejected
         // binary. Non-FAP data files keep their existing MD5/routing checks.
-        let (devApi, devTarget) = await deviceApiTarget()
+        let devApi: Int?
+        let devTarget: Int?
+        do {
+            (devApi, devTarget) = try await deviceApiTarget()
+        } catch {
+            phase = .failed(error.localizedDescription)
+            return
+        }
         deviceApiMajor = devApi
         deviceTarget = devTarget
         classifications = PluginSelectionPolicy.classify(
@@ -783,14 +832,13 @@ final class PluginUpdater: ObservableObject {
         transferReporter.begin("all-the-plugins")
         defer {
             transferReporter.end()
-            live.finish(installed: installed.count, total: selected.count)
         }
 
         let maxAttempts = 3
         for (i, u) in selected.enumerated() {
             // Stop before starting a new file: apps not yet started keep their version.
             if stopRequested { break }
-            live.update(current: i + 1, total: selected.count, name: u.name)
+            live.update(current: i, total: selected.count, detail: u.name)
             guard let data = extractData(remotePath: u.remotePath) else {
                 failures.append("\(u.name): not found in pack"); continue
             }
@@ -886,6 +934,7 @@ final class PluginUpdater: ObservableObject {
             } else if !stoppedMidFile {
                 failures.append("\(u.name): \(lastReason)")
             }
+            live.update(current: i + 1, total: selected.count, detail: u.name)
             // Stopped mid-file: the temp was discarded and the live app kept its previous
             // working version — it's neither installed nor failed. End the run here.
             if stopRequested { break }
@@ -928,12 +977,35 @@ final class PluginUpdater: ObservableObject {
                     + failures.prefix(3).joined(separator: "; ") + (failures.count > 3 ? " …" : "")
                 phase = .failed(msg)
             }
+            live.stop(
+                completed: installed.count,
+                total: selected.count,
+                detail: failures.isEmpty ? "Install stopped" : "Stopped with failures"
+            )
         } else if failures.isEmpty {
             phase = .done("Installed \(installed.count) app\(installed.count == 1 ? "" : "s")\(cleanNote) · \(tag)")
+            live.succeed(
+                completed: installed.count,
+                total: selected.count,
+                detail: "Plugins installed"
+            )
         } else {
             let head = installed.isEmpty ? "Install failed" : "Installed \(installed.count), \(failures.count) failed"
             phase = .failed("\(head)\(cleanNote): " + failures.prefix(4).joined(separator: "; ")
                             + (failures.count > 4 ? " …" : ""))
+            if installed.isEmpty {
+                live.fail(
+                    completed: 0,
+                    total: selected.count,
+                    detail: "Install failed"
+                )
+            } else {
+                live.completeWithIssues(
+                    completed: installed.count,
+                    total: selected.count,
+                    detail: "\(failures.count) failed"
+                )
+            }
         }
     }
 
@@ -962,7 +1034,13 @@ final class PluginUpdater: ObservableObject {
             if Task.isCancelled { phase = .idle; return }
             phase = .verifying(i + 1, items.count)
             guard await fileChannelReady(channel) else { phase = .failed("Disconnected during verify"); return }
-            let dev = await storage.md5(f.targetPath)
+            let dev: String?
+            do {
+                dev = try await storage.checkedMD5(f.targetPath)
+            } catch {
+                phase = .failed(error.localizedDescription)
+                return
+            }
             if dev == f.newMD5 {
                 verified += 1
             } else {

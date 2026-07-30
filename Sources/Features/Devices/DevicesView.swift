@@ -3,7 +3,6 @@ import SwiftUI
 struct DevicesView: View {
     @EnvironmentObject var ble: FlipperBLE
     @EnvironmentObject var transfer: TransferChannelStore
-    @ObservedObject private var buddy = BuddyRelay.shared
     @ObservedObject private var layout = HomeLayoutStore.shared
     @Binding var path: [HomeTileID]
     @State private var showCustomize = false
@@ -17,7 +16,6 @@ struct DevicesView: View {
             CardScroll {
                 connectionCard
                 if ble.state != .ready && !ble.discovered.isEmpty { nearbyCard }
-                if buddy.enabled { buddyCard }
                 ForEach(HomeGroupID.allCases) { groupCard($0) }
                 versionFooter
             }
@@ -67,8 +65,13 @@ struct DevicesView: View {
                 }
             }
             HStack(spacing: 8) {
-                StatusPill(text: ble.state == .ready ? "Ready" : statusShort,
-                           color: color)
+                StatusPill(
+                    text: ble.state == .ready
+                        ? (ble.serialOwner == .claudeBuddy ? "Claude Buddy" : "Ready")
+                        : statusShort,
+                    color: ble.serialOwner == .claudeBuddy ? .purple : color,
+                    systemImage: ble.serialOwner == .claudeBuddy ? "bell.badge.fill" : nil
+                )
                 if ble.state == .ready {
                     StatusPill(text: ble.supportsAppBridge ? (ble.appBridgeV2 ? "Bridge v2" : "Bridge v1") : "No bridge",
                                color: ble.supportsAppBridge ? (ble.appBridgeV2 ? .green : .secondary) : .orange,
@@ -112,23 +115,6 @@ struct DevicesView: View {
                     }
                     .buttonStyle(.plain)
                 }
-            }
-        }
-    }
-
-    private var buddyCard: some View {
-        SectionCard(title: "Claude Buddy", systemImage: "bell.badge.fill",
-                    accessory: AnyView(
-                        StatusPill(text: buddy.active ? "Active" : "Idle",
-                                   color: buddy.active ? .green : .secondary)
-                    )) {
-            if let last = buddy.lastEvent {
-                Text(last).font(.subheadline)
-            } else {
-                Text(buddy.active ? "Buddy app is talking to the Flipper."
-                                  : "Idle — opens automatically when the Buddy app is in front on the Flipper.")
-                    .font(.caption).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -213,7 +199,10 @@ struct DevicesView: View {
 
     private var label: String {
         switch ble.state {
-        case .ready: return "Connected & ready"
+        case .ready:
+            return ble.serialOwner == .claudeBuddy
+                ? "Connected · serial in use by Buddy"
+                : "Connected & ready"
         case .connected: return "Connecting services…"
         case .connecting: return "Connecting…"
         case .scanning: return "Scanning for Flippers"
