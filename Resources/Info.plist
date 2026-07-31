@@ -55,13 +55,16 @@
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>TumoCompanion finds the Mac AI Radar bridge on your local network and sends relay actions to Home Assistant when your Flipper triggers them.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>TumoCompanion shares one position only when your connected Tumoflip requests it over Bluetooth while the app is in the background. It stops location updates immediately after replying and stores no location history.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>TumoCompanion uses your location to map WiFi networks — it tags each scan reading relayed from your Flipper with your phone's GPS position and triangulates where the access points are.</string>
+	<string>TumoCompanion uses your location for WiFi mapping and for one-shot position requests that you explicitly enable for a connected Tumoflip device.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>bluetooth-central</string>
+		<string>location</string>
 		<string>fetch</string>
 	</array>
 	<key>UIFileSharingEnabled</key>

@@ -51,6 +51,23 @@ final class DeviceServiceContractTests: XCTestCase {
         XCTAssertEqual(payload.count, DeviceServiceContract.maximumResponseBytes)
         XCTAssertTrue(String(decoding: payload.prefix(30), as: UTF8.self).contains("status=200"))
     }
+
+    func testHTTPSRequestUsesGitHubCompatibleHeaders() throws {
+        let url = try XCTUnwrap(URL(string: "https://api.github.com/zen"))
+        let request = SafeHTTPSRequest.make(for: url)
+
+        XCTAssertEqual(request.httpMethod, "GET")
+        XCTAssertEqual(
+            request.value(forHTTPHeaderField: "Accept"),
+            "application/vnd.github+json"
+        )
+        XCTAssertEqual(
+            request.value(forHTTPHeaderField: "X-GitHub-Api-Version"),
+            SafeHTTPSRequest.githubAPIVersion
+        )
+        XCTAssertEqual(request.value(forHTTPHeaderField: "User-Agent"), "TumoCompanion")
+        XCTAssertNil(request.httpBody)
+    }
 }
 
 @MainActor
@@ -87,9 +104,31 @@ final class DeviceServiceCoordinatorTests: XCTestCase {
 
     private final class FakeLocation: DeviceLocationProviding {
         var authorizationStatus: CLAuthorizationStatus = .authorizedWhenInUse
+        var backgroundAuthorized = false
+        var backgroundAuthorizationRequests = 0
         var result = CLLocation(latitude: 55.75, longitude: 37.62)
+        func requestBackgroundAuthorization() { backgroundAuthorizationRequests += 1 }
         func requestLocation() async throws -> CLLocation { result }
         func cancel() {}
+    }
+
+    private final class FakeBackground: DeviceBackgroundExecutionProviding {
+        var isInBackground = false
+        var beginCount = 0
+        var endCount = 0
+        var expirationHandler: (() -> Void)?
+
+        func begin(
+            expirationHandler: @escaping @MainActor () -> Void
+        ) -> UIBackgroundTaskIdentifier {
+            beginCount += 1
+            self.expirationHandler = { Task { @MainActor in expirationHandler() } }
+            return UIBackgroundTaskIdentifier(rawValue: beginCount)
+        }
+
+        func end(_ identifier: UIBackgroundTaskIdentifier) {
+            if identifier != .invalid { endCount += 1 }
+        }
     }
 
     private final class FakeHTTPS: DeviceHTTPSProviding {
@@ -121,6 +160,7 @@ final class DeviceServiceCoordinatorTests: XCTestCase {
             transport: transport,
             location: FakeLocation(),
             https: FakeHTTPS(),
+            background: FakeBackground(),
             defaults: defaults()
         )
         XCTAssertFalse(coordinator.locationEnabled)
@@ -139,6 +179,7 @@ final class DeviceServiceCoordinatorTests: XCTestCase {
             transport: transport,
             location: FakeLocation(),
             https: FakeHTTPS(),
+            background: FakeBackground(),
             defaults: defaults()
         )
         coordinator.locationEnabled = true
@@ -159,6 +200,7 @@ final class DeviceServiceCoordinatorTests: XCTestCase {
             transport: transport,
             location: FakeLocation(),
             https: FakeHTTPS(),
+            background: FakeBackground(),
             defaults: defaults()
         )
         coordinator.networkEnabled = true
@@ -172,5 +214,97 @@ final class DeviceServiceCoordinatorTests: XCTestCase {
 
         XCTAssertEqual(String(decoding: transport.responses.first?.2 ?? Data(), as: UTF8.self), "busy")
         XCTAssertEqual(transport.responses.first?.3, true)
+    }
+
+    func testBackgroundLocationRequiresAlwaysAuthorization() async {
+        let transport = FakeTransport()
+        let location = FakeLocation()
+        let background = FakeBackground()
+        background.isInBackground = true
+        let coordinator = DeviceServiceCoordinator(
+            transport: transport,
+            location: location,
+            https: FakeHTTPS(),
+            background: background,
+            defaults: defaults()
+        )
+        coordinator.locationEnabled = true
+
+        transport.frames.send(request(command: "gps_once", id: 91, payload: Data("schema=1".utf8)))
+        for _ in 0..<20 where transport.responses.isEmpty { await Task.yield() }
+
+        XCTAssertEqual(String(decoding: transport.responses.first?.2 ?? Data(), as: UTF8.self), "permission")
+        XCTAssertEqual(transport.responses.first?.3, true)
+        XCTAssertEqual(background.beginCount, 1)
+        XCTAssertEqual(background.endCount, 1)
+    }
+
+    func testBackgroundLocationSucceedsWithAlwaysAuthorization() async {
+        let transport = FakeTransport()
+        let location = FakeLocation()
+        location.authorizationStatus = .authorizedAlways
+        location.backgroundAuthorized = true
+        let background = FakeBackground()
+        background.isInBackground = true
+        let coordinator = DeviceServiceCoordinator(
+            transport: transport,
+            location: location,
+            https: FakeHTTPS(),
+            background: background,
+            defaults: defaults()
+        )
+        coordinator.locationEnabled = true
+
+        transport.frames.send(request(command: "gps_once", id: 93, payload: Data("schema=1".utf8)))
+        for _ in 0..<20 where transport.responses.isEmpty { await Task.yield() }
+
+        XCTAssertEqual(transport.responses.first?.3, false)
+        XCTAssertTrue(
+            String(decoding: transport.responses.first?.2 ?? Data(), as: UTF8.self)
+                .contains("lat=55.750000")
+        )
+        XCTAssertEqual(background.beginCount, 1)
+        XCTAssertEqual(background.endCount, 1)
+    }
+
+    func testForegroundOnlyStateRequestsBackgroundPermission() {
+        let location = FakeLocation()
+        let coordinator = DeviceServiceCoordinator(
+            transport: FakeTransport(),
+            location: location,
+            https: FakeHTTPS(),
+            background: FakeBackground(),
+            defaults: defaults()
+        )
+        coordinator.locationEnabled = true
+
+        XCTAssertEqual(coordinator.locationState, .foregroundOnly)
+        coordinator.prepareBackgroundLocationAuthorization()
+        XCTAssertEqual(location.backgroundAuthorizationRequests, 1)
+    }
+
+    func testBackgroundHTTPSGetsAndReleasesExecutionTime() async {
+        let transport = FakeTransport()
+        let background = FakeBackground()
+        background.isInBackground = true
+        let coordinator = DeviceServiceCoordinator(
+            transport: transport,
+            location: FakeLocation(),
+            https: FakeHTTPS(),
+            background: background,
+            defaults: defaults()
+        )
+        coordinator.networkEnabled = true
+
+        transport.frames.send(request(
+            command: "https_get",
+            id: 92,
+            payload: Data("https://api.github.com/zen".utf8)
+        ))
+        for _ in 0..<20 where transport.responses.isEmpty { await Task.yield() }
+
+        XCTAssertEqual(transport.responses.first?.3, false)
+        XCTAssertEqual(background.beginCount, 1)
+        XCTAssertEqual(background.endCount, 1)
     }
 }
