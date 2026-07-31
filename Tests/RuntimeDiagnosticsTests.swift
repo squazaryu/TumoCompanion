@@ -13,7 +13,7 @@ final class RuntimeDiagnosticsTests: XCTestCase {
     func testCompactFeatCapabilities() {
         // The exact string emitted by TUMOFLIP_RUNTIME_CAPABILITIES.
         let raw = FlipperBLE.parseCapabilities(Data(
-            "runtime=1;fab=2;session=3;status=2;trace=1;twin=1;pkg=1;radio=2;sd=1;fabric=1;feat=pkg,radio,trace,twin,transfer,fabric".utf8))
+            "runtime=1;fab=2;session=3;status=2;trace=1;twin=1;pkg=1;radio=2;sd=1;fabric=1;gps=1;net=1;feat=pkg,radio,trace,twin,transfer,fabric,gps,net".utf8))
         let caps = RuntimeCapabilities(raw)
 
         XCTAssertTrue(caps.supportsStatus)
@@ -23,6 +23,8 @@ final class RuntimeDiagnosticsTests: XCTestCase {
         XCTAssertTrue(caps.supportsRadio)
         XCTAssertTrue(caps.supportsTransferActivity)
         XCTAssertTrue(caps.supportsFabric)
+        XCTAssertTrue(caps.supportsGPS)
+        XCTAssertTrue(caps.supportsNetwork)
         XCTAssertEqual(caps.sessionVersion, 3)
     }
 
@@ -33,6 +35,8 @@ final class RuntimeDiagnosticsTests: XCTestCase {
 
         XCTAssertFalse(caps.supportsTransferActivity)
         XCTAssertFalse(caps.supportsFabric)
+        XCTAssertFalse(caps.supportsGPS)
+        XCTAssertFalse(caps.supportsNetwork)
     }
 
     // MARK: - Capabilities: legacy `features` (older firmware)
@@ -60,6 +64,8 @@ final class RuntimeDiagnosticsTests: XCTestCase {
         XCTAssertFalse(caps.supportsTwin)
         XCTAssertFalse(caps.supportsTransferActivity)
         XCTAssertFalse(caps.supportsFabric)
+        XCTAssertFalse(caps.supportsGPS)
+        XCTAssertFalse(caps.supportsNetwork)
         XCTAssertNil(caps.sessionVersion)
     }
 
