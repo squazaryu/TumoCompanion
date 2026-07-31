@@ -414,6 +414,31 @@ final class FlipperBLE: NSObject, ObservableObject {
         }
     }
 
+    /// Reply to a Flipper-originated FAB2 request with the same request id. This
+    /// is intentionally separate from `appBridgeRequest`: device services are
+    /// reverse-direction requests initiated by an on-device app.
+    @discardableResult
+    func sendAppBridgeResponse(
+        appID: String,
+        command: String,
+        requestID: UInt32,
+        payload: Data = Data(),
+        error: Bool = false
+    ) -> Bool {
+        guard appBridgeV2, requestID != 0,
+              peripheral != nil, bridgeCmdChar != nil else { return false }
+        let flags = AppBridgeFrame.flagResponse | (error ? AppBridgeFrame.flagError : 0)
+        guard let frames = AppBridgeFrame.encodeV2(
+            appID: appID,
+            command: command,
+            payload: payload,
+            requestID: requestID,
+            flags: flags
+        ) else { return false }
+        writeBridgeFrames(frames)
+        return true
+    }
+
     /// Send a FAB2 request and await the firmware's correlated response payload.
     /// Requires a v2-negotiated link; throws `AppBridgeError.notNegotiated` otherwise.
     func appBridgeRequest(appID: String, command: String, payload: Data = Data(),

@@ -61,6 +61,7 @@ enum AppIconOption: String, CaseIterable, Identifiable {
 struct SettingsView: View {
     @EnvironmentObject var settings: SettingsStore
     @EnvironmentObject var ble: FlipperBLE
+    @EnvironmentObject var deviceServices: DeviceServiceCoordinator
     @ObservedObject private var buddy = BuddyRelay.shared
     @State private var currentIcon = UIApplication.shared.alternateIconName
     @State private var iconError: String?
@@ -115,6 +116,51 @@ struct SettingsView: View {
                 Text("Holds the Bluetooth link open while the app is backgrounded so the Flipper can trigger the relay (and other App Bridge actions) without opening the app — iOS reconnects automatically when the Flipper is back in range. Costs a little battery, and can't survive force-quitting the app from the App Switcher (an iOS limit) or re-pairing the Flipper.")
                     .font(.caption2).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+            }
+
+            SectionCard(title: "Device services", systemImage: "iphone.and.arrow.forward") {
+                Toggle(isOn: $deviceServices.locationEnabled) {
+                    serviceRow(
+                        title: "Share iPhone location",
+                        systemImage: "location.fill",
+                        status: deviceServices.locationState
+                    )
+                }
+                .tint(Theme.accent)
+                .accessibilityIdentifier("device-services-location")
+                Text("Lets an open Flipper app request one GPS fix. Uses When In Use permission, stores no location history, and stops on disconnect.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Divider().opacity(0.4)
+
+                Toggle(isOn: $deviceServices.networkEnabled) {
+                    serviceRow(
+                        title: "Allow safe HTTPS",
+                        systemImage: "network",
+                        status: deviceServices.networkState
+                    )
+                }
+                .tint(Theme.accent)
+                .accessibilityIdentifier("device-services-network")
+                Text("Allows one bounded HTTPS GET to the approved public test endpoint. Raw sockets, redirects, credentials, local addresses and background access stay blocked.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if deviceServices.locationState == .denied {
+                    Button("Open iOS Settings") {
+                        if let url = URL(string: UIApplication.openSettingsURLString) {
+                            UIApplication.shared.open(url)
+                        }
+                    }
+                }
+                if let error = deviceServices.lastError {
+                    Text("Last error: \(error)")
+                        .font(.system(.caption2, design: .monospaced))
+                        .foregroundStyle(.orange)
+                }
             }
 
             SectionCard(title: "Claude Buddy", systemImage: "bell.badge") {
@@ -213,6 +259,20 @@ struct SettingsView: View {
     private func refreshNotif() async {
         let s = await UNUserNotificationCenter.current().notificationSettings()
         await MainActor.run { notifStatus = s.authorizationStatus }
+    }
+
+    private func serviceRow(
+        title: String,
+        systemImage: String,
+        status: DeviceServiceState
+    ) -> some View {
+        HStack {
+            Label(title, systemImage: systemImage)
+            Spacer()
+            Text(status.label)
+                .font(.caption)
+                .foregroundStyle(status == .inUse ? .green : .secondary)
+        }
     }
 
     private func setIcon(_ opt: AppIconOption) {

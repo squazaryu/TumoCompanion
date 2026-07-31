@@ -39,6 +39,8 @@ struct RuntimeCapabilities: Equatable {
         featureTokens.contains("transfer_activity") || featureTokens.contains("transfer")
     }
     var supportsFabric: Bool { has("fabric", versionKey: "fabric") }
+    var supportsGPS: Bool { has("gps", versionKey: "gps") }
+    var supportsNetwork: Bool { has("net", versionKey: "net") }
     var sessionVersion: Int? { raw["session"].flatMap(Int.init) }
 }
 
