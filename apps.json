@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.8.2",
+      "version": "1.9.0",
       "versionDate": "2026-07-31",
-      "versionDescription": "Fixes the Phone Services HTTPS 415 response and lets opt-in one-shot GPS and bounded HTTPS requests finish after a BLE background wake. Background GPS requires Always Location and stops immediately after replying.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.8.2/TumoCompanion-unsigned.ipa",
-      "size": 29313767,
+      "versionDescription": "Adds opt-in iPhone Field Services: TumoSurvey GPS fallback, named weather/place/release lookups, capture location sidecars, one clearable last-known location, a bounded field journal, and optional Keychain-backed HTTPS webhook delivery.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.9.0/TumoCompanion-unsigned.ipa",
+      "size": 29415175,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.9.0",
+          "date": "2026-07-31",
+          "localizedDescription": "Adds opt-in iPhone Field Services: TumoSurvey GPS fallback, named weather/place/release lookups, capture location sidecars, one clearable last-known location, a bounded field journal, and optional Keychain-backed HTTPS webhook delivery.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.9.0/TumoCompanion-unsigned.ipa",
+          "size": 29415175,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.8.2",
           "date": "2026-07-31",
