@@ -38,6 +38,7 @@
 		3508D2DF378C22434730D556 /* RemotesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A0A014201261EED37823E5C /* RemotesView.swift */; };
 		358C8C06E879E7C1C092B49A /* InstallActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EA9037CE5911F4E4DF8951C /* InstallActivityAttributes.swift */; };
 		382D481F4B3744731A3527CE /* PluginUpdateMonitorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D74C1AC4E19C6F9FC21C9D8D /* PluginUpdateMonitorTests.swift */; };
+		39E5EC816D84A909AAAD7935 /* FieldServicesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0544D0FD5C4C15A8EE3509DE /* FieldServicesView.swift */; };
 		3A33EB625F256D95748132BB /* LocationProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9E15B5C37393C6ADFB482C2 /* LocationProvider.swift */; };
 		3AE3A3C058B65ACBC7B6B3A4 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 89D1A875D2EC8E243C24C7DA /* ZIPFoundation */; };
 		3B8F9FDDE4E195CFAB92B2A1 /* InstallActivityController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7DFAFD2A63623B73457A3B2 /* InstallActivityController.swift */; };
@@ -63,6 +64,7 @@
 		55DF4154B997B215DD5CF9C6 /* InstallActivityAttributesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ECE4D716C1F73A551397D21 /* InstallActivityAttributesTests.swift */; };
 		561C47A5EC74F7DF05D11A2B /* HomeAssistantDiscoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D70BBAA6C69E3FCD8488170 /* HomeAssistantDiscoveryTests.swift */; };
 		56630654C5F12C545C47A195 /* AIRadarBridgeClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95FA4896B7AE237BFC022E1E /* AIRadarBridgeClient.swift */; };
+		56E703AEE38BA106610D2DA5 /* FieldServiceModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B95CE7D8E715A07E4318F9D1 /* FieldServiceModels.swift */; };
 		58ADEF0B8E8D011FDB32D17F /* BridgeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A72EEDF7D1BE89A42EBAFB7D /* BridgeView.swift */; };
 		5CF5B93624E1418CAC1E13A9 /* TumoNetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85A71B8014DF7BCBEAE77C5A /* TumoNetView.swift */; };
 		5EAC241A8A24322589A7FB52 /* TumoflipUpdaterService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8697965C8EA5F8D768000FC9 /* TumoflipUpdaterService.swift */; };
@@ -118,6 +120,7 @@
 		BCA5C227A003B22953FA49D7 /* AppBridgeRequestTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B04D2FFBE41EED4A3482CEFA /* AppBridgeRequestTests.swift */; };
 		BD4118BB0E5018BF9D2BB6C1 /* russian_trusted_root_ca.pem in Resources */ = {isa = PBXBuildFile; fileRef = 3342FDAF60635FDA2E1AC94C /* russian_trusted_root_ca.pem */; };
 		BE034ACD6CA3C46C72805A4E /* MediaRemoteController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BEE7D9848B6ECE40FE2FF04 /* MediaRemoteController.swift */; };
+		BE83B7C0719E55A9D2AF0EB9 /* FieldServiceNetworkClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 301B6FE711A1B7281FDA825F /* FieldServiceNetworkClient.swift */; };
 		BFE33FBE261830F715775863 /* SberLoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24DE2B5AF5B3FA4C77EEF6AB /* SberLoginView.swift */; };
 		C25AAD849847AC8C673B9462 /* DeviceServiceCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D5340A6B3C8B38B925507BA /* DeviceServiceCoordinator.swift */; };
 		C390ACDEA69EE872DDF566E0 /* RuntimeDiagnosticsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDD681FE18BFDF3BD90EC71D /* RuntimeDiagnosticsTests.swift */; };
@@ -219,6 +222,7 @@
 /* Begin PBXFileReference section */
 		022BE984F8DAB89F987AEC28 /* DolphinAnimations */ = {isa = PBXFileReference; lastKnownFileType = folder; name = DolphinAnimations; path = Resources/DolphinAnimations; sourceTree = SOURCE_ROOT; };
 		02EF4133669223E43E09D659 /* UnleashedWidgets.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = UnleashedWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		0544D0FD5C4C15A8EE3509DE /* FieldServicesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FieldServicesView.swift; sourceTree = "<group>"; };
 		0711A5F791B6D248100D3EBD /* ProtocolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtocolTests.swift; sourceTree = "<group>"; };
 		090EE11AA22E9A2D32CB5FBC /* FilesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilesView.swift; sourceTree = "<group>"; };
 		0BD911DD24B8F7F707E87CE0 /* TumoflipUpdaterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoflipUpdaterView.swift; sourceTree = "<group>"; };
@@ -239,6 +243,7 @@
 		2BB98D039C72778CC12CED00 /* TumoSpectrumReportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoSpectrumReportTests.swift; sourceTree = "<group>"; };
 		2D5340A6B3C8B38B925507BA /* DeviceServiceCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceServiceCoordinator.swift; sourceTree = "<group>"; };
 		2E66A60CC5ADE5831A2D34FF /* TumoflipFirmwareRoutingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoflipFirmwareRoutingTests.swift; sourceTree = "<group>"; };
+		301B6FE711A1B7281FDA825F /* FieldServiceNetworkClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FieldServiceNetworkClient.swift; sourceTree = "<group>"; };
 		3342FDAF60635FDA2E1AC94C /* russian_trusted_root_ca.pem */ = {isa = PBXFileReference; path = russian_trusted_root_ca.pem; sourceTree = "<group>"; };
 		3352B17F82ACA14AD4B854B7 /* DolphinProfileTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DolphinProfileTests.swift; sourceTree = "<group>"; };
 		3443A5546515DB6C6D192059 /* WiFiMapperGeoJSONTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WiFiMapperGeoJSONTests.swift; sourceTree = "<group>"; };
@@ -322,6 +327,7 @@
 		B503520198AB916BA4F47F10 /* DeviceInfoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceInfoView.swift; sourceTree = "<group>"; };
 		B87192747729E361050D9378 /* ESP32UpdaterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ESP32UpdaterTests.swift; sourceTree = "<group>"; };
 		B88944BB257B9DC6B24EFC2C /* HomeAssistantDiscovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeAssistantDiscovery.swift; sourceTree = "<group>"; };
+		B95CE7D8E715A07E4318F9D1 /* FieldServiceModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FieldServiceModels.swift; sourceTree = "<group>"; };
 		B9759CEE5F028AF5A01580A8 /* FlipperCatalogClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlipperCatalogClient.swift; sourceTree = "<group>"; };
 		B9C1FAA4D8FE4B122507A7DD /* DolphinPackService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DolphinPackService.swift; sourceTree = "<group>"; };
 		B9E15B5C37393C6ADFB482C2 /* LocationProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationProvider.swift; sourceTree = "<group>"; };
@@ -484,6 +490,9 @@
 			isa = PBXGroup;
 			children = (
 				2D5340A6B3C8B38B925507BA /* DeviceServiceCoordinator.swift */,
+				B95CE7D8E715A07E4318F9D1 /* FieldServiceModels.swift */,
+				301B6FE711A1B7281FDA825F /* FieldServiceNetworkClient.swift */,
+				0544D0FD5C4C15A8EE3509DE /* FieldServicesView.swift */,
 			);
 			path = DeviceServices;
 			sourceTree = "<group>";
@@ -1111,6 +1120,9 @@
 				0DC75147EFFA11291AB3D10D /* ESP32FirmwareView.swift in Sources */,
 				624755C1707F30D1CF685556 /* ESP32Updater.swift in Sources */,
 				B868D9DF098B04FB000252E1 /* FapMetadata.swift in Sources */,
+				56E703AEE38BA106610D2DA5 /* FieldServiceModels.swift in Sources */,
+				BE83B7C0719E55A9D2AF0EB9 /* FieldServiceNetworkClient.swift in Sources */,
+				39E5EC816D84A909AAAD7935 /* FieldServicesView.swift in Sources */,
 				61371A51934A206CF6FF6545 /* FileEditorView.swift in Sources */,
 				752AD784AC7FA646BAB74A3D /* FilesView.swift in Sources */,
 				1D65DE3335571D6E326C95C1 /* FirmwareLibrary.swift in Sources */,
@@ -1254,7 +1266,7 @@
 				CODE_SIGNING_REQUIRED = NO;
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 205;
+				CURRENT_PROJECT_VERSION = 206;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -1274,7 +1286,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 1.8.2;
+				MARKETING_VERSION = 1.9.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -1479,7 +1491,7 @@
 				CODE_SIGNING_REQUIRED = NO;
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 205;
+				CURRENT_PROJECT_VERSION = 206;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = "";
 				ENABLE_NS_ASSERTIONS = NO;
@@ -1493,7 +1505,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 1.8.2;
+				MARKETING_VERSION = 1.9.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";

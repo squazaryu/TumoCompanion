@@ -13,6 +13,7 @@ struct UnleashedApp: App {
     @StateObject private var transfer = TransferChannelStore.shared
     @StateObject private var updates = UpdatesCoordinator()
     @StateObject private var deviceServices = DeviceServiceCoordinator()
+    @StateObject private var fieldServices = FieldServicesStore.shared
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
@@ -47,6 +48,7 @@ struct UnleashedApp: App {
                 .environmentObject(transfer)
                 .environmentObject(updates)
                 .environmentObject(deviceServices)
+                .environmentObject(fieldServices)
                 .tint(.orange)
                 .background(WindowStyleApplier(style: settings.appearance.uiStyle))
         }
