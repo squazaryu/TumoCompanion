@@ -1,6 +1,7 @@
 import Combine
 import CoreLocation
 import Foundation
+import UIKit
 
 enum DeviceServiceKind: Equatable {
     case location
@@ -13,6 +14,7 @@ enum DeviceServiceState: Equatable {
     case available
     case inUse
     case denied
+    case foregroundOnly
 
     var label: String {
         switch self {
@@ -21,6 +23,7 @@ enum DeviceServiceState: Equatable {
         case .available: return "Available"
         case .inUse: return "In use"
         case .denied: return "Permission denied"
+        case .foregroundOnly: return "Foreground only"
         }
     }
 }
@@ -124,8 +127,17 @@ extension FlipperBLE: DeviceServiceTransport {
 @MainActor
 protocol DeviceLocationProviding: AnyObject {
     var authorizationStatus: CLAuthorizationStatus { get }
+    var backgroundAuthorized: Bool { get }
+    func requestBackgroundAuthorization()
     func requestLocation() async throws -> CLLocation
     func cancel()
+}
+
+@MainActor
+protocol DeviceBackgroundExecutionProviding: AnyObject {
+    var isInBackground: Bool { get }
+    func begin(expirationHandler: @escaping @MainActor () -> Void) -> UIBackgroundTaskIdentifier
+    func end(_ identifier: UIBackgroundTaskIdentifier)
 }
 
 protocol DeviceHTTPSProviding: AnyObject {
@@ -178,16 +190,19 @@ final class DeviceServiceCoordinator: ObservableObject {
     private let transport: DeviceServiceTransport
     private let location: DeviceLocationProviding
     private let https: DeviceHTTPSProviding
+    private let background: DeviceBackgroundExecutionProviding
     private let defaults: UserDefaults
     private var cancellables = Set<AnyCancellable>()
     private var requestTask: Task<Void, Never>?
     private var activeRequestID: UInt32?
+    private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
 
     convenience init() {
         self.init(
             transport: FlipperBLE.shared,
             location: SystemDeviceLocationProvider(),
             https: SafeHTTPSClient(),
+            background: SystemDeviceBackgroundExecutionProvider(),
             defaults: .standard
         )
     }
@@ -196,11 +211,13 @@ final class DeviceServiceCoordinator: ObservableObject {
         transport: DeviceServiceTransport,
         location: DeviceLocationProviding,
         https: DeviceHTTPSProviding,
+        background: DeviceBackgroundExecutionProviding,
         defaults: UserDefaults
     ) {
         self.transport = transport
         self.location = location
         self.https = https
+        self.background = background
         self.defaults = defaults
         locationEnabled = defaults.bool(forKey: Self.locationEnabledKey)
         networkEnabled = defaults.bool(forKey: Self.networkEnabledKey)
@@ -224,6 +241,7 @@ final class DeviceServiceCoordinator: ObservableObject {
         if activeService == .location { return .inUse }
         switch location.authorizationStatus {
         case .denied, .restricted: return .denied
+        case .authorizedWhenInUse: return .foregroundOnly
         default:
             return transport.deviceServiceReady && transport.deviceServicesSupported
                 ? .available : .unavailable
@@ -235,6 +253,11 @@ final class DeviceServiceCoordinator: ObservableObject {
         if activeService == .network { return .inUse }
         return transport.deviceServiceReady && transport.deviceServicesSupported
             ? .available : .unavailable
+    }
+
+    func prepareBackgroundLocationAuthorization() {
+        guard locationEnabled else { return }
+        location.requestBackgroundAuthorization()
     }
 
     private func receive(_ frame: AppBridgeFrame) {
@@ -263,8 +286,11 @@ final class DeviceServiceCoordinator: ObservableObject {
                 respondError(.disabled, command: frame.command, requestID: frame.requestID)
                 return
             }
-            start(frame, kind: .location) { [transport, location] in
+            start(frame, kind: .location) { [transport, location, background] in
                 try await transport.ensureDeviceServiceSession()
+                guard !background.isInBackground || location.backgroundAuthorized else {
+                    throw DeviceServiceError.permission
+                }
                 return DeviceServiceContract.gpsPayload(try await location.requestLocation())
             }
 
@@ -296,6 +322,9 @@ final class DeviceServiceCoordinator: ObservableObject {
         activeRequestID = frame.requestID
         activeService = kind
         lastError = nil
+        backgroundTaskID = background.begin { [weak self] in
+            self?.cancelActiveRequest()
+        }
         requestTask = Task { [weak self] in
             do {
                 let payload = try await operation()
@@ -370,6 +399,28 @@ final class DeviceServiceCoordinator: ObservableObject {
         requestTask = nil
         activeRequestID = nil
         activeService = nil
+        if backgroundTaskID != .invalid {
+            background.end(backgroundTaskID)
+            backgroundTaskID = .invalid
+        }
+    }
+}
+
+@MainActor
+final class SystemDeviceBackgroundExecutionProvider: DeviceBackgroundExecutionProviding {
+    var isInBackground: Bool { UIApplication.shared.applicationState != .active }
+
+    func begin(
+        expirationHandler: @escaping @MainActor () -> Void
+    ) -> UIBackgroundTaskIdentifier {
+        UIApplication.shared.beginBackgroundTask(withName: "Phone Services") {
+            Task { @MainActor in expirationHandler() }
+        }
+    }
+
+    func end(_ identifier: UIBackgroundTaskIdentifier) {
+        guard identifier != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(identifier)
     }
 }
 
@@ -378,6 +429,8 @@ final class SystemDeviceLocationProvider: NSObject, DeviceLocationProviding, CLL
     private let manager: CLLocationManager
     private var continuation: CheckedContinuation<CLLocation, Error>?
     private var timeoutTask: Task<Void, Never>?
+    private var wantsBackgroundAuthorization = false
+    private var requestedAlwaysAuthorization = false
 
     override init() {
         manager = CLLocationManager()
@@ -387,6 +440,20 @@ final class SystemDeviceLocationProvider: NSObject, DeviceLocationProviding, CLL
     }
 
     var authorizationStatus: CLAuthorizationStatus { manager.authorizationStatus }
+    var backgroundAuthorized: Bool { manager.authorizationStatus == .authorizedAlways }
+
+    func requestBackgroundAuthorization() {
+        wantsBackgroundAuthorization = true
+        switch manager.authorizationStatus {
+        case .notDetermined:
+            manager.requestWhenInUseAuthorization()
+        case .authorizedWhenInUse where !requestedAlwaysAuthorization:
+            requestedAlwaysAuthorization = true
+            manager.requestAlwaysAuthorization()
+        default:
+            break
+        }
+    }
 
     func requestLocation() async throws -> CLLocation {
         guard continuation == nil else { throw DeviceServiceError.busy }
@@ -401,7 +468,11 @@ final class SystemDeviceLocationProvider: NSObject, DeviceLocationProviding, CLL
                 }
 
                 switch manager.authorizationStatus {
-                case .authorizedAlways, .authorizedWhenInUse:
+                case .authorizedAlways:
+                    manager.allowsBackgroundLocationUpdates = true
+                    manager.showsBackgroundLocationIndicator = true
+                    manager.requestLocation()
+                case .authorizedWhenInUse:
                     manager.requestLocation()
                 case .notDetermined:
                     manager.requestWhenInUseAuthorization()
@@ -434,7 +505,17 @@ final class SystemDeviceLocationProvider: NSObject, DeviceLocationProviding, CLL
         let status = manager.authorizationStatus
         Task { @MainActor in
             switch status {
-            case .authorizedAlways, .authorizedWhenInUse:
+            case .authorizedAlways:
+                if self.continuation != nil {
+                    manager.allowsBackgroundLocationUpdates = true
+                    manager.showsBackgroundLocationIndicator = true
+                    manager.requestLocation()
+                }
+            case .authorizedWhenInUse:
+                if self.wantsBackgroundAuthorization && !self.requestedAlwaysAuthorization {
+                    self.requestedAlwaysAuthorization = true
+                    manager.requestAlwaysAuthorization()
+                }
                 if self.continuation != nil { manager.requestLocation() }
             case .denied, .restricted:
                 self.resolve(.failure(DeviceServiceError.permission))
@@ -451,6 +532,8 @@ final class SystemDeviceLocationProvider: NSObject, DeviceLocationProviding, CLL
     private func resolve(_ result: Result<CLLocation, Error>) {
         guard let continuation else { return }
         self.continuation = nil
+        manager.allowsBackgroundLocationUpdates = false
+        manager.showsBackgroundLocationIndicator = false
         timeoutTask?.cancel()
         timeoutTask = nil
         continuation.resume(with: result)
@@ -489,6 +572,19 @@ struct SafeHTTPSResponse: Equatable {
     let truncated: Bool
 }
 
+enum SafeHTTPSRequest {
+    static let githubAPIVersion = "2026-03-10"
+
+    static func make(for url: URL) -> URLRequest {
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.setValue(githubAPIVersion, forHTTPHeaderField: "X-GitHub-Api-Version")
+        request.setValue("TumoCompanion", forHTTPHeaderField: "User-Agent")
+        return request
+    }
+}
+
 final class SafeHTTPSClient: DeviceHTTPSProviding {
     private let policy: HTTPSURLPolicy
     private let maximumDownloadBytes: Int
@@ -514,9 +610,7 @@ final class SafeHTTPSClient: DeviceHTTPSProviding {
         let session = URLSession(configuration: configuration)
         defer { session.invalidateAndCancel() }
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("text/plain", forHTTPHeaderField: "Accept")
+        let request = SafeHTTPSRequest.make(for: url)
         let (bytes, response) = try await session.bytes(for: request, delegate: redirect)
 
         guard let response = response as? HTTPURLResponse else {

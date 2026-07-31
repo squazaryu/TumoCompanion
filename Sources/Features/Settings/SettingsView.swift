@@ -128,7 +128,7 @@ struct SettingsView: View {
                 }
                 .tint(Theme.accent)
                 .accessibilityIdentifier("device-services-location")
-                Text("Lets an open Flipper app request one GPS fix. Uses When In Use permission, stores no location history, and stops on disconnect.")
+                Text("Lets a connected Flipper request one GPS fix, including while this app is in the background. Background requests require Always Location; tracking stops after the reply and no history is stored.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -144,12 +144,13 @@ struct SettingsView: View {
                 }
                 .tint(Theme.accent)
                 .accessibilityIdentifier("device-services-network")
-                Text("Allows one bounded HTTPS GET to the approved public test endpoint. Raw sockets, redirects, credentials, local addresses and background access stay blocked.")
+                Text("Allows one bounded HTTPS GET to the approved public test endpoint, including after a BLE background wake. Raw sockets, redirects, credentials and local addresses stay blocked.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
 
-                if deviceServices.locationState == .denied {
+                if deviceServices.locationState == .denied ||
+                    deviceServices.locationState == .foregroundOnly {
                     Button("Open iOS Settings") {
                         if let url = URL(string: UIApplication.openSettingsURLString) {
                             UIApplication.shared.open(url)
@@ -161,6 +162,12 @@ struct SettingsView: View {
                         .font(.system(.caption2, design: .monospaced))
                         .foregroundStyle(.orange)
                 }
+            }
+            .onAppear {
+                deviceServices.prepareBackgroundLocationAuthorization()
+            }
+            .onChange(of: deviceServices.locationEnabled) { _, enabled in
+                if enabled { deviceServices.prepareBackgroundLocationAuthorization() }
             }
 
             SectionCard(title: "Claude Buddy", systemImage: "bell.badge") {
