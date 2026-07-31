@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.8.1",
+      "version": "1.8.2",
       "versionDate": "2026-07-31",
-      "versionDescription": "Adds opt-in one-shot iPhone location and bounded allowlisted HTTPS services for Tumoflip over App Bridge v2, with explicit availability states, fail-closed validation, cancellation, and both services disabled by default.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.8.1/TumoCompanion-unsigned.ipa",
-      "size": 29310782,
+      "versionDescription": "Fixes the Phone Services HTTPS 415 response and lets opt-in one-shot GPS and bounded HTTPS requests finish after a BLE background wake. Background GPS requires Always Location and stops immediately after replying.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.8.2/TumoCompanion-unsigned.ipa",
+      "size": 29313767,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.8.2",
+          "date": "2026-07-31",
+          "localizedDescription": "Fixes the Phone Services HTTPS 415 response and lets opt-in one-shot GPS and bounded HTTPS requests finish after a BLE background wake. Background GPS requires Always Location and stops immediately after replying.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.8.2/TumoCompanion-unsigned.ipa",
+          "size": 29313767,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.8.1",
           "date": "2026-07-31",
