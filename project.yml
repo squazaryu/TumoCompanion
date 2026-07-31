@@ -18,8 +18,8 @@ packages:
 
 settings:
   base:
-    MARKETING_VERSION: "1.8.2"
-    CURRENT_PROJECT_VERSION: "205"
+    MARKETING_VERSION: "1.9.0"
+    CURRENT_PROJECT_VERSION: "206"
     SWIFT_VERSION: "5.9"
     DEVELOPMENT_TEAM: ""
     CODE_SIGN_STYLE: Manual
@@ -84,7 +84,8 @@ targets:
         NSLocationAlwaysAndWhenInUseUsageDescription: >-
           TumoCompanion shares one position only when your connected Tumoflip requests
           it over Bluetooth while the app is in the background. It stops location
-          updates immediately after replying and stores no location history.
+          updates immediately after replying. If you explicitly enable Last Known
+          Location, one visible and clearable location is stored on this iPhone.
         NFCReaderUsageDescription: >-
           TumoCompanion uses NFC to run authorized TumoVM and TumoCard transport
           diagnostics against your Flipper Zero.

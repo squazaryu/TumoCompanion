@@ -26,4 +26,43 @@ final class DeviceServicesUITests: XCTestCase {
         screenshot.lifetime = .keepAlways
         add(screenshot)
     }
+
+    func testFieldServicesRouteIsCompactAndOptIn() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-onboardingDone", "YES",
+            "-fieldServices.rememberLocation.v1", "NO",
+            "-fieldServices.journalEnabled.v1", "NO",
+            "-fieldServices.webhookEnabled.v1", "NO",
+        ]
+        app.launch()
+
+        let tile = app.buttons["Field Services"]
+        for _ in 0..<6 where !tile.isHittable { app.swipeUp() }
+        if !tile.exists {
+            let tools = app.buttons.matching(
+                NSPredicate(format: "label CONTAINS[c] %@", "TOOLS")
+            ).firstMatch
+            XCTAssertTrue(tools.waitForExistence(timeout: 3))
+            tools.tap()
+        }
+        for _ in 0..<4 where !tile.isHittable { app.swipeUp() }
+        XCTAssertTrue(tile.waitForExistence(timeout: 3))
+        tile.tap()
+
+        XCTAssertTrue(app.navigationBars["Field Services"].waitForExistence(timeout: 3))
+        XCTAssertEqual(app.switches["field-services-remember-location"].value as? String, "0")
+        for _ in 0..<5 where !app.switches["field-services-journal"].isHittable {
+            app.swipeUp()
+        }
+        XCTAssertEqual(app.switches["field-services-journal"].value as? String, "0")
+        XCTAssertTrue(app.staticTexts["Weather"].exists)
+        XCTAssertTrue(app.staticTexts["Place"].exists)
+        XCTAssertTrue(app.staticTexts["Release"].exists)
+
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = "Field Services opt-in route"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
 }

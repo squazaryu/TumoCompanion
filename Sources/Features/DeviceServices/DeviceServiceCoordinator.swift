@@ -6,6 +6,7 @@ import UIKit
 enum DeviceServiceKind: Equatable {
     case location
     case network
+    case journal
 }
 
 enum DeviceServiceState: Equatable {
@@ -38,6 +39,8 @@ enum DeviceServiceError: Error, Equatable {
     case timeout
     case responseTooLarge
     case network
+    case invalidPayload
+    case notConfigured
 
     var token: String {
         switch self {
@@ -50,6 +53,8 @@ enum DeviceServiceError: Error, Equatable {
         case .timeout: return "timeout"
         case .responseTooLarge: return "too_large"
         case .network: return "network"
+        case .invalidPayload: return "invalid_payload"
+        case .notConfigured: return "not_configured"
         }
     }
 }
@@ -60,6 +65,8 @@ protocol DeviceServiceTransport: AnyObject {
     var deviceServiceReady: Bool { get }
     var deviceServicesSupported: Bool { get }
     var deviceServiceBuddyMode: Bool { get }
+    var deviceServiceConnectionState: FlipperConnectionState { get }
+    var deviceServiceDeviceName: String { get }
     func ensureDeviceServiceSession() async throws
 
     @discardableResult
@@ -86,6 +93,8 @@ extension FlipperBLE: DeviceServiceTransport {
         return capabilities.supportsGPS && capabilities.supportsNetwork
     }
     var deviceServiceBuddyMode: Bool { buddyMode }
+    var deviceServiceConnectionState: FlipperConnectionState { state }
+    var deviceServiceDeviceName: String { connectedName ?? "Flipper Zero" }
 
     func ensureDeviceServiceSession() async throws {
         let response = try await appBridgeRequest(
@@ -148,6 +157,10 @@ enum DeviceServiceContract {
     static let appID = "device_services"
     static let gpsCommand = "gps_once"
     static let httpsCommand = "https_get"
+    static let weatherCommand = "weather_now"
+    static let placeCommand = "place_once"
+    static let releaseCommand = "release_latest"
+    static let journalCommand = "journal_append"
     static let maximumRequestBytes = 160
     static let maximumResponseBytes = 512
 
@@ -155,6 +168,7 @@ enum DeviceServiceContract {
         let timestamp = Int(location.timestamp.timeIntervalSince1970)
         let text = String(
             format: "schema=1;lat=%.6f;lon=%.6f;alt=%.1f;acc=%.1f;ts=%d",
+            locale: Locale(identifier: "en_US_POSIX"),
             location.coordinate.latitude,
             location.coordinate.longitude,
             location.altitude,
@@ -171,18 +185,97 @@ enum DeviceServiceContract {
         payload.append(response.body.prefix(available))
         return payload
     }
+
+    static func gpsReason(_ payload: Data) -> FieldLocationReason? {
+        let fields = fields(payload)
+        guard fields["schema"] == "1" else { return nil }
+        switch fields["purpose"] {
+        case nil, "manual": return .explicitRequest
+        case "survey": return .survey
+        case "sidecar": return .sidecar
+        case "service": return .service
+        case "journal": return .journal
+        default: return nil
+        }
+    }
+
+    static func journalRequest(_ payload: Data) -> (kind: String, note: String)? {
+        let values = fields(payload)
+        guard values["schema"] == "1" else { return nil }
+        return (values["kind"] ?? "field", values["note"] ?? "Field event")
+    }
+
+    static func namedRequestIsValid(_ payload: Data) -> Bool {
+        fields(payload)["schema"] == "1"
+    }
+
+    static func weatherPayload(_ result: FieldWeatherResult) -> Data {
+        Data(String(
+            format: "schema=1;temp=%.1f;feels=%.1f;wind=%.1f;code=%d;at=%@",
+            locale: Locale(identifier: "en_US_POSIX"),
+            result.temperatureCelsius,
+            result.apparentCelsius,
+            result.windKPH,
+            result.weatherCode,
+            safeWire(result.observedAt, maximum: 24)
+        ).utf8)
+    }
+
+    static func placePayload(_ result: FieldPlaceResult) -> Data {
+        Data("schema=1;place=\(safeWire(result.locality, maximum: 40));region=\(safeWire(result.region, maximum: 40));country=\(safeWire(result.country, maximum: 40))".utf8)
+    }
+
+    static func releasePayload(_ result: FieldReleaseResult) -> Data {
+        Data("schema=1;tag=\(safeWire(result.tag, maximum: 32));name=\(safeWire(result.name, maximum: 48));at=\(safeWire(result.publishedAt, maximum: 32))".utf8)
+    }
+
+    static func journalPayload(_ entry: FieldJournalEntry) -> Data {
+        let sent = entry.delivery == .sent ? 1 : 0
+        return Data("schema=1;stored=1;sent=\(sent);delivery=\(entry.delivery.rawValue);id=\(entry.id.uuidString.prefix(8))".utf8)
+    }
+
+    private static func fields(_ payload: Data) -> [String: String] {
+        guard let text = String(data: payload, encoding: .utf8) else { return [:] }
+        return text.split(separator: ";").reduce(into: [:]) { result, component in
+            let pair = component.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
+            guard pair.count == 2 else { return }
+            result[String(pair[0])] = String(pair[1])
+        }
+    }
+
+    private static func safeWire(_ input: String, maximum: Int) -> String {
+        let filtered = input.unicodeScalars.map { scalar -> Character in
+            guard scalar.isASCII, scalar.value >= 0x20, scalar.value != 0x7F,
+                  scalar != ";", scalar != "=" else { return " " }
+            return Character(scalar)
+        }
+        let normalized = String(filtered)
+            .split(whereSeparator: { $0.isWhitespace })
+            .joined(separator: " ")
+        return String(normalized.prefix(maximum))
+    }
 }
 
 @MainActor
 final class DeviceServiceCoordinator: ObservableObject {
     @Published var locationEnabled: Bool {
-        didSet { defaults.set(locationEnabled, forKey: Self.locationEnabledKey) }
+        didSet {
+            defaults.set(locationEnabled, forKey: Self.locationEnabledKey)
+            if !locationEnabled {
+                cancelActiveRequest()
+                cancelConnectionCapture()
+            }
+        }
     }
     @Published var networkEnabled: Bool {
-        didSet { defaults.set(networkEnabled, forKey: Self.networkEnabledKey) }
+        didSet {
+            defaults.set(networkEnabled, forKey: Self.networkEnabledKey)
+            if !networkEnabled, activeService == .network { cancelActiveRequest() }
+        }
     }
     @Published private(set) var activeService: DeviceServiceKind?
     @Published private(set) var lastError: String?
+    @Published private(set) var lastResult: String?
 
     private static let locationEnabledKey = "deviceServices.locationEnabled.v1"
     private static let networkEnabledKey = "deviceServices.networkEnabled.v1"
@@ -191,11 +284,17 @@ final class DeviceServiceCoordinator: ObservableObject {
     private let location: DeviceLocationProviding
     private let https: DeviceHTTPSProviding
     private let background: DeviceBackgroundExecutionProviding
+    private let fieldServices: FieldServicesStore
+    private let fieldNetwork: FieldServiceNetworkProviding
     private let defaults: UserDefaults
     private var cancellables = Set<AnyCancellable>()
     private var requestTask: Task<Void, Never>?
     private var activeRequestID: UInt32?
     private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
+    private var connectionCaptureTask: Task<Void, Never>?
+    private var connectionBackgroundTaskID: UIBackgroundTaskIdentifier = .invalid
+    private var previousConnectionState: FlipperConnectionState
+    private var lastReadyDeviceName: String
 
     convenience init() {
         self.init(
@@ -203,7 +302,9 @@ final class DeviceServiceCoordinator: ObservableObject {
             location: SystemDeviceLocationProvider(),
             https: SafeHTTPSClient(),
             background: SystemDeviceBackgroundExecutionProvider(),
-            defaults: .standard
+            defaults: .standard,
+            fieldServices: .shared,
+            fieldNetwork: FieldServiceNetworkClient()
         )
     }
 
@@ -212,13 +313,19 @@ final class DeviceServiceCoordinator: ObservableObject {
         location: DeviceLocationProviding,
         https: DeviceHTTPSProviding,
         background: DeviceBackgroundExecutionProviding,
-        defaults: UserDefaults
+        defaults: UserDefaults,
+        fieldServices: FieldServicesStore? = nil,
+        fieldNetwork: FieldServiceNetworkProviding = FieldServiceNetworkClient()
     ) {
         self.transport = transport
         self.location = location
         self.https = https
         self.background = background
         self.defaults = defaults
+        self.fieldServices = fieldServices ?? .shared
+        self.fieldNetwork = fieldNetwork
+        previousConnectionState = transport.deviceServiceConnectionState
+        lastReadyDeviceName = transport.deviceServiceDeviceName
         locationEnabled = defaults.bool(forKey: Self.locationEnabledKey)
         networkEnabled = defaults.bool(forKey: Self.networkEnabledKey)
 
@@ -230,8 +337,7 @@ final class DeviceServiceCoordinator: ObservableObject {
 
         transport.deviceServiceConnectionStates
             .sink { [weak self] state in
-                guard state != .ready else { return }
-                Task { @MainActor in self?.cancelActiveRequest() }
+                Task { @MainActor in self?.handleConnectionState(state) }
             }
             .store(in: &cancellables)
     }
@@ -286,12 +392,15 @@ final class DeviceServiceCoordinator: ObservableObject {
                 respondError(.disabled, command: frame.command, requestID: frame.requestID)
                 return
             }
-            start(frame, kind: .location) { [transport, location, background] in
+            guard let reason = DeviceServiceContract.gpsReason(frame.payload) else {
+                respondError(.invalidPayload, command: frame.command, requestID: frame.requestID)
+                return
+            }
+            start(frame, kind: .location) { [weak self, transport] in
+                guard let self else { throw CancellationError() }
                 try await transport.ensureDeviceServiceSession()
-                guard !background.isInBackground || location.backgroundAuthorized else {
-                    throw DeviceServiceError.permission
-                }
-                return DeviceServiceContract.gpsPayload(try await location.requestLocation())
+                let fix = try await self.requestLocation(reason: reason)
+                return DeviceServiceContract.gpsPayload(fix)
             }
 
         case DeviceServiceContract.httpsCommand:
@@ -309,6 +418,86 @@ final class DeviceServiceCoordinator: ObservableObject {
                 return DeviceServiceContract.httpsPayload(try await https.get(url))
             }
 
+        case DeviceServiceContract.weatherCommand:
+            guard locationEnabled, networkEnabled else {
+                respondError(.disabled, command: frame.command, requestID: frame.requestID)
+                return
+            }
+            guard DeviceServiceContract.namedRequestIsValid(frame.payload) else {
+                respondError(.invalidPayload, command: frame.command, requestID: frame.requestID)
+                return
+            }
+            start(frame, kind: .network) { [weak self, transport, fieldNetwork] in
+                guard let self else { throw CancellationError() }
+                try await transport.ensureDeviceServiceSession()
+                let fix = try await self.requestLocation(reason: .service)
+                return DeviceServiceContract.weatherPayload(try await fieldNetwork.weather(at: fix))
+            }
+
+        case DeviceServiceContract.placeCommand:
+            guard locationEnabled, networkEnabled else {
+                respondError(.disabled, command: frame.command, requestID: frame.requestID)
+                return
+            }
+            guard DeviceServiceContract.namedRequestIsValid(frame.payload) else {
+                respondError(.invalidPayload, command: frame.command, requestID: frame.requestID)
+                return
+            }
+            start(frame, kind: .network) { [weak self, transport, fieldNetwork] in
+                guard let self else { throw CancellationError() }
+                try await transport.ensureDeviceServiceSession()
+                let fix = try await self.requestLocation(reason: .service)
+                return DeviceServiceContract.placePayload(try await fieldNetwork.place(at: fix))
+            }
+
+        case DeviceServiceContract.releaseCommand:
+            guard networkEnabled else {
+                respondError(.disabled, command: frame.command, requestID: frame.requestID)
+                return
+            }
+            guard DeviceServiceContract.namedRequestIsValid(frame.payload) else {
+                respondError(.invalidPayload, command: frame.command, requestID: frame.requestID)
+                return
+            }
+            start(frame, kind: .network) { [transport, fieldNetwork] in
+                try await transport.ensureDeviceServiceSession()
+                return DeviceServiceContract.releasePayload(try await fieldNetwork.latestRelease())
+            }
+
+        case DeviceServiceContract.journalCommand:
+            guard locationEnabled, fieldServices.journalEnabled else {
+                respondError(.disabled, command: frame.command, requestID: frame.requestID)
+                return
+            }
+            guard let journal = DeviceServiceContract.journalRequest(frame.payload) else {
+                respondError(.invalidPayload, command: frame.command, requestID: frame.requestID)
+                return
+            }
+            start(frame, kind: .journal) { [weak self, transport, fieldServices, fieldNetwork] in
+                guard let self else { throw CancellationError() }
+                try await transport.ensureDeviceServiceSession()
+                let fix = try await self.requestLocation(reason: .journal)
+                var entry = try fieldServices.appendJournal(
+                    kind: journal.kind,
+                    note: journal.note,
+                    location: fix,
+                    deviceName: transport.deviceServiceDeviceName
+                )
+                if fieldServices.webhookEnabled {
+                    do {
+                        guard self.networkEnabled else { throw DeviceServiceError.disabled }
+                        let configuration = try fieldServices.webhookConfiguration()
+                        try await fieldNetwork.deliver(entry, to: configuration)
+                        fieldServices.markDelivery(id: entry.id, as: .sent)
+                        entry.delivery = .sent
+                    } catch {
+                        fieldServices.markDelivery(id: entry.id, as: .failed)
+                        entry.delivery = .failed
+                    }
+                }
+                return DeviceServiceContract.journalPayload(entry)
+            }
+
         default:
             respondError(.unsupported, command: frame.command, requestID: frame.requestID)
         }
@@ -319,9 +508,11 @@ final class DeviceServiceCoordinator: ObservableObject {
         kind: DeviceServiceKind,
         operation: @escaping @MainActor () async throws -> Data
     ) {
+        cancelConnectionCapture()
         activeRequestID = frame.requestID
         activeService = kind
         lastError = nil
+        lastResult = nil
         backgroundTaskID = background.begin { [weak self] in
             self?.cancelActiveRequest()
         }
@@ -366,6 +557,7 @@ final class DeviceServiceCoordinator: ObservableObject {
             lastError = error.token
             respondError(error, command: command, requestID: requestID)
         } else {
+            lastResult = String(decoding: payload.prefix(160), as: UTF8.self)
             _ = transport.sendDeviceServiceResponse(
                 command: command,
                 requestID: requestID,
@@ -402,6 +594,74 @@ final class DeviceServiceCoordinator: ObservableObject {
         if backgroundTaskID != .invalid {
             background.end(backgroundTaskID)
             backgroundTaskID = .invalid
+        }
+    }
+
+    private func requestLocation(reason: FieldLocationReason) async throws -> CLLocation {
+        guard !background.isInBackground || location.backgroundAuthorized else {
+            throw DeviceServiceError.permission
+        }
+        let fix = try await location.requestLocation()
+        if reason != .journal {
+            fieldServices.record(
+                fix,
+                reason: reason,
+                deviceName: transport.deviceServiceDeviceName
+            )
+        }
+        return fix
+    }
+
+    private func handleConnectionState(_ state: FlipperConnectionState) {
+        let previous = previousConnectionState
+        previousConnectionState = state
+
+        if state != .ready { cancelActiveRequest() }
+        if state == .ready, previous != .ready {
+            lastReadyDeviceName = transport.deviceServiceDeviceName
+            captureConnectionLocation(reason: .connection, deviceName: lastReadyDeviceName)
+        } else if previous == .ready, state != .ready {
+            captureConnectionLocation(reason: .disconnection, deviceName: lastReadyDeviceName)
+        }
+    }
+
+    private func captureConnectionLocation(
+        reason: FieldLocationReason,
+        deviceName: String
+    ) {
+        guard fieldServices.rememberLastLocation, locationEnabled else { return }
+        cancelConnectionCapture()
+        connectionBackgroundTaskID = background.begin { [weak self] in
+            self?.cancelConnectionCapture()
+        }
+        connectionCaptureTask = Task { [weak self] in
+            guard let self else { return }
+            defer { self.finishConnectionCapture() }
+            do {
+                guard !self.background.isInBackground || self.location.backgroundAuthorized else {
+                    return
+                }
+                let fix = try await self.location.requestLocation()
+                guard !Task.isCancelled else { return }
+                self.fieldServices.record(fix, reason: reason, deviceName: deviceName)
+            } catch {
+                return
+            }
+        }
+    }
+
+    private func cancelConnectionCapture() {
+        guard connectionCaptureTask != nil || connectionBackgroundTaskID != .invalid else { return }
+        connectionCaptureTask?.cancel()
+        location.cancel()
+        finishConnectionCapture()
+    }
+
+    private func finishConnectionCapture() {
+        connectionCaptureTask = nil
+        if connectionBackgroundTaskID != .invalid {
+            background.end(connectionBackgroundTaskID)
+            connectionBackgroundTaskID = .invalid
         }
     }
 }
@@ -497,7 +757,7 @@ final class SystemDeviceLocationProvider: NSObject, DeviceLocationProviding, CLL
         _ manager: CLLocationManager,
         didUpdateLocations locations: [CLLocation]
     ) {
-        guard let location = locations.last else { return }
+        guard let location = locations.last(where: Self.isUsableFix) else { return }
         Task { @MainActor in self.resolve(.success(location)) }
     }
 
@@ -527,6 +787,13 @@ final class SystemDeviceLocationProvider: NSObject, DeviceLocationProviding, CLL
 
     nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         Task { @MainActor in self.resolve(.failure(DeviceServiceError.network)) }
+    }
+
+    nonisolated private static func isUsableFix(_ location: CLLocation) -> Bool {
+        CLLocationCoordinate2DIsValid(location.coordinate) &&
+            location.horizontalAccuracy >= 0 &&
+            location.horizontalAccuracy <= 10_000 &&
+            abs(location.timestamp.timeIntervalSinceNow) <= 30
     }
 
     private func resolve(_ result: Result<CLLocation, Error>) {

@@ -2,7 +2,7 @@ import SwiftUI
 
 /// A destination that can live as a tile on the Home screen (and double as a deep-link route).
 enum HomeTileID: String, Codable, CaseIterable, Identifiable, Hashable {
-    case info, apps, files, airadar, wifi, spectrum, relay, tumonet, esp32, updates, backup, remotes, media
+    case info, apps, files, airadar, wifi, fieldServices, spectrum, relay, tumonet, esp32, updates, backup, remotes, media
     var id: String { rawValue }
 
     var title: String {
@@ -12,6 +12,7 @@ enum HomeTileID: String, Codable, CaseIterable, Identifiable, Hashable {
         case .files:   return "Files"
         case .airadar: return "AI Radar"
         case .wifi:    return "TumoSurvey"
+        case .fieldServices: return "Field Services"
         case .spectrum: return "TumoSpectrum"
         case .relay:   return "Relay"
         case .tumonet: return "TumoNet"
@@ -30,6 +31,7 @@ enum HomeTileID: String, Codable, CaseIterable, Identifiable, Hashable {
         case .files:   return "folder.fill"
         case .airadar: return "chart.bar.xaxis"
         case .wifi:    return "wifi"
+        case .fieldServices: return "location.viewfinder"
         case .spectrum: return "waveform.path.ecg"
         case .relay:   return "antenna.radiowaves.left.and.right"
         case .tumonet: return "point.3.connected.trianglepath.dotted"
@@ -48,6 +50,7 @@ enum HomeTileID: String, Codable, CaseIterable, Identifiable, Hashable {
         case .files:   return .cyan
         case .airadar: return .green
         case .wifi:    return .mint
+        case .fieldServices: return .blue
         case .spectrum: return .orange
         case .relay:   return .red
         case .tumonet: return .orange
@@ -93,7 +96,7 @@ private struct HomeLayoutData: Codable {
 
     static var `default`: HomeLayoutData {
         .init(info: ["info", "apps", "files"],
-              tools: ["airadar", "wifi", "spectrum", "relay", "tumonet", "esp32"],
+              tools: ["airadar", "wifi", "fieldServices", "spectrum", "relay", "tumonet", "esp32"],
               revision: ["updates", "backup", "remotes"],
               hidden: [],
               collapsed: [])

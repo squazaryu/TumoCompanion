@@ -68,6 +68,27 @@ final class DeviceServiceContractTests: XCTestCase {
         XCTAssertEqual(request.value(forHTTPHeaderField: "User-Agent"), "TumoCompanion")
         XCTAssertNil(request.httpBody)
     }
+
+    func testWebhookPolicyRejectsLocalAndCredentialURLs() throws {
+        XCTAssertNoThrow(try WebhookURLPolicy.validate(URL(string: "https://example.com/tumoflip")!))
+        XCTAssertThrowsError(try WebhookURLPolicy.validate(URL(string: "https://127.0.0.1/hook")!))
+        XCTAssertThrowsError(try WebhookURLPolicy.validate(URL(string: "https://192.168.1.10/hook")!))
+        XCTAssertThrowsError(try WebhookURLPolicy.validate(URL(string: "https://host.local/hook")!))
+        XCTAssertThrowsError(try WebhookURLPolicy.validate(URL(string: "https://user:pass@example.com/hook")!))
+        XCTAssertThrowsError(try WebhookURLPolicy.validate(URL(string: "https://example.com/hook?token=x")!))
+    }
+
+    func testNamedPayloadsStayBoundedAndWireSafe() {
+        let place = DeviceServiceContract.placePayload(FieldPlaceResult(
+            locality: String(repeating: "City;bad=value", count: 8),
+            region: String(repeating: "Region", count: 12),
+            country: String(repeating: "Country", count: 12)
+        ))
+        XCTAssertLessThanOrEqual(place.count, AppBridgeFrame.payloadMaxV2)
+        let text = String(decoding: place, as: UTF8.self)
+        XCTAssertFalse(text.contains("bad=value"))
+        XCTAssertTrue(text.contains("place=City bad value"))
+    }
 }
 
 @MainActor
@@ -78,6 +99,7 @@ final class DeviceServiceCoordinatorTests: XCTestCase {
         var ready = true
         var supported = true
         var buddy = false
+        var name = "Test Flipper"
         var responses: [(String, UInt32, Data, Bool)] = []
 
         var deviceServiceFrames: AnyPublisher<AppBridgeFrame, Never> {
@@ -89,6 +111,8 @@ final class DeviceServiceCoordinatorTests: XCTestCase {
         var deviceServiceReady: Bool { ready }
         var deviceServicesSupported: Bool { supported }
         var deviceServiceBuddyMode: Bool { buddy }
+        var deviceServiceConnectionState: FlipperConnectionState { states.value }
+        var deviceServiceDeviceName: String { name }
         func ensureDeviceServiceSession() async throws {}
 
         func sendDeviceServiceResponse(
@@ -107,8 +131,9 @@ final class DeviceServiceCoordinatorTests: XCTestCase {
         var backgroundAuthorized = false
         var backgroundAuthorizationRequests = 0
         var result = CLLocation(latitude: 55.75, longitude: 37.62)
+        var requestCount = 0
         func requestBackgroundAuthorization() { backgroundAuthorizationRequests += 1 }
-        func requestLocation() async throws -> CLLocation { result }
+        func requestLocation() async throws -> CLLocation { requestCount += 1; return result }
         func cancel() {}
     }
 
@@ -136,6 +161,32 @@ final class DeviceServiceCoordinatorTests: XCTestCase {
         func get(_ url: URL) async throws -> SafeHTTPSResponse { response }
     }
 
+    private final class FakeFieldNetwork: FieldServiceNetworkProviding {
+        var weatherResult = FieldWeatherResult(
+            temperatureCelsius: 21.5,
+            apparentCelsius: 20.0,
+            windKPH: 7.2,
+            weatherCode: 1,
+            observedAt: "2026-07-31T12:00"
+        )
+        var placeResult = FieldPlaceResult(locality: "Moscow", region: "Moscow", country: "Russia")
+        var releaseResult = FieldReleaseResult(tag: "v1.0.3", name: "Tumoflip", publishedAt: "2026-07-30")
+        var delivered: [UUID] = []
+
+        func weather(at location: CLLocation) async throws -> FieldWeatherResult { weatherResult }
+        func place(at location: CLLocation) async throws -> FieldPlaceResult { placeResult }
+        func latestRelease() async throws -> FieldReleaseResult { releaseResult }
+        func deliver(_ entry: FieldJournalEntry, to webhook: FieldWebhookConfiguration) async throws {
+            delivered.append(entry.id)
+        }
+    }
+
+    private final class FakeSecrets: FieldSecretStoring {
+        var values: [String: String] = [:]
+        func read(account: String) -> String? { values[account] }
+        func write(_ value: String?, account: String) throws { values[account] = value }
+    }
+
     private func request(command: String, id: UInt32, payload: Data) -> AppBridgeFrame {
         let encoded = AppBridgeFrame.encodeV2(
             appID: DeviceServiceContract.appID,
@@ -152,6 +203,10 @@ final class DeviceServiceCoordinatorTests: XCTestCase {
         let defaults = UserDefaults(suiteName: suite)!
         defaults.removePersistentDomain(forName: suite)
         return defaults
+    }
+
+    private func fieldStore(_ defaults: UserDefaults) -> FieldServicesStore {
+        FieldServicesStore(defaults: defaults, secrets: FakeSecrets())
     }
 
     func testDisabledLocationFailsClosed() async {
@@ -306,5 +361,153 @@ final class DeviceServiceCoordinatorTests: XCTestCase {
         XCTAssertEqual(transport.responses.first?.3, false)
         XCTAssertEqual(background.beginCount, 1)
         XCTAssertEqual(background.endCount, 1)
+    }
+
+    func testWeatherUsesLocationAndNamedProvider() async {
+        let transport = FakeTransport()
+        let location = FakeLocation()
+        let suite = defaults()
+        let fields = fieldStore(suite)
+        let coordinator = DeviceServiceCoordinator(
+            transport: transport,
+            location: location,
+            https: FakeHTTPS(),
+            background: FakeBackground(),
+            defaults: suite,
+            fieldServices: fields,
+            fieldNetwork: FakeFieldNetwork()
+        )
+        coordinator.locationEnabled = true
+        coordinator.networkEnabled = true
+
+        transport.frames.send(request(
+            command: DeviceServiceContract.weatherCommand,
+            id: 101,
+            payload: Data("schema=1".utf8)
+        ))
+        for _ in 0..<30 where transport.responses.isEmpty { await Task.yield() }
+
+        XCTAssertEqual(location.requestCount, 1)
+        XCTAssertEqual(transport.responses.first?.3, false)
+        XCTAssertTrue(String(decoding: transport.responses.first?.2 ?? Data(), as: UTF8.self)
+            .contains("temp=21.5"))
+    }
+
+    func testNamedServiceRejectsMissingSchema() async {
+        let transport = FakeTransport()
+        let coordinator = DeviceServiceCoordinator(
+            transport: transport,
+            location: FakeLocation(),
+            https: FakeHTTPS(),
+            background: FakeBackground(),
+            defaults: defaults(),
+            fieldNetwork: FakeFieldNetwork()
+        )
+        coordinator.locationEnabled = true
+        coordinator.networkEnabled = true
+
+        transport.frames.send(request(
+            command: DeviceServiceContract.weatherCommand,
+            id: 103,
+            payload: Data("purpose=service".utf8)
+        ))
+        await Task.yield()
+
+        XCTAssertEqual(String(decoding: transport.responses.first?.2 ?? Data(), as: UTF8.self), "invalid_payload")
+        XCTAssertEqual(transport.responses.first?.3, true)
+    }
+
+    func testWebhookTokenRejectsOversizedValue() {
+        let fields = fieldStore(defaults())
+        XCTAssertThrowsError(try fields.saveWebhookToken(String(repeating: "x", count: 513))) {
+            XCTAssertEqual($0 as? DeviceServiceError, .invalidPayload)
+        }
+        XCTAssertThrowsError(try fields.saveWebhookToken("secret\n")) {
+            XCTAssertEqual($0 as? DeviceServiceError, .invalidPayload)
+        }
+    }
+
+    func testJournalStoresLocationAndReturnsAcknowledgement() async {
+        let transport = FakeTransport()
+        let suite = defaults()
+        let fields = fieldStore(suite)
+        fields.journalEnabled = true
+        let coordinator = DeviceServiceCoordinator(
+            transport: transport,
+            location: FakeLocation(),
+            https: FakeHTTPS(),
+            background: FakeBackground(),
+            defaults: suite,
+            fieldServices: fields,
+            fieldNetwork: FakeFieldNetwork()
+        )
+        coordinator.locationEnabled = true
+
+        transport.frames.send(request(
+            command: DeviceServiceContract.journalCommand,
+            id: 102,
+            payload: Data("schema=1;kind=field;note=Gate check".utf8)
+        ))
+        for _ in 0..<30 where transport.responses.isEmpty { await Task.yield() }
+
+        XCTAssertEqual(fields.journalEntries.count, 1)
+        XCTAssertEqual(fields.journalEntries.first?.note, "Gate check")
+        XCTAssertEqual(fields.journalEntries.first?.location.deviceName, "Test Flipper")
+        XCTAssertTrue(String(decoding: transport.responses.first?.2 ?? Data(), as: UTF8.self)
+            .contains("stored=1"))
+    }
+
+    func testConnectionCaptureStoresOnlyOneOptInLocation() async {
+        let transport = FakeTransport()
+        transport.states.value = .disconnected
+        let location = FakeLocation()
+        let suite = defaults()
+        let fields = fieldStore(suite)
+        fields.rememberLastLocation = true
+        let coordinator = DeviceServiceCoordinator(
+            transport: transport,
+            location: location,
+            https: FakeHTTPS(),
+            background: FakeBackground(),
+            defaults: suite,
+            fieldServices: fields,
+            fieldNetwork: FakeFieldNetwork()
+        )
+        coordinator.locationEnabled = true
+
+        transport.states.send(.ready)
+        for _ in 0..<30 where fields.lastLocation == nil { await Task.yield() }
+
+        XCTAssertEqual(fields.lastLocation?.reason, .connection)
+        XCTAssertEqual(location.requestCount, 1)
+    }
+
+    func testDisconnectCaptureKeepsLastReadyDeviceName() async {
+        let transport = FakeTransport()
+        transport.states.value = .disconnected
+        transport.name = "Field Flipper"
+        let location = FakeLocation()
+        let suite = defaults()
+        let fields = fieldStore(suite)
+        fields.rememberLastLocation = true
+        let coordinator = DeviceServiceCoordinator(
+            transport: transport,
+            location: location,
+            https: FakeHTTPS(),
+            background: FakeBackground(),
+            defaults: suite,
+            fieldServices: fields,
+            fieldNetwork: FakeFieldNetwork()
+        )
+        coordinator.locationEnabled = true
+
+        transport.states.send(.ready)
+        for _ in 0..<30 where fields.lastLocation?.reason != .connection { await Task.yield() }
+        transport.name = "Flipper Zero"
+        transport.states.send(.disconnected)
+        for _ in 0..<30 where fields.lastLocation?.reason != .disconnection { await Task.yield() }
+
+        XCTAssertEqual(fields.lastLocation?.reason, .disconnection)
+        XCTAssertEqual(fields.lastLocation?.deviceName, "Field Flipper")
     }
 }

@@ -128,7 +128,7 @@ struct SettingsView: View {
                 }
                 .tint(Theme.accent)
                 .accessibilityIdentifier("device-services-location")
-                Text("Lets a connected Flipper request one GPS fix, including while this app is in the background. Background requests require Always Location; tracking stops after the reply and no history is stored.")
+                Text("Lets a connected Flipper request one GPS fix, including while this app is in the background. Background requests require Always Location; tracking stops after every reply. Optional last-known storage is configured in Field Services.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -144,7 +144,7 @@ struct SettingsView: View {
                 }
                 .tint(Theme.accent)
                 .accessibilityIdentifier("device-services-network")
-                Text("Allows one bounded HTTPS GET to the approved public test endpoint, including after a BLE background wake. Raw sockets, redirects, credentials and local addresses stay blocked.")
+                Text("Allows bounded named Weather, Place, Release and diagnostic HTTPS requests, including after a BLE background wake. Raw sockets, redirects and Flipper-supplied hosts stay blocked.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -162,6 +162,13 @@ struct SettingsView: View {
                         .font(.system(.caption2, design: .monospaced))
                         .foregroundStyle(.orange)
                 }
+
+                NavigationLink {
+                    FieldServicesView()
+                } label: {
+                    Label("Field Services settings", systemImage: "location.viewfinder")
+                }
+                .accessibilityIdentifier("field-services-settings-link")
             }
             .onAppear {
                 deviceServices.prepareBackgroundLocationAuthorization()

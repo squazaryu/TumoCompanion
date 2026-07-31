@@ -6,7 +6,7 @@
 
 **A native iOS companion for Flipper Zero** — BLE/USB SD file access, screen mirror, Sub-GHz/NFC, a Sber smart-relay failsafe, Marauder log analysis, ESP32 firmware flashing, and live Claude Code status on your Flipper.
 
-![version](https://img.shields.io/badge/version-1.8.0-F36E12)
+![version](https://img.shields.io/badge/version-1.9.0-F36E12)
 ![platform](https://img.shields.io/badge/iOS-17%2B-black?logo=apple)
 ![SwiftUI](https://img.shields.io/badge/SwiftUI-5.9-orange?logo=swift)
 ![transport](https://img.shields.io/badge/transport-BLE%20%2B%20USB%20SD-blue?logo=bluetooth)
@@ -21,6 +21,7 @@
 - [Install](#install-feather--altstore)
 - [Screenshots](#screenshots)
 - [Features](#features)
+- [Field Services](#field-services)
 - [App Bridge (FAB1 / FAB2)](#app-bridge-fab1--fab2)
 - [Firmware packages (atomic updater)](#firmware-packages-atomic-updater)
 - [How the relay state works](#how-the-relay-state-works)
@@ -68,6 +69,14 @@ https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/apps.json
 - Surfaces **Evil Portal** captured credentials.
 - Compact filter (Useful / Captures / Scans / Portal / All) with the statistics pinned at the top; the (often hundreds-strong) file list is collapsed below — tap any single capture to inspect it on its own.
 - Parses classic `.pcap` (802.11 / radiotap) and Marauder text logs; finds them in the real `pcaps/` · `logs/` · `dumps/` subfolders automatically.
+
+### Field Services
+
+- TumoSurvey asks the iPhone for one GPS fix when a survey starts; firmware uses it only for Wi-Fi rows that do not already contain Module One coordinates.
+- Flipper Companion exposes named Weather, Place and latest stable-release lookups without accepting arbitrary service URLs from Flipper.
+- Existing `.sub`, `.nfc` and `.rfid` captures can receive a separate transactional `.tumoflip.json` location sidecar; the source file is never modified.
+- Optional one-record last-known BLE location and a 200-entry field journal are visible and clearable on iPhone. All related switches are off by default.
+- Optional journal delivery uses an iPhone-configured HTTPS webhook. Its bearer token stays in Keychain and is never sent to Flipper.
 
 ### 🔌 ESP32 Marauder firmware
 - Checks ESP32Marauder releases, detects your board from the esp_flasher layout, downloads the matching image and stages a flash folder over BLE or USB SD — with size guard + MD5 verify.
@@ -117,6 +126,7 @@ The Sber relay doesn't report a reliable *steady* state back to Home Assistant (
 
 - **No telemetry, no analytics, no account.**
 - Sber / Home Assistant tokens are stored in the **iOS Keychain** and entered by you — nothing personal is baked into the build.
+- Field Services are opt-in. Weather and place lookup share the requested coordinates only with their named public provider; last-known storage, journal storage and webhook delivery have separate switches and clear controls.
 - Update notifications are **local** (`BGAppRefreshTask` + local notifications); they only fetch public GitHub release tags.
 - Bundles the public Russian Trusted Root CA so Sber's TLS validates — no private keys involved.
 
