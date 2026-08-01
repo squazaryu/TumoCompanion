@@ -4,6 +4,7 @@ import Foundation
 import UIKit
 
 enum DeviceServiceKind: Equatable {
+    case time
     case location
     case network
     case journal
@@ -90,7 +91,8 @@ extension FlipperBLE: DeviceServiceTransport {
     var deviceServiceReady: Bool { state == .ready && appBridgeV2 }
     var deviceServicesSupported: Bool {
         let capabilities = RuntimeCapabilities(appBridgeCapabilities)
-        return capabilities.supportsGPS && capabilities.supportsNetwork
+        return capabilities.supportsTime ||
+            (capabilities.supportsGPS && capabilities.supportsNetwork)
     }
     var deviceServiceBuddyMode: Bool { buddyMode }
     var deviceServiceConnectionState: FlipperConnectionState { state }
@@ -155,6 +157,7 @@ protocol DeviceHTTPSProviding: AnyObject {
 
 enum DeviceServiceContract {
     static let appID = "device_services"
+    static let timeCommand = "time_once"
     static let gpsCommand = "gps_once"
     static let httpsCommand = "https_get"
     static let weatherCommand = "weather_now"
@@ -163,6 +166,12 @@ enum DeviceServiceContract {
     static let journalCommand = "journal_append"
     static let maximumRequestBytes = 160
     static let maximumResponseBytes = 512
+
+    static func timePayload(date: Date, timeZone: TimeZone) -> Data {
+        let unix = Int64(date.timeIntervalSince1970.rounded(.down))
+        let offset = timeZone.secondsFromGMT(for: date)
+        return Data("schema=1;unix=\(unix);offset=\(offset)".utf8)
+    }
 
     static func gpsPayload(_ location: CLLocation) -> Data {
         let timestamp = Int(location.timestamp.timeIntervalSince1970)
@@ -387,6 +396,20 @@ final class DeviceServiceCoordinator: ObservableObject {
         }
 
         switch frame.command {
+        case DeviceServiceContract.timeCommand:
+            guard DeviceServiceContract.namedRequestIsValid(frame.payload) else {
+                respondError(.invalidPayload, command: frame.command, requestID: frame.requestID)
+                return
+            }
+            start(frame, kind: .time) { [transport] in
+                try await transport.ensureDeviceServiceSession()
+                let now = Date()
+                return DeviceServiceContract.timePayload(
+                    date: now,
+                    timeZone: .autoupdatingCurrent
+                )
+            }
+
         case DeviceServiceContract.gpsCommand:
             guard locationEnabled else {
                 respondError(.disabled, command: frame.command, requestID: frame.requestID)
