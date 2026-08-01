@@ -84,7 +84,22 @@ echo "==> Packaging IPA from $APP"
 rm -rf build/ipa
 mkdir -p build/ipa/Payload
 cp -R "$APP" build/ipa/Payload/
-( cd build/ipa && zip -qr "$ROOT/build/TumoCompanion-unsigned.ipa" Payload )
+
+# Always create a new archive. Updating an existing ZIP keeps entries that no
+# longer exist in the app bundle, which invalidates the outer code signature.
+PACKAGE_DIR=$(mktemp -d "$ROOT/build/.ipa-package.XXXXXX")
+CHECK_DIR=$(mktemp -d "$ROOT/build/.ipa-check.XXXXXX")
+PACKAGE_IPA="$PACKAGE_DIR/TumoCompanion-unsigned.ipa"
+cleanup_ipa_temp() {
+  rm -rf "$PACKAGE_DIR" "$CHECK_DIR"
+}
+trap cleanup_ipa_temp EXIT
+( cd build/ipa && zip -qr "$PACKAGE_IPA" Payload )
+ditto -x -k "$PACKAGE_IPA" "$CHECK_DIR"
+codesign --verify --deep --strict "$CHECK_DIR/Payload/UnleashedCompanion.app"
+mv -f "$PACKAGE_IPA" "$ROOT/build/TumoCompanion-unsigned.ipa"
+cleanup_ipa_temp
+trap - EXIT
 
 echo "==> Done: build/TumoCompanion-unsigned.ipa"
 ls -lh build/TumoCompanion-unsigned.ipa
