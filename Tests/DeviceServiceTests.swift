@@ -4,6 +4,18 @@ import XCTest
 @testable import UnleashedCompanion
 
 final class DeviceServiceContractTests: XCTestCase {
+    func testTimePayloadContainsDeterministicUnixTimeAndOffset() {
+        let date = Date(timeIntervalSince1970: 1_700_000_000.75)
+        let zone = TimeZone(secondsFromGMT: 3 * 60 * 60)!
+        let payload = DeviceServiceContract.timePayload(date: date, timeZone: zone)
+
+        XCTAssertEqual(
+            String(decoding: payload, as: UTF8.self),
+            "schema=1;unix=1700000000;offset=10800"
+        )
+        XCTAssertLessThanOrEqual(payload.count, AppBridgeFrame.payloadMaxV2)
+    }
+
     func testURLPolicyAcceptsOnlyExactHTTPSEndpoint() throws {
         let policy = HTTPSURLPolicy.deviceServices
         XCTAssertNoThrow(try policy.validate(URL(string: "https://api.github.com/zen")!))
@@ -246,6 +258,33 @@ final class DeviceServiceCoordinatorTests: XCTestCase {
         XCTAssertEqual(transport.responses.first?.1, 77)
         XCTAssertEqual(transport.responses.first?.3, false)
         XCTAssertTrue(String(decoding: transport.responses.first?.2 ?? Data(), as: UTF8.self).contains("lat=55.750000"))
+    }
+
+    func testTimeSyncDoesNotRequireLocationOrNetworkToggles() async {
+        let transport = FakeTransport()
+        let coordinator = DeviceServiceCoordinator(
+            transport: transport,
+            location: FakeLocation(),
+            https: FakeHTTPS(),
+            background: FakeBackground(),
+            defaults: defaults()
+        )
+        XCTAssertFalse(coordinator.locationEnabled)
+        XCTAssertFalse(coordinator.networkEnabled)
+
+        transport.frames.send(request(
+            command: DeviceServiceContract.timeCommand,
+            id: 78,
+            payload: Data("schema=1;purpose=clock".utf8)
+        ))
+        for _ in 0..<20 where transport.responses.isEmpty { await Task.yield() }
+
+        XCTAssertEqual(transport.responses.first?.0, DeviceServiceContract.timeCommand)
+        XCTAssertEqual(transport.responses.first?.1, 78)
+        XCTAssertEqual(transport.responses.first?.3, false)
+        let response = String(decoding: transport.responses.first?.2 ?? Data(), as: UTF8.self)
+        XCTAssertTrue(response.hasPrefix("schema=1;unix="))
+        XCTAssertTrue(response.contains(";offset="))
     }
 
     func testBuddyModeReturnsBusy() async {
