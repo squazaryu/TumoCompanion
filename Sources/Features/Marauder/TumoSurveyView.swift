@@ -4,6 +4,7 @@ import SwiftUI
 struct TumoSurveyView: View {
     @EnvironmentObject private var ble: FlipperBLE
     @StateObject private var live = LiveMarauderViewModel()
+    @StateObject private var liveMap = WiFiMapperLiveMapViewModel()
 
     var body: some View {
         CardScroll {
@@ -25,8 +26,16 @@ struct TumoSurveyView: View {
                 .accessibilityLabel("Clear live survey")
             }
         }
-        .task { live.start() }
-        .onDisappear { live.stop() }
+        .task {
+            live.start()
+            // Start GPS tagging on the survey dashboard, before the user opens
+            // Live Map. This preserves observations already received in-session.
+            liveMap.start()
+        }
+        .onDisappear {
+            live.stop()
+            liveMap.stop()
+        }
     }
 
     private var statusCard: some View {
@@ -99,7 +108,7 @@ struct TumoSurveyView: View {
 
     private var toolsCard: some View {
         SectionCard(title: "Workspace", systemImage: "square.grid.2x2") {
-            NavigationLink { WiFiMapperLiveMapView() } label: {
+            NavigationLink { WiFiMapperLiveMapView(viewModel: liveMap) } label: {
                 toolRow(
                     icon: "location.viewfinder",
                     title: "Live Map",
