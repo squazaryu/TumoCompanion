@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.10.0",
-      "versionDate": "2026-08-01",
-      "versionDescription": "Adds authenticated iPhone system-time service for Tumoflip Clock and TOTP checks, independent of Location and Network sharing, and hardens IPA packaging against stale ZIP entries.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.0/TumoCompanion-unsigned.ipa",
-      "size": 29416003,
+      "version": "1.10.1",
+      "versionDate": "2026-08-02",
+      "versionDescription": "Fixes TumoSurvey Live Map by preserving and buffering Wi-Fi observations until iPhone location is available, then refining each BSSID with RSSI-weighted samples. Relay no longer reports GPS or survey traffic as no mapping.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.1/TumoCompanion-unsigned.ipa",
+      "size": 29422069,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.10.1",
+          "date": "2026-08-02",
+          "localizedDescription": "Fixes TumoSurvey Live Map by preserving and buffering Wi-Fi observations until iPhone location is available, then refining each BSSID with RSSI-weighted samples. Relay no longer reports GPS or survey traffic as no mapping.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.1/TumoCompanion-unsigned.ipa",
+          "size": 29422069,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.10.0",
           "date": "2026-08-01",
