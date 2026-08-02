@@ -4,6 +4,16 @@ import XCTest
 /// Tests for the Home Assistant Bonjour discovery helpers and the Relay base-URL
 /// resolution priority (issue #2). Pure logic only — no NetService / network.
 final class HomeAssistantDiscoveryTests: XCTestCase {
+    func testRelayAcceptsOnlyItsOwnAppBridgeNamespace() {
+        let relay = AppBridgeFrame(appID: "sber_relay", command: "toggle")
+        let gps = AppBridgeFrame(appID: "device_services", command: "gps_once")
+        let survey = AppBridgeFrame(appID: "wifi_mapper", command: "live_line")
+
+        XCTAssertTrue(RelayExecutor.accepts(relay))
+        XCTAssertFalse(RelayExecutor.accepts(gps))
+        XCTAssertFalse(RelayExecutor.accepts(survey))
+    }
+
 
     private func txt(_ pairs: [String: String]) -> [String: Data] {
         Dictionary(uniqueKeysWithValues: pairs.map { ($0.key, Data($0.value.utf8)) })

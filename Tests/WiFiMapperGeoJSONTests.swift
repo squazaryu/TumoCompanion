@@ -1,7 +1,53 @@
+import CoreLocation
 import XCTest
 @testable import UnleashedCompanion
 
 final class WiFiMapperGeoJSONTests: XCTestCase {
+    @MainActor
+    func testLiveMapPublishesFirstLocatedNetworkWithoutWaitingForThreeRows() {
+        let model = WiFiMapperLiveMapViewModel()
+        let fix = CLLocation(
+            coordinate: CLLocationCoordinate2D(latitude: 55.7558, longitude: 37.6173),
+            altitude: 144,
+            horizontalAccuracy: 5,
+            verticalAccuracy: 8,
+            timestamp: Date())
+
+        model.ingest(
+            "-45 Ch: 6 AA:BB:CC:DD:EE:FF ESSID: Cafe 11 04",
+            using: fix)
+
+        XCTAssertEqual(model.observations, 1)
+        XCTAssertEqual(model.uniqueNetworks, 1)
+        XCTAssertEqual(model.estimates.count, 1)
+        XCTAssertEqual(model.estimates[0].displaySSID, "Cafe")
+        XCTAssertEqual(model.estimates[0].confidence, .low)
+    }
+
+    @MainActor
+    func testLiveMapRetainsRowsUntilFirstFreshLocationArrives() {
+        let model = WiFiMapperLiveMapViewModel()
+        model.ingest(
+            "-60 Ch: 11 AA:BB:CC:DD:EE:01 ESSID: Early 11 04",
+            using: nil)
+
+        XCTAssertEqual(model.observations, 0)
+
+        let fix = CLLocation(
+            coordinate: CLLocationCoordinate2D(latitude: 59.9343, longitude: 30.3351),
+            altitude: 4,
+            horizontalAccuracy: 7,
+            verticalAccuracy: 9,
+            timestamp: Date())
+        model.receiveLocation(fix)
+
+        XCTAssertEqual(model.observations, 1)
+        XCTAssertEqual(model.estimates.count, 1)
+        XCTAssertEqual(model.estimates[0].displaySSID, "Early")
+        XCTAssertEqual(model.estimates[0].coordinate.latitude, 59.9343, accuracy: 0.000001)
+        XCTAssertEqual(model.estimates[0].coordinate.longitude, 30.3351, accuracy: 0.000001)
+    }
+
     func testParsesCleanExportFeature() throws {
         let data = Data("""
         {
@@ -151,6 +197,27 @@ final class WiFiMapperGeoJSONTests: XCTestCase {
         let estimates = WiFiMapperAPEstimator.estimates(from: points)
 
         XCTAssertTrue(estimates.isEmpty)
+    }
+
+    func testLiveEstimatorShowsSingleObservationWithLowConfidence() throws {
+        let points = [
+            mapperPoint(
+                id: "a",
+                latitude: 55.75580,
+                longitude: 37.61730,
+                rssi: -45),
+        ]
+
+        let estimates = WiFiMapperAPEstimator.estimates(
+            from: points,
+            minimumObservations: 1)
+
+        XCTAssertEqual(estimates.count, 1)
+        XCTAssertEqual(estimates[0].bssid, "AA:BB:CC:DD:EE:FF")
+        XCTAssertEqual(estimates[0].observationCount, 1)
+        XCTAssertEqual(estimates[0].confidence, .low)
+        XCTAssertEqual(estimates[0].coordinate.latitude, 55.75580, accuracy: 0.000001)
+        XCTAssertEqual(estimates[0].coordinate.longitude, 37.61730, accuracy: 0.000001)
     }
 
     func testEstimatorIgnoresPointsWithoutRSSI() throws {

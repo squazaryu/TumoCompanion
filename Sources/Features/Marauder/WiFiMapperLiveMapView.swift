@@ -22,9 +22,26 @@ final class WiFiMapperLiveMapViewModel: ObservableObject {
     let location = LocationProvider()
     private let ble: FlipperBLE
     private var relaySub: AnyCancellable?
+    private var locationSubscriptions = Set<AnyCancellable>()
+    private var pendingAccessPoints: [MarauderAP] = []
     private var seq = 0
+    private static let pendingLimit = 500
 
-    init(ble: FlipperBLE = .shared) { self.ble = ble }
+    init(ble: FlipperBLE = .shared) {
+        self.ble = ble
+        location.objectWillChange
+            .sink { [weak self] in self?.objectWillChange.send() }
+            .store(in: &locationSubscriptions)
+        location.$location
+            .compactMap { $0 }
+            .sink { [weak self] fix in
+                guard let self else { return }
+                // Place any scan rows that arrived while Core Location acquired
+                // its fix. The nested provider publisher refreshes the UI.
+                self.receiveLocation(fix)
+            }
+            .store(in: &locationSubscriptions)
+    }
 
     func start() {
         location.start()
@@ -50,6 +67,8 @@ final class WiFiMapperLiveMapViewModel: ObservableObject {
         uniqueNetworks = 0
         observations = 0
         lastObservationAt = nil
+        pendingAccessPoints = []
+        seq = 0
     }
 
     private func handle(_ frame: AppBridgeFrame) {
@@ -60,14 +79,37 @@ final class WiFiMapperLiveMapViewModel: ObservableObject {
         }
         guard transition == .data else { return }
         guard let text = String(data: frame.payload, encoding: .utf8), !text.isEmpty else { return }
-        // Every observation is anchored to the phone's position at the moment it
-        // arrived — drop the batch if we don't have a usable fix yet.
-        guard let fix = location.location, fix.horizontalAccuracy > 0 else { return }
+        ingest(text, using: location.location)
+    }
+
+    /// Parse a relayed batch and place it at the current iPhone fix. Rows that
+    /// beat the first GPS callback are kept briefly instead of being lost.
+    func ingest(_ text: String, using fix: CLLocation?) {
+        let accessPoints = MarauderLogParser.parse(text).aps.filter {
+            $0.rssi != nil && !$0.bssid.isEmpty
+        }
+        guard !accessPoints.isEmpty else { return }
+        guard let fix, Self.isUsable(fix) else {
+            pendingAccessPoints.append(contentsOf: accessPoints)
+            if pendingAccessPoints.count > Self.pendingLimit {
+                pendingAccessPoints.removeFirst(pendingAccessPoints.count - Self.pendingLimit)
+            }
+            return
+        }
+        append(accessPoints, using: fix)
+    }
+
+    func receiveLocation(_ fix: CLLocation) {
+        guard !pendingAccessPoints.isEmpty, Self.isUsable(fix) else { return }
+        let accessPoints = pendingAccessPoints
+        pendingAccessPoints = []
+        append(accessPoints, using: fix)
+    }
+
+    private func append(_ accessPoints: [MarauderAP], using fix: CLLocation) {
         let coord = fix.coordinate
-        let parsed = MarauderLogParser.parse(text)
-        var added = false
-        for ap in parsed.aps {
-            guard let rssi = ap.rssi, !ap.bssid.isEmpty else { continue }
+        for ap in accessPoints {
+            guard let rssi = ap.rssi else { continue }
             seq += 1
             points.append(WiFiMapperPoint(
                 id: "live|\(ap.bssid)|\(seq)",
@@ -85,22 +127,34 @@ final class WiFiMapperLiveMapViewModel: ObservableObject {
                 altitude: fix.altitude,
                 accuracy: fix.horizontalAccuracy))
             observations += 1
-            added = true
         }
-        // Recompute the (cached) triangulation once per relayed batch that added
-        // data — not on every SwiftUI render, and not per estimate access.
-        if added {
-            lastObservationAt = Date()
-            uniqueNetworks = Set(points.map(\.bssid)).count
-            estimates = WiFiMapperAPEstimator.estimates(from: points)
-        }
+        lastObservationAt = Date()
+        uniqueNetworks = Set(points.map(\.bssid)).count
+        // A single observation is still useful: it is shown as a low-confidence
+        // position near the phone and converges as more readings arrive.
+        estimates = WiFiMapperAPEstimator.estimates(from: points, minimumObservations: 1)
+    }
+
+    private static func isUsable(_ fix: CLLocation) -> Bool {
+        fix.horizontalAccuracy > 0 &&
+            abs(fix.timestamp.timeIntervalSinceNow) <= 30
     }
 }
 
 struct WiFiMapperLiveMapView: View {
     @EnvironmentObject var ble: FlipperBLE
-    @StateObject private var vm = WiFiMapperLiveMapViewModel()
+    @StateObject private var vm: WiFiMapperLiveMapViewModel
     @State private var position: MapCameraPosition = .userLocation(fallback: .automatic)
+
+    @MainActor
+    init() {
+        _vm = StateObject(wrappedValue: WiFiMapperLiveMapViewModel())
+    }
+
+    @MainActor
+    init(viewModel: WiFiMapperLiveMapViewModel) {
+        _vm = StateObject(wrappedValue: viewModel)
+    }
 
     var body: some View {
         CardScroll {
@@ -149,7 +203,7 @@ struct WiFiMapperLiveMapView: View {
                     statTile("\(vm.estimates.count)", "AP est.")
                 }
                 if vm.location.location == nil {
-                    Label("Waiting for a GPS fix — go outside with a clear sky view.",
+                    Label("Waiting for an iPhone location fix. Early scan rows will be placed when it arrives.",
                           systemImage: "location.magnifyingglass")
                         .font(.caption2).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -199,6 +253,10 @@ struct WiFiMapperLiveMapView: View {
             }
             .frame(height: 320)
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            Text("Pins are RSSI-weighted estimates. One reading is shown with low confidence; accuracy improves as you move.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             HStack {
                 Button { position = .userLocation(fallback: .automatic) } label: {
                     Label("Follow me", systemImage: "location.fill")

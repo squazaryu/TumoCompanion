@@ -88,6 +88,9 @@ final class RelayExecutor: ObservableObject {
     @Published private(set) var log: [RelayLogEntry] = []
 
     static let sberActions: Set<String> = ["on", "off", "toggle"]
+    nonisolated static func accepts(_ frame: AppBridgeFrame) -> Bool {
+        frame.appID == "sber_relay"
+    }
     private let haTimeoutAuto: TimeInterval = 2.5
     private var cancellable: AnyCancellable?
 
@@ -105,6 +108,10 @@ final class RelayExecutor: ObservableObject {
         self.relayState = UserDefaults.standard.object(forKey: "relayLastState") as? Bool
 
         cancellable = FlipperBLE.shared.appBridgeIn
+            // Relay owns only its own App Bridge namespace. Device Services,
+            // TumoSurvey and other unsolicited events must stay in their feature
+            // coordinators instead of becoming false "no mapping" failures here.
+            .filter(Self.accepts)
             .receive(on: RunLoop.main)
             .sink { [weak self] frame in self?.handle(frame) }
 
