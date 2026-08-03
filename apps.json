@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.10.4",
+      "version": "1.10.5",
       "versionDate": "2026-08-03",
-      "versionDescription": "Fixes an empty TumoSurvey Live Map by accepting realistic recent iPhone location fixes, preserving scan rows longer, and clearly showing approximate positions with wider uncertainty.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.4/TumoCompanion-unsigned.ipa",
-      "size": 29470581,
+      "versionDescription": "Declutters dense TumoSurvey maps with numbered network clusters, one uncertainty ring for the selected AP, and detailed per-network position information.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.5/TumoCompanion-unsigned.ipa",
+      "size": 29524062,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.10.5",
+          "date": "2026-08-03",
+          "localizedDescription": "Declutters dense TumoSurvey maps with numbered network clusters, one uncertainty ring for the selected AP, and detailed per-network position information.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.5/TumoCompanion-unsigned.ipa",
+          "size": 29524062,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.10.4",
           "date": "2026-08-03",
