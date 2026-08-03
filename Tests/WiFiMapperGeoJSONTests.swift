@@ -49,24 +49,42 @@ final class WiFiMapperGeoJSONTests: XCTestCase {
     }
 
     @MainActor
-    func testLiveMapWaitsForFreshAccurateLocation() {
+    func testLiveMapAcceptsStationaryApproximateFixWithoutHidingMap() {
         let model = WiFiMapperLiveMapViewModel()
-        let stale = CLLocation(
+        let stationaryApproximate = CLLocation(
+            coordinate: CLLocationCoordinate2D(latitude: 55.7558, longitude: 37.6173),
+            altitude: 144,
+            horizontalAccuracy: 80,
+            verticalAccuracy: 8,
+            timestamp: Date().addingTimeInterval(-20))
+        model.ingest(
+            "-52 Ch: 6 AA:BB:CC:DD:EE:FF ESSID: Cafe 11 04",
+            using: stationaryApproximate)
+
+        XCTAssertEqual(model.observations, 1)
+        XCTAssertEqual(model.estimates.first?.displaySSID, "Cafe")
+        XCTAssertEqual(model.estimates.first?.averageAccuracyMeters, 80)
+    }
+
+    @MainActor
+    func testLiveMapRejectsOnlyExpiredOrVeryCoarseFixThenRecovers() {
+        let model = WiFiMapperLiveMapViewModel()
+        let expired = CLLocation(
             coordinate: CLLocationCoordinate2D(latitude: 55.7558, longitude: 37.6173),
             altitude: 144,
             horizontalAccuracy: 5,
             verticalAccuracy: 8,
-            timestamp: Date().addingTimeInterval(-10))
+            timestamp: Date().addingTimeInterval(-31))
         model.ingest(
             "-52 Ch: 6 AA:BB:CC:DD:EE:FF ESSID: Cafe 11 04",
-            using: stale)
+            using: expired)
 
         XCTAssertEqual(model.observations, 0)
 
         let coarse = CLLocation(
             coordinate: CLLocationCoordinate2D(latitude: 55.7568, longitude: 37.6183),
             altitude: 144,
-            horizontalAccuracy: 80,
+            horizontalAccuracy: 250,
             verticalAccuracy: 8,
             timestamp: Date())
         model.receiveLocation(coarse)
@@ -83,6 +101,25 @@ final class WiFiMapperGeoJSONTests: XCTestCase {
         XCTAssertEqual(model.observations, 1)
         XCTAssertEqual(model.estimates.first?.displaySSID, "Cafe")
         XCTAssertEqual(model.estimates.first?.coordinate.latitude ?? 0, 55.7559, accuracy: 0.000001)
+    }
+
+    @MainActor
+    func testLiveMapKeepsInitialRowsLongerThanFiveSeconds() {
+        let model = WiFiMapperLiveMapViewModel()
+        model.ingest(
+            "-60 Ch: 11 AA:BB:CC:DD:EE:01 ESSID: Early 11 04",
+            using: nil)
+
+        let delayedFix = CLLocation(
+            coordinate: CLLocationCoordinate2D(latitude: 59.9343, longitude: 30.3351),
+            altitude: 4,
+            horizontalAccuracy: 65,
+            verticalAccuracy: 9,
+            timestamp: Date().addingTimeInterval(20))
+        model.receiveLocation(delayedFix)
+
+        XCTAssertEqual(model.observations, 1)
+        XCTAssertEqual(model.estimates.first?.displaySSID, "Early")
     }
 
     func testParsesCleanExportFeature() throws {

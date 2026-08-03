@@ -26,12 +26,22 @@ final class WiFiMapperLiveMapViewModel: ObservableObject {
     private var pendingAccessPoints: [PendingAccessPoint] = []
     private var seq = 0
     private static let pendingLimit = 500
-    private static let maximumFixAge: TimeInterval = 5
-    private static let maximumAssociationDelay: TimeInterval = 5
-    private static let maximumHorizontalAccuracy = 50.0
+    // Standard Core Location may reuse a good stationary fix instead of
+    // publishing a new timestamp every few seconds, especially indoors. Keep a
+    // bounded window and carry the reported accuracy into the estimator rather
+    // than making the entire map disappear when a fix is merely approximate.
+    private static let maximumFixAge: TimeInterval = 30
+    private static let maximumAssociationDelay: TimeInterval = 30
+    private static let maximumHorizontalAccuracy = 200.0
+    private static let preferredFixAge: TimeInterval = 10
+    private static let preferredHorizontalAccuracy = 50.0
 
     var hasUsableLocation: Bool {
         location.location.map(Self.isUsable) ?? false
+    }
+
+    var hasPreferredLocation: Bool {
+        location.location.map(Self.isPreferred) ?? false
     }
 
     init(ble: FlipperBLE = .shared) {
@@ -155,6 +165,12 @@ final class WiFiMapperLiveMapViewModel: ObservableObject {
             fix.horizontalAccuracy <= maximumHorizontalAccuracy &&
             abs(fix.timestamp.timeIntervalSinceNow) <= maximumFixAge
     }
+
+    private static func isPreferred(_ fix: CLLocation) -> Bool {
+        fix.horizontalAccuracy > 0 &&
+            fix.horizontalAccuracy <= preferredHorizontalAccuracy &&
+            abs(fix.timestamp.timeIntervalSinceNow) <= preferredFixAge
+    }
 }
 
 private struct PendingAccessPoint {
@@ -224,9 +240,14 @@ struct WiFiMapperLiveMapView: View {
                     statTile("\(vm.estimates.count)", "AP est.")
                 }
                 if !vm.hasUsableLocation {
-                    Label("Waiting for a fresh iPhone GPS fix under ±50 m. Recent scan rows are buffered briefly.",
+                    Label("Waiting for an iPhone location fix. Recent scan rows are buffered for up to 30 seconds.",
                           systemImage: "location.magnifyingglass")
                         .font(.caption2).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else if !vm.hasPreferredLocation {
+                    Label("Using an approximate iPhone fix. The map stays available and shows a wider uncertainty area.",
+                          systemImage: "location.circle")
+                        .font(.caption2).foregroundStyle(.orange)
                         .fixedSize(horizontal: false, vertical: true)
                 } else if vm.observations == 0 {
                     Label(vm.session.isActive ? "Survey active — waiting for mapped observations." : "Waiting for an active survey.",
@@ -240,9 +261,10 @@ struct WiFiMapperLiveMapView: View {
 
     private var gpsRow: some View {
         HStack(spacing: 6) {
-            Circle().fill(vm.hasUsableLocation ? .green : .orange).frame(width: 7, height: 7)
+            Circle().fill(vm.hasPreferredLocation ? .green : .orange).frame(width: 7, height: 7)
             if let fix = vm.location.location {
-                Text("GPS ±\(Int(fix.horizontalAccuracy)) m\(vm.hasUsableLocation ? "" : " · waiting")")
+                let state = vm.hasUsableLocation ? (vm.hasPreferredLocation ? "" : " · approximate") : " · waiting"
+                Text("GPS ±\(Int(fix.horizontalAccuracy)) m\(state)")
                     .font(.caption).foregroundStyle(.secondary)
             } else {
                 Text("Acquiring GPS…").font(.caption).foregroundStyle(.secondary)
