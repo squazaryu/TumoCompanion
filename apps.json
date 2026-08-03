@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.10.2",
+      "version": "1.10.3",
       "versionDate": "2026-08-03",
-      "versionDescription": "Improves TumoSurvey network positioning by using fresh accurate iPhone locations and spatially distinct RSSI samples. Restores known SSIDs when individual observations report a hidden name.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.2/TumoCompanion-unsigned.ipa",
-      "size": 29428683,
+      "versionDescription": "Adds Download again for ESP32 firmware and stages complete installer-manifest packages with per-segment size, SHA-256, on-device verification, atomic replacement, and rollback.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.3/TumoCompanion-unsigned.ipa",
+      "size": 29468349,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.10.3",
+          "date": "2026-08-03",
+          "localizedDescription": "Adds Download again for ESP32 firmware and stages complete installer-manifest packages with per-segment size, SHA-256, on-device verification, atomic replacement, and rollback.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.3/TumoCompanion-unsigned.ipa",
+          "size": 29468349,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.10.2",
           "date": "2026-08-03",
