@@ -20,6 +20,11 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
         m.delegate = self
         m.desiredAccuracy = kCLLocationAccuracyBest
         m.distanceFilter = kCLDistanceFilterNone
+        // A live survey needs continued foreground fixes even while the phone is
+        // briefly stationary. Otherwise iOS may pause updates and the latest
+        // timestamp ages out while Wi-Fi observations continue to arrive.
+        m.activityType = .fitness
+        m.pausesLocationUpdatesAutomatically = false
     }
 
     var isAuthorized: Bool {
