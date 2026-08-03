@@ -48,6 +48,43 @@ final class WiFiMapperGeoJSONTests: XCTestCase {
         XCTAssertEqual(model.estimates[0].coordinate.longitude, 30.3351, accuracy: 0.000001)
     }
 
+    @MainActor
+    func testLiveMapWaitsForFreshAccurateLocation() {
+        let model = WiFiMapperLiveMapViewModel()
+        let stale = CLLocation(
+            coordinate: CLLocationCoordinate2D(latitude: 55.7558, longitude: 37.6173),
+            altitude: 144,
+            horizontalAccuracy: 5,
+            verticalAccuracy: 8,
+            timestamp: Date().addingTimeInterval(-10))
+        model.ingest(
+            "-52 Ch: 6 AA:BB:CC:DD:EE:FF ESSID: Cafe 11 04",
+            using: stale)
+
+        XCTAssertEqual(model.observations, 0)
+
+        let coarse = CLLocation(
+            coordinate: CLLocationCoordinate2D(latitude: 55.7568, longitude: 37.6183),
+            altitude: 144,
+            horizontalAccuracy: 80,
+            verticalAccuracy: 8,
+            timestamp: Date())
+        model.receiveLocation(coarse)
+        XCTAssertEqual(model.observations, 0)
+
+        let fresh = CLLocation(
+            coordinate: CLLocationCoordinate2D(latitude: 55.7559, longitude: 37.6174),
+            altitude: 144,
+            horizontalAccuracy: 8,
+            verticalAccuracy: 8,
+            timestamp: Date())
+        model.receiveLocation(fresh)
+
+        XCTAssertEqual(model.observations, 1)
+        XCTAssertEqual(model.estimates.first?.displaySSID, "Cafe")
+        XCTAssertEqual(model.estimates.first?.coordinate.latitude ?? 0, 55.7559, accuracy: 0.000001)
+    }
+
     func testParsesCleanExportFeature() throws {
         let data = Data("""
         {
@@ -220,6 +257,57 @@ final class WiFiMapperGeoJSONTests: XCTestCase {
         XCTAssertEqual(estimates[0].coordinate.longitude, 37.61730, accuracy: 0.000001)
     }
 
+    func testEstimatorKeepsKnownSSIDWhenStrongestRowIsAnonymous() throws {
+        let points = [
+            mapperPoint(
+                id: "named",
+                ssid: "Cafe",
+                latitude: 55.75580,
+                longitude: 37.61730,
+                rssi: -58),
+            mapperPoint(
+                id: "anonymous-strongest",
+                ssid: "",
+                latitude: 55.75590,
+                longitude: 37.61750,
+                rssi: -42),
+        ]
+
+        let estimates = WiFiMapperAPEstimator.estimates(
+            from: points,
+            minimumObservations: 1)
+
+        XCTAssertEqual(estimates.first?.displaySSID, "Cafe")
+    }
+
+    func testEstimatorDoesNotLetRepeatedWeakRowsDragPinAway() throws {
+        var points = [
+            mapperPoint(
+                id: "strong",
+                latitude: 55.75580,
+                longitude: 37.61730,
+                rssi: -43),
+        ]
+        for index in 0..<100 {
+            points.append(mapperPoint(
+                id: "weak-\(index)",
+                latitude: 55.75670,
+                longitude: 37.61870,
+                rssi: -80))
+        }
+
+        let estimate = try XCTUnwrap(WiFiMapperAPEstimator.estimates(
+            from: points,
+            minimumObservations: 1).first)
+        let strongestLocation = CLLocation(latitude: 55.75580, longitude: 37.61730)
+        let estimatedLocation = CLLocation(
+            latitude: estimate.coordinate.latitude,
+            longitude: estimate.coordinate.longitude)
+
+        XCTAssertLessThan(estimatedLocation.distance(from: strongestLocation), 5)
+        XCTAssertEqual(estimate.observationCount, 101)
+    }
+
     func testEstimatorIgnoresPointsWithoutRSSI() throws {
         let points = [
             mapperPoint(id: "a", latitude: 55.75580, longitude: 37.61730, rssi: nil),
@@ -235,14 +323,16 @@ final class WiFiMapperGeoJSONTests: XCTestCase {
     private func mapperPoint(
         id: String,
         bssid: String = "AA:BB:CC:DD:EE:FF",
+        ssid: String = "Cafe",
         latitude: Double,
         longitude: Double,
-        rssi: Int?
+        rssi: Int?,
+        accuracy: Double? = 5
     ) -> WiFiMapperPoint {
         WiFiMapperPoint(
             id: id,
             sourceName: "test.geojson",
-            ssid: "Cafe",
+            ssid: ssid,
             bssid: bssid,
             auth: "WPA2",
             channel: 6,
@@ -257,6 +347,6 @@ final class WiFiMapperGeoJSONTests: XCTestCase {
             latitude: latitude,
             longitude: longitude,
             altitude: nil,
-            accuracy: 5)
+            accuracy: accuracy)
     }
 }

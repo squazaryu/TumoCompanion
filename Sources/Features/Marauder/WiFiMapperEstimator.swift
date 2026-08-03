@@ -89,15 +89,30 @@ enum WiFiMapperAPEstimator {
         observations: [WiFiMapperPoint],
         minimumObservations: Int
     ) -> WiFiMapperAPEstimate? {
-        let usable = observations.compactMap { point -> WeightedObservation? in
+        let raw = observations.compactMap { point -> SignalObservation? in
             guard let rssi = point.primaryRSSI else { return nil }
-            return WeightedObservation(point: point, rssi: rssi, weight: weight(for: point, rssi: rssi))
+            return SignalObservation(point: point, rssi: rssi)
         }
+        guard let first = raw.first else { return nil }
 
-        guard usable.count >= minimumObservations else { return nil }
-
-        let reference = usable[0].point.coordinate
+        let reference = first.point.coordinate
         let projection = LocalProjection(reference: reference)
+        // Repeated scans while the phone is stationary must not outweigh a
+        // stronger reading from another position. Keep the strongest reading
+        // in each five-metre cell before calculating the location estimate.
+        let distinct = spatiallyDistinct(raw, projection: projection)
+        guard distinct.count >= minimumObservations else { return nil }
+
+        let strongestRSSI = distinct.map(\.rssi).max() ?? first.rssi
+        let usable = distinct.map { item in
+            WeightedObservation(
+                point: item.point,
+                rssi: item.rssi,
+                weight: weight(
+                    for: item.point,
+                    rssi: item.rssi,
+                    strongestRSSI: strongestRSSI))
+        }
         let totalWeight = usable.reduce(0) { $0 + $1.weight }
         guard totalWeight > 0 else { return nil }
 
@@ -131,6 +146,12 @@ enum WiFiMapperAPEstimator {
             .map { projection.distance(from: $0.point.coordinate, to: coordinate) }
             .max() ?? 0
         let strongest = usable.max { $0.rssi < $1.rssi }!
+        // SSID discovery and signal strength are independent. Some Module One
+        // rows omit SSID even after the same BSSID was already named, so use the
+        // strongest non-empty name seen anywhere in the group.
+        let named = raw
+            .filter { isNamedSSID($0.point.ssid, bssid: bssid) }
+            .max { $0.rssi < $1.rssi }
         let averageRSSI = Int((weightedRSSI / totalWeight).rounded())
         let averageAccuracy = accuracyWeight > 0 ? weightedAccuracy / accuracyWeight : nil
         let confidence = confidence(
@@ -142,11 +163,11 @@ enum WiFiMapperAPEstimator {
 
         return WiFiMapperAPEstimate(
             id: bssid,
-            ssid: strongest.point.ssid,
+            ssid: named?.point.ssid ?? strongest.point.ssid,
             bssid: bssid,
             channel: strongest.point.channel,
             coordinate: coordinate,
-            observationCount: usable.count,
+            observationCount: raw.count,
             strongestRSSI: strongest.rssi,
             averageRSSI: averageRSSI,
             radiusMeters: radius,
@@ -155,16 +176,61 @@ enum WiFiMapperAPEstimator {
             confidence: confidence)
     }
 
-    private static func weight(for point: WiFiMapperPoint, rssi: Int) -> Double {
-        let signal = min(max((Double(rssi) + 100.0) / 70.0, 0.05), 1.0)
-        let sampleWeight = sqrt(Double(max(point.samples ?? 1, 1))).clamped(to: 1.0 ... 4.0)
+    private static func weight(
+        for point: WiFiMapperPoint,
+        rssi: Int,
+        strongestRSSI: Int
+    ) -> Double {
+        // Convert dB difference to a relative received-power ratio. This keeps
+        // the estimate close to the strongest observed location instead of
+        // letting many distant weak rows drag a linear centroid away.
+        let signal = pow(10.0, Double(rssi - strongestRSSI) / 10.0)
         let accuracyWeight: Double
         if let accuracy = point.accuracy, accuracy > 0 {
             accuracyWeight = (30.0 / max(accuracy, 3.0)).clamped(to: 0.25 ... 2.0)
         } else {
             accuracyWeight = 1.0
         }
-        return pow(signal, 3.0) * sampleWeight * accuracyWeight
+        return max(signal, 0.0001) * accuracyWeight
+    }
+
+    private static func spatiallyDistinct(
+        _ observations: [SignalObservation],
+        projection: LocalProjection
+    ) -> [SignalObservation] {
+        let cellSizeMeters = 5.0
+        var byCell: [SpatialCell: SignalObservation] = [:]
+
+        for observation in observations {
+            let point = projection.project(observation.point.coordinate)
+            let cell = SpatialCell(
+                x: Int((point.x / cellSizeMeters).rounded()),
+                y: Int((point.y / cellSizeMeters).rounded()))
+            if let current = byCell[cell] {
+                if observation.rssi > current.rssi ||
+                    (observation.rssi == current.rssi &&
+                        accuracy(of: observation.point) < accuracy(of: current.point)) {
+                    byCell[cell] = observation
+                }
+            } else {
+                byCell[cell] = observation
+            }
+        }
+
+        return Array(byCell.values)
+    }
+
+    private static func accuracy(of point: WiFiMapperPoint) -> Double {
+        guard let accuracy = point.accuracy, accuracy > 0 else { return .greatestFiniteMagnitude }
+        return accuracy
+    }
+
+    private static func isNamedSSID(_ value: String, bssid: String) -> Bool {
+        let candidate = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !candidate.isEmpty &&
+            candidate.caseInsensitiveCompare(bssid) != .orderedSame &&
+            candidate.caseInsensitiveCompare("<hidden>") != .orderedSame &&
+            candidate.caseInsensitiveCompare("(hidden)") != .orderedSame
     }
 
     private static func confidenceRadius(
@@ -211,6 +277,16 @@ enum WiFiMapperAPEstimator {
 
         return .low
     }
+}
+
+private struct SignalObservation {
+    let point: WiFiMapperPoint
+    let rssi: Int
+}
+
+private struct SpatialCell: Hashable {
+    let x: Int
+    let y: Int
 }
 
 private struct WeightedObservation {

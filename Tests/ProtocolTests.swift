@@ -159,6 +159,23 @@ final class ProtocolTests: XCTestCase {
         XCTAssertEqual(by["52:FF:20:78:27:D1"]?.ssid, "")
     }
 
+    func testMarauderStructuredWiFiRowsPreserveSSID() {
+        let log = """
+        WIFI,74:9D:79:8C:E8:28,MGTS_GPON_4509,[WPA2_PSK],-54,11,0,0,0,0
+        WIFI,AA:BB:CC:DD:EE:FF,"Cafe, Guest",[WPA3_SAE],-61,6,0,0,0,0
+        WIFI,52:FF:20:78:27:D1,52:FF:20:78:27:D1,[WPA2_PSK],-85,1,0,0,0,0
+        """
+
+        let result = MarauderLogParser.parse(log)
+        let byBSSID = Dictionary(uniqueKeysWithValues: result.aps.map { ($0.bssid, $0) })
+
+        XCTAssertEqual(byBSSID["74:9D:79:8C:E8:28"]?.ssid, "MGTS_GPON_4509")
+        XCTAssertEqual(byBSSID["74:9D:79:8C:E8:28"]?.rssi, -54)
+        XCTAssertEqual(byBSSID["74:9D:79:8C:E8:28"]?.channel, 11)
+        XCTAssertEqual(byBSSID["AA:BB:CC:DD:EE:FF"]?.ssid, "Cafe, Guest")
+        XCTAssertEqual(byBSSID["52:FF:20:78:27:D1"]?.ssid, "")
+    }
+
     func testAggregateMergesAcrossFiles() {
         var a = MarauderParseResult()
         a.aps = [MarauderAP(ssid: "Net", bssid: "AA:BB:CC:00:00:01", channel: 6)]

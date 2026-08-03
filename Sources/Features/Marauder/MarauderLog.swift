@@ -131,6 +131,22 @@ enum MarauderLogParser {
                 result.handshakes += 1
             }
 
+            // Current Module One firmware can emit a compact structured row:
+            // WIFI,<bssid>,<ssid>,<auth>,<rssi>,<channel>,<lat>,<lon>,<alt>,<accuracy>
+            // Parse it before the generic MAC heuristic so the first colon in
+            // the BSSID is never mistaken for the legacy "idx: SSID" separator.
+            if let wifi = structuredWiFiFields(in: line) {
+                var ap = byBSSID[wifi.bssid] ?? MarauderAP(
+                    ssid: wifi.ssid,
+                    bssid: wifi.bssid)
+                if ap.ssid.isEmpty { ap.ssid = wifi.ssid }
+                if let r = wifi.rssi { ap.rssi = r }
+                if let c = wifi.channel { ap.channel = c }
+                if ap.auth.isEmpty { ap.auth = wifi.auth }
+                byBSSID[wifi.bssid] = ap
+                continue
+            }
+
             // Wardrive rows have a different, comma-delimited shape than the
             // scanall/scanap lines (no "ESSID:"/"Ch:"), so parse them explicitly —
             // otherwise the generic path below grabs a MAC fragment as the SSID.
@@ -190,15 +206,79 @@ enum MarauderLogParser {
     private static func wardriveFields(in line: String)
         -> (bssid: String, ssid: String, auth: String, channel: Int?, rssi: Int?)? {
         guard let bar = line.range(of: "|") else { return nil }
-        let comps = line[bar.upperBound...]
-            .split(separator: ",", omittingEmptySubsequences: false)
-            .map { $0.trimmingCharacters(in: .whitespaces) }
+        let comps = csvFields(in: String(line[bar.upperBound...]))
         guard comps.count >= 7, comps.last?.uppercased() == "WIFI",
               let bssid = firstMAC(in: comps[0]) else { return nil }
-        // A hidden network reports its own BSSID as the SSID — blank it so it
-        // renders as <hidden> rather than a MAC, matching the scanall parser.
-        let ssid = firstMAC(in: comps[1]) == nil ? comps[1] : ""
+        let ssid = normalizedSSID(comps[1], bssid: bssid)
         return (bssid, ssid, comps[2], Int(comps[4]), Int(comps[5]))
+    }
+
+    private static func structuredWiFiFields(in line: String)
+        -> (bssid: String, ssid: String, auth: String, channel: Int?, rssi: Int?)? {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        guard trimmed.range(of: "WIFI,", options: [.anchored, .caseInsensitive]) != nil else {
+            return nil
+        }
+
+        let comps = csvFields(in: trimmed)
+        guard comps.count >= 6,
+              comps[0].caseInsensitiveCompare("WIFI") == .orderedSame,
+              let bssid = firstMAC(in: comps[1])
+        else { return nil }
+
+        return (
+            bssid,
+            normalizedSSID(comps[2], bssid: bssid),
+            comps[3],
+            Int(comps[5]),
+            Int(comps[4]))
+    }
+
+    /// Minimal RFC 4180 reader for the Module One rows. SSIDs may contain a
+    /// comma or an escaped quote, so String.split(separator:) is not sufficient.
+    private static func csvFields(in text: String) -> [String] {
+        let characters = Array(text)
+        var fields: [String] = []
+        var field = ""
+        var quoted = false
+        var index = 0
+
+        while index < characters.count {
+            let character = characters[index]
+            if quoted {
+                if character == "\"" {
+                    if index + 1 < characters.count, characters[index + 1] == "\"" {
+                        field.append("\"")
+                        index += 1
+                    } else {
+                        quoted = false
+                    }
+                } else {
+                    field.append(character)
+                }
+            } else if character == "," {
+                fields.append(field.trimmingCharacters(in: .whitespaces))
+                field = ""
+            } else if character == "\"", field.isEmpty {
+                quoted = true
+            } else {
+                field.append(character)
+            }
+            index += 1
+        }
+
+        fields.append(field.trimmingCharacters(in: .whitespaces))
+        return fields
+    }
+
+    private static func normalizedSSID(_ value: String, bssid: String) -> String {
+        let candidate = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !candidate.isEmpty,
+              candidate.caseInsensitiveCompare(bssid) != .orderedSame,
+              candidate.caseInsensitiveCompare("<hidden>") != .orderedSame,
+              candidate.caseInsensitiveCompare("(hidden)") != .orderedSame
+        else { return "" }
+        return candidate
     }
 
     private static func ssid(in line: String, bssid: String) -> String {
@@ -213,7 +293,8 @@ enum MarauderLogParser {
                 tokens.removeLast()
             }
             let name = tokens.joined(separator: " ").trimmingCharacters(in: .whitespaces)
-            if !name.isEmpty && firstMAC(in: name) == nil { return name }
+            let normalized = normalizedSSID(name, bssid: bssid)
+            if !normalized.isEmpty { return normalized }
         }
         // Legacy "idx: SSID, rssi, ch, BSSID" format.
         if let comma = line.firstIndex(of: ":") {
@@ -221,7 +302,8 @@ enum MarauderLogParser {
             let parts = after.split(separator: ",")
             if let first = parts.first {
                 let candidate = first.trimmingCharacters(in: .whitespaces)
-                if !candidate.isEmpty && firstMAC(in: candidate) == nil { return candidate }
+                let normalized = normalizedSSID(candidate, bssid: bssid)
+                if !normalized.isEmpty { return normalized }
             }
         }
         return ""

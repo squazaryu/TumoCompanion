@@ -6,8 +6,8 @@ import UIKit
 
 /// Live WiFi mapping using the **iPhone's GPS** (not an ESP32 GPS module): each
 /// scan line relayed from TumoSurvey over App Bridge is tagged with
-/// the phone's current position, and the shared `WiFiMapperAPEstimator` triangulates
-/// each access point from the RSSI-weighted spread of those observations. Walk/drive
+/// the phone's current position, and the shared `WiFiMapperAPEstimator` estimates
+/// each access point from the signal-weighted spread of those observations. Walk/drive
 /// while the AP estimates update in real time.
 @MainActor
 final class WiFiMapperLiveMapViewModel: ObservableObject {
@@ -23,9 +23,16 @@ final class WiFiMapperLiveMapViewModel: ObservableObject {
     private let ble: FlipperBLE
     private var relaySub: AnyCancellable?
     private var locationSubscriptions = Set<AnyCancellable>()
-    private var pendingAccessPoints: [MarauderAP] = []
+    private var pendingAccessPoints: [PendingAccessPoint] = []
     private var seq = 0
     private static let pendingLimit = 500
+    private static let maximumFixAge: TimeInterval = 5
+    private static let maximumAssociationDelay: TimeInterval = 5
+    private static let maximumHorizontalAccuracy = 50.0
+
+    var hasUsableLocation: Bool {
+        location.location.map(Self.isUsable) ?? false
+    }
 
     init(ble: FlipperBLE = .shared) {
         self.ble = ble
@@ -90,7 +97,10 @@ final class WiFiMapperLiveMapViewModel: ObservableObject {
         }
         guard !accessPoints.isEmpty else { return }
         guard let fix, Self.isUsable(fix) else {
-            pendingAccessPoints.append(contentsOf: accessPoints)
+            let receivedAt = Date()
+            pendingAccessPoints.append(contentsOf: accessPoints.map {
+                PendingAccessPoint(accessPoint: $0, receivedAt: receivedAt)
+            })
             if pendingAccessPoints.count > Self.pendingLimit {
                 pendingAccessPoints.removeFirst(pendingAccessPoints.count - Self.pendingLimit)
             }
@@ -101,9 +111,14 @@ final class WiFiMapperLiveMapViewModel: ObservableObject {
 
     func receiveLocation(_ fix: CLLocation) {
         guard !pendingAccessPoints.isEmpty, Self.isUsable(fix) else { return }
-        let accessPoints = pendingAccessPoints
+        // Only associate rows that arrived close to this fix. Assigning an old
+        // scan batch to a later position creates convincing but false AP pins.
+        let accessPoints = pendingAccessPoints.compactMap { pending in
+            abs(fix.timestamp.timeIntervalSince(pending.receivedAt)) <= Self.maximumAssociationDelay ?
+                pending.accessPoint : nil
+        }
         pendingAccessPoints = []
-        append(accessPoints, using: fix)
+        if !accessPoints.isEmpty { append(accessPoints, using: fix) }
     }
 
     private func append(_ accessPoints: [MarauderAP], using fix: CLLocation) {
@@ -137,8 +152,14 @@ final class WiFiMapperLiveMapViewModel: ObservableObject {
 
     private static func isUsable(_ fix: CLLocation) -> Bool {
         fix.horizontalAccuracy > 0 &&
-            abs(fix.timestamp.timeIntervalSinceNow) <= 30
+            fix.horizontalAccuracy <= maximumHorizontalAccuracy &&
+            abs(fix.timestamp.timeIntervalSinceNow) <= maximumFixAge
     }
+}
+
+private struct PendingAccessPoint {
+    let accessPoint: MarauderAP
+    let receivedAt: Date
 }
 
 struct WiFiMapperLiveMapView: View {
@@ -202,8 +223,8 @@ struct WiFiMapperLiveMapView: View {
                     statTile("\(vm.uniqueNetworks)", "networks")
                     statTile("\(vm.estimates.count)", "AP est.")
                 }
-                if vm.location.location == nil {
-                    Label("Waiting for an iPhone location fix. Early scan rows will be placed when it arrives.",
+                if !vm.hasUsableLocation {
+                    Label("Waiting for a fresh iPhone GPS fix under ±50 m. Recent scan rows are buffered briefly.",
                           systemImage: "location.magnifyingglass")
                         .font(.caption2).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -219,9 +240,10 @@ struct WiFiMapperLiveMapView: View {
 
     private var gpsRow: some View {
         HStack(spacing: 6) {
-            Circle().fill(vm.location.location != nil ? .green : .orange).frame(width: 7, height: 7)
+            Circle().fill(vm.hasUsableLocation ? .green : .orange).frame(width: 7, height: 7)
             if let fix = vm.location.location {
-                Text("GPS ±\(Int(fix.horizontalAccuracy)) m").font(.caption).foregroundStyle(.secondary)
+                Text("GPS ±\(Int(fix.horizontalAccuracy)) m\(vm.hasUsableLocation ? "" : " · waiting")")
+                    .font(.caption).foregroundStyle(.secondary)
             } else {
                 Text("Acquiring GPS…").font(.caption).foregroundStyle(.secondary)
             }
@@ -253,7 +275,7 @@ struct WiFiMapperLiveMapView: View {
             }
             .frame(height: 320)
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            Text("Pins are RSSI-weighted estimates. One reading is shown with low confidence; accuracy improves as you move.")
+            Text("Pins favor the strongest distinct locations. One reading is low confidence; accuracy improves as you move around the network.")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
