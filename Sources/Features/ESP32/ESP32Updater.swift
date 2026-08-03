@@ -4,13 +4,74 @@ import os
 
 private let elog = Logger(subsystem: "com.tumoflip.unleashedcompanion", category: "esp32")
 
+struct ESP32InstallerManifest: Decodable, Equatable {
+    struct Target: Decodable, Equatable {
+        struct Flash: Decodable, Equatable {
+            struct Factory: Decodable, Equatable {
+                let segments: [Segment]
+            }
+
+            struct Segment: Decodable, Equatable {
+                let role: String
+                let offset: Int
+                let size: Int
+                let sha256: String
+                let fileName: String
+            }
+
+            let factory: Factory
+        }
+
+        let id: String
+        let assetSuffix: String
+        let flash: Flash
+    }
+
+    let schemaVersion: Int
+    let channel: String
+    let kind: String
+    let metadataStatus: String
+    let sourceRepository: String
+    let version: String
+    let targets: [Target]
+}
+
+enum ESP32ManifestError: LocalizedError, Equatable {
+    case unsupportedSchema(Int)
+    case wrongChannel(String)
+    case wrongKind(String)
+    case nonAuthoritative(String)
+    case wrongRepository(String)
+    case versionMismatch(expected: String, actual: String)
+    case missingBoard(String)
+    case invalidSegments(String)
+    case missingAsset(String)
+    case assetMetadataMismatch(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .unsupportedSchema(let version): return "Unsupported installer manifest schema \(version)."
+        case .wrongChannel(let channel): return "Installer manifest channel is \(channel), not stable."
+        case .wrongKind(let kind): return "Unexpected installer manifest kind: \(kind)."
+        case .nonAuthoritative(let status): return "Installer manifest metadata is \(status), not authoritative."
+        case .wrongRepository(let repository): return "Unexpected installer source: \(repository)."
+        case .versionMismatch(let expected, let actual):
+            return "Installer manifest is for \(actual), expected \(expected)."
+        case .missingBoard(let key): return "No verified installer package for board \(key)."
+        case .invalidSegments(let key): return "Installer package for \(key) is incomplete or invalid."
+        case .missingAsset(let name): return "Installer asset is missing: \(name)."
+        case .assetMetadataMismatch(let name): return "Installer metadata doesn't match release asset \(name)."
+        }
+    }
+}
+
 /// Checks the ESP32Marauder GitHub repo for new firmware and, on demand, writes a
 /// NEW manual flash folder onto the Flipper SD under `/ext/apps_data/esp_flasher/`
 /// so the user can flash it from the Flipper's esp_flasher app.
 ///
-/// Marauder release assets are per-board APP images (flashed at 0x10000); the
-/// bootloader/partitions/boot_app0 boot files are version-independent, so we reuse
-/// them from the board's existing `*_manual` folder and only swap in the new app.
+/// Stable releases with `firmware-manifest.json` are staged as complete, per-board
+/// factory packages and every segment is checked against its declared SHA-256 before
+/// an atomic folder replacement. Older releases retain the guarded app-only fallback.
 @MainActor
 final class ESP32Updater: ObservableObject {
     struct Board: Identifiable, Equatable {
@@ -57,12 +118,103 @@ final class ESP32Updater: ObservableObject {
     static let flasherDir = "/ext/apps_data/esp_flasher"
     static let archiveDir = "\(flasherDir)/_archive"
 
+    private(set) var latestManifest: ESP32InstallerManifest?
+    private(set) var manifestError: String?
+    private var releaseHasManifest = false
+
+    var verifiedPackageAvailable: Bool {
+        releaseHasManifest && latestManifest != nil && manifestError == nil
+    }
+
+    var canStageLatest: Bool {
+        latestTag != nil && (!releaseHasManifest || verifiedPackageAvailable)
+    }
+
     nonisolated static func norm(_ v: String) -> String {
         v.lowercased().replacingOccurrences(of: "v", with: "")
             .replacingOccurrences(of: "_", with: ".")
     }
 
     nonisolated static func versionParts(_ v: String) -> [Int] { norm(v).split(separator: ".").compactMap { Int($0) } }
+
+    nonisolated static func decodeManifest(_ data: Data, expectedVersion: String) throws -> ESP32InstallerManifest {
+        let manifest = try JSONDecoder().decode(ESP32InstallerManifest.self, from: data)
+        guard manifest.schemaVersion == 1 else {
+            throw ESP32ManifestError.unsupportedSchema(manifest.schemaVersion)
+        }
+        guard manifest.channel == "stable" else {
+            throw ESP32ManifestError.wrongChannel(manifest.channel)
+        }
+        guard manifest.kind == "esp32-marauder-installer-release" else {
+            throw ESP32ManifestError.wrongKind(manifest.kind)
+        }
+        guard manifest.metadataStatus == "authoritative" else {
+            throw ESP32ManifestError.nonAuthoritative(manifest.metadataStatus)
+        }
+        guard manifest.sourceRepository == "justcallmekoko/ESP32Marauder" else {
+            throw ESP32ManifestError.wrongRepository(manifest.sourceRepository)
+        }
+        guard norm(manifest.version) == norm(expectedVersion) else {
+            throw ESP32ManifestError.versionMismatch(expected: expectedVersion, actual: manifest.version)
+        }
+        return manifest
+    }
+
+    nonisolated static func factorySegments(
+        for boardKey: String,
+        manifest: ESP32InstallerManifest,
+        assetSizes: [String: Int],
+        assetSHA256: [String: String]
+    ) throws -> [ESP32InstallerManifest.Target.Flash.Segment] {
+        guard let target = manifest.targets.first(where: { $0.assetSuffix == boardKey }) else {
+            throw ESP32ManifestError.missingBoard(boardKey)
+        }
+        let segments = target.flash.factory.segments
+        let expectedRoles = Set(["bootloader", "partition-table", "ota-data", "application"])
+        let roles = Set(segments.map(\.role))
+        let offsets = Set(segments.map(\.offset))
+        let validSHA = CharacterSet(charactersIn: "0123456789abcdefABCDEF")
+        guard segments.count == 4,
+              roles == expectedRoles,
+              offsets.count == segments.count,
+              segments.allSatisfy({
+                  $0.offset >= 0 && $0.size > 0 && $0.sha256.count == 64 &&
+                      $0.sha256.unicodeScalars.allSatisfy(validSHA.contains)
+              }) else {
+            throw ESP32ManifestError.invalidSegments(boardKey)
+        }
+        for segment in segments {
+            guard let releaseSize = assetSizes[segment.fileName] else {
+                throw ESP32ManifestError.missingAsset(segment.fileName)
+            }
+            guard releaseSize == segment.size else {
+                throw ESP32ManifestError.assetMetadataMismatch(segment.fileName)
+            }
+            if let releaseSHA = assetSHA256[segment.fileName],
+               releaseSHA.lowercased() != segment.sha256.lowercased() {
+                throw ESP32ManifestError.assetMetadataMismatch(segment.fileName)
+            }
+        }
+        return segments.sorted { $0.offset < $1.offset }
+    }
+
+    nonisolated static func stagedFileName(
+        for segment: ESP32InstallerManifest.Target.Flash.Segment,
+        version: String,
+        boardKey: String
+    ) -> String {
+        let offset = String(segment.offset, radix: 16)
+        switch segment.role {
+        case "bootloader": return "bootloader_0x\(offset).bin"
+        case "partition-table": return "partitions_0x\(offset).bin"
+        case "ota-data": return "boot_app0_0x\(offset).bin"
+        case "application":
+            let underscored = version.replacingOccurrences(of: ".", with: "_")
+            return "esp32_marauder_\(underscored)_\(boardKey)_0x\(offset).bin"
+        default:
+            return "segment_0x\(offset).bin"
+        }
+    }
 
     /// Numeric, component-wise newer test (so 1.12.10 > 1.12.2, not lexical).
     nonisolated static func isNewer(_ a: String, than b: String) -> Bool {
@@ -259,7 +411,9 @@ final class ESP32Updater: ObservableObject {
         status = "Checking via \(transferChannel.label)…"
         await scanBoards()
         await checkLatest()
-        if let t = latestTag {
+        if let manifestError {
+            status = "Release manifest rejected: \(manifestError)"
+        } else if let t = latestTag {
             status = updateAvailable ? "Update available: \(t)" : "Up to date (\(t))"
         } else {
             status = "Couldn't reach GitHub."
@@ -344,104 +498,129 @@ final class ESP32Updater: ObservableObject {
         var req = URLRequest(url: url)
         req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         do {
-            let (data, _) = try await URLSession.shared.data(for: req)
+            let (data, response) = try await URLSession.shared.data(for: req)
+            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+                throw URLError(.badServerResponse)
+            }
             if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                let tag = obj["tag_name"] as? String {
                 latestTag = tag
-                latestAssets = [:]; latestAssetSizes = [:]
+                latestAssets = [:]; latestAssetSizes = [:]; latestAssetSHA256 = [:]
                 for a in (obj["assets"] as? [[String: Any]]) ?? [] {
                     guard let n = a["name"] as? String,
                           let u = a["browser_download_url"] as? String,
                           let url = URL(string: u) else { continue }
                     latestAssets[n] = url
                     latestAssetSizes[n] = (a["size"] as? Int) ?? 0
+                    if let digest = a["digest"] as? String,
+                       digest.lowercased().hasPrefix("sha256:") {
+                        latestAssetSHA256[n] = String(digest.dropFirst("sha256:".count))
+                    }
                 }
+                await loadInstallerManifest(for: tag)
             }
-        } catch { elog.error("github check: \(error.localizedDescription, privacy: .public)") }
+        } catch {
+            latestManifest = nil
+            manifestError = nil
+            releaseHasManifest = false
+            elog.error("github check: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     private var latestAssets: [String: URL] = [:]
     private var latestAssetSizes: [String: Int] = [:]
+    private var latestAssetSHA256: [String: String] = [:]
+
+    private func loadInstallerManifest(for tag: String) async {
+        latestManifest = nil
+        manifestError = nil
+        guard let manifestURL = latestAssets["firmware-manifest.json"] else {
+            releaseHasManifest = false
+            return
+        }
+        releaseHasManifest = true
+        do {
+            let (data, response) = try await URLSession.shared.data(from: manifestURL)
+            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+                throw URLError(.badServerResponse)
+            }
+            let expectedSize = latestAssetSizes["firmware-manifest.json"] ?? 0
+            guard expectedSize <= 0 || data.count == expectedSize else {
+                throw ESP32ManifestError.assetMetadataMismatch("firmware-manifest.json")
+            }
+            if let expectedSHA = latestAssetSHA256["firmware-manifest.json"],
+               Self.sha256Hex(data).lowercased() != expectedSHA.lowercased() {
+                throw ESP32ManifestError.assetMetadataMismatch("firmware-manifest.json")
+            }
+            latestManifest = try Self.decodeManifest(data, expectedVersion: tag)
+        } catch {
+            manifestError = error.localizedDescription
+            elog.error("installer manifest: \(error.localizedDescription, privacy: .public)")
+        }
+    }
 
     private func md5Hex(_ data: Data) -> String {
         Insecure.MD5.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 
-    // MARK: - Download + write a new manual folder
+    nonisolated private static func sha256Hex(_ data: Data) -> String {
+        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    }
+
+    // MARK: - Download + atomically stage a manual folder
+
+    private struct DownloadPlan {
+        let sourceName: String
+        let sourceURL: URL
+        let expectedSize: Int
+        let expectedSHA256: String?
+        let outputName: String
+    }
+
+    private struct DownloadedFile {
+        let plan: DownloadPlan
+        let data: Data
+    }
 
     func install(_ board: Board) async {
         guard let tag = latestTag else { return }
+        guard canStageLatest else {
+            status = manifestError.map { "Release manifest rejected: \($0)" }
+                ?? "No verified installer package is available."
+            return
+        }
+
         let storage = self.storage
         let channel = storage.channel
         transferChannel = channel
         busy = true; progress = 0; downloadPhase = true; progressText = nil
         defer { busy = false; progress = nil; downloadPhase = false; progressText = nil }
 
-        // Find the release asset whose own parsed board key matches this board — robust
-        // to the release naming carrying a build date the local file may not have.
-        guard let (assetName, assetURL) = latestAssets.first(where: {
-            Self.parseImageName($0.key)?.key == board.key
-        }) else {
-            status = "No “\(board.key)” board image in \(tag)."; return
-        }
-        status = "Downloading \(assetName)…"
-        // Stream the download so we can show live percent + downloaded/total,
-        // falling back to the size GitHub reported when the CDN response omits
-        // Content-Length. Progress drives the same bar the write phase reuses.
-        let knownTotal = Int64(latestAssetSizes[assetName] ?? 0)
-        let appData: Data
+        let plans: [DownloadPlan]
         do {
-            // didWriteData fires once per network read (tens–hundreds of times for a
-            // multi-MB image). Coalesce on the delegate's serial queue to whole-percent
-            // steps (or ~256KB steps when the total is unknown) so we don't spawn a
-            // main-actor Task + two ByteCountFormatter allocations per read. The captured
-            // counters are safe: callbacks for one task are delivered serially.
-            var lastPct = -1
-            var lastWritten: Int64 = 0
-            let delegate = DownloadProgressDelegate { [weak self] written, expected in
-                let total = expected > 0 ? expected : knownTotal
-                if total > 0 {
-                    let fraction = min(1, Double(written) / Double(total))
-                    let pct = Int(fraction * 100)
-                    if pct == lastPct { return }
-                    lastPct = pct
-                    Task { @MainActor in
-                        guard let self, self.downloadPhase else { return }
-                        self.progress = fraction
-                        self.progressText = "\(pct)% · \(Self.fileSize(written)) / \(Self.fileSize(total))"
-                    }
-                } else {
-                    if written - lastWritten < 256 * 1024 { return }
-                    lastWritten = written
-                    Task { @MainActor in
-                        guard let self, self.downloadPhase else { return }
-                        self.progressText = Self.fileSize(written)
-                    }
-                }
-            }
-            let (tmp, _) = try await URLSession.shared.download(from: assetURL, delegate: delegate)
-            appData = try Data(contentsOf: tmp)
-        } catch { status = "Download failed: \(error.localizedDescription)"; return }
-        // Close the download phase (on the main actor, no await before the write phase)
-        // so any still-queued progress Task no-ops instead of clobbering the write bar.
-        downloadPhase = false
-        progress = nil            // hand the bar back to the write phase
-        progressText = nil        // write phase re-populates it per percent
-        status = "Preparing…"     // neutral caption during the boot-file copy
-
-        // Guard a truncated download against the size GitHub reported.
-        let expectedSize = latestAssetSizes[assetName] ?? 0
-        if expectedSize > 0 && appData.count != expectedSize {
-            status = "Download incomplete (\(appData.count)/\(expectedSize) B). Check your connection and retry."
+            plans = try downloadPlans(for: board, tag: tag)
+        } catch {
+            status = error.localizedDescription
             return
         }
-        let expectedMD5 = md5Hex(appData)
 
-        let newVerUnderscored = tag.replacingOccurrences(of: ".", with: "_")   // "v1_12_2"
-        // Use the cleaned base so repeated updates don't stack version suffixes
-        // (module_one_v6_1_v1_12_2_v1_12_3_manual …).
-        let newFolder = "\(Self.flasherDir)/\(Self.cleanBase(board.base))_\(newVerUnderscored)_manual"
-        let appOut = "\(newFolder)/esp32_marauder_\(newVerUnderscored)_\(board.key)_0x10000.bin"
+        let files: [DownloadedFile]
+        do {
+            files = try await download(plans)
+        } catch {
+            status = "Download failed: \(error.localizedDescription)"
+            return
+        }
+
+        downloadPhase = false
+        progress = nil
+        progressText = nil
+        status = "Preparing verified package…"
+
+        let versionName = tag.replacingOccurrences(of: ".", with: "_")
+        let target = "\(Self.flasherDir)/\(Self.cleanBase(board.base))_\(versionName)_manual"
+        let staging = "\(target).partial-\(UUID().uuidString.lowercased())"
+        let isManifestPackage = latestManifest != nil
 
         let transferReporter = TransferActivityReporter(channel: channel)
         _ = await transferReporter.prepare()
@@ -449,55 +628,209 @@ final class ESP32Updater: ObservableObject {
         defer { transferReporter.end() }
 
         do {
-            try await storage.makeDirectory(newFolder)
-            // Reuse the version-independent boot files from the existing folder.
-            for name in board.bootFiles {
-                let data = try await storage.read("\(board.folder)/\(name)")
-                try await storage.write("\(newFolder)/\(name)", data: data)
-            }
-            // Write the new application image at 0x10000, then VERIFY it landed
-            // intact (a dropped BLE link mid-write silently truncates the file and
-            // bricks the flash). Retry once; never leave a partial image behind.
-            let totalBytes = Int64(appData.count)
-            var ok = false
-            for attempt in 0..<2 {
-                let note = channel == .usb ? "keep USB SD Mode active" : "keep this app open"
-                status = attempt == 0
-                    ? "Writing via \(channel.label)… \(note)"
-                    : "Write incomplete — retrying via \(channel.label)… \(note)"
-                progress = 0
-                var lastWritePct = -1
-                try await storage.write(appOut, data: appData) { [weak self] sent in
-                    // Coalesce to whole-percent steps on the callback thread so we don't
-                    // spawn a main-actor Task + two ByteCountFormatter allocations per chunk.
-                    let pct = Int((Double(sent) / Double(max(1, totalBytes))) * 100)
-                    if pct == lastWritePct { return }
-                    lastWritePct = pct
-                    Task { @MainActor in
-                        guard let self else { return }
-                        self.progress = min(1, Double(sent) / Double(max(1, totalBytes)))
-                        self.progressText = "\(pct)% · \(Self.fileSize(Int64(sent))) / \(Self.fileSize(totalBytes))"
-                        transferReporter.progress(assetName)
+            try await storage.makeDirectory(staging)
+
+            // Stable releases with an installer manifest provide a complete factory
+            // package. Legacy releases have only an app image, so retain their known
+            // boot files while still staging into a separate transaction directory.
+            if !isManifestPackage {
+                for name in board.bootFiles {
+                    let data = try await storage.read("\(board.folder)/\(name)")
+                    let path = "\(staging)/\(name)"
+                    try await storage.write(path, data: data)
+                    guard await storage.md5(path) == md5Hex(data) else {
+                        throw CocoaError(.fileWriteUnknown, userInfo: [
+                            NSLocalizedDescriptionKey: "Couldn't verify reused file \(name)."
+                        ])
                     }
                 }
-                if await storage.md5(appOut) == expectedMD5 { ok = true; break }
             }
-            progressText = nil
-            if ok {
-                status = "Done ✓ verified. Flash \(board.base) \(tag) from the Flipper’s esp_flasher app."
-            } else {
-                try? await storage.delete(appOut)   // remove the bad image so it can't be flashed
-                let devSize = (try? await storage.list(newFolder))?.first { $0.name.hasSuffix("_0x10000.bin") }?.size ?? 0
-                status = "Write failed: only \(devSize)/\(appData.count) B landed. Keep the app foregrounded and tap Update again."
-            }
-            await scanBoards()
+
+            try await writeAndVerify(files, to: staging, reporter: transferReporter, channel: channel)
+            try await replaceAtomically(target: target, with: staging)
+            status = "Done ✓ \(files.count)-file package verified. Flash \(board.display) \(tag) from esp_flasher."
         } catch {
-            status = "Write failed: \(error.localizedDescription)"
+            if await storage.exists(staging) {
+                try? await storage.delete(staging, recursive: true)
+            }
+            status = "Staging failed: \(error.localizedDescription)"
+        }
+        await scanBoards()
+    }
+
+    private func downloadPlans(for board: Board, tag: String) throws -> [DownloadPlan] {
+        if releaseHasManifest {
+            guard let manifest = latestManifest else {
+                throw ESP32ManifestError.invalidSegments(board.key)
+            }
+            let segments = try Self.factorySegments(
+                for: board.key,
+                manifest: manifest,
+                assetSizes: latestAssetSizes,
+                assetSHA256: latestAssetSHA256)
+            return try segments.map { segment in
+                guard let url = latestAssets[segment.fileName] else {
+                    throw ESP32ManifestError.missingAsset(segment.fileName)
+                }
+                return DownloadPlan(
+                    sourceName: segment.fileName,
+                    sourceURL: url,
+                    expectedSize: segment.size,
+                    expectedSHA256: segment.sha256,
+                    outputName: Self.stagedFileName(for: segment, version: tag, boardKey: board.key))
+            }
+        }
+
+        guard let (assetName, assetURL) = latestAssets.first(where: {
+            Self.parseImageName($0.key)?.key == board.key
+        }) else {
+            throw ESP32ManifestError.missingBoard(board.key)
+        }
+        let versionName = tag.replacingOccurrences(of: ".", with: "_")
+        return [DownloadPlan(
+            sourceName: assetName,
+            sourceURL: assetURL,
+            expectedSize: latestAssetSizes[assetName] ?? 0,
+            expectedSHA256: latestAssetSHA256[assetName],
+            outputName: "esp32_marauder_\(versionName)_\(board.key)_0x10000.bin")]
+    }
+
+    private func download(_ plans: [DownloadPlan]) async throws -> [DownloadedFile] {
+        let expectedTotal = Int64(plans.reduce(0) { $0 + max(0, $1.expectedSize) })
+        var completed: Int64 = 0
+        var result: [DownloadedFile] = []
+        result.reserveCapacity(plans.count)
+
+        for (index, plan) in plans.enumerated() {
+            status = "Downloading \(index + 1)/\(plans.count): \(plan.sourceName)…"
+            let completedBefore = completed
+            let progressGate = PercentProgressGate()
+            let delegate = DownloadProgressDelegate { [weak self] written, _ in
+                let current = completedBefore + written
+                guard expectedTotal > 0 else { return }
+                let fraction = min(1, Double(current) / Double(expectedTotal))
+                let pct = Int(fraction * 100)
+                guard progressGate.accept(pct) else { return }
+                Task { @MainActor in
+                    guard let self, self.downloadPhase else { return }
+                    self.progress = fraction
+                    self.progressText = "\(pct)% · \(Self.fileSize(current)) / \(Self.fileSize(expectedTotal))"
+                }
+            }
+            let (temporaryURL, response) = try await URLSession.shared.download(
+                from: plan.sourceURL,
+                delegate: delegate)
+            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+                throw URLError(.badServerResponse)
+            }
+            let data = try Data(contentsOf: temporaryURL)
+            guard plan.expectedSize <= 0 || data.count == plan.expectedSize else {
+                throw ESP32ManifestError.assetMetadataMismatch(plan.sourceName)
+            }
+            if let expectedSHA = plan.expectedSHA256,
+               Self.sha256Hex(data).lowercased() != expectedSHA.lowercased() {
+                throw ESP32ManifestError.assetMetadataMismatch(plan.sourceName)
+            }
+            completed += Int64(data.count)
+            result.append(DownloadedFile(plan: plan, data: data))
+        }
+        return result
+    }
+
+    private func writeAndVerify(
+        _ files: [DownloadedFile],
+        to directory: String,
+        reporter: TransferActivityReporter,
+        channel: TransferChannel
+    ) async throws {
+        let totalBytes = Int64(files.reduce(0) { $0 + $1.data.count })
+        var completed: Int64 = 0
+
+        for (index, file) in files.enumerated() {
+            let path = "\(directory)/\(file.plan.outputName)"
+            let expectedMD5 = md5Hex(file.data)
+            let completedBefore = completed
+            let note = channel == .usb ? "keep USB SD Mode active" : "keep this app open"
+            status = "Writing \(index + 1)/\(files.count) via \(channel.label)… \(note)"
+            var verified = false
+            for attempt in 0..<2 {
+                if attempt > 0 { status = "Verification failed — retrying \(file.plan.outputName)…" }
+                let progressGate = PercentProgressGate()
+                try await storage.write(path, data: file.data) { [weak self] sent in
+                    let current = completedBefore + Int64(sent)
+                    let pct = Int((Double(current) / Double(max(1, totalBytes))) * 100)
+                    guard progressGate.accept(pct) else { return }
+                    Task { @MainActor in
+                        guard let self else { return }
+                        self.progress = min(1, Double(current) / Double(max(1, totalBytes)))
+                        self.progressText = "\(pct)% · \(Self.fileSize(current)) / \(Self.fileSize(totalBytes))"
+                        reporter.progress(file.plan.outputName)
+                    }
+                }
+                if await storage.md5(path) == expectedMD5 {
+                    verified = true
+                    break
+                }
+            }
+            guard verified else {
+                throw CocoaError(.fileWriteUnknown, userInfo: [
+                    NSLocalizedDescriptionKey: "Couldn't verify \(file.plan.outputName) after two writes."
+                ])
+            }
+            completed += Int64(file.data.count)
+        }
+    }
+
+    private func replaceAtomically(target: String, with staging: String) async throws {
+        let hadTarget = await storage.exists(target)
+        let targetName = Self.folderName(from: target)
+        let backup = "\(Self.archiveDir)/.\(targetName).replacement-\(UUID().uuidString.lowercased())"
+
+        if hadTarget {
+            try await storage.makeDirectory(Self.archiveDir)
+            try await storage.move(target, to: backup)
+        }
+        do {
+            try await storage.move(staging, to: target)
+        } catch {
+            if hadTarget {
+                do {
+                    try await storage.move(backup, to: target)
+                } catch let rollbackError {
+                    throw CocoaError(.fileWriteUnknown, userInfo: [
+                        NSLocalizedDescriptionKey:
+                            "Package replacement failed and rollback failed: \(rollbackError.localizedDescription)"
+                    ])
+                }
+            }
+            throw error
+        }
+        if hadTarget {
+            do {
+                try await storage.delete(backup, recursive: true)
+            } catch {
+                elog.error("replacement backup cleanup: \(error.localizedDescription, privacy: .public)")
+            }
         }
     }
 
     private static func fileSize(_ bytes: Int64) -> String {
         ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+    }
+}
+
+/// Coalesces progress callbacks without capturing mutable state in a Sendable
+/// closure. URLSession and device writes may invoke their callbacks off-main.
+private final class PercentProgressGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var lastPercent = -1
+
+    func accept(_ percent: Int) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard percent != lastPercent else { return false }
+        lastPercent = percent
+        return true
     }
 }
 

@@ -83,10 +83,15 @@ struct ESP32FirmwareView: View {
                 Text(s).font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Text("Checks github.com/justcallmekoko/ESP32Marauder. Updating writes a new manual folder to the SD — flash it from the Flipper’s esp_flasher app.")
+            if up.verifiedPackageAvailable {
+                Label("Verified full installer package", systemImage: "checkmark.shield.fill")
+                    .font(.caption)
+                    .foregroundStyle(.green)
+            }
+            Text("Checks github.com/justcallmekoko/ESP32Marauder and atomically stages a manual folder on the SD. Use Download again to replace a suspected incomplete copy, then flash it from esp_flasher.")
                 .font(.caption2).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            Text("Each detected board key is updated separately. C5 and WROOM modules keep separate versioned folders.")
+            Text("Stable manifests stage and verify bootloader, partition table, OTA data, and application for the exact board key. C5 and WROOM modules keep separate versioned folders.")
                 .font(.caption2).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -121,6 +126,10 @@ struct ESP32FirmwareView: View {
             } else {
                 Label("Up to date", systemImage: "checkmark.circle.fill")
                     .font(.caption).foregroundStyle(.green)
+                PillButton(title: "Download again via \(currentChannel.label)", systemImage: "arrow.clockwise", tint: Theme.accent) {
+                    Task { await up.install(b) }
+                }
+                .disabled(up.busy || !hasFileChannel || !up.canStageLatest)
             }
             Text("Board key: \(b.key)").font(.caption2).foregroundStyle(.secondary)
         }
