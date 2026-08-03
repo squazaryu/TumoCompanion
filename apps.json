@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.10.1",
-      "versionDate": "2026-08-02",
-      "versionDescription": "Fixes TumoSurvey Live Map by preserving and buffering Wi-Fi observations until iPhone location is available, then refining each BSSID with RSSI-weighted samples. Relay no longer reports GPS or survey traffic as no mapping.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.1/TumoCompanion-unsigned.ipa",
-      "size": 29422069,
+      "version": "1.10.2",
+      "versionDate": "2026-08-03",
+      "versionDescription": "Improves TumoSurvey network positioning by using fresh accurate iPhone locations and spatially distinct RSSI samples. Restores known SSIDs when individual observations report a hidden name.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.2/TumoCompanion-unsigned.ipa",
+      "size": 29428683,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.10.2",
+          "date": "2026-08-03",
+          "localizedDescription": "Improves TumoSurvey network positioning by using fresh accurate iPhone locations and spatially distinct RSSI samples. Restores known SSIDs when individual observations report a hidden name.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.2/TumoCompanion-unsigned.ipa",
+          "size": 29428683,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.10.1",
           "date": "2026-08-02",
