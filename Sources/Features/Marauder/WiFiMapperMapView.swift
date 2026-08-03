@@ -226,8 +226,9 @@ private enum WiFiMapperMapLayer: String, CaseIterable, Identifiable {
 
 struct WiFiMapperMapView: View {
     @StateObject private var vm = WiFiMapperMapViewModel()
-    @State private var position: MapCameraPosition = .automatic
     @State private var mapLayer: WiFiMapperMapLayer = .both
+    @State private var mapSelection: WiFiNetworkMapSelection?
+    @State private var mapCommand = WiFiNetworkMapCommand.fitAll()
 
     var body: some View {
         CardScroll {
@@ -253,7 +254,7 @@ struct WiFiMapperMapView: View {
             }
         }
         .task { await refresh() }
-        .onChange(of: vm.filteredPoints) { _, _ in updateMapRegion() }
+        .onChange(of: vm.filteredPoints) { _, _ in resetMapPresentation() }
     }
 
     private var controlsCard: some View {
@@ -287,7 +288,7 @@ struct WiFiMapperMapView: View {
                             Button(file.name) {
                                 Task {
                                     await vm.load(file)
-                                    updateMapRegion()
+                                    resetMapPresentation()
                                 }
                             }
                         }
@@ -323,7 +324,7 @@ struct WiFiMapperMapView: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                .onChange(of: mapLayer) { _, _ in updateMapRegion() }
+                .onChange(of: mapLayer) { _, _ in resetMapPresentation() }
             } else if let status = vm.status {
                 Text(status)
                     .font(.caption)
@@ -344,48 +345,120 @@ struct WiFiMapperMapView: View {
 
     private var mapCard: some View {
         SectionCard(title: "Map", systemImage: "location") {
-            Map(position: $position) {
-                if mapLayer.showsEstimates {
-                    ForEach(vm.estimatedAccessPoints) { estimate in
-                        MapCircle(center: estimate.coordinate, radius: estimate.radiusMeters)
-                            .foregroundStyle(confidenceColor(estimate).opacity(0.10))
-                            .stroke(confidenceColor(estimate).opacity(0.35), lineWidth: 1)
-                    }
+            WiFiNetworkClusterMap(
+                items: visibleMapItems,
+                showsUserLocation: false,
+                selection: $mapSelection,
+                command: mapCommand)
+            .frame(height: 320)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
-                    ForEach(vm.estimatedAccessPoints) { estimate in
-                        Annotation(estimate.displaySSID, coordinate: estimate.coordinate) {
-                            ZStack {
-                                Circle()
-                                    .fill(confidenceColor(estimate).opacity(0.20))
-                                    .frame(width: 34, height: 34)
-                                Image(systemName: "location.circle.fill")
-                                    .font(.title2)
-                                    .foregroundStyle(confidenceColor(estimate))
-                                    .background(.regularMaterial, in: Circle())
-                            }
-                        }
-                    }
+            mapSelectionDetail
+
+            HStack {
+                Text("Markers cluster automatically. An uncertainty ring is drawn only for the selected AP.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 8)
+                Button { mapCommand = .fitAll() } label: {
+                    Label("Fit all", systemImage: "arrow.up.left.and.arrow.down.right")
                 }
+                .font(.caption)
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+        }
+    }
 
-                if mapLayer.showsObservations {
-                    ForEach(vm.filteredPoints) { point in
-                        Annotation(point.displaySSID, coordinate: point.coordinate) {
-                            ZStack {
-                                Circle()
-                                    .fill(signalColor(point).opacity(0.22))
-                                    .frame(width: 30, height: 30)
-                                Image(systemName: "wifi.circle.fill")
-                                    .font(.title3)
-                                    .foregroundStyle(signalColor(point))
-                                    .background(.regularMaterial, in: Circle())
+    private var visibleMapItems: [WiFiNetworkMapItem] {
+        var items: [WiFiNetworkMapItem] = []
+        if mapLayer.showsEstimates {
+            items.append(contentsOf: vm.estimatedAccessPoints.map(WiFiNetworkMapItem.estimate))
+        }
+        if mapLayer.showsObservations {
+            items.append(contentsOf: vm.filteredPoints.map(WiFiNetworkMapItem.observation))
+        }
+        return items
+    }
+
+    @ViewBuilder
+    private var mapSelectionDetail: some View {
+        switch mapSelection {
+        case let .item(itemID):
+            if let item = visibleMapItems.first(where: { $0.id == itemID }) {
+                selectedMapItemCard(item)
+            } else {
+                mapHint
+            }
+        case let .cluster(itemIDs):
+            let items = visibleMapItems.filter { itemIDs.contains($0.id) }
+            VStack(alignment: .leading, spacing: 8) {
+                Label("\(items.count) map points overlap here", systemImage: "square.3.layers.3d")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(items) { item in
+                            Button {
+                                mapSelection = .item(item.id)
+                            } label: {
+                                Label(item.title, systemImage: item.kind == .estimate ? "wifi" : "dot.radiowaves.left.and.right")
+                                    .font(.caption)
+                                    .lineLimit(1)
                             }
+                            .buttonStyle(.bordered)
+                            .tint(item.tone.color)
+                            .controlSize(.small)
                         }
                     }
                 }
             }
-            .frame(height: 320)
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .padding(10)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        case nil:
+            mapHint
         }
+    }
+
+    private var mapHint: some View {
+        Label("Tap a marker or numbered cluster for details.", systemImage: "hand.tap")
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func selectedMapItemCard(_ item: WiFiNetworkMapItem) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: item.kind == .estimate ? "wifi.circle.fill" : "dot.radiowaves.left.and.right")
+                .font(.title2)
+                .foregroundStyle(item.tone.color)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(item.title)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .lineLimit(1)
+                Text(item.subtitle)
+                    .font(.system(.caption2, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                if item.kind == .estimate,
+                   let estimate = vm.estimatedAccessPoints.first(where: { $0.id == item.sourceID }) {
+                    Text("\(estimate.confidence.label) confidence · \(estimate.observationCount) readings · avg \(estimate.averageRSSI) dBm")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                } else if let point = vm.filteredPoints.first(where: { $0.id == item.sourceID }),
+                          let channel = point.channel {
+                    Text("Channel \(channel)")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Spacer(minLength: 4)
+        }
+        .padding(10)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     private var estimatedAccessPointsCard: some View {
@@ -393,30 +466,35 @@ struct WiFiMapperMapView: View {
                         accessory: AnyView(StatusPill(text: "\(vm.estimatedAccessPoints.count)", color: .secondary))) {
             VStack(spacing: 8) {
                 ForEach(Array(vm.estimatedAccessPoints.prefix(80))) { estimate in
-                    HStack(spacing: 10) {
-                        Image(systemName: "location.circle")
-                            .foregroundStyle(confidenceColor(estimate))
-                            .frame(width: 22)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(estimate.displaySSID)
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                                .lineLimit(1)
-                            Text(estimate.bssid)
-                                .font(.system(.caption2, design: .monospaced))
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                        }
-                        Spacer()
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text("\(Int(estimate.radiusMeters.rounded())) m")
-                                .font(.caption)
-                                .monospacedDigit()
-                            Text("\(estimate.confidence.label) · \(estimate.observationCount)x")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
+                    Button {
+                        mapSelection = .item(WiFiNetworkMapItem.estimate(estimate).id)
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "location.circle")
+                                .foregroundStyle(confidenceColor(estimate))
+                                .frame(width: 22)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(estimate.displaySSID)
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .lineLimit(1)
+                                Text(estimate.bssid)
+                                    .font(.system(.caption2, design: .monospaced))
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                            Spacer()
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text("\(Int(estimate.radiusMeters.rounded())) m")
+                                    .font(.caption)
+                                    .monospacedDigit()
+                                Text("\(estimate.confidence.label) · \(estimate.observationCount)x")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
+                    .buttonStyle(.plain)
                     Divider().opacity(0.25)
                 }
 
@@ -434,34 +512,39 @@ struct WiFiMapperMapView: View {
                         accessory: AnyView(StatusPill(text: "\(vm.filteredPoints.count)", color: .secondary))) {
             VStack(spacing: 8) {
                 ForEach(Array(vm.filteredPoints.prefix(120))) { point in
-                    HStack(spacing: 10) {
-                        Image(systemName: "wifi")
-                            .foregroundStyle(signalColor(point))
-                            .frame(width: 22)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(point.displaySSID)
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                                .lineLimit(1)
-                            Text(point.bssid.isEmpty ? point.sourceName : point.bssid)
-                                .font(.system(.caption2, design: .monospaced))
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                        }
-                        Spacer()
-                        VStack(alignment: .trailing, spacing: 2) {
-                            if let rssi = point.primaryRSSI {
-                                Text("\(rssi) dBm")
-                                    .font(.caption)
-                                    .monospacedDigit()
-                            }
-                            if let channel = point.channel {
-                                Text("ch \(channel)")
-                                    .font(.caption2)
+                    Button {
+                        mapSelection = .item(WiFiNetworkMapItem.observation(point).id)
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "wifi")
+                                .foregroundStyle(signalColor(point))
+                                .frame(width: 22)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(point.displaySSID)
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .lineLimit(1)
+                                Text(point.bssid.isEmpty ? point.sourceName : point.bssid)
+                                    .font(.system(.caption2, design: .monospaced))
                                     .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                            Spacer()
+                            VStack(alignment: .trailing, spacing: 2) {
+                                if let rssi = point.primaryRSSI {
+                                    Text("\(rssi) dBm")
+                                        .font(.caption)
+                                        .monospacedDigit()
+                                }
+                                if let channel = point.channel {
+                                    Text("ch \(channel)")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
                             }
                         }
                     }
+                    .buttonStyle(.plain)
                     Divider().opacity(0.25)
                 }
 
@@ -504,23 +587,12 @@ struct WiFiMapperMapView: View {
 
     private func refresh() async {
         await vm.refresh()
-        updateMapRegion()
+        resetMapPresentation()
     }
 
-    private func updateMapRegion() {
-        var coordinates: [CLLocationCoordinate2D] = []
-        if mapLayer.showsObservations {
-            coordinates.append(contentsOf: vm.filteredPoints.map(\.coordinate))
-        }
-        if mapLayer.showsEstimates {
-            coordinates.append(contentsOf: vm.estimatedAccessPoints.map(\.coordinate))
-        }
-
-        guard let region = vm.region(for: coordinates) else {
-            position = .automatic
-            return
-        }
-        position = .region(region)
+    private func resetMapPresentation() {
+        mapSelection = nil
+        mapCommand = .fitAll()
     }
 }
 
