@@ -86,6 +86,8 @@ struct RootView: View {
             LiveActivityLayoutQAView()
         } else if ProcessInfo.processInfo.arguments.contains("-wifi-map-density-qa") {
             WiFiNetworkMapDensityQAView()
+        } else if ProcessInfo.processInfo.arguments.contains("-wifi-live-map-selection-qa") {
+            WiFiLiveMapSelectionQAView()
         } else {
             appContent
         }

@@ -130,6 +130,28 @@ final class WiFiNetworkMapPresentationTests: XCTestCase {
     }
 
     @MainActor
+    func testCoordinatorClearsSelectionWhenMarkerIsDeselected() throws {
+        let item = WiFiNetworkMapItem.estimate(makeEstimate())
+        var selection: WiFiNetworkMapSelection? = .item(item.id)
+        let binding = Binding<WiFiNetworkMapSelection?>(
+            get: { selection },
+            set: { selection = $0 })
+        let coordinator = WiFiNetworkClusterMap.Coordinator(selection: binding)
+        let mapView = MKMapView(frame: CGRect(x: 0, y: 0, width: 320, height: 320))
+        mapView.delegate = coordinator
+        registerMapViews(on: mapView)
+        coordinator.update(items: [item], on: mapView)
+
+        let annotation = try XCTUnwrap(
+            mapView.annotations.first { !($0 is MKUserLocation) })
+        let view = try XCTUnwrap(coordinator.mapView(mapView, viewFor: annotation))
+        coordinator.mapView(mapView, didDeselect: view)
+
+        XCTAssertNil(selection)
+        XCTAssertTrue(mapView.overlays.isEmpty)
+    }
+
+    @MainActor
     func testClusterMarkerShowsMemberCount() throws {
         let coordinator = WiFiNetworkClusterMap.Coordinator(selection: .constant(nil))
         let mapView = MKMapView(frame: CGRect(x: 0, y: 0, width: 320, height: 320))

@@ -1,6 +1,28 @@
 import XCTest
 
 final class DeviceServicesUITests: XCTestCase {
+    func testLiveMapSelectionCanBeCleared() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-wifi-live-map-selection-qa"]
+        app.launch()
+
+        let clearSelection = app.buttons["Clear network selection"]
+        XCTAssertTrue(clearSelection.waitForExistence(timeout: 5))
+
+        let selected = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        selected.name = "Live map selected network"
+        selected.lifetime = .keepAlways
+        add(selected)
+
+        clearSelection.tap()
+        XCTAssertFalse(clearSelection.waitForExistence(timeout: 1))
+
+        let cleared = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        cleared.name = "Live map cleared selection"
+        cleared.lifetime = .keepAlways
+        add(cleared)
+    }
+
     func testDeviceServicesAreVisibleAndOptIn() {
         let app = XCUIApplication()
         app.launchArguments = [

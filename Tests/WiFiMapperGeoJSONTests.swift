@@ -49,6 +49,25 @@ final class WiFiMapperGeoJSONTests: XCTestCase {
     }
 
     @MainActor
+    func testLiveMapAssociatesPendingRowsWithAStationaryFixCallback() {
+        let model = WiFiMapperLiveMapViewModel()
+        model.ingest(
+            "-60 Ch: 11 AA:BB:CC:DD:EE:01 ESSID: Early 11 04",
+            using: nil)
+
+        let stationaryFix = CLLocation(
+            coordinate: CLLocationCoordinate2D(latitude: 59.9343, longitude: 30.3351),
+            altitude: 4,
+            horizontalAccuracy: 12,
+            verticalAccuracy: 9,
+            timestamp: Date().addingTimeInterval(-120))
+        model.receiveLocation(stationaryFix)
+
+        XCTAssertEqual(model.observations, 1)
+        XCTAssertEqual(model.estimates.first?.displaySSID, "Early")
+    }
+
+    @MainActor
     func testLiveMapAcceptsStationaryApproximateFixWithoutHidingMap() {
         let model = WiFiMapperLiveMapViewModel()
         let stationaryApproximate = CLLocation(
@@ -67,7 +86,7 @@ final class WiFiMapperGeoJSONTests: XCTestCase {
     }
 
     @MainActor
-    func testLiveMapRejectsOnlyExpiredOrVeryCoarseFixThenRecovers() {
+    func testLiveMapKeepsAStationaryFixButRejectsVeryCoarseLocation() {
         let model = WiFiMapperLiveMapViewModel()
         let expired = CLLocation(
             coordinate: CLLocationCoordinate2D(latitude: 55.7558, longitude: 37.6173),
@@ -79,16 +98,22 @@ final class WiFiMapperGeoJSONTests: XCTestCase {
             "-52 Ch: 6 AA:BB:CC:DD:EE:FF ESSID: Cafe 11 04",
             using: expired)
 
-        XCTAssertEqual(model.observations, 0)
+        // CLLocation may retain an older timestamp while the phone is
+        // stationary. The fix was delivered by the active provider and remains
+        // usable; rejecting it after 30 seconds made live maps silently stop.
+        XCTAssertEqual(model.observations, 1)
 
+        let coarseModel = WiFiMapperLiveMapViewModel()
         let coarse = CLLocation(
             coordinate: CLLocationCoordinate2D(latitude: 55.7568, longitude: 37.6183),
             altitude: 144,
             horizontalAccuracy: 250,
             verticalAccuracy: 8,
             timestamp: Date())
-        model.receiveLocation(coarse)
-        XCTAssertEqual(model.observations, 0)
+        coarseModel.ingest(
+            "-58 Ch: 11 11:22:33:44:55:66 ESSID: Office 11 04",
+            using: coarse)
+        XCTAssertEqual(coarseModel.observations, 0)
 
         let fresh = CLLocation(
             coordinate: CLLocationCoordinate2D(latitude: 55.7559, longitude: 37.6174),
@@ -100,7 +125,7 @@ final class WiFiMapperGeoJSONTests: XCTestCase {
 
         XCTAssertEqual(model.observations, 1)
         XCTAssertEqual(model.estimates.first?.displaySSID, "Cafe")
-        XCTAssertEqual(model.estimates.first?.coordinate.latitude ?? 0, 55.7559, accuracy: 0.000001)
+        XCTAssertEqual(model.estimates.first?.coordinate.latitude ?? 0, 55.7558, accuracy: 0.000001)
     }
 
     @MainActor

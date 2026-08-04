@@ -32,10 +32,11 @@ struct TumoSurveyView: View {
             // Live Map. This preserves observations already received in-session.
             liveMap.start()
         }
-        .onDisappear {
-            live.stop()
-            liveMap.stop()
-        }
+        // Both view models belong to this TumoSurvey workspace. Do not stop
+        // them when a child screen is pushed: SwiftUI reports the dashboard as
+        // disappeared during that transition, even though the workspace and
+        // its StateObjects are still alive. Their Combine subscriptions are
+        // released with the StateObjects after the workspace is actually left.
     }
 
     private var statusCard: some View {
