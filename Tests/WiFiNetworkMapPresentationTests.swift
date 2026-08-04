@@ -92,10 +92,41 @@ final class WiFiNetworkMapPresentationTests: XCTestCase {
         coordinator.update(items: [item], on: mapView)
 
         let annotation = try XCTUnwrap(mapView.annotations.first { !($0 is MKUserLocation) })
-        let view = try XCTUnwrap(
-            coordinator.mapView(mapView, viewFor: annotation) as? MKMarkerAnnotationView)
+        let view = try XCTUnwrap(coordinator.mapView(mapView, viewFor: annotation))
         XCTAssertEqual(view.clusteringIdentifier, "tumoflip.wifi.estimate")
         XCTAssertEqual(view.displayPriority, .defaultHigh)
+    }
+
+    @MainActor
+    func testDetailMemberLeavesClusterWithoutChangingItsCoordinate() throws {
+        let item = WiFiNetworkMapItem.estimate(makeEstimate())
+        let coordinator = WiFiNetworkClusterMap.Coordinator(selection: .constant(nil))
+        let mapView = MKMapView(frame: CGRect(x: 0, y: 0, width: 320, height: 320))
+        mapView.delegate = coordinator
+        registerMapViews(on: mapView)
+
+        coordinator.update(items: [item], detailItemIDs: [item.id], on: mapView)
+
+        let annotation = try XCTUnwrap(mapView.annotations.first { !($0 is MKUserLocation) })
+        let view = try XCTUnwrap(coordinator.mapView(mapView, viewFor: annotation))
+        XCTAssertNil(view.clusteringIdentifier)
+        XCTAssertEqual(view.displayPriority, .required)
+        XCTAssertEqual(annotation.coordinate.latitude, item.coordinate.latitude, accuracy: 0.0000001)
+        XCTAssertEqual(annotation.coordinate.longitude, item.coordinate.longitude, accuracy: 0.0000001)
+    }
+
+    @MainActor
+    func testFocusCommandCentersTheRealEstimate() {
+        let item = WiFiNetworkMapItem.estimate(makeEstimate())
+        let coordinator = WiFiNetworkClusterMap.Coordinator(selection: .constant(.item(item.id)))
+        let mapView = MKMapView(frame: CGRect(x: 0, y: 0, width: 320, height: 320))
+        registerMapViews(on: mapView)
+        coordinator.update(items: [item], detailItemIDs: [item.id], on: mapView)
+
+        coordinator.apply(command: .focus(item.id), on: mapView)
+
+        XCTAssertEqual(mapView.region.center.latitude, item.coordinate.latitude, accuracy: 0.0001)
+        XCTAssertEqual(mapView.region.center.longitude, item.coordinate.longitude, accuracy: 0.0001)
     }
 
     @MainActor
@@ -173,9 +204,44 @@ final class WiFiNetworkMapPresentationTests: XCTestCase {
     }
 
     @MainActor
+    func testExpandingClusterKeepsSelectionWhenMapKitRemovesClusterView() throws {
+        let first = WiFiNetworkMapItem.estimate(makeEstimate())
+        let second = WiFiNetworkMapItem.estimate(WiFiMapperAPEstimate(
+            id: "11:22:33:44:55:66",
+            ssid: "Office",
+            bssid: "11:22:33:44:55:66",
+            channel: 11,
+            coordinate: CLLocationCoordinate2D(latitude: 55.7559, longitude: 37.6174),
+            observationCount: 5,
+            strongestRSSI: -52,
+            averageRSSI: -61,
+            radiusMeters: 65,
+            maxSpreadMeters: 24,
+            averageAccuracyMeters: 18,
+            confidence: .medium))
+        let ids = [first.id, second.id]
+        var selection: WiFiNetworkMapSelection? = .cluster(ids)
+        let binding = Binding<WiFiNetworkMapSelection?>(
+            get: { selection },
+            set: { selection = $0 })
+        let coordinator = WiFiNetworkClusterMap.Coordinator(selection: binding)
+        let mapView = MKMapView(frame: CGRect(x: 0, y: 0, width: 320, height: 320))
+        mapView.delegate = coordinator
+        registerMapViews(on: mapView)
+        coordinator.update(items: [first, second], detailItemIDs: ids, on: mapView)
+
+        let members = mapView.annotations.filter { !($0 is MKUserLocation) }
+        let removedCluster = MKClusterAnnotation(memberAnnotations: members)
+        let view = try XCTUnwrap(coordinator.mapView(mapView, viewFor: removedCluster))
+        coordinator.mapView(mapView, didDeselect: view)
+
+        XCTAssertEqual(selection, .cluster(ids))
+    }
+
+    @MainActor
     private func registerMapViews(on mapView: MKMapView) {
         mapView.register(
-            MKMarkerAnnotationView.self,
+            MKAnnotationView.self,
             forAnnotationViewWithReuseIdentifier: WiFiNetworkClusterMap.Coordinator.networkReuseIdentifier)
         mapView.register(
             MKMarkerAnnotationView.self,

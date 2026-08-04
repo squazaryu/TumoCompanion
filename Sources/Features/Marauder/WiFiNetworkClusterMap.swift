@@ -108,6 +108,7 @@ struct WiFiNetworkMapCommand: Equatable {
     enum Action: Equatable {
         case fitAll
         case followUser
+        case focus(String)
     }
 
     let id = UUID()
@@ -119,6 +120,10 @@ struct WiFiNetworkMapCommand: Equatable {
 
     static func followUser() -> WiFiNetworkMapCommand {
         WiFiNetworkMapCommand(action: .followUser)
+    }
+
+    static func focus(_ itemID: String) -> WiFiNetworkMapCommand {
+        WiFiNetworkMapCommand(action: .focus(itemID))
     }
 }
 
@@ -141,6 +146,7 @@ enum WiFiNetworkMapPresentation {
 struct WiFiNetworkClusterMap: UIViewRepresentable {
     let items: [WiFiNetworkMapItem]
     let showsUserLocation: Bool
+    var detailItemIDs: [String] = []
     @Binding var selection: WiFiNetworkMapSelection?
     let command: WiFiNetworkMapCommand
 
@@ -157,7 +163,7 @@ struct WiFiNetworkClusterMap: UIViewRepresentable {
         mapView.showsScale = true
         mapView.showsUserLocation = showsUserLocation
         mapView.register(
-            MKMarkerAnnotationView.self,
+            MKAnnotationView.self,
             forAnnotationViewWithReuseIdentifier: Coordinator.networkReuseIdentifier)
         mapView.register(
             MKMarkerAnnotationView.self,
@@ -168,7 +174,10 @@ struct WiFiNetworkClusterMap: UIViewRepresentable {
     func updateUIView(_ mapView: MKMapView, context: Context) {
         context.coordinator.selection = $selection
         mapView.showsUserLocation = showsUserLocation
-        context.coordinator.update(items: items, on: mapView)
+        context.coordinator.update(
+            items: items,
+            detailItemIDs: detailItemIDs,
+            on: mapView)
         context.coordinator.apply(selection: selection, on: mapView)
         context.coordinator.apply(command: command, on: mapView)
     }
@@ -184,13 +193,25 @@ struct WiFiNetworkClusterMap: UIViewRepresentable {
         private var selectedCircleTone: WiFiNetworkMapTone = .orange
         private var lastCommandID: UUID?
         private var hasFittedInitialItems = false
+        private var detailItemIDs: Set<String> = []
 
         init(selection: Binding<WiFiNetworkMapSelection?>) {
             self.selection = selection
         }
 
         func update(items: [WiFiNetworkMapItem], on mapView: MKMapView) {
+            update(items: items, detailItemIDs: [], on: mapView)
+        }
+
+        func update(
+            items: [WiFiNetworkMapItem],
+            detailItemIDs requestedDetailIDs: [String],
+            on mapView: MKMapView
+        ) {
             let desired = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
+            let nextDetailIDs = Set(requestedDetailIDs).intersection(desired.keys)
+            let detailChanged = nextDetailIDs != detailItemIDs
+            detailItemIDs = nextDetailIDs
             let removed = annotations.keys.filter { desired[$0] == nil }
             let removedAnnotations = removed.compactMap { annotations.removeValue(forKey: $0) }
             if !removedAnnotations.isEmpty {
@@ -202,7 +223,7 @@ struct WiFiNetworkClusterMap: UIViewRepresentable {
                 if let annotation = annotations[item.id] {
                     if annotation.item != item {
                         annotation.update(with: item)
-                        if let view = mapView.view(for: annotation) as? MKMarkerAnnotationView {
+                        if let view = mapView.view(for: annotation) {
                             configure(view, for: item)
                         }
                     }
@@ -212,12 +233,22 @@ struct WiFiNetworkClusterMap: UIViewRepresentable {
                     additions.append(annotation)
                 }
             }
-            if !additions.isEmpty {
+            if detailChanged {
+                // MapKit calculates clusters when annotations are inserted.
+                // Reinsert them only when entering/leaving a detail group so
+                // its members can render at their true coordinates without
+                // disabling clustering for the rest of the map.
+                let current = Array(annotations.values)
+                mapView.removeAnnotations(current)
+                mapView.addAnnotations(current)
+            } else if !additions.isEmpty {
                 mapView.addAnnotations(additions)
             }
 
             if items.isEmpty {
                 hasFittedInitialItems = false
+            } else if detailChanged, !detailItemIDs.isEmpty {
+                fitDetail(on: mapView, animated: true)
             } else if !hasFittedInitialItems {
                 hasFittedInitialItems = true
                 fitAll(on: mapView, animated: false)
@@ -226,6 +257,7 @@ struct WiFiNetworkClusterMap: UIViewRepresentable {
 
         func apply(selection newSelection: WiFiNetworkMapSelection?, on mapView: MKMapView) {
             updateSelectedCircle(selection: newSelection, on: mapView)
+            refreshVisibleStyles(on: mapView)
 
             guard newSelection != nil else {
                 for annotation in mapView.selectedAnnotations {
@@ -252,6 +284,8 @@ struct WiFiNetworkClusterMap: UIViewRepresentable {
                 fitAll(on: mapView, animated: true)
             case .followUser:
                 mapView.setUserTrackingMode(.follow, animated: true)
+            case let .focus(itemID):
+                focus(itemID: itemID, on: mapView, animated: true)
             }
         }
 
@@ -273,13 +307,14 @@ struct WiFiNetworkClusterMap: UIViewRepresentable {
                 view.collisionMode = .circle
                 view.canShowCallout = false
                 view.clusteringIdentifier = nil
+                view.alpha = detailItemIDs.isEmpty ? 1 : 0.38
                 return view
             }
 
             guard let network = annotation as? WiFiNetworkAnnotation else { return nil }
             let view = mapView.dequeueReusableAnnotationView(
                 withIdentifier: Self.networkReuseIdentifier,
-                for: network) as! MKMarkerAnnotationView
+                for: network)
             view.annotation = network
             configure(view, for: network.item)
             return view
@@ -318,6 +353,17 @@ struct WiFiNetworkClusterMap: UIViewRepresentable {
                 return
             }
 
+            // Expanding a selected MapKit cluster reinserts its members with
+            // clustering disabled. MapKit consequently deselects the cluster
+            // annotation that it just removed. Keep the logical cluster
+            // selection alive during that transition; a user deselecting an
+            // individual detailed marker is still handled below.
+            if case let .cluster(ids) = selection.wrappedValue,
+               !detailItemIDs.isEmpty,
+               !deselectedIDs.isDisjoint(with: ids) {
+                return
+            }
+
             switch selection.wrappedValue {
             case let .item(id) where deselectedIDs.contains(id):
                 selection.wrappedValue = nil
@@ -339,18 +385,40 @@ struct WiFiNetworkClusterMap: UIViewRepresentable {
             return renderer
         }
 
-        private func configure(_ view: MKMarkerAnnotationView, for item: WiFiNetworkMapItem) {
-            view.markerTintColor = item.tone.uiColor
-            view.glyphTintColor = .white
-            view.glyphText = nil
-            view.glyphImage = UIImage(systemName: item.kind == .estimate ? "wifi" : "dot.radiowaves.left.and.right")
-            view.titleVisibility = .hidden
-            view.subtitleVisibility = .hidden
+        private func configure(_ view: MKAnnotationView, for item: WiFiNetworkMapItem) {
+            let isDetailed = detailItemIDs.contains(item.id)
+            let isSelected: Bool = {
+                guard case let .item(id) = selection.wrappedValue else { return false }
+                return id == item.id
+            }()
+            let symbol = isSelected ? "scope" :
+                (item.kind == .estimate ? "wifi" : "dot.radiowaves.left.and.right")
+            view.image = WiFiNetworkMarkerImage.image(
+                tone: item.tone,
+                symbol: symbol,
+                selected: isSelected)
+            view.centerOffset = .zero
             view.canShowCallout = false
-            view.animatesWhenAdded = false
             view.collisionMode = .circle
-            view.clusteringIdentifier = "tumoflip.wifi.\(item.kind.rawValue)"
-            view.displayPriority = item.kind == .estimate ? .defaultHigh : .defaultLow
+            view.clusteringIdentifier = isDetailed ? nil : "tumoflip.wifi.\(item.kind.rawValue)"
+            view.displayPriority = isDetailed || isSelected ? .required :
+                (item.kind == .estimate ? .defaultHigh : .defaultLow)
+            view.alpha = detailItemIDs.isEmpty || isDetailed ? 1 : 0.38
+            view.layer.shadowColor = UIColor.black.cgColor
+            view.layer.shadowOpacity = isSelected ? 0.28 : 0.18
+            view.layer.shadowRadius = isSelected ? 4 : 2
+            view.layer.shadowOffset = CGSize(width: 0, height: 1)
+            view.accessibilityLabel = item.title
+        }
+
+        private func refreshVisibleStyles(on mapView: MKMapView) {
+            for annotation in annotations.values {
+                guard let view = mapView.view(for: annotation) else { continue }
+                configure(view, for: annotation.item)
+            }
+            for cluster in mapView.annotations.compactMap({ $0 as? MKClusterAnnotation }) {
+                mapView.view(for: cluster)?.alpha = detailItemIDs.isEmpty ? 1 : 0.38
+            }
         }
 
         private func updateSelectedCircle(
@@ -401,6 +469,38 @@ struct WiFiNetworkClusterMap: UIViewRepresentable {
                 mapView.showAnnotations(values, animated: animated)
             }
         }
+
+        private func fitDetail(on mapView: MKMapView, animated: Bool) {
+            let values = detailItemIDs.compactMap { annotations[$0] }
+            guard !values.isEmpty else { return }
+            mapView.setUserTrackingMode(.none, animated: false)
+
+            let distinct = Set(values.map {
+                CoordinateKey(latitude: $0.coordinate.latitude, longitude: $0.coordinate.longitude)
+            })
+            if values.count == 1 || distinct.count == 1, let first = values.first {
+                mapView.setRegion(
+                    MKCoordinateRegion(
+                        center: first.coordinate,
+                        latitudinalMeters: 320,
+                        longitudinalMeters: 320),
+                    animated: animated)
+            } else {
+                mapView.showAnnotations(values, animated: animated)
+            }
+        }
+
+        private func focus(itemID: String, on mapView: MKMapView, animated: Bool) {
+            guard let annotation = annotations[itemID] else { return }
+            mapView.setUserTrackingMode(.none, animated: false)
+            let diameter = max((annotation.item.uncertaintyRadiusMeters ?? 80) * 4, 240)
+            mapView.setRegion(
+                MKCoordinateRegion(
+                    center: annotation.coordinate,
+                    latitudinalMeters: diameter,
+                    longitudinalMeters: diameter),
+                animated: animated)
+        }
     }
 }
 
@@ -431,6 +531,53 @@ private final class WiFiNetworkAnnotation: NSObject, MKAnnotation {
 private struct CoordinateKey: Hashable {
     let latitude: Double
     let longitude: Double
+}
+
+private enum WiFiNetworkMarkerImage {
+    private static let cache = NSCache<NSString, UIImage>()
+
+    static func image(
+        tone: WiFiNetworkMapTone,
+        symbol: String,
+        selected: Bool
+    ) -> UIImage {
+        let key = "\(tone)-\(symbol)-\(selected)" as NSString
+        if let cached = cache.object(forKey: key) { return cached }
+
+        let diameter: CGFloat = selected ? 38 : 30
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = UIScreen.main.scale
+        let image = UIGraphicsImageRenderer(
+            size: CGSize(width: diameter, height: diameter),
+            format: format
+        ).image { context in
+            let bounds = CGRect(origin: .zero, size: CGSize(width: diameter, height: diameter))
+            let inset: CGFloat = selected ? 2 : 1
+            let circle = UIBezierPath(ovalIn: bounds.insetBy(dx: inset, dy: inset))
+            tone.uiColor.setFill()
+            circle.fill()
+
+            UIColor.white.withAlphaComponent(selected ? 0.95 : 0.75).setStroke()
+            circle.lineWidth = selected ? 2.5 : 1
+            circle.stroke()
+
+            let configuration = UIImage.SymbolConfiguration(
+                pointSize: selected ? 18 : 14,
+                weight: .semibold)
+            guard let glyph = UIImage(systemName: symbol, withConfiguration: configuration)?
+                .withTintColor(.white, renderingMode: .alwaysOriginal)
+            else { return }
+            let glyphRect = CGRect(
+                x: (diameter - glyph.size.width) / 2,
+                y: (diameter - glyph.size.height) / 2,
+                width: glyph.size.width,
+                height: glyph.size.height)
+            glyph.draw(in: glyphRect)
+            context.cgContext.setBlendMode(.normal)
+        }
+        cache.setObject(image, forKey: key)
+        return image
+    }
 }
 
 #if DEBUG

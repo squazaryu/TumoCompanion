@@ -213,6 +213,7 @@ struct WiFiMapperLiveMapView: View {
     @StateObject private var vm: WiFiMapperLiveMapViewModel
     private let ownsViewModel: Bool
     @State private var mapSelection: WiFiNetworkMapSelection?
+    @State private var detailItemIDs: [String] = []
     @State private var mapCommand = WiFiNetworkMapCommand.fitAll()
 
     @MainActor
@@ -224,10 +225,12 @@ struct WiFiMapperLiveMapView: View {
     @MainActor
     init(
         viewModel: WiFiMapperLiveMapViewModel,
-        initialSelection: WiFiNetworkMapSelection? = nil
+        initialSelection: WiFiNetworkMapSelection? = nil,
+        initialDetailItemIDs: [String] = []
     ) {
         _vm = StateObject(wrappedValue: viewModel)
         _mapSelection = State(initialValue: initialSelection)
+        _detailItemIDs = State(initialValue: initialDetailItemIDs)
         ownsViewModel = false
     }
 
@@ -245,7 +248,7 @@ struct WiFiMapperLiveMapView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Button(role: .destructive) {
                     vm.clear()
-                    mapSelection = nil
+                    clearMapSelection()
                 } label: {
                     Image(systemName: "trash")
                 }
@@ -260,6 +263,9 @@ struct WiFiMapperLiveMapView: View {
         }
         .onDisappear {
             if ownsViewModel { vm.stop() }
+        }
+        .onChange(of: mapSelection) { _, selection in
+            synchronizeDetailState(with: selection)
         }
     }
 
@@ -332,6 +338,7 @@ struct WiFiMapperLiveMapView: View {
             WiFiNetworkClusterMap(
                 items: liveMapItems,
                 showsUserLocation: true,
+                detailItemIDs: detailItemIDs,
                 selection: $mapSelection,
                 command: mapCommand)
             .frame(height: 320)
@@ -339,7 +346,7 @@ struct WiFiMapperLiveMapView: View {
 
             mapSelectionDetail
 
-            Text("Nearby networks are grouped into numbered clusters. Tap a marker to show only that network's uncertainty ring; its estimate improves as you move around it.")
+            Text("Clusters keep the overview readable. Open one for exact estimated coordinates, then inspect its networks without moving their map positions.")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -372,33 +379,41 @@ struct WiFiMapperLiveMapView: View {
                 mapHint
             }
         case let .cluster(itemIDs):
-            let items = liveMapItems.filter { itemIDs.contains($0.id) }
+            let estimates = orderedEstimates(for: itemIDs)
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Label("\(items.count) networks overlap here", systemImage: "square.3.layers.3d")
+                    Label("\(estimates.count) nearby estimates", systemImage: "square.3.layers.3d")
                         .font(.caption)
                         .fontWeight(.semibold)
                     Spacer()
                     clearMapSelectionButton
                 }
-                Text("Choose one to inspect its estimated position and uncertainty.")
+                Text(clusterDetailDescription(estimates))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(items) { item in
-                            Button {
-                                mapSelection = .item(item.id)
-                            } label: {
-                                Label(item.title, systemImage: "wifi")
-                                    .font(.caption)
-                                    .lineLimit(1)
-                            }
-                            .buttonStyle(.bordered)
-                            .tint(item.tone.color)
-                            .controlSize(.small)
+                VStack(spacing: 0) {
+                    ForEach(Array(estimates.prefix(5))) { estimate in
+                        clusterEstimateRow(estimate)
+                        if estimate.id != estimates.prefix(5).last?.id {
+                            Divider().opacity(0.25)
                         }
                     }
+                }
+                if estimates.count > 5 {
+                    Menu {
+                        ForEach(estimates.dropFirst(5)) { estimate in
+                            Button {
+                                selectEstimate(estimate, retainingCluster: true)
+                            } label: {
+                                Text("\(estimate.displaySSID) · \(estimate.bssid)")
+                            }
+                        }
+                    } label: {
+                        Label("Show \(estimates.count - 5) more", systemImage: "ellipsis.circle")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
                 }
             }
             .padding(10)
@@ -416,36 +431,74 @@ struct WiFiMapperLiveMapView: View {
     }
 
     private func selectedEstimateCard(_ estimate: WiFiMapperAPEstimate) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "wifi.circle.fill")
-                .font(.title2)
-                .foregroundStyle(confidenceColor(estimate))
-            VStack(alignment: .leading, spacing: 3) {
-                Text(estimate.displaySSID)
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .lineLimit(1)
-                Text(estimate.bssid)
-                    .font(.system(.caption2, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                HStack(spacing: 10) {
-                    Label("±\(Int(estimate.radiusMeters.rounded())) m", systemImage: "circle.dashed")
-                    Label("\(estimate.averageRSSI) dBm", systemImage: "wave.3.right")
-                    if let channel = estimate.channel {
-                        Text("ch \(channel)")
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "scope")
+                    .font(.title2)
+                    .foregroundStyle(confidenceColor(estimate))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(estimate.displaySSID)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .lineLimit(1)
+                    Text(estimate.bssid)
+                        .font(.system(.caption2, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    HStack(spacing: 10) {
+                        Label("±\(Int(estimate.radiusMeters.rounded())) m", systemImage: "circle.dashed")
+                        Label("\(estimate.averageRSSI) dBm", systemImage: "wave.3.right")
+                        if let channel = estimate.channel {
+                            Text("ch \(channel)")
+                        }
                     }
-                }
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-            }
-            Spacer(minLength: 4)
-            VStack(alignment: .trailing, spacing: 6) {
-                clearMapSelectionButton
-                Text("\(estimate.observationCount)x")
-                    .font(.caption)
-                    .monospacedDigit()
+                    .font(.caption2)
                     .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 4)
+                clearMapSelectionButton
+            }
+
+            HStack(spacing: 8) {
+                Label(coordinateText(estimate), systemImage: "mappin.and.ellipse")
+                    .font(.system(.caption2, design: .monospaced))
+                Spacer(minLength: 4)
+                if let distance = distanceFromPhone(estimate) {
+                    Text(distance)
+                        .font(.caption2)
+                        .monospacedDigit()
+                }
+                Text("\(estimate.observationCount)x")
+                    .font(.caption2)
+                    .monospacedDigit()
+            }
+            .foregroundStyle(.secondary)
+
+            if let position = detailPosition(of: estimate) {
+                Divider().opacity(0.3)
+                HStack {
+                    Button {
+                        selectDetailEstimate(at: position - 1)
+                    } label: {
+                        Image(systemName: "chevron.left")
+                    }
+                    .disabled(position == 0)
+                    .accessibilityLabel("Previous network in cluster")
+                    Spacer()
+                    Text("\(position + 1) of \(detailEstimates.count) in cluster")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button {
+                        selectDetailEstimate(at: position + 1)
+                    } label: {
+                        Image(systemName: "chevron.right")
+                    }
+                    .disabled(position + 1 >= detailEstimates.count)
+                    .accessibilityLabel("Next network in cluster")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
             }
         }
         .padding(10)
@@ -454,7 +507,7 @@ struct WiFiMapperLiveMapView: View {
 
     private var clearMapSelectionButton: some View {
         Button {
-            mapSelection = nil
+            clearMapSelection()
         } label: {
             Image(systemName: "xmark.circle.fill")
                 .foregroundStyle(.secondary)
@@ -473,7 +526,7 @@ struct WiFiMapperLiveMapView: View {
             VStack(spacing: 8) {
                 ForEach(Array(vm.estimates.prefix(80))) { estimate in
                     Button {
-                        mapSelection = .item(WiFiNetworkMapItem.estimate(estimate).id)
+                        selectEstimate(estimate, retainingCluster: false)
                     } label: {
                         HStack(spacing: 10) {
                             Image(systemName: "location.circle")
@@ -513,38 +566,192 @@ struct WiFiMapperLiveMapView: View {
         case .low: return .red
         }
     }
+
+    private var detailEstimates: [WiFiMapperAPEstimate] {
+        orderedEstimates(for: detailItemIDs)
+    }
+
+    private func orderedEstimates(for itemIDs: [String]) -> [WiFiMapperAPEstimate] {
+        let ids = Set(itemIDs)
+        return vm.estimates
+            .filter { ids.contains(WiFiNetworkMapItem.estimate($0).id) }
+            .sorted {
+                if $0.averageRSSI != $1.averageRSSI { return $0.averageRSSI > $1.averageRSSI }
+                return $0.displaySSID.localizedCaseInsensitiveCompare($1.displaySSID) == .orderedAscending
+            }
+    }
+
+    private func synchronizeDetailState(with selection: WiFiNetworkMapSelection?) {
+        switch selection {
+        case let .cluster(itemIDs):
+            detailItemIDs = orderedEstimates(for: itemIDs).map {
+                WiFiNetworkMapItem.estimate($0).id
+            }
+        case let .item(itemID):
+            if !detailItemIDs.contains(itemID) { detailItemIDs = [] }
+            mapCommand = .focus(itemID)
+        case nil:
+            detailItemIDs = []
+        }
+    }
+
+    private func clearMapSelection() {
+        detailItemIDs = []
+        mapSelection = nil
+    }
+
+    private func selectEstimate(
+        _ estimate: WiFiMapperAPEstimate,
+        retainingCluster: Bool
+    ) {
+        let itemID = WiFiNetworkMapItem.estimate(estimate).id
+        if !retainingCluster { detailItemIDs = [] }
+        mapSelection = .item(itemID)
+        mapCommand = .focus(itemID)
+    }
+
+    private func selectDetailEstimate(at index: Int) {
+        guard detailEstimates.indices.contains(index) else { return }
+        selectEstimate(detailEstimates[index], retainingCluster: true)
+    }
+
+    private func detailPosition(of estimate: WiFiMapperAPEstimate) -> Int? {
+        let itemID = WiFiNetworkMapItem.estimate(estimate).id
+        return detailEstimates.firstIndex {
+            WiFiNetworkMapItem.estimate($0).id == itemID
+        }
+    }
+
+    private func clusterEstimateRow(_ estimate: WiFiMapperAPEstimate) -> some View {
+        Button {
+            selectEstimate(estimate, retainingCluster: true)
+        } label: {
+            HStack(spacing: 9) {
+                Circle()
+                    .fill(confidenceColor(estimate))
+                    .frame(width: 8, height: 8)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(estimate.displaySSID)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .lineLimit(1)
+                    Text(estimate.bssid)
+                        .font(.system(.caption2, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("\(estimate.averageRSSI) dBm")
+                    Text("±\(Int(estimate.radiusMeters.rounded())) m")
+                        .foregroundStyle(.secondary)
+                }
+                .font(.caption2)
+                .monospacedDigit()
+                Image(systemName: "chevron.right")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+            .contentShape(Rectangle())
+            .padding(.vertical, 7)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func clusterDetailDescription(_ estimates: [WiFiMapperAPEstimate]) -> String {
+        guard estimates.count > 1 else {
+            return "Select the network to inspect its estimated coordinate and uncertainty."
+        }
+        let spread = maximumSpread(of: estimates)
+        return "Estimated points span \(Int(spread.rounded())) m. Select a network to center its true estimate; markers are not artificially separated."
+    }
+
+    private func maximumSpread(of estimates: [WiFiMapperAPEstimate]) -> CLLocationDistance {
+        var result: CLLocationDistance = 0
+        for firstIndex in estimates.indices {
+            for secondIndex in estimates.indices where secondIndex > firstIndex {
+                let first = CLLocation(
+                    latitude: estimates[firstIndex].coordinate.latitude,
+                    longitude: estimates[firstIndex].coordinate.longitude)
+                let second = CLLocation(
+                    latitude: estimates[secondIndex].coordinate.latitude,
+                    longitude: estimates[secondIndex].coordinate.longitude)
+                result = max(result, first.distance(from: second))
+            }
+        }
+        return result
+    }
+
+    private func coordinateText(_ estimate: WiFiMapperAPEstimate) -> String {
+        String(format: "%.5f, %.5f", estimate.coordinate.latitude, estimate.coordinate.longitude)
+    }
+
+    private func distanceFromPhone(_ estimate: WiFiMapperAPEstimate) -> String? {
+        guard let phoneLocation = vm.location.location else { return nil }
+        let estimateLocation = CLLocation(
+            latitude: estimate.coordinate.latitude,
+            longitude: estimate.coordinate.longitude)
+        let distance = estimateLocation.distance(from: phoneLocation)
+        if distance < 1_000 { return "\(Int(distance.rounded())) m away" }
+        return String(format: "%.1f km away", distance / 1_000)
+    }
 }
 
 #if DEBUG
 struct WiFiLiveMapSelectionQAView: View {
-    private static let selectedEstimate = WiFiMapperAPEstimate(
-        id: "AA:BB:CC:DD:EE:FF",
-        ssid: "TUMO LAB",
-        bssid: "AA:BB:CC:DD:EE:FF",
-        channel: 6,
-        coordinate: CLLocationCoordinate2D(latitude: 55.7558, longitude: 37.6173),
-        observationCount: 12,
-        strongestRSSI: -43,
-        averageRSSI: -55,
-        radiusMeters: 38,
-        maxSpreadMeters: 26,
-        averageAccuracyMeters: 14,
-        confidence: .medium)
+    private static let estimates: [WiFiMapperAPEstimate] = [
+        qaEstimate(0, "TUMO LAB", -51, 38, 0.00000, 0.00000, .medium),
+        qaEstimate(1, "Studio WiFi", -57, 46, 0.00010, 0.00006, .medium),
+        qaEstimate(2, "Workshop", -63, 58, -0.00008, 0.00012, .low),
+        qaEstimate(3, "Guest", -68, 72, 0.00014, -0.00009, .low),
+        qaEstimate(4, "Office 5G", -48, 29, -0.00011, -0.00007, .high),
+        qaEstimate(5, "<hidden>", -71, 81, 0.00004, 0.00016, .low),
+    ]
+
+    private static func qaEstimate(
+        _ index: Int,
+        _ name: String,
+        _ rssi: Int,
+        _ radius: Double,
+        _ latitudeOffset: Double,
+        _ longitudeOffset: Double,
+        _ confidence: WiFiMapperAPConfidence
+    ) -> WiFiMapperAPEstimate {
+        let bssid = "AA:BB:CC:DD:EE:\(String(format: "%02X", index))"
+        return WiFiMapperAPEstimate(
+            id: bssid,
+            ssid: name,
+            bssid: bssid,
+            channel: [1, 6, 11][index % 3],
+            coordinate: CLLocationCoordinate2D(
+                latitude: 55.7558 + latitudeOffset,
+                longitude: 37.6173 + longitudeOffset),
+            observationCount: 12 - index,
+            strongestRSSI: rssi + 8,
+            averageRSSI: rssi,
+            radiusMeters: radius,
+            maxSpreadMeters: max(radius - 10, 5),
+            averageAccuracyMeters: 14 + Double(index),
+            confidence: confidence)
+    }
 
     @StateObject private var viewModel: WiFiMapperLiveMapViewModel
+    private let showCluster: Bool
 
     @MainActor
-    init() {
+    init(showCluster: Bool = false) {
         let viewModel = WiFiMapperLiveMapViewModel()
-        viewModel.loadSelectionQA([Self.selectedEstimate])
+        viewModel.loadSelectionQA(Self.estimates)
         _viewModel = StateObject(wrappedValue: viewModel)
+        self.showCluster = showCluster
     }
 
     var body: some View {
+        let itemIDs = Self.estimates.map { WiFiNetworkMapItem.estimate($0).id }
         NavigationStack {
             WiFiMapperLiveMapView(
                 viewModel: viewModel,
-                initialSelection: .item(WiFiNetworkMapItem.estimate(Self.selectedEstimate).id))
+                initialSelection: showCluster ? .cluster(itemIDs) : .item(itemIDs[0]),
+                initialDetailItemIDs: itemIDs)
         }
         .environmentObject(FlipperBLE.shared)
     }
