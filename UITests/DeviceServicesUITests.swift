@@ -1,6 +1,21 @@
 import XCTest
 
 final class DeviceServicesUITests: XCTestCase {
+    func testLiveMapClusterShowsDetailedMembers() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-wifi-live-map-cluster-qa"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["6 nearby estimates"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["TUMO LAB"].exists)
+        XCTAssertTrue(app.staticTexts["Office 5G"].exists)
+
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = "Live map detailed cluster"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+
     func testLiveMapSelectionCanBeCleared() {
         let app = XCUIApplication()
         app.launchArguments = ["-wifi-live-map-selection-qa"]
@@ -13,6 +28,16 @@ final class DeviceServicesUITests: XCTestCase {
         selected.name = "Live map selected network"
         selected.lifetime = .keepAlways
         add(selected)
+
+        let nextNetwork = app.buttons["Next network in cluster"]
+        XCTAssertTrue(nextNetwork.waitForExistence(timeout: 2))
+        nextNetwork.tap()
+        XCTAssertTrue(app.staticTexts["Studio WiFi"].waitForExistence(timeout: 2))
+
+        let switched = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        switched.name = "Live map switched cluster network"
+        switched.lifetime = .keepAlways
+        add(switched)
 
         clearSelection.tap()
         XCTAssertFalse(clearSelection.waitForExistence(timeout: 1))
