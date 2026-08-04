@@ -227,6 +227,13 @@ struct WiFiNetworkClusterMap: UIViewRepresentable {
         func apply(selection newSelection: WiFiNetworkMapSelection?, on mapView: MKMapView) {
             updateSelectedCircle(selection: newSelection, on: mapView)
 
+            guard newSelection != nil else {
+                for annotation in mapView.selectedAnnotations {
+                    mapView.deselectAnnotation(annotation, animated: true)
+                }
+                return
+            }
+
             guard case let .item(id) = newSelection,
                   let annotation = annotations[id],
                   !mapView.selectedAnnotations.contains(where: { ($0 as? WiFiNetworkAnnotation)?.id == id })
@@ -297,6 +304,29 @@ struct WiFiNetworkClusterMap: UIViewRepresentable {
             if distinctCoordinates.count > 1 {
                 mapView.showAnnotations(members, animated: true)
             }
+        }
+
+        func mapView(_ mapView: MKMapView, didDeselect view: MKAnnotationView) {
+            let deselectedIDs: Set<String>
+            if let network = view.annotation as? WiFiNetworkAnnotation {
+                deselectedIDs = [network.id]
+            } else if let cluster = view.annotation as? MKClusterAnnotation {
+                deselectedIDs = Set(cluster.memberAnnotations.compactMap {
+                    ($0 as? WiFiNetworkAnnotation)?.id
+                })
+            } else {
+                return
+            }
+
+            switch selection.wrappedValue {
+            case let .item(id) where deselectedIDs.contains(id):
+                selection.wrappedValue = nil
+            case let .cluster(ids) where !deselectedIDs.isDisjoint(with: ids):
+                selection.wrappedValue = nil
+            default:
+                return
+            }
+            updateSelectedCircle(selection: nil, on: mapView)
         }
 
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {

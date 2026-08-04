@@ -26,11 +26,11 @@ final class WiFiMapperLiveMapViewModel: ObservableObject {
     private var pendingAccessPoints: [PendingAccessPoint] = []
     private var seq = 0
     private static let pendingLimit = 500
-    // Standard Core Location may reuse a good stationary fix instead of
-    // publishing a new timestamp every few seconds, especially indoors. Keep a
-    // bounded window and carry the reported accuracy into the estimator rather
-    // than making the entire map disappear when a fix is merely approximate.
-    private static let maximumFixAge: TimeInterval = 30
+    // Standard Core Location may keep a good stationary fix without refreshing
+    // its embedded timestamp every few seconds, especially indoors. A fix
+    // delivered by this active provider remains usable while its reported
+    // accuracy is bounded; freshness still controls the preferred/approximate
+    // UI state and the accuracy is carried into the estimator.
     private static let maximumAssociationDelay: TimeInterval = 30
     private static let maximumHorizontalAccuracy = 200.0
     private static let preferredFixAge: TimeInterval = 10
@@ -123,8 +123,9 @@ final class WiFiMapperLiveMapViewModel: ObservableObject {
         guard !pendingAccessPoints.isEmpty, Self.isUsable(fix) else { return }
         // Only associate rows that arrived close to this fix. Assigning an old
         // scan batch to a later position creates convincing but false AP pins.
+        let receivedAt = Date()
         let accessPoints = pendingAccessPoints.compactMap { pending in
-            abs(fix.timestamp.timeIntervalSince(pending.receivedAt)) <= Self.maximumAssociationDelay ?
+            receivedAt.timeIntervalSince(pending.receivedAt) <= Self.maximumAssociationDelay ?
                 pending.accessPoint : nil
         }
         pendingAccessPoints = []
@@ -162,8 +163,7 @@ final class WiFiMapperLiveMapViewModel: ObservableObject {
 
     private static func isUsable(_ fix: CLLocation) -> Bool {
         fix.horizontalAccuracy > 0 &&
-            fix.horizontalAccuracy <= maximumHorizontalAccuracy &&
-            abs(fix.timestamp.timeIntervalSinceNow) <= maximumFixAge
+            fix.horizontalAccuracy <= maximumHorizontalAccuracy
     }
 
     private static func isPreferred(_ fix: CLLocation) -> Bool {
@@ -171,6 +171,36 @@ final class WiFiMapperLiveMapViewModel: ObservableObject {
             fix.horizontalAccuracy <= preferredHorizontalAccuracy &&
             abs(fix.timestamp.timeIntervalSinceNow) <= preferredFixAge
     }
+
+#if DEBUG
+    func loadSelectionQA(_ values: [WiFiMapperAPEstimate]) {
+        estimates = values
+        uniqueNetworks = values.count
+        observations = values.reduce(0) { $0 + $1.observationCount }
+        points = values.enumerated().map { index, estimate in
+            WiFiMapperPoint(
+                id: "qa|\(estimate.id)|\(index)",
+                sourceName: "qa",
+                ssid: estimate.ssid,
+                bssid: estimate.bssid,
+                auth: "WPA2",
+                channel: estimate.channel,
+                rssi: estimate.averageRSSI,
+                bestRSSI: nil,
+                lastRSSI: nil,
+                averageRSSI: nil,
+                samples: estimate.observationCount,
+                tickMS: nil,
+                firstTickMS: nil,
+                lastTickMS: nil,
+                latitude: estimate.coordinate.latitude,
+                longitude: estimate.coordinate.longitude,
+                altitude: nil,
+                accuracy: estimate.averageAccuracyMeters)
+        }
+        lastObservationAt = Date()
+    }
+#endif
 }
 
 private struct PendingAccessPoint {
@@ -181,17 +211,24 @@ private struct PendingAccessPoint {
 struct WiFiMapperLiveMapView: View {
     @EnvironmentObject var ble: FlipperBLE
     @StateObject private var vm: WiFiMapperLiveMapViewModel
+    private let ownsViewModel: Bool
     @State private var mapSelection: WiFiNetworkMapSelection?
     @State private var mapCommand = WiFiNetworkMapCommand.fitAll()
 
     @MainActor
     init() {
         _vm = StateObject(wrappedValue: WiFiMapperLiveMapViewModel())
+        ownsViewModel = true
     }
 
     @MainActor
-    init(viewModel: WiFiMapperLiveMapViewModel) {
+    init(
+        viewModel: WiFiMapperLiveMapViewModel,
+        initialSelection: WiFiNetworkMapSelection? = nil
+    ) {
         _vm = StateObject(wrappedValue: viewModel)
+        _mapSelection = State(initialValue: initialSelection)
+        ownsViewModel = false
     }
 
     var body: some View {
@@ -215,8 +252,15 @@ struct WiFiMapperLiveMapView: View {
                     .disabled(vm.observations == 0)
             }
         }
-        .task { vm.start() }
-        .onDisappear { vm.stop() }
+        .task {
+            // Standalone entry points own their model. The TumoSurvey dashboard
+            // passes a workspace-owned model which must keep collecting while
+            // navigation swaps the dashboard and map views.
+            if ownsViewModel { vm.start() }
+        }
+        .onDisappear {
+            if ownsViewModel { vm.stop() }
+        }
     }
 
     private var statusCard: some View {
@@ -330,9 +374,13 @@ struct WiFiMapperLiveMapView: View {
         case let .cluster(itemIDs):
             let items = liveMapItems.filter { itemIDs.contains($0.id) }
             VStack(alignment: .leading, spacing: 8) {
-                Label("\(items.count) networks overlap here", systemImage: "square.3.layers.3d")
-                    .font(.caption)
-                    .fontWeight(.semibold)
+                HStack {
+                    Label("\(items.count) networks overlap here", systemImage: "square.3.layers.3d")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                    Spacer()
+                    clearMapSelectionButton
+                }
                 Text("Choose one to inspect its estimated position and uncertainty.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -392,13 +440,27 @@ struct WiFiMapperLiveMapView: View {
                 .foregroundStyle(.secondary)
             }
             Spacer(minLength: 4)
-            Text("\(estimate.observationCount)x")
-                .font(.caption)
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
+            VStack(alignment: .trailing, spacing: 6) {
+                clearMapSelectionButton
+                Text("\(estimate.observationCount)x")
+                    .font(.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(10)
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    private var clearMapSelectionButton: some View {
+        Button {
+            mapSelection = nil
+        } label: {
+            Image(systemName: "xmark.circle.fill")
+                .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Clear network selection")
     }
 
     private func estimate(for mapItemID: String) -> WiFiMapperAPEstimate? {
@@ -452,3 +514,39 @@ struct WiFiMapperLiveMapView: View {
         }
     }
 }
+
+#if DEBUG
+struct WiFiLiveMapSelectionQAView: View {
+    private static let selectedEstimate = WiFiMapperAPEstimate(
+        id: "AA:BB:CC:DD:EE:FF",
+        ssid: "TUMO LAB",
+        bssid: "AA:BB:CC:DD:EE:FF",
+        channel: 6,
+        coordinate: CLLocationCoordinate2D(latitude: 55.7558, longitude: 37.6173),
+        observationCount: 12,
+        strongestRSSI: -43,
+        averageRSSI: -55,
+        radiusMeters: 38,
+        maxSpreadMeters: 26,
+        averageAccuracyMeters: 14,
+        confidence: .medium)
+
+    @StateObject private var viewModel: WiFiMapperLiveMapViewModel
+
+    @MainActor
+    init() {
+        let viewModel = WiFiMapperLiveMapViewModel()
+        viewModel.loadSelectionQA([Self.selectedEstimate])
+        _viewModel = StateObject(wrappedValue: viewModel)
+    }
+
+    var body: some View {
+        NavigationStack {
+            WiFiMapperLiveMapView(
+                viewModel: viewModel,
+                initialSelection: .item(WiFiNetworkMapItem.estimate(Self.selectedEstimate).id))
+        }
+        .environmentObject(FlipperBLE.shared)
+    }
+}
+#endif
