@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.10.5",
-      "versionDate": "2026-08-03",
-      "versionDescription": "Declutters dense TumoSurvey maps with numbered network clusters, one uncertainty ring for the selected AP, and detailed per-network position information.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.5/TumoCompanion-unsigned.ipa",
-      "size": 29524062,
+      "version": "1.10.6",
+      "versionDate": "2026-08-04",
+      "versionDescription": "Keeps TumoSurvey Live Map collection active across navigation and stationary GPS updates, preserves buffered Wi-Fi observations, and adds a clear network-selection action.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.6/TumoCompanion-unsigned.ipa",
+      "size": 29532580,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.10.6",
+          "date": "2026-08-04",
+          "localizedDescription": "Keeps TumoSurvey Live Map collection active across navigation and stationary GPS updates, preserves buffered Wi-Fi observations, and adds a clear network-selection action.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.6/TumoCompanion-unsigned.ipa",
+          "size": 29532580,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.10.5",
           "date": "2026-08-03",
