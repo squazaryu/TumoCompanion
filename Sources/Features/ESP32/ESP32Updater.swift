@@ -70,10 +70,11 @@ enum ESP32ManifestError: LocalizedError, Equatable {
 /// so the user can flash it from the Flipper's esp_flasher app.
 ///
 /// Stable releases with `firmware-manifest.json` are staged as complete, per-board
-/// factory packages and every selected segment is checked against its declared SHA-256
-/// before an atomic folder replacement. ESP32-C5 packages deliberately omit OTA data
-/// to match the upstream C5 flasher's supported three-file recipe. Older releases retain
-/// the guarded app-only fallback.
+/// factory packages and every selected segment is checked against its manifest SHA-256 or
+/// GitHub release digest before an atomic folder replacement. ESP32-C5 packages use the
+/// manifest bootloader and partition table plus the normal release application, matching
+/// the upstream C5 flasher's supported three-file recipe. Older releases retain the guarded
+/// app-only fallback.
 @MainActor
 final class ESP32Updater: ObservableObject {
     struct Board: Identifiable, Equatable {
@@ -171,10 +172,10 @@ final class ESP32Updater: ObservableObject {
         guard let target = manifest.targets.first(where: { $0.assetSuffix == boardKey }) else {
             throw ESP32ManifestError.missingBoard(boardKey)
         }
-        // The upstream release manifest exposes a generic four-segment factory image,
-        // but its supported ESP32-C5 flasher ships only bootloader, partition table and
-        // application. OTA data is not part of that supported C5 recipe and must not be
-        // staged through the Flipper path.
+        // The installer workflow is an independent rebuild. Its generic factory plan is
+        // not the three-file package used by the upstream ESP32-C5 Python flasher. For C5,
+        // keep the manifest bootloader and partition table, omit OTA data, and replace the
+        // installer application with the normal release application asset.
         let isC5 = boardKey == "esp32c5devkitc1"
         let expectedRoles = isC5
             ? Set(["bootloader", "partition-table", "application"])
@@ -186,7 +187,35 @@ final class ESP32Updater: ObservableObject {
               declaredRoles.isSubset(of: allowedRoles) else {
             throw ESP32ManifestError.invalidSegments(boardKey)
         }
-        let segments = declaredSegments.filter { !(isC5 && $0.role == "ota-data") }
+        let selectedSegments: [ESP32InstallerManifest.Target.Flash.Segment]
+        if isC5 {
+            let applicationAssets = assetSizes.keys.filter { name in
+                guard let parsed = parseImageName(name) else { return false }
+                return parsed.key == boardKey && norm(parsed.version) == norm(manifest.version)
+            }
+            guard applicationAssets.count == 1,
+                  let applicationName = applicationAssets.first,
+                  let applicationSize = assetSizes[applicationName], applicationSize > 0,
+                  let applicationSHA = assetSHA256[applicationName],
+                  applicationSHA.count == 64,
+                  applicationSHA.unicodeScalars.allSatisfy(
+                    CharacterSet(charactersIn: "0123456789abcdefABCDEF").contains)
+            else {
+                throw ESP32ManifestError.missingAsset(
+                    "normal \(manifest.version) application for \(boardKey)")
+            }
+            selectedSegments = declaredSegments.filter {
+                $0.role == "bootloader" || $0.role == "partition-table"
+            } + [ESP32InstallerManifest.Target.Flash.Segment(
+                role: "application",
+                offset: 0x10000,
+                size: applicationSize,
+                sha256: applicationSHA,
+                fileName: applicationName)]
+        } else {
+            selectedSegments = declaredSegments
+        }
+        let segments = selectedSegments
         let roles = Set(segments.map(\.role))
         let offsets = Set(segments.map(\.offset))
         let validSHA = CharacterSet(charactersIn: "0123456789abcdefABCDEF")
