@@ -70,8 +70,10 @@ enum ESP32ManifestError: LocalizedError, Equatable {
 /// so the user can flash it from the Flipper's esp_flasher app.
 ///
 /// Stable releases with `firmware-manifest.json` are staged as complete, per-board
-/// factory packages and every segment is checked against its declared SHA-256 before
-/// an atomic folder replacement. Older releases retain the guarded app-only fallback.
+/// factory packages and every selected segment is checked against its declared SHA-256
+/// before an atomic folder replacement. ESP32-C5 packages deliberately omit OTA data
+/// to match the upstream C5 flasher's supported three-file recipe. Older releases retain
+/// the guarded app-only fallback.
 @MainActor
 final class ESP32Updater: ObservableObject {
     struct Board: Identifiable, Equatable {
@@ -169,12 +171,26 @@ final class ESP32Updater: ObservableObject {
         guard let target = manifest.targets.first(where: { $0.assetSuffix == boardKey }) else {
             throw ESP32ManifestError.missingBoard(boardKey)
         }
-        let segments = target.flash.factory.segments
-        let expectedRoles = Set(["bootloader", "partition-table", "ota-data", "application"])
+        // The upstream release manifest exposes a generic four-segment factory image,
+        // but its supported ESP32-C5 flasher ships only bootloader, partition table and
+        // application. OTA data is not part of that supported C5 recipe and must not be
+        // staged through the Flipper path.
+        let isC5 = boardKey == "esp32c5devkitc1"
+        let expectedRoles = isC5
+            ? Set(["bootloader", "partition-table", "application"])
+            : Set(["bootloader", "partition-table", "ota-data", "application"])
+        let allowedRoles = isC5 ? expectedRoles.union(["ota-data"]) : expectedRoles
+        let declaredSegments = target.flash.factory.segments
+        let declaredRoles = Set(declaredSegments.map(\.role))
+        guard declaredSegments.count == declaredRoles.count,
+              declaredRoles.isSubset(of: allowedRoles) else {
+            throw ESP32ManifestError.invalidSegments(boardKey)
+        }
+        let segments = declaredSegments.filter { !(isC5 && $0.role == "ota-data") }
         let roles = Set(segments.map(\.role))
         let offsets = Set(segments.map(\.offset))
         let validSHA = CharacterSet(charactersIn: "0123456789abcdefABCDEF")
-        guard segments.count == 4,
+        guard segments.count == expectedRoles.count,
               roles == expectedRoles,
               offsets.count == segments.count,
               segments.allSatisfy({
@@ -182,6 +198,16 @@ final class ESP32Updater: ObservableObject {
                       $0.sha256.unicodeScalars.allSatisfy(validSHA.contains)
               }) else {
             throw ESP32ManifestError.invalidSegments(boardKey)
+        }
+        if isC5 {
+            let expectedOffsets = [
+                "bootloader": 0x2000,
+                "partition-table": 0x8000,
+                "application": 0x10000,
+            ]
+            guard segments.allSatisfy({ expectedOffsets[$0.role] == $0.offset }) else {
+                throw ESP32ManifestError.invalidSegments(boardKey)
+            }
         }
         for segment in segments {
             guard let releaseSize = assetSizes[segment.fileName] else {
