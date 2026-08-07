@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.10.7",
-      "versionDate": "2026-08-04",
-      "versionDescription": "Adds precise dense-cluster detail to TumoSurvey: real estimated positions, compact markers, per-network uncertainty and coordinates, plus previous and next navigation without artificial offsets.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.7/TumoCompanion-unsigned.ipa",
-      "size": 29563455,
+      "version": "1.10.8",
+      "versionDate": "2026-08-07",
+      "versionDescription": "Fixes ESP32-C5 Marauder installation by staging the supported three-file package at exact offsets while preserving fail-closed integrity checks, atomic replacement and rollback.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.8/TumoCompanion-unsigned.ipa",
+      "size": 29566110,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.10.8",
+          "date": "2026-08-07",
+          "localizedDescription": "Fixes ESP32-C5 Marauder installation by staging the supported three-file package at exact offsets while preserving fail-closed integrity checks, atomic replacement and rollback.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.8/TumoCompanion-unsigned.ipa",
+          "size": 29566110,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.10.7",
           "date": "2026-08-04",
