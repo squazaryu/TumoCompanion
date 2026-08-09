@@ -4,6 +4,18 @@ import os
 
 private let elog = Logger(subsystem: "com.tumoflip.unleashedcompanion", category: "esp32")
 
+// The v1.14.x installer workflow rebuilt the ESP32-C5 bootloader, but that image does
+// not boot reliably when flashed through Flipper ESP Flasher. Keep the last
+// hardware-accepted upstream bootloader pinned by digest until a newer one passes the
+// same physical-device gate. The URL is version-pinned and the downloaded bytes are
+// still checked against this SHA-256 before they can reach the SD card.
+private let c5CompatibilityBootloaderName = "c5_adapter_v1_13_0_bootloader.bin"
+private let c5CompatibilityBootloaderURL =
+    "https://raw.githubusercontent.com/justcallmekoko/ESP32Marauder/v1.13.0/C5_Py_Flasher_for_adapter/bins/bootloader.bin"
+private let c5CompatibilityBootloaderSize = 20_464
+private let c5CompatibilityBootloaderSHA256 =
+    "3e2b92a74cf406745dddc88ecb5193fd446f4b269b96d2b9991d84f41c810611"
+
 struct ESP32InstallerManifest: Decodable, Equatable {
     struct Target: Decodable, Equatable {
         struct Flash: Decodable, Equatable {
@@ -70,10 +82,11 @@ enum ESP32ManifestError: LocalizedError, Equatable {
 /// so the user can flash it from the Flipper's esp_flasher app.
 ///
 /// Stable releases with `firmware-manifest.json` are staged as complete, per-board
-/// factory packages and every selected segment is checked against its declared SHA-256
-/// before an atomic folder replacement. ESP32-C5 packages deliberately omit OTA data
-/// to match the upstream C5 flasher's supported three-file recipe. Older releases retain
-/// the guarded app-only fallback.
+/// factory packages and every selected segment is checked against its manifest SHA-256 or
+/// GitHub release digest before an atomic folder replacement. ESP32-C5 packages use the
+/// hardware-accepted compatibility bootloader, the release partition table, and the normal
+/// release application. This deliberately avoids upgrading low-level C5 boot code as a side
+/// effect of an application update. Older releases retain the guarded app-only fallback.
 @MainActor
 final class ESP32Updater: ObservableObject {
     struct Board: Identifiable, Equatable {
@@ -171,10 +184,10 @@ final class ESP32Updater: ObservableObject {
         guard let target = manifest.targets.first(where: { $0.assetSuffix == boardKey }) else {
             throw ESP32ManifestError.missingBoard(boardKey)
         }
-        // The upstream release manifest exposes a generic four-segment factory image,
-        // but its supported ESP32-C5 flasher ships only bootloader, partition table and
-        // application. OTA data is not part of that supported C5 recipe and must not be
-        // staged through the Flipper path.
+        // The installer workflow is an independent rebuild. Its generic factory plan is
+        // not the hardware-accepted C5 update recipe. For C5, pin the last known-good
+        // upstream adapter bootloader, keep the release partition table, omit OTA data,
+        // and replace the installer application with the normal release application asset.
         let isC5 = boardKey == "esp32c5devkitc1"
         let expectedRoles = isC5
             ? Set(["bootloader", "partition-table", "application"])
@@ -186,7 +199,42 @@ final class ESP32Updater: ObservableObject {
               declaredRoles.isSubset(of: allowedRoles) else {
             throw ESP32ManifestError.invalidSegments(boardKey)
         }
-        let segments = declaredSegments.filter { !(isC5 && $0.role == "ota-data") }
+        let selectedSegments: [ESP32InstallerManifest.Target.Flash.Segment]
+        if isC5 {
+            let applicationAssets = assetSizes.keys.filter { name in
+                guard let parsed = parseImageName(name) else { return false }
+                return parsed.key == boardKey && norm(parsed.version) == norm(manifest.version)
+            }
+            guard applicationAssets.count == 1,
+                  let applicationName = applicationAssets.first,
+                  let applicationSize = assetSizes[applicationName], applicationSize > 0,
+                  let applicationSHA = assetSHA256[applicationName],
+                  applicationSHA.count == 64,
+                  applicationSHA.unicodeScalars.allSatisfy(
+                    CharacterSet(charactersIn: "0123456789abcdefABCDEF").contains)
+            else {
+                throw ESP32ManifestError.missingAsset(
+                    "normal \(manifest.version) application for \(boardKey)")
+            }
+            selectedSegments = [
+                ESP32InstallerManifest.Target.Flash.Segment(
+                    role: "bootloader",
+                    offset: 0x2000,
+                    size: c5CompatibilityBootloaderSize,
+                    sha256: c5CompatibilityBootloaderSHA256,
+                    fileName: c5CompatibilityBootloaderName),
+            ] + declaredSegments.filter {
+                $0.role == "partition-table"
+            } + [ESP32InstallerManifest.Target.Flash.Segment(
+                role: "application",
+                offset: 0x10000,
+                size: applicationSize,
+                sha256: applicationSHA,
+                fileName: applicationName)]
+        } else {
+            selectedSegments = declaredSegments
+        }
+        let segments = selectedSegments
         let roles = Set(segments.map(\.role))
         let offsets = Set(segments.map(\.offset))
         let validSHA = CharacterSet(charactersIn: "0123456789abcdefABCDEF")
@@ -210,6 +258,9 @@ final class ESP32Updater: ObservableObject {
             }
         }
         for segment in segments {
+            if isC5 && segment.fileName == c5CompatibilityBootloaderName {
+                continue
+            }
             guard let releaseSize = assetSizes[segment.fileName] else {
                 throw ESP32ManifestError.missingAsset(segment.fileName)
             }
@@ -695,8 +746,18 @@ final class ESP32Updater: ObservableObject {
                 assetSizes: latestAssetSizes,
                 assetSHA256: latestAssetSHA256)
             return try segments.map { segment in
-                guard let url = latestAssets[segment.fileName] else {
-                    throw ESP32ManifestError.missingAsset(segment.fileName)
+                let url: URL
+                if board.key == "esp32c5devkitc1",
+                   segment.fileName == c5CompatibilityBootloaderName {
+                    guard let compatibilityURL = URL(string: c5CompatibilityBootloaderURL) else {
+                        throw ESP32ManifestError.missingAsset(segment.fileName)
+                    }
+                    url = compatibilityURL
+                } else {
+                    guard let releaseURL = latestAssets[segment.fileName] else {
+                        throw ESP32ManifestError.missingAsset(segment.fileName)
+                    }
+                    url = releaseURL
                 }
                 return DownloadPlan(
                     sourceName: segment.fileName,
