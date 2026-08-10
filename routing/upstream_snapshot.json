@@ -1,5 +1,5 @@
 {
-  "release_tag": "3aug2026",
+  "release_tag": "9aug2026",
   "stems": {
     "24cxxprog": "GPIO",
     "4inrow": "Games",
@@ -36,6 +36,7 @@
     "can_commander": "GPIO",
     "can_tools": "Tools",
     "catacombs": "Games",
+    "ccid_test": "USB",
     "chess": "Games",
     "chess_clock": "Games",
     "chief_cooker": "Sub-GHz",
@@ -99,6 +100,7 @@
     "flizzer_tracker": "Media",
     "fmf_to_sub": "Sub-GHz",
     "fmradio_controller": "GPIO",
+    "fmtx": "Sub-GHz",
     "fordradiocode": "Tools",
     "freq_analyzer_ext": "Sub-GHz",
     "furious_birds": "Games",
