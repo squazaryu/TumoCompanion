@@ -112,6 +112,7 @@ final class ESP32UpdaterTests: XCTestCase {
 
     func testAuthoritativeInstallerManifestProducesCompleteFactoryPackage() throws {
         let manifest = try ESP32Updater.decodeManifest(manifestData(), expectedVersion: "v1.14.1")
+        let packageBoard = try ESP32Updater.packageBoard(for: "v6_1", manifest: manifest)
         let sizes = [
             "esp32_marauder_installer_v1_14_1_20260801_v6_1.bootloader.bin": 23_664,
             "esp32_marauder_installer_v1_14_1_20260801_v6_1.partition-table.bin": 3_072,
@@ -126,6 +127,9 @@ final class ESP32UpdaterTests: XCTestCase {
             assetSHA256: digests)
 
         XCTAssertEqual(segments.map(\.offset), [0x1000, 0x8000, 0xe000, 0x10000])
+        XCTAssertEqual(packageBoard.modelId, "marauder-v6-1")
+        XCTAssertEqual(packageBoard.displayName, "Marauder v6.1")
+        XCTAssertEqual(packageBoard.chipFamily, "esp32")
         XCTAssertEqual(
             segments.map { ESP32Updater.stagedFileName(for: $0, version: manifest.version, boardKey: "v6_1") },
             [
@@ -138,6 +142,7 @@ final class ESP32UpdaterTests: XCTestCase {
 
     func testC5InstallerManifestProducesHardwareAcceptedThreeFilePackage() throws {
         let manifest = try ESP32Updater.decodeManifest(c5ManifestData(), expectedVersion: "v1.14.1")
+        let packageBoard = try ESP32Updater.packageBoard(for: "esp32c5devkitc1", manifest: manifest)
         let segments = try ESP32Updater.factorySegments(
             for: "esp32c5devkitc1",
             manifest: manifest,
@@ -145,6 +150,9 @@ final class ESP32UpdaterTests: XCTestCase {
             assetSHA256: c5ReleaseAssetSHA256)
 
         XCTAssertEqual(segments.map(\.role), ["bootloader", "partition-table", "application"])
+        XCTAssertEqual(packageBoard.modelId, "esp32-c5-devkitc-1")
+        XCTAssertEqual(packageBoard.displayName, "ESP32-C5-DevKitC-1")
+        XCTAssertEqual(packageBoard.chipFamily, "esp32c5")
         XCTAssertEqual(segments.map(\.offset), [0x2000, 0x8000, 0x10000])
         XCTAssertEqual(segments.first?.size, 20_464)
         XCTAssertEqual(
@@ -255,6 +263,26 @@ final class ESP32UpdaterTests: XCTestCase {
         }
     }
 
+    func testPackageIdentityFailsClosedWhenAuthoritativeTargetIdentityIsMissing() throws {
+        let manifest = try ESP32Updater.decodeManifest(
+            manifestData(includeIdentity: false),
+            expectedVersion: "v1.14.1")
+
+        XCTAssertThrowsError(try ESP32Updater.packageBoard(for: "v6_1", manifest: manifest)) { error in
+            XCTAssertEqual(error as? ESP32FlashPackageError, .invalidBoard("v6_1"))
+        }
+    }
+
+    func testPackageIdentityRejectsChipFamilyMismatch() throws {
+        let json = try XCTUnwrap(String(data: manifestData(), encoding: .utf8))
+            .replacingOccurrences(of: "\"chipFamily\": \"ESP32\"", with: "\"chipFamily\": \"ESP32-S3\"")
+        let manifest = try ESP32Updater.decodeManifest(Data(json.utf8), expectedVersion: "v1.14.1")
+
+        XCTAssertThrowsError(try ESP32Updater.packageBoard(for: "v6_1", manifest: manifest)) { error in
+            XCTAssertEqual(error as? ESP32FlashPackageError, .invalidBoard("v6_1"))
+        }
+    }
+
     func testInstallerManifestFailsClosedWhenReleaseAssetIsMissing() throws {
         let manifest = try ESP32Updater.decodeManifest(manifestData(), expectedVersion: "v1.14.1")
         XCTAssertThrowsError(try ESP32Updater.factorySegments(
@@ -268,8 +296,13 @@ final class ESP32UpdaterTests: XCTestCase {
             }
     }
 
-    private func manifestData() -> Data {
-        Data(#"""
+    private func manifestData(includeIdentity: Bool = true) -> Data {
+        let identity = includeIdentity ? #"""
+            "displayName": "Marauder v6.1",
+            "chipFamily": "ESP32",
+            "esptoolChip": "esp32",
+        """# : ""
+        return Data(#"""
         {
           "schemaVersion": 1,
           "channel": "stable",
@@ -279,6 +312,7 @@ final class ESP32UpdaterTests: XCTestCase {
           "version": "v1.14.1",
           "targets": [{
             "id": "marauder-v6-1",
+            \#(identity)
             "assetSuffix": "v6_1",
             "flash": {"factory": {"segments": [
               {"role":"application","offset":65536,"size":1694384,"sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","fileName":"esp32_marauder_installer_v1_14_1_20260801_v6_1.bin"},
@@ -305,6 +339,9 @@ final class ESP32UpdaterTests: XCTestCase {
           "version": "v1.14.1",
           "targets": [{
             "id": "esp32-c5-devkitc-1",
+            "displayName": "ESP32-C5-DevKitC-1",
+            "chipFamily": "ESP32-C5",
+            "esptoolChip": "esp32c5",
             "assetSuffix": "esp32c5devkitc1",
             "flash": {"factory": {"segments": [
               {"role":"bootloader","offset":\#(bootloaderOffset),"size":20784,"sha256":"f0cc3970dbf6001eb398e589244047f0731acbc0ded1ccfa952cd7559c083b13","fileName":"esp32_marauder_installer_v1_14_1_20260801_esp32c5devkitc1.bootloader.bin"},

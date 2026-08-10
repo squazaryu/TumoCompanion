@@ -80,7 +80,8 @@ https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/apps.json
 - Optional journal delivery uses an iPhone-configured HTTPS webhook. Its bearer token stays in Keychain and is never sent to Flipper.
 
 ### 🔌 ESP32 Marauder firmware
-- Checks ESP32Marauder releases, detects your board from the esp_flasher layout, downloads the matching image and stages a flash folder over BLE or USB SD — with size guard + MD5 verify.
+- Checks ESP32Marauder releases, detects your board from the esp_flasher layout, downloads the matching image and stages a flash folder over BLE or USB SD — with size/SHA-256 guards and on-device MD5 verification.
+- Verified factory packages include `tumoflip-flash-package.json` for automatic ESP Flasher selection. The manifest is written and readback-verified only after every binary, then committed with the same atomic folder replacement; legacy folders without it remain available for Manual Flash.
 - Archives outdated staged flash folders into `/ext/apps_data/esp_flasher/_archive` so old Marauder builds do not clutter the normal flashing list; archived folders can be restored or deleted from the ESP32 screen.
 - Shows a per-board-key firmware version manager, so C5/WROOM modules keep separate versioned folders and an older build can be restored before flashing from the Flipper.
 
