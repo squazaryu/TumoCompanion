@@ -55,7 +55,8 @@ struct ESP32FlashPackageManifest: Codable, Equatable {
         guard packageKind == Self.currentPackageKind else {
             throw ESP32FlashPackageError.invalidPackageKind(packageKind)
         }
-        guard Self.isIdentifier(board.key),
+        guard (board.key == "esp32c5devkitc1" || board.key == "v6_1"),
+              Self.isIdentifier(board.key),
               Self.isIdentifier(board.modelId),
               Self.isIdentifier(board.chipFamily),
               !board.displayName.isEmpty else {
@@ -74,7 +75,7 @@ struct ESP32FlashPackageManifest: Codable, Equatable {
             throw ESP32FlashPackageError.invalidErasePolicy(erasePolicy)
         }
         guard Self.isISO8601(createdAt),
-              !createdBy.application.isEmpty,
+              createdBy.application == "TumoCompanion",
               !createdBy.version.isEmpty else {
             throw ESP32FlashPackageError.invalidCreationMetadata
         }
@@ -94,16 +95,26 @@ struct ESP32FlashPackageManifest: Codable, Equatable {
             throw ESP32FlashPackageError.invalidSegments(board.key)
         }
 
+        let maximumUInt32 = Int(UInt32.max)
         for segment in segments {
-            guard Self.isRelativeFileName(segment.fileName),
+            guard Self.isSafeSegmentFileName(segment.fileName),
                   segment.fileName.hasSuffix(".bin"),
                   segment.offset >= 0,
+                  segment.offset <= maximumUInt32,
                   segment.size > 0,
+                  segment.size <= maximumUInt32,
+                  segment.offset <= maximumUInt32 - segment.size,
                   Self.isHexDigest(segment.sha256, length: 64),
                   Self.isHexDigest(segment.md5, length: 32),
                   segment.sha256 == segment.sha256.lowercased(),
                   segment.md5 == segment.md5.lowercased() else {
                 throw ESP32FlashPackageError.invalidSegment(segment.fileName)
+            }
+        }
+        for (previous, next) in zip(segments, segments.dropFirst()) {
+            guard previous.offset < next.offset,
+                  previous.offset + previous.size <= next.offset else {
+                throw ESP32FlashPackageError.invalidSegments(board.key)
             }
         }
 
@@ -118,6 +129,7 @@ struct ESP32FlashPackageManifest: Codable, Equatable {
                   board.chipFamily == "esp32c5",
                   recipe.id == "c5-compat-v1",
                   recipe.status == "hardware-accepted",
+                  bootloader?.fileName == "bootloader_0x2000.bin",
                   bootloader?.size == 20_464,
                   bootloader?.sha256 ==
                     "3e2b92a74cf406745dddc88ecb5193fd446f4b269b96d2b9991d84f41c810611",
@@ -158,9 +170,19 @@ struct ESP32FlashPackageManifest: Codable, Equatable {
         return value.unicodeScalars.allSatisfy(valid.contains)
     }
 
-    private static func isRelativeFileName(_ value: String) -> Bool {
-        !value.isEmpty && value != "." && value != ".." &&
-            !value.contains("/") && !value.contains("\\") && !value.contains("\0")
+    private static func isSafeSegmentFileName(_ value: String) -> Bool {
+        guard !value.isEmpty,
+              value.utf8.count < 96,
+              value.first != ".",
+              !value.contains("..") else {
+            return false
+        }
+        return value.utf8.allSatisfy { byte in
+            (byte >= 48 && byte <= 57) ||
+                (byte >= 65 && byte <= 90) ||
+                (byte >= 97 && byte <= 122) ||
+                byte == 46 || byte == 95 || byte == 45
+        }
     }
 
     private static func isHexDigest(_ value: String, length: Int) -> Bool {

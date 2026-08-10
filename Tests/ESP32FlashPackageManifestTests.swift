@@ -88,6 +88,67 @@ final class ESP32FlashPackageManifestTests: XCTestCase {
         assertInvalid(makeManifest(boardKey: "v6_1", segments: badMD5))
     }
 
+    func testRejectsUnknownBoardAndForeignProducer() {
+        assertInvalid(makeManifest(boardKey: "marauder_v7"))
+        assertInvalid(makeManifest(
+            boardKey: "v6_1",
+            createdByApplication: "OtherCompanion"))
+    }
+
+    func testRejectsUnsafeOrOversizedFileNames() {
+        let invalidNames = [
+            ".bootloader_0x1000.bin",
+            "boot loader_0x1000.bin",
+            "bootloader_ж_0x1000.bin",
+            "boot..loader_0x1000.bin",
+            String(repeating: "a", count: 92) + ".bin",
+        ]
+        for fileName in invalidNames {
+            var segments = makeManifest(boardKey: "v6_1").segments
+            segments[0] = segment(
+                role: "bootloader",
+                fileName: fileName,
+                offset: 0x1000)
+            assertInvalid(makeManifest(boardKey: "v6_1", segments: segments))
+        }
+    }
+
+    func testRejectsValuesOutsideUInt32AndOverlappingSegments() {
+        var oversizedOffset = makeManifest(boardKey: "v6_1").segments
+        oversizedOffset[3] = segment(
+            role: "application",
+            fileName: oversizedOffset[3].fileName,
+            offset: Int(UInt32.max) + 1)
+        assertInvalid(makeManifest(boardKey: "v6_1", segments: oversizedOffset))
+
+        var oversizedSize = makeManifest(boardKey: "v6_1").segments
+        oversizedSize[0] = segment(
+            role: "bootloader",
+            fileName: oversizedSize[0].fileName,
+            offset: 0x1000,
+            size: Int(UInt32.max) + 1)
+        assertInvalid(makeManifest(boardKey: "v6_1", segments: oversizedSize))
+
+        var overlapping = makeManifest(boardKey: "v6_1").segments
+        overlapping[0] = segment(
+            role: "bootloader",
+            fileName: overlapping[0].fileName,
+            offset: 0x1000,
+            size: 0x8000)
+        assertInvalid(makeManifest(boardKey: "v6_1", segments: overlapping))
+    }
+
+    func testRejectsRenamedC5CompatibilityBootloader() {
+        var segments = makeManifest(boardKey: "esp32c5devkitc1").segments
+        segments[0] = segment(
+            role: "bootloader",
+            fileName: "c5_bootloader_0x2000.bin",
+            offset: 0x2000,
+            size: 20_464,
+            sha256: "3e2b92a74cf406745dddc88ecb5193fd446f4b269b96d2b9991d84f41c810611")
+        assertInvalid(makeManifest(boardKey: "esp32c5devkitc1", segments: segments))
+    }
+
     func testAtomicReplacementMovesManifestWithPackage() async throws {
         let fixture = try makeStorageFixture()
         defer { try? FileManager.default.removeItem(at: fixture.root) }
@@ -270,7 +331,8 @@ final class ESP32FlashPackageManifestTests: XCTestCase {
     private func makeManifest(
         boardKey: String,
         modelId: String? = nil,
-        segments: [ESP32FlashPackageManifest.Segment]? = nil
+        segments: [ESP32FlashPackageManifest.Segment]? = nil,
+        createdByApplication: String = "TumoCompanion"
     ) -> ESP32FlashPackageManifest {
         let isC5 = boardKey == "esp32c5devkitc1"
         let resolvedSegments = segments ?? (isC5 ? [
@@ -312,7 +374,7 @@ final class ESP32FlashPackageManifestTests: XCTestCase {
             erasePolicy: "segments",
             segments: resolvedSegments,
             createdAt: "2026-08-10T18:30:00.000Z",
-            createdBy: .init(application: "TumoCompanion", version: "1.10.10"))
+            createdBy: .init(application: createdByApplication, version: "1.10.10"))
     }
 
     private func segment(

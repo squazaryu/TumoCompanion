@@ -132,7 +132,7 @@ final class ESP32Updater: ObservableObject {
     private var downloadPhase = false
 
     private var storage: any DeviceFileStore { TransferChannelStore.shared.activeStore }
-    static let repo = "justcallmekoko/ESP32Marauder"
+    nonisolated static let repo = "justcallmekoko/ESP32Marauder"
     static let flasherDir = "/ext/apps_data/esp_flasher"
     static let archiveDir = "\(flasherDir)/_archive"
 
@@ -299,7 +299,8 @@ final class ESP32Updater: ObservableObject {
         for boardKey: String,
         manifest: ESP32InstallerManifest
     ) throws -> ESP32FlashPackageManifest.Board {
-        guard let target = manifest.targets.first(where: { $0.assetSuffix == boardKey }),
+        guard automaticPackageSupported(for: boardKey),
+              let target = manifest.targets.first(where: { $0.assetSuffix == boardKey }),
               !target.id.isEmpty,
               let displayName = target.displayName, !displayName.isEmpty,
               let sourceChipFamily = target.chipFamily, !sourceChipFamily.isEmpty,
@@ -312,6 +313,20 @@ final class ESP32Updater: ObservableObject {
             modelId: target.id,
             displayName: displayName,
             chipFamily: esptoolChip.lowercased())
+    }
+
+    /// Schema v1 is intentionally limited to the exact profiles implemented by
+    /// Tumoflip ESP Flasher. Other authoritative factory packages remain valid
+    /// Manual Flash folders but must not advertise automatic installation.
+    nonisolated static func automaticPackageSupported(for boardKey: String) -> Bool {
+        boardKey == "esp32c5devkitc1" || boardKey == "v6_1"
+    }
+
+    nonisolated static func shouldWriteAutomaticPackageManifest(
+        hasAuthoritativeManifest: Bool,
+        boardKey: String
+    ) -> Bool {
+        hasAuthoritativeManifest && automaticPackageSupported(for: boardKey)
     }
 
     nonisolated private static func normalizedChipFamily(_ value: String) -> String {
@@ -771,7 +786,10 @@ final class ESP32Updater: ObservableObject {
         let versionName = tag.replacingOccurrences(of: ".", with: "_")
         let target = "\(Self.flasherDir)/\(Self.cleanBase(board.base))_\(versionName)_manual"
         let staging = "\(target).partial-\(UUID().uuidString.lowercased())"
-        let isManifestPackage = latestManifest != nil
+        let hasAuthoritativeFactoryPackage = latestManifest != nil
+        let writesAutomaticManifest = Self.shouldWriteAutomaticPackageManifest(
+            hasAuthoritativeManifest: hasAuthoritativeFactoryPackage,
+            boardKey: board.key)
 
         let transferReporter = TransferActivityReporter(channel: channel)
         _ = await transferReporter.prepare()
@@ -784,7 +802,7 @@ final class ESP32Updater: ObservableObject {
             // Stable releases with an installer manifest provide a complete factory
             // package. Legacy releases have only an app image, so retain their known
             // boot files while still staging into a separate transaction directory.
-            if !isManifestPackage {
+            if !hasAuthoritativeFactoryPackage {
                 for name in board.bootFiles {
                     let data = try await storage.read("\(board.folder)/\(name)")
                     let path = "\(staging)/\(name)"
@@ -804,7 +822,7 @@ final class ESP32Updater: ObservableObject {
                 channel: channel,
                 storage: storage)
 
-            if isManifestPackage {
+            if writesAutomaticManifest {
                 let packageManifest = try makeFlashPackageManifest(
                     board: board,
                     tag: tag,
@@ -823,7 +841,11 @@ final class ESP32Updater: ObservableObject {
                 target: target,
                 staging: staging,
                 archiveDirectory: Self.archiveDir)
-            status = "Done ✓ \(files.count)-file package verified. Flash \(board.display) \(tag) from esp_flasher."
+            if writesAutomaticManifest {
+                status = "Done ✓ \(files.count)-file package verified. Open esp_flasher to install automatically."
+            } else {
+                status = "Done ✓ \(files.count)-file package verified. Open esp_flasher → Manual Flash."
+            }
         } catch {
             if await storage.exists(staging) {
                 try? await storage.delete(staging, recursive: true)

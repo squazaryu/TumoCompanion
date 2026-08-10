@@ -283,6 +283,37 @@ final class ESP32UpdaterTests: XCTestCase {
         }
     }
 
+    func testAutomaticPackageSchemaV1SupportsOnlyFirmwareProfiles() {
+        XCTAssertTrue(ESP32Updater.automaticPackageSupported(for: "esp32c5devkitc1"))
+        XCTAssertTrue(ESP32Updater.automaticPackageSupported(for: "v6_1"))
+        XCTAssertFalse(ESP32Updater.automaticPackageSupported(for: "marauder_v7"))
+        XCTAssertFalse(ESP32Updater.automaticPackageSupported(for: "flipper"))
+
+        XCTAssertTrue(ESP32Updater.shouldWriteAutomaticPackageManifest(
+            hasAuthoritativeManifest: true,
+            boardKey: "v6_1"))
+        XCTAssertFalse(ESP32Updater.shouldWriteAutomaticPackageManifest(
+            hasAuthoritativeManifest: false,
+            boardKey: "v6_1"))
+        XCTAssertFalse(ESP32Updater.shouldWriteAutomaticPackageManifest(
+            hasAuthoritativeManifest: true,
+            boardKey: "marauder_v7"))
+    }
+
+    func testPackageIdentityRejectsAuthoritativeButUnsupportedTarget() throws {
+        let json = try XCTUnwrap(String(data: manifestData(), encoding: .utf8))
+            .replacingOccurrences(of: "marauder-v6-1", with: "marauder-v7")
+            .replacingOccurrences(of: "Marauder v6.1", with: "Marauder v7")
+            .replacingOccurrences(of: "v6_1", with: "marauder_v7")
+        let manifest = try ESP32Updater.decodeManifest(Data(json.utf8), expectedVersion: "v1.14.1")
+
+        XCTAssertThrowsError(
+            try ESP32Updater.packageBoard(for: "marauder_v7", manifest: manifest)
+        ) { error in
+            XCTAssertEqual(error as? ESP32FlashPackageError, .invalidBoard("marauder_v7"))
+        }
+    }
+
     func testInstallerManifestFailsClosedWhenReleaseAssetIsMissing() throws {
         let manifest = try ESP32Updater.decodeManifest(manifestData(), expectedVersion: "v1.14.1")
         XCTAssertThrowsError(try ESP32Updater.factorySegments(
