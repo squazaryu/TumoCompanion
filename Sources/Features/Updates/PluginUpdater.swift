@@ -357,6 +357,7 @@ final class PluginUpdater: ObservableObject {
         "ble_gatt_lab",
         "claude_buddy",
         "claude_remote_ble",
+        "esp_flasher",
         "esp32_wifi_marauder",
         "field_logger",
         "flipper_companion",

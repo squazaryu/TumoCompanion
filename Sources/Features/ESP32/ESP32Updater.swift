@@ -35,7 +35,10 @@ struct ESP32InstallerManifest: Decodable, Equatable {
         }
 
         let id: String
+        let displayName: String?
         let assetSuffix: String
+        let chipFamily: String?
+        let esptoolChip: String?
         let flash: Flash
     }
 
@@ -129,7 +132,7 @@ final class ESP32Updater: ObservableObject {
     private var downloadPhase = false
 
     private var storage: any DeviceFileStore { TransferChannelStore.shared.activeStore }
-    static let repo = "justcallmekoko/ESP32Marauder"
+    nonisolated static let repo = "justcallmekoko/ESP32Marauder"
     static let flasherDir = "/ext/apps_data/esp_flasher"
     static let archiveDir = "\(flasherDir)/_archive"
 
@@ -290,6 +293,44 @@ final class ESP32Updater: ObservableObject {
             }
         }
         return segments.sorted { $0.offset < $1.offset }
+    }
+
+    nonisolated static func packageBoard(
+        for boardKey: String,
+        manifest: ESP32InstallerManifest
+    ) throws -> ESP32FlashPackageManifest.Board {
+        guard automaticPackageSupported(for: boardKey),
+              let target = manifest.targets.first(where: { $0.assetSuffix == boardKey }),
+              !target.id.isEmpty,
+              let displayName = target.displayName, !displayName.isEmpty,
+              let sourceChipFamily = target.chipFamily, !sourceChipFamily.isEmpty,
+              let esptoolChip = target.esptoolChip, !esptoolChip.isEmpty,
+              normalizedChipFamily(sourceChipFamily) == normalizedChipFamily(esptoolChip) else {
+            throw ESP32FlashPackageError.invalidBoard(boardKey)
+        }
+        return ESP32FlashPackageManifest.Board(
+            key: boardKey,
+            modelId: target.id,
+            displayName: displayName,
+            chipFamily: esptoolChip.lowercased())
+    }
+
+    /// Schema v1 is intentionally limited to the exact profiles implemented by
+    /// Tumoflip ESP Flasher. Other authoritative factory packages remain valid
+    /// Manual Flash folders but must not advertise automatic installation.
+    nonisolated static func automaticPackageSupported(for boardKey: String) -> Bool {
+        boardKey == "esp32c5devkitc1" || boardKey == "v6_1"
+    }
+
+    nonisolated static func shouldWriteAutomaticPackageManifest(
+        hasAuthoritativeManifest: Bool,
+        boardKey: String
+    ) -> Bool {
+        hasAuthoritativeManifest && automaticPackageSupported(for: boardKey)
+    }
+
+    nonisolated private static func normalizedChipFamily(_ value: String) -> String {
+        value.lowercased().filter { $0.isLetter || $0.isNumber }
     }
 
     nonisolated static func stagedFileName(
@@ -698,6 +739,8 @@ final class ESP32Updater: ObservableObject {
         let expectedSize: Int
         let expectedSHA256: String?
         let outputName: String
+        let role: String?
+        let offset: Int?
     }
 
     private struct DownloadedFile {
@@ -743,7 +786,10 @@ final class ESP32Updater: ObservableObject {
         let versionName = tag.replacingOccurrences(of: ".", with: "_")
         let target = "\(Self.flasherDir)/\(Self.cleanBase(board.base))_\(versionName)_manual"
         let staging = "\(target).partial-\(UUID().uuidString.lowercased())"
-        let isManifestPackage = latestManifest != nil
+        let hasAuthoritativeFactoryPackage = latestManifest != nil
+        let writesAutomaticManifest = Self.shouldWriteAutomaticPackageManifest(
+            hasAuthoritativeManifest: hasAuthoritativeFactoryPackage,
+            boardKey: board.key)
 
         let transferReporter = TransferActivityReporter(channel: channel)
         _ = await transferReporter.prepare()
@@ -756,7 +802,7 @@ final class ESP32Updater: ObservableObject {
             // Stable releases with an installer manifest provide a complete factory
             // package. Legacy releases have only an app image, so retain their known
             // boot files while still staging into a separate transaction directory.
-            if !isManifestPackage {
+            if !hasAuthoritativeFactoryPackage {
                 for name in board.bootFiles {
                     let data = try await storage.read("\(board.folder)/\(name)")
                     let path = "\(staging)/\(name)"
@@ -769,9 +815,37 @@ final class ESP32Updater: ObservableObject {
                 }
             }
 
-            try await writeAndVerify(files, to: staging, reporter: transferReporter, channel: channel)
-            try await replaceAtomically(target: target, with: staging)
-            status = "Done ✓ \(files.count)-file package verified. Flash \(board.display) \(tag) from esp_flasher."
+            let verifiedMD5 = try await writeAndVerify(
+                files,
+                to: staging,
+                reporter: transferReporter,
+                channel: channel,
+                storage: storage)
+
+            if writesAutomaticManifest {
+                let packageManifest = try makeFlashPackageManifest(
+                    board: board,
+                    tag: tag,
+                    files: files,
+                    verifiedMD5: verifiedMD5)
+                // The helper first proves that only the MD5-verified binary set is
+                // present, then writes and verifies the manifest as the commit marker.
+                try await ESP32PackageCommitMarker.writeManifestLast(
+                    storage: storage,
+                    directory: staging,
+                    manifest: packageManifest)
+            }
+
+            try await ESP32PackageTransaction.replaceAtomically(
+                storage: storage,
+                target: target,
+                staging: staging,
+                archiveDirectory: Self.archiveDir)
+            if writesAutomaticManifest {
+                status = "Done ✓ \(files.count)-file package verified. Open esp_flasher to install automatically."
+            } else {
+                status = "Done ✓ \(files.count)-file package verified. Open esp_flasher → Manual Flash."
+            }
         } catch {
             if await storage.exists(staging) {
                 try? await storage.delete(staging, recursive: true)
@@ -810,7 +884,9 @@ final class ESP32Updater: ObservableObject {
                     sourceURL: url,
                     expectedSize: segment.size,
                     expectedSHA256: segment.sha256,
-                    outputName: Self.stagedFileName(for: segment, version: tag, boardKey: board.key))
+                    outputName: Self.stagedFileName(for: segment, version: tag, boardKey: board.key),
+                    role: segment.role,
+                    offset: segment.offset)
             }
         }
 
@@ -825,7 +901,9 @@ final class ESP32Updater: ObservableObject {
             sourceURL: assetURL,
             expectedSize: latestAssetSizes[assetName] ?? 0,
             expectedSHA256: latestAssetSHA256[assetName],
-            outputName: "esp32_marauder_\(versionName)_\(board.key)_0x10000.bin")]
+            outputName: "esp32_marauder_\(versionName)_\(board.key)_0x10000.bin",
+            role: nil,
+            offset: nil)]
     }
 
     private func download(_ plans: [DownloadPlan]) async throws -> [DownloadedFile] {
@@ -874,10 +952,12 @@ final class ESP32Updater: ObservableObject {
         _ files: [DownloadedFile],
         to directory: String,
         reporter: TransferActivityReporter,
-        channel: TransferChannel
-    ) async throws {
+        channel: TransferChannel,
+        storage: any DeviceFileStore
+    ) async throws -> [String: String] {
         let totalBytes = Int64(files.reduce(0) { $0 + $1.data.count })
         var completed: Int64 = 0
+        var verifiedMD5: [String: String] = [:]
 
         for (index, file) in files.enumerated() {
             let path = "\(directory)/\(file.plan.outputName)"
@@ -910,41 +990,60 @@ final class ESP32Updater: ObservableObject {
                     NSLocalizedDescriptionKey: "Couldn't verify \(file.plan.outputName) after two writes."
                 ])
             }
+            verifiedMD5[file.plan.outputName] = expectedMD5
             completed += Int64(file.data.count)
         }
+        return verifiedMD5
     }
 
-    private func replaceAtomically(target: String, with staging: String) async throws {
-        let hadTarget = await storage.exists(target)
-        let targetName = Self.folderName(from: target)
-        let backup = "\(Self.archiveDir)/.\(targetName).replacement-\(UUID().uuidString.lowercased())"
+    private func makeFlashPackageManifest(
+        board: Board,
+        tag: String,
+        files: [DownloadedFile],
+        verifiedMD5: [String: String]
+    ) throws -> ESP32FlashPackageManifest {
+        let segments = try files.map { file -> ESP32FlashPackageManifest.Segment in
+            guard let role = file.plan.role,
+                  let offset = file.plan.offset,
+                  let expectedSHA256 = file.plan.expectedSHA256,
+                  let md5 = verifiedMD5[file.plan.outputName] else {
+                throw ESP32FlashPackageError.invalidSegment(file.plan.outputName)
+            }
+            return ESP32FlashPackageManifest.Segment(
+                role: role,
+                fileName: file.plan.outputName,
+                offset: offset,
+                size: file.data.count,
+                sha256: expectedSHA256.lowercased(),
+                md5: md5.lowercased())
+        }.sorted { $0.offset < $1.offset }
 
-        if hadTarget {
-            try await storage.makeDirectory(Self.archiveDir)
-            try await storage.move(target, to: backup)
+        guard let installerManifest = latestManifest else {
+            throw ESP32FlashPackageError.invalidBoard(board.key)
         }
-        do {
-            try await storage.move(staging, to: target)
-        } catch {
-            if hadTarget {
-                do {
-                    try await storage.move(backup, to: target)
-                } catch let rollbackError {
-                    throw CocoaError(.fileWriteUnknown, userInfo: [
-                        NSLocalizedDescriptionKey:
-                            "Package replacement failed and rollback failed: \(rollbackError.localizedDescription)"
-                    ])
-                }
-            }
-            throw error
-        }
-        if hadTarget {
-            do {
-                try await storage.delete(backup, recursive: true)
-            } catch {
-                elog.error("replacement backup cleanup: \(error.localizedDescription, privacy: .public)")
-            }
-        }
+        let packageBoard = try Self.packageBoard(for: board.key, manifest: installerManifest)
+        let isC5 = board.key == "esp32c5devkitc1"
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let companionVersion = Bundle.main.object(
+            forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "development"
+        let manifest = ESP32FlashPackageManifest(
+            schemaVersion: ESP32FlashPackageManifest.currentSchemaVersion,
+            packageKind: ESP32FlashPackageManifest.currentPackageKind,
+            board: packageBoard,
+            firmware: .init(
+                version: tag,
+                sourceRepository: Self.repo,
+                sourceRelease: "https://github.com/\(Self.repo)/releases/tag/\(tag)"),
+            recipe: .init(
+                id: isC5 ? "c5-compat-v1" : "upstream-factory-v1",
+                status: isC5 ? "hardware-accepted" : "authoritative"),
+            erasePolicy: "segments",
+            segments: segments,
+            createdAt: formatter.string(from: Date()),
+            createdBy: .init(application: "TumoCompanion", version: companionVersion))
+        try manifest.validate()
+        return manifest
     }
 
     private static func fileSize(_ bytes: Int64) -> String {

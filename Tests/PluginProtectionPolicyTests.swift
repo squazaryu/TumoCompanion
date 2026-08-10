@@ -42,7 +42,7 @@ final class PluginProtectionPolicyTests: XCTestCase {
         let expected: Set<String> = [
             "ai_dashboard", "app_bridge_terminal", "arf_frequency_analyzer",
             "arf_subghz_full", "ble_gatt_lab", "claude_buddy", "claude_remote_ble",
-            "esp32_wifi_marauder",
+            "esp_flasher", "esp32_wifi_marauder",
             "field_logger", "flipper_companion", "flipper_relay",
             "module_one_cockpit", "module_one_sensor_logger", "nfc_ccid_bridge",
             "protocol_compiler", "proto_pirate",
@@ -71,6 +71,19 @@ final class PluginProtectionPolicyTests: XCTestCase {
         XCTAssertTrue(PluginProtectionPolicy.isProtected(
             name: "claude_remote_ble",
             remotePath: "/ext/apps/Bluetooth/claude_remote_ble.fap",
+            excluded: PluginUpdater.builtInExcluded,
+            unprotectedBuiltIns: []))
+    }
+
+    func testAllThePluginsCannotOverwriteTumoflipESPFlasher() {
+        let routedPath = PluginInstallRouting.targetPath(
+            for: "/ext/apps/GPIO/esp_flasher.fap")
+        XCTAssertEqual(
+            routedPath,
+            "/ext/apps/Module One/ESP32 Wi-Fi/esp_flasher.fap")
+        XCTAssertTrue(PluginProtectionPolicy.isProtected(
+            name: "esp_flasher",
+            remotePath: routedPath,
             excluded: PluginUpdater.builtInExcluded,
             unprotectedBuiltIns: []))
     }
