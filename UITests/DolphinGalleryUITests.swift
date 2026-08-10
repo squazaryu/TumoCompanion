@@ -154,6 +154,32 @@ final class FWPackagesActionBarUITests: XCTestCase {
     }
 }
 
+final class ESP32ArchivedRedownloadUITests: XCTestCase {
+    func testArchivedPackageKeepsRedownloadActionVisible() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-onboardingDone", "YES",
+            "-esp32-archived-redownload-qa",
+        ]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Archived source"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["v1.14.1"].exists)
+        XCTAssertTrue(
+            app.buttons.matching(
+                NSPredicate(format: "label CONTAINS[c] %@", "Download again")
+            ).firstMatch.exists)
+        XCTAssertTrue(
+            app.staticTexts["Creates a new active package. The archived copy stays unchanged."].exists)
+        XCTAssertFalse(app.staticTexts["No Marauder flash folders found under esp_flasher."].exists)
+
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = "ESP32 archived package redownload"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+}
+
 final class QualityPassUITests: XCTestCase {
     func testLongFirmwareVersionWrapsWithoutClipping() {
         let app = XCUIApplication()

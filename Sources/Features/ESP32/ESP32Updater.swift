@@ -137,6 +137,23 @@ final class ESP32Updater: ObservableObject {
     private(set) var manifestError: String?
     private var releaseHasManifest = false
 
+#if DEBUG
+    static func archivedRedownloadQA() -> ESP32Updater {
+        let updater = ESP32Updater()
+        updater.latestTag = "v1.14.1"
+        updater.archivedBoards = [Board(
+            folder: "\(archiveDir)/module_one_v6_1_v1_14_1_manual",
+            base: "module_one_v6_1_v1_14_1",
+            display: "Module One v6.1",
+            key: "v6_1",
+            currentVersion: "v1.14.1",
+            appName: "esp32_marauder_v1_14_1_v6_1_0x10000.bin",
+            bootFiles: ["bootloader_0x1000.bin", "partitions_0x8000.bin"])]
+        updater.status = "Up to date (v1.14.1)"
+        return updater
+    }
+#endif
+
     var verifiedPackageAvailable: Bool {
         releaseHasManifest && latestManifest != nil && manifestError == nil
     }
@@ -316,6 +333,35 @@ final class ESP32Updater: ObservableObject {
         }.sorted { $0.display < $1.display }
     }
 
+    /// One usable download source per board key. Prefer the active package because
+    /// legacy releases may need to copy its boot files forward; when every package
+    /// was archived, fall back to the newest archived copy. Downloading from that
+    /// fallback always stages a new active folder and leaves the archive untouched.
+    var stagingBoards: [Board] {
+        Self.selectStagingBoards(active: boards, archived: archivedBoards)
+    }
+
+    nonisolated static func selectStagingBoards(active: [Board], archived: [Board]) -> [Board] {
+        let activeByKey = Dictionary(grouping: active, by: \.key)
+        let archivedByKey = Dictionary(grouping: archived, by: \.key)
+        let keys = Set(activeByKey.keys).union(archivedByKey.keys)
+
+        return keys.compactMap { key in
+            let activeSource = activeByKey[key]?.sorted {
+                isNewer($0.currentVersion, than: $1.currentVersion)
+            }.first
+            if let activeSource { return activeSource }
+            return archivedByKey[key]?.sorted {
+                isNewer($0.currentVersion, than: $1.currentVersion)
+            }.first
+        }
+        .sorted { $0.display.localizedCaseInsensitiveCompare($1.display) == .orderedAscending }
+    }
+
+    func isArchived(_ board: Board) -> Bool {
+        archivedBoards.contains(board)
+    }
+
     /// Older staged folders (every folder except the newest of each board) — the archive.
     var olderBoards: [Board] {
         let keep = Set(currentBoards.map(\.id))
@@ -328,7 +374,7 @@ final class ESP32Updater: ObservableObject {
     /// True when any detected board's installed version differs from the latest release.
     var updateAvailable: Bool {
         guard let latest = latestTag else { return false }
-        return currentBoards.contains { Self.norm($0.currentVersion) != Self.norm(latest) }
+        return stagingBoards.contains { Self.norm($0.currentVersion) != Self.norm(latest) }
     }
 
     func newVersion(for board: Board) -> Bool {

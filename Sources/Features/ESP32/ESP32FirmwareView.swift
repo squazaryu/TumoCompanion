@@ -1,18 +1,27 @@
 import SwiftUI
 
+@MainActor
 struct ESP32FirmwareView: View {
     @EnvironmentObject var ble: FlipperBLE
     @EnvironmentObject var transfer: TransferChannelStore
-    @StateObject private var up = ESP32Updater()
+    @StateObject private var up: ESP32Updater
     @State private var expandedVersionGroups: Set<String> = []
     @State private var deleteTarget: ESP32Updater.Board?
     @State private var deleteAll = false
     @State private var deleteArchived = false
 
+    init() {
+        _up = StateObject(wrappedValue: ESP32Updater())
+    }
+
+    init(updater: ESP32Updater) {
+        _up = StateObject(wrappedValue: updater)
+    }
+
     var body: some View {
         CardScroll {
             statusCard
-            ForEach(up.currentBoards) { b in boardCard(b) }
+            ForEach(up.stagingBoards) { b in boardCard(b) }
             if !up.versionGroups.isEmpty { versionManagerCard }
             if up.boards.isEmpty && up.archivedBoards.isEmpty && !up.busy { emptyCard }
         }
@@ -99,13 +108,16 @@ struct ESP32FirmwareView: View {
 
     private func boardCard(_ b: ESP32Updater.Board) -> some View {
         let newer = up.newVersion(for: b)
+        let archivedSource = up.isArchived(b)
         return SectionCard(title: b.display, systemImage: "memorychip",
                            accessory: AnyView(
                             StatusPill(text: newer ? "Update" : "Latest",
                                        color: newer ? .orange : .green,
                                        systemImage: newer ? "arrow.down.circle.fill" : "checkmark.circle.fill"))) {
             HStack {
-                Text("Installed").font(.caption).foregroundStyle(.secondary)
+                Text(archivedSource ? "Archived source" : "Active package")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 Spacer()
                 Text(b.currentVersion).font(.caption).fontWeight(.medium)
             }
@@ -130,6 +142,12 @@ struct ESP32FirmwareView: View {
                     Task { await up.install(b) }
                 }
                 .disabled(up.busy || !hasFileChannel || !up.canStageLatest)
+            }
+            if archivedSource {
+                Text("Creates a new active package. The archived copy stays unchanged.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Text("Board key: \(b.key)").font(.caption2).foregroundStyle(.secondary)
         }
