@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.10.10",
+      "version": "1.10.11",
       "versionDate": "2026-08-10",
-      "versionDescription": "Restores ESP32 firmware re-download after active installers are archived: the newest archived package keeps the board card and Download again action, while re-staging creates a fresh active verified package without changing the archive.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.10/TumoCompanion-unsigned.ipa",
-      "size": 29570362,
+      "versionDescription": "Adds verified automatic ESP Flasher packages for C5 and Module One v6.1 with exact board recipes, atomic replacement, SHA-256 and on-device MD5 checks. Other boards remain available through Manual Flash.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.11/TumoCompanion-unsigned.ipa",
+      "size": 29608321,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.10.11",
+          "date": "2026-08-10",
+          "localizedDescription": "Adds verified automatic ESP Flasher packages for C5 and Module One v6.1 with exact board recipes, atomic replacement, SHA-256 and on-device MD5 checks. Other boards remain available through Manual Flash.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.11/TumoCompanion-unsigned.ipa",
+          "size": 29608321,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.10.10",
           "date": "2026-08-10",
