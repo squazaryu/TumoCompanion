@@ -69,6 +69,47 @@ final class ESP32UpdaterTests: XCTestCase {
         XCTAssertEqual(ESP32Updater.folderName(from: "plain_manual"), "plain_manual")
     }
 
+    func testArchivedOnlyBoardRemainsAvailableForRedownload() {
+        let archived = board(
+            folder: "/ext/apps_data/esp_flasher/_archive/module_one_v6_1_v1_14_1_manual",
+            version: "v1.14.1",
+            key: "v6_1")
+
+        let selected = ESP32Updater.selectStagingBoards(active: [], archived: [archived])
+
+        XCTAssertEqual(selected, [archived])
+    }
+
+    func testActivePackageWinsOverNewerArchivedCopyAsLegacySource() {
+        let active = board(
+            folder: "/ext/apps_data/esp_flasher/module_one_v6_1_v1_13_0_manual",
+            version: "v1.13.0",
+            key: "v6_1")
+        let archived = board(
+            folder: "/ext/apps_data/esp_flasher/_archive/module_one_v6_1_v1_14_1_manual",
+            version: "v1.14.1",
+            key: "v6_1")
+
+        let selected = ESP32Updater.selectStagingBoards(active: [active], archived: [archived])
+
+        XCTAssertEqual(selected, [active])
+    }
+
+    func testNewestArchivedPackageIsUsedWhenNoActivePackageExists() {
+        let old = board(
+            folder: "/ext/apps_data/esp_flasher/_archive/module_one_v6_1_v1_13_0_manual",
+            version: "v1.13.0",
+            key: "v6_1")
+        let latest = board(
+            folder: "/ext/apps_data/esp_flasher/_archive/module_one_v6_1_v1_14_1_manual",
+            version: "v1.14.1",
+            key: "v6_1")
+
+        let selected = ESP32Updater.selectStagingBoards(active: [], archived: [old, latest])
+
+        XCTAssertEqual(selected, [latest])
+    }
+
     func testAuthoritativeInstallerManifestProducesCompleteFactoryPackage() throws {
         let manifest = try ESP32Updater.decodeManifest(manifestData(), expectedVersion: "v1.14.1")
         let sizes = [
@@ -290,5 +331,16 @@ final class ESP32UpdaterTests: XCTestCase {
             "esp32_marauder_v1_14_1_20260801_esp32c5devkitc1.bin":
                 "cd278319c3850fb615cf8fe432055c38c30cbaf59a80de7aa4d0c38aa928e95b",
         ]
+    }
+
+    private func board(folder: String, version: String, key: String) -> ESP32Updater.Board {
+        ESP32Updater.Board(
+            folder: folder,
+            base: "module_one_\(key)_\(version.replacingOccurrences(of: ".", with: "_"))",
+            display: "module_one_\(key)",
+            key: key,
+            currentVersion: version,
+            appName: "esp32_marauder_\(version)_\(key)_0x10000.bin",
+            bootFiles: ["bootloader_0x1000.bin", "partitions_0x8000.bin"])
     }
 }

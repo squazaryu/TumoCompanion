@@ -80,6 +80,10 @@ struct RootView: View {
 #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("-fw-packages-action-bar-qa") {
             FWPackagesActionBarQAView()
+        } else if ProcessInfo.processInfo.arguments.contains("-esp32-archived-redownload-qa") {
+            NavigationStack {
+                ESP32FirmwareView(updater: .archivedRedownloadQA())
+            }
         } else if ProcessInfo.processInfo.arguments.contains("-device-info-layout-qa") {
             DeviceInfoLayoutQAView()
         } else if ProcessInfo.processInfo.arguments.contains("-live-activity-layout-qa") {
