@@ -114,7 +114,8 @@ struct ESP32FlashPackageManifest: Codable, Equatable {
                 "application": 0x10000,
             ]
             let bootloader = segments.first { $0.role == "bootloader" }
-            guard board.chipFamily == "esp32c5",
+            guard board.modelId == "esp32-c5-devkitc-1",
+                  board.chipFamily == "esp32c5",
                   recipe.id == "c5-compat-v1",
                   recipe.status == "hardware-accepted",
                   bootloader?.size == 20_464,
@@ -135,7 +136,8 @@ struct ESP32FlashPackageManifest: Codable, Equatable {
                     "ota-data": 0xe000,
                     "application": 0x10000,
                 ]
-                guard board.chipFamily == "esp32",
+                guard board.modelId == "marauder-v6-1",
+                      board.chipFamily == "esp32",
                       segments.allSatisfy({ expectedOffsets[$0.role] == $0.offset }) else {
                     throw ESP32FlashPackageError.invalidSegments(board.key)
                 }

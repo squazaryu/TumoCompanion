@@ -40,6 +40,15 @@ final class ESP32FlashPackageManifestTests: XCTestCase {
         assertInvalid(makeManifest(boardKey: "v6_1", segments: segments))
     }
 
+    func testRejectsUnexpectedModelIDsForSupportedProfiles() {
+        assertInvalid(makeManifest(
+            boardKey: "esp32c5devkitc1",
+            modelId: "esp32-c5-devkitc-1-clone"))
+        assertInvalid(makeManifest(
+            boardKey: "v6_1",
+            modelId: "marauder-v6-2"))
+    }
+
     func testRejectsTraversalAndDuplicateFileNames() {
         var traversal = makeManifest(boardKey: "v6_1").segments
         traversal[0] = segment(role: "bootloader", fileName: "../bootloader.bin", offset: 0x1000)
@@ -260,6 +269,7 @@ final class ESP32FlashPackageManifestTests: XCTestCase {
 
     private func makeManifest(
         boardKey: String,
+        modelId: String? = nil,
         segments: [ESP32FlashPackageManifest.Segment]? = nil
     ) -> ESP32FlashPackageManifest {
         let isC5 = boardKey == "esp32c5devkitc1"
@@ -289,7 +299,7 @@ final class ESP32FlashPackageManifestTests: XCTestCase {
             packageKind: "tumoflip-esp32-flash-package",
             board: .init(
                 key: boardKey,
-                modelId: isC5 ? "esp32-c5-devkitc-1" : "marauder-v6-1",
+                modelId: modelId ?? (isC5 ? "esp32-c5-devkitc-1" : "marauder-v6-1"),
                 displayName: isC5 ? "ESP32-C5-DevKitC-1" : "Marauder v6.1",
                 chipFamily: isC5 ? "esp32c5" : "esp32"),
             firmware: .init(
