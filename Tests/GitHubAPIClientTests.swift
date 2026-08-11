@@ -49,6 +49,44 @@ final class GitHubAPIClientTests: XCTestCase {
         XCTAssertEqual(requests[1].value(forHTTPHeaderField: "X-GitHub-Api-Version"), "2022-11-28")
     }
 
+    func testConnectedAccountAddsBearerToken() async throws {
+        let credentials = MemoryGitHubCredentialStore(token: "gho_test_token")
+        let transport = StubTransport([
+            .success(response(200, data: json("v1"))),
+        ])
+        let client = client(
+            directory: temporaryDirectory(),
+            credentials: credentials,
+            transport: transport
+        )
+
+        _ = try await client.data(from: url)
+
+        let requests = await transport.recordedRequests()
+        let request = try XCTUnwrap(requests.first)
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer gho_test_token")
+    }
+
+    func testUnauthorizedResponseDeletesCredentialAndFailsClosed() async throws {
+        let credentials = MemoryGitHubCredentialStore(token: "gho_expired")
+        let transport = StubTransport([
+            .success(response(401)),
+        ])
+        let client = client(
+            directory: temporaryDirectory(),
+            credentials: credentials,
+            transport: transport
+        )
+
+        do {
+            _ = try await client.data(from: url)
+            XCTFail("Expected authentication failure")
+        } catch let error as GitHubAPIError {
+            XCTAssertEqual(error, .authenticationExpired)
+        }
+        XCTAssertNil(try credentials.readToken())
+    }
+
     func testRateLimitReturnsLastValidatedCatalog() async throws {
         let directory = temporaryDirectory()
         let clock = TestClock(Date(timeIntervalSince1970: 1_000))
@@ -163,12 +201,14 @@ final class GitHubAPIClientTests: XCTestCase {
     private func client(
         directory: URL,
         clock: TestClock = TestClock(Date(timeIntervalSince1970: 1_000)),
+        credentials: any GitHubCredentialStoring = MemoryGitHubCredentialStore(),
         transport: StubTransport
     ) -> GitHubAPIClient {
         GitHubAPIClient(
             cacheDirectory: directory,
             defaultMaxAge: 60,
             now: { clock.now },
+            credentials: credentials,
             sender: { request in try await transport.send(request) }
         )
     }
@@ -190,6 +230,27 @@ final class GitHubAPIClientTests: XCTestCase {
         headers: [String: String] = [:]
     ) -> GitHubHTTPResponse {
         GitHubHTTPResponse(statusCode: status, headers: headers, data: data)
+    }
+}
+
+private final class MemoryGitHubCredentialStore: GitHubCredentialStoring, @unchecked Sendable {
+    private let lock = NSLock()
+    private var token: String?
+
+    init(token: String? = nil) {
+        self.token = token
+    }
+
+    func readToken() throws -> String? {
+        lock.lock()
+        defer { lock.unlock() }
+        return token
+    }
+
+    func writeToken(_ token: String?) throws {
+        lock.lock()
+        self.token = token
+        lock.unlock()
     }
 }
 

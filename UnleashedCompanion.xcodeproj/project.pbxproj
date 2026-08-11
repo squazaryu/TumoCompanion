@@ -19,6 +19,7 @@
 		0D58380E2D1F29BB7FF7DF4B /* TumoflipStatusTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B5D803E53BDA356E1AA5784 /* TumoflipStatusTests.swift */; };
 		0D820CE7564243D692B1A3E9 /* WiFiNetworkMapPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4178D107C8E9CCE11C051E5A /* WiFiNetworkMapPresentationTests.swift */; };
 		0DC75147EFFA11291AB3D10D /* ESP32FirmwareView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1B731E78843D6D04ECF5B60 /* ESP32FirmwareView.swift */; };
+		0F495F54248E0EA637815AA8 /* GitHubOAuthClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2462BE494E6F4BA685D1DD95 /* GitHubOAuthClient.swift */; };
 		1271969636C8F7AE272D9529 /* storage.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33D8A4DF0DF2880CD4231FB /* storage.pb.swift */; };
 		178F947E4834FD231F84D405 /* BuildInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7DAA192B026B24A4907283A /* BuildInfo.swift */; };
 		19DFE5895853A9679A01976A /* USBStorageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCE7269E5AB13331C01704F7 /* USBStorageTests.swift */; };
@@ -29,6 +30,7 @@
 		255DDC35E88194CCE38D71CB /* DeviceServicesUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24AE55444A9A10FFD0C9F3C5 /* DeviceServicesUITests.swift */; };
 		26FF73B8130C693F08F1E0ED /* UpdatesCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECF30EB507BBE4F21FC1E85D /* UpdatesCoordinator.swift */; };
 		27599EE38999934EC1A45783 /* SberCloud.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76878DEC8BC405158A23294C /* SberCloud.swift */; };
+		28702C890E2997A5A584C813 /* GitHubCredentials.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D35965EF8F66DCC57BE7E33 /* GitHubCredentials.swift */; };
 		2B45A22CD9A1C8B210BE241C /* UnleashedShared.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B269822737BE205267576415 /* UnleashedShared.framework */; };
 		2C2CD7524360C29B07886293 /* TumoNet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AA09E6B23CF0D4774C8E449 /* TumoNet.swift */; };
 		2ECBCE8FD84F73551EC51D94 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF110587D01496E5B9809C9F /* OnboardingView.swift */; };
@@ -50,6 +52,8 @@
 		3E3E586D830439E2A9A3C8F9 /* CompanionBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 299EFF336F47935AE03E9500 /* CompanionBridge.swift */; };
 		3F042FA8BCF01CBAD8377161 /* DolphinGalleryModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2223CB55367C869D06A5001D /* DolphinGalleryModel.swift */; };
 		3FFE12E9A014C7F05D300AAB /* MarauderResultViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52741A242FCEED74C342D4D6 /* MarauderResultViews.swift */; };
+		4657F289AE20F68598CF1F23 /* GitHubOAuthClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA766CD63AD11289FB5F0DC8 /* GitHubOAuthClientTests.swift */; };
+		46936C2B1C79FA9536851B40 /* GitHubAuthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EBD710F983D218FB913E435 /* GitHubAuthStore.swift */; };
 		46EF26B33502AED58F1E687A /* MarauderPcap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95DB35AEEDE67D42752C5953 /* MarauderPcap.swift */; };
 		48276A161253EB6EEB942020 /* WiFiNetworkClusterMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1BBC0C91333C23488DCC52C /* WiFiNetworkClusterMap.swift */; };
 		497514C65E0284BC9C754AC1 /* PluginSelectionPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34BC23F6FD22122831005AA0 /* PluginSelectionPolicyTests.swift */; };
@@ -141,6 +145,7 @@
 		D1F9B1FCB9746D60A07E5702 /* CustomizeHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B45DE40E2BC405AC4C85567B /* CustomizeHomeView.swift */; };
 		D5D267A9E0553575932192E6 /* AppBridgeConsole.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C77746A516D982B72D1FB47 /* AppBridgeConsole.swift */; };
 		D6ACA63F88F6163391E1E1FD /* ESP32FlashPackageManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9043704DE321E7D7FCC7972F /* ESP32FlashPackageManifest.swift */; };
+		D73CC8F61AEDB3DF57991AFA /* GitHubAccessCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19E12C880E5E2F99397122BC /* GitHubAccessCard.swift */; };
 		D856CB4BFED1F96B396EED09 /* gui.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B425A6BF85037300E8AFB83 /* gui.pb.swift */; };
 		DBF198850F9BCC58CE887DCF /* FirmwareCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63CF454F5F1DBADC991DD631 /* FirmwareCatalogTests.swift */; };
 		E0452138F079A133810BE595 /* TumoSpectrumReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3C85FA6B539178BE8FD40A5 /* TumoSpectrumReport.swift */; };
@@ -160,6 +165,7 @@
 		F8120678A5AB6773D39227A6 /* RuntimeDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D7F2E9465545B42943BBBE2 /* RuntimeDiagnostics.swift */; };
 		F87A64CF22F8A48A6E86EFA2 /* DevicesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCE61D0B4EB2C9925E58FA87 /* DevicesView.swift */; };
 		FD2037726A6354E2F8C9A7C1 /* BuddyRelay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AE5EB186755A19F769225F6 /* BuddyRelay.swift */; };
+		FF7338AC7B807DA5FD9CB559 /* GitHubAuthStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A54ADE2A988A392B1687C80 /* GitHubAuthStoreTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -235,10 +241,12 @@
 		0C80C0FD84155F0D33B39D83 /* desktop.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = desktop.pb.swift; sourceTree = "<group>"; };
 		18979E931D5ADCCC963ABB98 /* TumoVMNFCContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoVMNFCContract.swift; sourceTree = "<group>"; };
 		18E9E2A54A0286AF6188F9A9 /* FapMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FapMetadata.swift; sourceTree = "<group>"; };
+		19E12C880E5E2F99397122BC /* GitHubAccessCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubAccessCard.swift; sourceTree = "<group>"; };
 		1BEE7D9848B6ECE40FE2FF04 /* MediaRemoteController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaRemoteController.swift; sourceTree = "<group>"; };
 		1E6D8B0369156C577A846FC0 /* ScreenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenView.swift; sourceTree = "<group>"; };
 		1EA9037CE5911F4E4DF8951C /* InstallActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstallActivityAttributes.swift; sourceTree = "<group>"; };
 		2223CB55367C869D06A5001D /* DolphinGalleryModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DolphinGalleryModel.swift; sourceTree = "<group>"; };
+		2462BE494E6F4BA685D1DD95 /* GitHubOAuthClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubOAuthClient.swift; sourceTree = "<group>"; };
 		2485BA585EAEAF510AE43475 /* system.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = system.pb.swift; sourceTree = "<group>"; };
 		24AE55444A9A10FFD0C9F3C5 /* DeviceServicesUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceServicesUITests.swift; sourceTree = "<group>"; };
 		24DE2B5AF5B3FA4C77EEF6AB /* SberLoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SberLoginView.swift; sourceTree = "<group>"; };
@@ -259,6 +267,7 @@
 		3AA09E6B23CF0D4774C8E449 /* TumoNet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoNet.swift; sourceTree = "<group>"; };
 		3B35CB407A050A2BA05BFED2 /* FlipperBackup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlipperBackup.swift; sourceTree = "<group>"; };
 		3B425A6BF85037300E8AFB83 /* gui.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = gui.pb.swift; sourceTree = "<group>"; };
+		3D35965EF8F66DCC57BE7E33 /* GitHubCredentials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubCredentials.swift; sourceTree = "<group>"; };
 		3ECE4D716C1F73A551397D21 /* InstallActivityAttributesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstallActivityAttributesTests.swift; sourceTree = "<group>"; };
 		3F693046B543D525DC64F4D9 /* AIRadarRelay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIRadarRelay.swift; sourceTree = "<group>"; };
 		3FDC334B8785EB5B2A51B922 /* CatalogListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogListView.swift; sourceTree = "<group>"; };
@@ -301,7 +310,9 @@
 		85A71B8014DF7BCBEAE77C5A /* TumoNetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoNetView.swift; sourceTree = "<group>"; };
 		8697965C8EA5F8D768000FC9 /* TumoflipUpdaterService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoflipUpdaterService.swift; sourceTree = "<group>"; };
 		87F2C64ACDABA1AEFFB7CCD8 /* PluginUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginUpdater.swift; sourceTree = "<group>"; };
+		8A54ADE2A988A392B1687C80 /* GitHubAuthStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubAuthStoreTests.swift; sourceTree = "<group>"; };
 		8D70BBAA6C69E3FCD8488170 /* HomeAssistantDiscoveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeAssistantDiscoveryTests.swift; sourceTree = "<group>"; };
+		8EBD710F983D218FB913E435 /* GitHubAuthStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubAuthStore.swift; sourceTree = "<group>"; };
 		8F246F25BA68E90EAD73408E /* MarauderLiveAggregationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarauderLiveAggregationTests.swift; sourceTree = "<group>"; };
 		9043704DE321E7D7FCC7972F /* ESP32FlashPackageManifest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ESP32FlashPackageManifest.swift; sourceTree = "<group>"; };
 		90D1067254AC076FCC557F87 /* MarauderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarauderView.swift; sourceTree = "<group>"; };
@@ -375,6 +386,7 @@
 		F64FBF61D7D7605A7E126464 /* WiFiMapperEstimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WiFiMapperEstimator.swift; sourceTree = "<group>"; };
 		F7DFAFD2A63623B73457A3B2 /* InstallActivityController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstallActivityController.swift; sourceTree = "<group>"; };
 		F9183EF8E1FF8617A2B48EA8 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		FA766CD63AD11289FB5F0DC8 /* GitHubOAuthClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubOAuthClientTests.swift; sourceTree = "<group>"; };
 		FB7E01B87B6C90282CEE9FE0 /* SettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsStore.swift; sourceTree = "<group>"; };
 		FCB5C504F3756F796BB35073 /* DolphinGalleryUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DolphinGalleryUITests.swift; sourceTree = "<group>"; };
 		FCE7269E5AB13331C01704F7 /* USBStorageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = USBStorageTests.swift; sourceTree = "<group>"; };
@@ -561,6 +573,7 @@
 		5EAAD3C16E5F87117CF9DF87 /* Settings */ = {
 			isa = PBXGroup;
 			children = (
+				19E12C880E5E2F99397122BC /* GitHubAccessCard.swift */,
 				BF110587D01496E5B9809C9F /* OnboardingView.swift */,
 				FB7E01B87B6C90282CEE9FE0 /* SettingsStore.swift */,
 				824EE059E5BDBC0F8B7419E8 /* SettingsView.swift */,
@@ -656,6 +669,8 @@
 				406855A4F6EC92517E41CF68 /* FirmwareArchiveTests.swift */,
 				63CF454F5F1DBADC991DD631 /* FirmwareCatalogTests.swift */,
 				BF7F5D1B21FCD35496F56E26 /* GitHubAPIClientTests.swift */,
+				8A54ADE2A988A392B1687C80 /* GitHubAuthStoreTests.swift */,
+				FA766CD63AD11289FB5F0DC8 /* GitHubOAuthClientTests.swift */,
 				8D70BBAA6C69E3FCD8488170 /* HomeAssistantDiscoveryTests.swift */,
 				3ECE4D716C1F73A551397D21 /* InstallActivityAttributesTests.swift */,
 				8F246F25BA68E90EAD73408E /* MarauderLiveAggregationTests.swift */,
@@ -711,6 +726,9 @@
 				856D8627B88920587D56B850 /* FirmwareLibrary.swift */,
 				CFD10DB620EC18749FE46591 /* FirmwareLibraryView.swift */,
 				FDC48789DECAE2A030CB71DE /* GitHubAPIClient.swift */,
+				8EBD710F983D218FB913E435 /* GitHubAuthStore.swift */,
+				3D35965EF8F66DCC57BE7E33 /* GitHubCredentials.swift */,
+				2462BE494E6F4BA685D1DD95 /* GitHubOAuthClient.swift */,
 				F7DFAFD2A63623B73457A3B2 /* InstallActivityController.swift */,
 				CBA5FCA0F80809900471F32E /* PluginUpdateMonitor.swift */,
 				87F2C64ACDABA1AEFFB7CCD8 /* PluginUpdater.swift */,
@@ -1077,6 +1095,8 @@
 				CCE4664E2C132A8662B2F7F3 /* FirmwareArchiveTests.swift in Sources */,
 				DBF198850F9BCC58CE887DCF /* FirmwareCatalogTests.swift in Sources */,
 				597368D182EF7A5FD2E780FA /* GitHubAPIClientTests.swift in Sources */,
+				FF7338AC7B807DA5FD9CB559 /* GitHubAuthStoreTests.swift in Sources */,
+				4657F289AE20F68598CF1F23 /* GitHubOAuthClientTests.swift in Sources */,
 				561C47A5EC74F7DF05D11A2B /* HomeAssistantDiscoveryTests.swift in Sources */,
 				55DF4154B997B215DD5CF9C6 /* InstallActivityAttributesTests.swift in Sources */,
 				558EF6327C3F312D4C1A26B7 /* MarauderLiveAggregationTests.swift in Sources */,
@@ -1157,6 +1177,10 @@
 				53CB5CFA2958BBC762C9260C /* FlipperStorage.swift in Sources */,
 				B7D3F97F8516475BDCB9C56A /* FlipperSystem.swift in Sources */,
 				0091E2386B3AC40E8BD81D3B /* GitHubAPIClient.swift in Sources */,
+				D73CC8F61AEDB3DF57991AFA /* GitHubAccessCard.swift in Sources */,
+				46936C2B1C79FA9536851B40 /* GitHubAuthStore.swift in Sources */,
+				28702C890E2997A5A584C813 /* GitHubCredentials.swift in Sources */,
+				0F495F54248E0EA637815AA8 /* GitHubOAuthClient.swift in Sources */,
 				B6DB93E03F6FE5C851F2BD8F /* HomeAssistantDiscovery.swift in Sources */,
 				9D4526D85608E2635C63D0D8 /* HomeLayout.swift in Sources */,
 				3B8F9FDDE4E195CFAB92B2A1 /* InstallActivityController.swift in Sources */,
@@ -1290,7 +1314,7 @@
 				CODE_SIGNING_REQUIRED = NO;
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 219;
+				CURRENT_PROJECT_VERSION = 220;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -1309,8 +1333,9 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				GITHUB_OAUTH_CLIENT_ID = Ov23liKmKXYcliMvoCgL;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 1.10.12;
+				MARKETING_VERSION = 1.10.13;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -1515,7 +1540,7 @@
 				CODE_SIGNING_REQUIRED = NO;
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 219;
+				CURRENT_PROJECT_VERSION = 220;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = "";
 				ENABLE_NS_ASSERTIONS = NO;
@@ -1528,8 +1553,9 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				GITHUB_OAUTH_CLIENT_ID = Ov23liKmKXYcliMvoCgL;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 1.10.12;
+				MARKETING_VERSION = 1.10.13;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";

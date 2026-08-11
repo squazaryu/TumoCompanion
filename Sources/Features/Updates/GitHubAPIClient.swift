@@ -18,6 +18,7 @@ enum GitHubAPIError: LocalizedError, Equatable {
     case invalidJSON
     case responseTooLarge
     case transportFailure
+    case authenticationExpired
     case rateLimited(resetAt: Date?)
     case httpStatus(Int)
 
@@ -31,6 +32,8 @@ enum GitHubAPIError: LocalizedError, Equatable {
             return "GitHub returned a catalog that is too large."
         case .transportFailure:
             return "GitHub is unavailable. Check your connection and try again."
+        case .authenticationExpired:
+            return "GitHub sign-in expired. Reconnect your account in Settings."
         case .rateLimited(let resetAt):
             if let resetAt {
                 let formatter = DateFormatter()
@@ -55,12 +58,13 @@ struct GitHubHTTPResponse: @unchecked Sendable {
     }
 }
 
-/// Shared, quota-conscious access to GitHub's unauthenticated REST API.
+/// Shared, quota-conscious access to GitHub's REST API.
 ///
 /// Successful JSON responses are cached on disk and revalidated with ETag. Calls for
 /// the same URL share one in-flight request, so opening Updates cannot make Firmware,
-/// FW Packages and background monitors consume duplicate quota. A previously validated
-/// response remains usable during a transient outage or a 403/429 rate-limit response.
+/// FW Packages and background monitors consume duplicate quota. When the user connects
+/// GitHub, the OAuth token is read from Keychain and applied to every request. A previously
+/// validated response remains usable during a transient outage or a rate-limit response.
 actor GitHubAPIClient {
     typealias Sender = @Sendable (URLRequest) async throws -> GitHubHTTPResponse
 
@@ -80,6 +84,7 @@ actor GitHubAPIClient {
     private let defaultMaxAge: TimeInterval
     private let now: @Sendable () -> Date
     private let sender: Sender
+    private let credentials: any GitHubCredentialStoring
     private var memoryCache: [String: CacheEntry] = [:]
     private var inFlight: [String: Task<GitHubAPIResult, Error>] = [:]
 
@@ -87,11 +92,13 @@ actor GitHubAPIClient {
         cacheDirectory: URL = GitHubAPIClient.defaultCacheDirectory(),
         defaultMaxAge: TimeInterval = 5 * 60,
         now: @escaping @Sendable () -> Date = { Date() },
+        credentials: any GitHubCredentialStoring = KeychainGitHubCredentialStore.shared,
         sender: @escaping Sender = GitHubAPIClient.liveSender
     ) {
         self.cacheDirectory = cacheDirectory
         self.defaultMaxAge = defaultMaxAge
         self.now = now
+        self.credentials = credentials
         self.sender = sender
     }
 
@@ -134,6 +141,9 @@ actor GitHubAPIClient {
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         request.setValue(Self.apiVersion, forHTTPHeaderField: "X-GitHub-Api-Version")
         request.setValue(Self.userAgent, forHTTPHeaderField: "User-Agent")
+        if let token = try? credentials.readToken() {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
         if let etag = cached?.etag, !etag.isEmpty {
             request.setValue(etag, forHTTPHeaderField: "If-None-Match")
         }
@@ -176,6 +186,14 @@ actor GitHubAPIClient {
             let refreshed = CacheEntry(data: cached.data, etag: cached.etag, storedAt: now())
             saveCache(refreshed, for: key)
             return GitHubAPIResult(data: cached.data, source: .revalidatedCache)
+
+        case 401:
+            try? credentials.writeToken(nil)
+            NotificationCenter.default.post(name: .githubCredentialInvalidated, object: nil)
+            if let cached {
+                return GitHubAPIResult(data: cached.data, source: .staleCache)
+            }
+            throw GitHubAPIError.authenticationExpired
 
         case 403, 429:
             if let cached {

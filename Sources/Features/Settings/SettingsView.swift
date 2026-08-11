@@ -63,6 +63,7 @@ struct SettingsView: View {
     @EnvironmentObject var ble: FlipperBLE
     @EnvironmentObject var deviceServices: DeviceServiceCoordinator
     @ObservedObject private var buddy = BuddyRelay.shared
+    @StateObject private var githubAuth = GitHubAuthStore.shared
     @State private var currentIcon = UIApplication.shared.alternateIconName
     @State private var iconError: String?
     @State private var notifStatus: UNAuthorizationStatus = .notDetermined
@@ -201,6 +202,8 @@ struct SettingsView: View {
                     .font(.caption2).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+
+            GitHubAccessCard(auth: githubAuth)
 
             SectionCard(title: "Notifications", systemImage: "bell") {
                 HStack {
