@@ -65,6 +65,7 @@ enum TumoflipInstallError: Error, Equatable {
     case hashMismatch(String)
     case deviceVerifyFailed(String)
     case stagingVerifyFailed(target: String, expectedBytes: Int, actualBytes: Int?)
+    case stagingVerificationUnavailable(target: String, actualBytes: Int?)
     case incompatible(String)            // device firmware/api/target vs manifest
     case rollbackIncomplete([String])    // targets that could NOT be restored
     case statePersistenceFailed(String)
@@ -96,8 +97,6 @@ private final class TumoflipByteProgress: @unchecked Sendable {
     private let name: String
     private let report: ((Int, Int, String) -> Void)?
     private var lastPercent = -1
-    private var lastAttempt = 0
-    private var highWaterPercent = 0
 
     init(
         totalBytes: Int,
@@ -113,24 +112,16 @@ private final class TumoflipByteProgress: @unchecked Sendable {
         self.report = report
     }
 
-    func update(_ bytes: Int, attempt: Int) {
+    func update(_ bytes: Int) {
         let percent = min(100, max(0, bytes * 100 / totalBytes))
         lock.lock()
-        guard attempt != lastAttempt || percent != lastPercent else {
+        guard percent != lastPercent else {
             lock.unlock()
             return
         }
         lastPercent = percent
-        lastAttempt = attempt
-        highWaterPercent = max(highWaterPercent, percent)
-        let visiblePercent = highWaterPercent
         lock.unlock()
-        let prefix = attempt == 1 ? "" : "Retry \(attempt)/3 · "
-        report?(
-            completedUnits + visiblePercent,
-            totalUnits,
-            "\(prefix)Uploading \(name) · \(percent)%"
-        )
+        report?(completedUnits + percent, totalUnits, "Uploading \(name) · \(percent)%")
     }
 }
 
@@ -741,13 +732,23 @@ struct TumoflipInstaller {
         }
     }
 
-    /// A completed RPC write may become visible to the storage service before a
-    /// slow SD card has finished flushing. Check once immediately and once after
-    /// a bounded grace period before deciding the staged copy is corrupt.
-    private func stagedMD5Matches(_ path: String, expected: String) async throws -> Bool {
+    /// MD5 is a single RPC command with no intermediate progress frames. On a large
+    /// FAP a busy SD can return a stale digest immediately after the write, so retry
+    /// only a completed mismatch. A transport error remains observable and never
+    /// triggers another multi-megabyte upload.
+    private func stagedMD5Matches(
+        _ path: String,
+        expected: String,
+        isStopRequested: @escaping @Sendable () -> Bool
+    ) async throws -> Bool {
         for attempt in 0..<2 {
-            if attempt > 0 { try? await Task.sleep(nanoseconds: 500_000_000) }
-            if try await checkedDeviceMD5(path) == expected { return true }
+            if isStopRequested() { throw TumoflipInstallError.cancelled }
+            if attempt > 0 {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                if isStopRequested() { throw TumoflipInstallError.cancelled }
+            }
+            let digest = try await fs.checkedDeviceMD5(path)
+            if digest == expected { return true }
         }
         return false
     }
@@ -773,7 +774,11 @@ struct TumoflipInstaller {
         var journal = TumoflipJournal(
             releaseId: plan.releaseId, fingerprint: fp, groups: plan.groups, phase: .staging,
             ops: plan.files.map {
-                .init(target: $0.target, stage: "\(stage)/\(flat($0.target))",
+                // Match the long-proven Community Apps transaction: stage beside the
+                // destination, then rename only after MD5 succeeds. Keeping this path
+                // short also avoids making every 512-byte Storage frame carry a long
+                // hidden-directory path.
+                .init(target: $0.target, stage: $0.target + ".ucnew",
                       backup: "\(rb)/\(flat($0.target))", sha256: $0.sha256, md5: "", state: .planned)
             },
             cleanups: plan.cleanup.map {
@@ -787,7 +792,6 @@ struct TumoflipInstaller {
         do {
             // 2. STAGE — download, verify SHA-256, write to staging, verify on-device MD5.
             //    No live path is touched here, so any failure aborts with nothing activated.
-            try await fs.makeDirectory(stage)
             for i in journal.ops.indices {
                 // Stop checkpoint at a file boundary. Staging touches no live path, so
                 // throwing here rolls back to a device that was never modified.
@@ -805,55 +809,40 @@ struct TumoflipInstaller {
                 )
                 let md5 = TumoflipHash.md5(bytes)
                 let stagePath = journal.ops[i].stage
-                var staged = false
-                var lastWriteError: Error?
-                var actualBytes: Int?
-
-                // Large FAPs can expose a transient BLE/SD write failure. Retry the
-                // temporary copy only; the live target remains untouched until one
-                // complete staged file passes MD5.
-                for attempt in 1...3 {
-                    if isStopRequested() { throw TumoflipInstallError.cancelled }
-                    if await fs.exists(stagePath) { try await fs.delete(stagePath) }
-                    byteProgress.update(0, attempt: attempt)
-                    do {
-                        try await fs.write(
-                            bytes,
-                            to: stagePath,
-                            progress: { byteProgress.update($0, attempt: attempt) },
-                            isStopRequested: isStopRequested
-                        )
-                        lastWriteError = nil
-                        if isStopRequested() { throw TumoflipInstallError.cancelled }
-                        progress?(
-                            (i + 1) * 100,
-                            200 * journal.ops.count,
-                            attempt == 1
-                                ? "Verifying " + displayName
-                                : "Retry \(attempt)/3 · Verifying " + displayName
-                        )
-                        if try await stagedMD5Matches(stagePath, expected: md5) {
-                            staged = true
-                            break
-                        }
-                        actualBytes = await fs.fileSize(stagePath)
-                        try? await fs.delete(stagePath)
-                    } catch is CancellationError {
-                        throw TumoflipInstallError.cancelled
-                    } catch let error as TumoflipInstallError where error == .cancelled {
-                        throw error
-                    } catch {
-                        lastWriteError = error
-                        try? await fs.delete(stagePath)
-                    }
-
-                    if attempt < 3 {
-                        try? await Task.sleep(nanoseconds: 700_000_000)
-                    }
+                try await fs.makeDirectory(parentDir(stagePath))
+                if await fs.exists(stagePath) { try await fs.delete(stagePath) }
+                byteProgress.update(0)
+                do {
+                    try await fs.write(
+                        bytes,
+                        to: stagePath,
+                        progress: { byteProgress.update($0) },
+                        isStopRequested: isStopRequested
+                    )
+                } catch is CancellationError {
+                    throw TumoflipInstallError.cancelled
                 }
-
+                if isStopRequested() { throw TumoflipInstallError.cancelled }
+                progress?((i + 1) * 100, 200 * journal.ops.count, "Verifying " + displayName)
+                let staged: Bool
+                do {
+                    staged = try await stagedMD5Matches(
+                        stagePath,
+                        expected: md5,
+                        isStopRequested: isStopRequested
+                    )
+                } catch let error as TumoflipInstallError where error == .cancelled {
+                    throw error
+                } catch {
+                    if isStopRequested() { throw TumoflipInstallError.cancelled }
+                    let actualBytes = await fs.fileSize(stagePath)
+                    throw TumoflipInstallError.stagingVerificationUnavailable(
+                        target: f.target,
+                        actualBytes: actualBytes
+                    )
+                }
                 guard staged else {
-                    if let lastWriteError { throw lastWriteError }
+                    let actualBytes = await fs.fileSize(stagePath)
                     throw TumoflipInstallError.stagingVerifyFailed(
                         target: f.target,
                         expectedBytes: bytes.count,
@@ -886,6 +875,7 @@ struct TumoflipInstaller {
                 // them in the ledger without moving or rewriting an identical FAP;
                 // this also avoids touching an executable that just exited.
                 if await fs.deviceMD5(journal.ops[i].target) == journal.ops[i].md5 {
+                    try? await fs.delete(journal.ops[i].stage)
                     journal.ops[i].state = .unchanged
                     state.txn = journal; try await saveState(&state)
                     continue
@@ -938,6 +928,7 @@ struct TumoflipInstaller {
             }
             state.txn = nil
             try await saveState(&state)
+            for op in journal.ops { try? await fs.delete(op.stage) }
             try? await fs.deleteTree(stage)
             try? await fs.deleteTree(rb)
             return .installed(files: journal.ops.count,
@@ -996,6 +987,7 @@ struct TumoflipInstaller {
         journal.phase = .rolledBack
         state.txn = nil
         try await saveState(&state)
+        for op in journal.ops { try? await fs.delete(op.stage) }
         try? await fs.deleteTree(stageDir(journal.fingerprint))
         try? await fs.deleteTree(rollbackDir(journal.fingerprint))
     }
