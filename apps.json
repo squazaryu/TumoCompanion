@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.10.13",
+      "version": "1.10.14",
       "versionDate": "2026-08-11",
-      "versionDescription": "Adds optional GitHub sign-in for a 5,000-request personal allowance across Firmware, FW Packages, Community Apps and ESP32 catalogs, with device-local Keychain storage and safe credential invalidation.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.13/TumoCompanion-unsigned.ipa",
-      "size": 29705973,
+      "versionDescription": "Separates the FW Packages revision from the compatible firmware, hides archived dev evidence releases from catalogs, and labels apps-only package updates that do not require a firmware flash.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.14/TumoCompanion-unsigned.ipa",
+      "size": 29711709,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.10.14",
+          "date": "2026-08-11",
+          "localizedDescription": "Separates the FW Packages revision from the compatible firmware, hides archived dev evidence releases from catalogs, and labels apps-only package updates that do not require a firmware flash.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.14/TumoCompanion-unsigned.ipa",
+          "size": 29711709,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.10.13",
           "date": "2026-08-11",
