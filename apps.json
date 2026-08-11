@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.10.21",
+      "version": "1.10.22",
       "versionDate": "2026-08-11",
-      "versionDescription": "FW Packages now counts and installs only files that actually need an update after focused on-device MD5 checks, so a single ESP Flasher update appears as Install 1 instead of Install 94.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.21/TumoCompanion-unsigned.ipa",
-      "size": 29748156,
+      "versionDescription": "Prevents overlapping FW Packages transactions from silently restarting a large ESP Flasher upload from 0%; Install and Clean Up now acquire one immediate single-flight gate before any BLE preflight.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.22/TumoCompanion-unsigned.ipa",
+      "size": 29749159,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.10.22",
+          "date": "2026-08-11",
+          "localizedDescription": "Prevents overlapping FW Packages transactions from silently restarting a large ESP Flasher upload from 0%; Install and Clean Up now acquire one immediate single-flight gate before any BLE preflight.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.22/TumoCompanion-unsigned.ipa",
+          "size": 29749159,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.10.21",
           "date": "2026-08-11",
