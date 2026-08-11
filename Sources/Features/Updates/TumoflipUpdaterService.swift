@@ -27,7 +27,10 @@ struct FlipperDeviceFS: TumoflipDeviceFS {
     func read(_ path: String) async -> Data? { try? await storage.read(path) }
     func deviceMD5(_ path: String) async -> String? { await storage.md5(path) }
     func checkedDeviceMD5(_ path: String) async throws -> String? {
-        try await storage.checkedMD5(path)
+        // A large FAP can keep the Flipper busy hashing SD data for longer than the
+        // ordinary 20-second metadata timeout. This is only a ceiling; fast hashes
+        // still return immediately.
+        try await storage.checkedMD5(path, timeout: 60)
     }
     func fileSize(_ path: String) async -> Int? {
         let directory = (path as NSString).deletingLastPathComponent
@@ -1051,12 +1054,16 @@ final class TumoflipUpdater: ObservableObject {
         case .stagingVerifyFailed(let target, let expected, let actual):
             let name = (target as NSString).lastPathComponent
             guard let actual else {
-                return "Staged copy missing after 3 attempts: \(name) — rolled back."
+                return "Staged copy missing: \(name) — rolled back without re-uploading."
             }
             if actual != expected {
-                return "Staged copy incomplete after 3 attempts: \(name) · device \(actual) B vs source \(expected) B — rolled back."
+                return "Staged copy incomplete: \(name) · device \(actual) B vs source \(expected) B — rolled back without re-uploading."
             }
-            return "Staged copy corrupted after 3 attempts: \(name) · size matches but MD5 differs — rolled back."
+            return "Staged copy corrupted: \(name) · size matches but MD5 differs — rolled back without re-uploading."
+        case .stagingVerificationUnavailable(let target, let actual):
+            let name = (target as NSString).lastPathComponent
+            let size = actual.map { " · staged size \($0) B" } ?? ""
+            return "Could not read staged MD5: \(name)\(size) — rolled back without re-uploading."
         case .incompatible(let m): return "Incompatible: \(m). Nothing was changed."
         case .rollbackIncomplete(let t):
             return "Install failed AND rollback could not restore \(t.count) file(s): \(t.joined(separator: ", ")). Re-open to retry recovery."

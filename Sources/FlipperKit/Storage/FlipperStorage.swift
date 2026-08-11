@@ -70,8 +70,12 @@ final class FlipperStorage {
     /// On-device MD5 that keeps transport failures observable to callers which
     /// must not confuse a disconnected Flipper with a missing file.
     func checkedMD5(_ path: String) async throws -> String? {
+        try await checkedMD5(path, timeout: 20)
+    }
+
+    func checkedMD5(_ path: String, timeout: TimeInterval) async throws -> String? {
         do {
-            let responses = try await rpc.command(timeout: 20) { main in
+            let responses = try await rpc.command(timeout: timeout) { main in
                 main.content = .storageMd5SumRequest({
                     var r = PBStorage_Md5sumRequest(); r.path = path; return r
                 }())

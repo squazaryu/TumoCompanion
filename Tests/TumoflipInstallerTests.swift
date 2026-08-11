@@ -24,6 +24,7 @@ final class TumoflipInstallerTests: XCTestCase {
         var failMoveAfterCopy: ((String, String) -> Bool)?
         var failMoveAfterRemove: ((String, String) -> Bool)?
         var checkedMD5FailuresRemaining = 0
+        var onCheckedMD5: (() -> Void)?
         var cancellableWriteChunkSize: Int?
         var onWriteProgress: ((Int) -> Void)?
 
@@ -31,7 +32,7 @@ final class TumoflipInstallerTests: XCTestCase {
             if failWrite?(path) == true { throw Err.injected }
             writeCount += 1
             let isState = path == TumoflipInstaller.stateSlotA || path == TumoflipInstaller.stateSlotB
-            let isStaging = path.contains("/staging/")
+            let isStaging = path.contains("/staging/") || path.hasSuffix(".ucnew")
             if isStaging { stagingWriteCount += 1 }
             let corruptThisStagingWrite = isStaging && corruptStagingWritesRemaining > 0
             if corruptThisStagingWrite { corruptStagingWritesRemaining -= 1 }
@@ -52,7 +53,7 @@ final class TumoflipInstallerTests: XCTestCase {
                 return
             }
             if isStopRequested() { throw CancellationError() }
-            let isStaging = path.contains("/staging/")
+            let isStaging = path.contains("/staging/") || path.hasSuffix(".ucnew")
             if isStaging { stagingWriteCount += 1 }
             files[path] = Data()
             var offset = 0
@@ -72,13 +73,15 @@ final class TumoflipInstallerTests: XCTestCase {
         }
         func read(_ path: String) async -> Data? { files[path] }
         func deviceMD5(_ path: String) async -> String? {
-            if path.contains("/staging/"), staleStagingMD5ReadsRemaining > 0 {
+            if (path.contains("/staging/") || path.hasSuffix(".ucnew")),
+               staleStagingMD5ReadsRemaining > 0 {
                 staleStagingMD5ReadsRemaining -= 1
                 return String(repeating: "0", count: 32)
             }
             return files[path].map { TumoflipHash.md5($0) }
         }
         func checkedDeviceMD5(_ path: String) async throws -> String? {
+            onCheckedMD5?()
             if checkedMD5FailuresRemaining > 0 {
                 checkedMD5FailuresRemaining -= 1
                 throw Err.injected
@@ -194,7 +197,7 @@ final class TumoflipInstallerTests: XCTestCase {
         }
 
         XCTAssertEqual(fs.files[target], original)
-        XCTAssertFalse(fs.files.keys.contains { $0.contains("/staging/") })
+        XCTAssertNil(fs.files[target + ".ucnew"])
         let recoveredState = await fs.readState()
         XCTAssertNil(recoveredState?.txn)
     }
@@ -213,6 +216,7 @@ final class TumoflipInstallerTests: XCTestCase {
         let st = await fs.readState()
         XCTAssertNil(st?.txn, "transaction cleared after commit")
         XCTAssertEqual(st?.ledger["/ext/apps/a.fap"]?.sha256, TumoflipHash.sha256(b1))
+        XCTAssertFalse(fs.files.keys.contains { $0.hasSuffix(".ucnew") })
         XCTAssertFalse(fs.files.keys.contains { $0.contains("/.tumoflip/staging/") })
         XCTAssertFalse(fs.files.keys.contains { $0.contains("/.tumoflip/rollback/") })
     }
@@ -261,10 +265,10 @@ final class TumoflipInstallerTests: XCTestCase {
             .stagingVerifyFailed(target: "/ext/apps/a.fap", expectedBytes: 1, actualBytes: 2)
         )
         XCTAssertNil(fs.files["/ext/apps/a.fap"])
-        XCTAssertEqual(fs.stagingWriteCount, 3)
+        XCTAssertEqual(fs.stagingWriteCount, 1)
     }
 
-    func testStagingRetriesAfterMD5MismatchAndInstalls() async throws {
+    func testStagingDoesNotReuploadAfterMD5Mismatch() async throws {
         let bytes = Data("large-fap".utf8)
         let target = "/ext/apps/Module One/ESP32 Wi-Fi/esp_flasher.fap"
         let p = plan([file("esp-flasher", target, bytes)])
@@ -275,11 +279,18 @@ final class TumoflipInstallerTests: XCTestCase {
             source: FakeSource(data: ["esp-flasher": bytes])
         )
 
-        let outcome = try await inst.install(p)
+        await assertThrows(
+            { try await inst.install(p) },
+            .stagingVerifyFailed(
+                target: target,
+                expectedBytes: bytes.count,
+                actualBytes: bytes.count + 1
+            )
+        )
 
-        XCTAssertEqual(outcome, .installed(files: 1, legacyMovedAside: 0))
-        XCTAssertEqual(fs.files[target], bytes)
-        XCTAssertEqual(fs.stagingWriteCount, 2)
+        XCTAssertNil(fs.files[target])
+        XCTAssertNil(fs.files[target + ".ucnew"])
+        XCTAssertEqual(fs.stagingWriteCount, 1)
         let state = await fs.readState()
         XCTAssertNil(state?.txn)
     }
@@ -302,6 +313,58 @@ final class TumoflipInstallerTests: XCTestCase {
         XCTAssertEqual(fs.stagingWriteCount, 1)
     }
 
+    func testStagingDoesNotReuploadWhenVerificationIsUnavailable() async throws {
+        let bytes = Data("large-fap".utf8)
+        let target = "/ext/apps/Module One/ESP32 Wi-Fi/esp_flasher.fap"
+        let p = plan([file("esp-flasher", target, bytes)])
+        let fs = FakeFS()
+        fs.checkedMD5FailuresRemaining = 1
+        let inst = TumoflipInstaller(
+            fs: fs,
+            source: FakeSource(data: ["esp-flasher": bytes])
+        )
+
+        await assertThrows(
+            { try await inst.install(p) },
+            .stagingVerificationUnavailable(target: target, actualBytes: bytes.count)
+        )
+
+        XCTAssertNil(fs.files[target])
+        XCTAssertNil(fs.files[target + ".ucnew"])
+        XCTAssertEqual(fs.stagingWriteCount, 1)
+        let state = await fs.readState()
+        XCTAssertNil(state?.txn)
+    }
+
+    func testStopDuringStagedMD5FailureRollsBackWithoutReupload() async throws {
+        let old = Data("old-fap".utf8)
+        let replacement = Data("large-fap".utf8)
+        let target = "/ext/apps/Module One/ESP32 Wi-Fi/esp_flasher.fap"
+        let fs = FakeFS()
+        fs.files[target] = old
+        fs.checkedMD5FailuresRemaining = 1
+        let stop = StopToken()
+        fs.onCheckedMD5 = { stop.stop() }
+        let inst = TumoflipInstaller(
+            fs: fs,
+            source: FakeSource(data: ["esp-flasher": replacement])
+        )
+
+        await assertThrows(
+            {
+                try await inst.install(
+                    plan([file("esp-flasher", target, replacement)]),
+                    isStopRequested: { stop.isStopped }
+                )
+            },
+            .cancelled
+        )
+
+        XCTAssertEqual(fs.files[target], old)
+        XCTAssertNil(fs.files[target + ".ucnew"])
+        XCTAssertEqual(fs.stagingWriteCount, 1)
+    }
+
     // MARK: - In-process rollback
 
     func testInterruptedActivationRollsBack() async throws {
@@ -313,7 +376,7 @@ final class TumoflipInstallerTests: XCTestCase {
         fs.files[t1] = old1; fs.files[t2] = old2
         // Fail ONLY the activation (staged -> target) move for the 2nd file, not the
         // later restore (backup -> target) move.
-        fs.failMove = { from, to in to == t2 && from.contains("/staging/") }
+        fs.failMove = { from, to in to == t2 && from.hasSuffix(".ucnew") }
         let inst = TumoflipInstaller(fs: fs, source: FakeSource(data: ["a": new1, "b": new2]))
         do { _ = try await inst.install(p); XCTFail("expected failure") } catch {}
         XCTAssertEqual(fs.files[t1], old1, "t1 restored")
@@ -334,7 +397,7 @@ final class TumoflipInstallerTests: XCTestCase {
         let inst = TumoflipInstaller(fs: fs, source: FakeSource(data: ["a": new]))
         await assertThrows({ try await inst.install(p, isStopRequested: { true }) }, .cancelled)
         XCTAssertEqual(fs.files[t], old, "prior working version untouched")
-        XCTAssertFalse(fs.files.keys.contains { $0.contains("/staging/") }, "nothing staged")
+        XCTAssertFalse(fs.files.keys.contains { $0.hasSuffix(".ucnew") }, "nothing staged")
         let st = await fs.readState(); XCTAssertNil(st?.txn, "transaction rolled back / cleared")
     }
 
@@ -349,7 +412,7 @@ final class TumoflipInstallerTests: XCTestCase {
         fs.files[t1] = old1; fs.files[t2] = old2
         // Trip the stop as soon as the first staging file exists — the boundary check
         // at the top of the 2nd staging iteration then throws.
-        let stop: @Sendable () -> Bool = { fs.files.keys.contains { $0.contains("/staging/") } }
+        let stop: @Sendable () -> Bool = { fs.files.keys.contains { $0.hasSuffix(".ucnew") } }
         let inst = TumoflipInstaller(fs: fs, source: FakeSource(data: ["a": new1, "b": new2]))
         await assertThrows({ try await inst.install(p, isStopRequested: stop) }, .cancelled)
         XCTAssertEqual(fs.files[t1], old1, "no live path touched during staging")
@@ -386,7 +449,7 @@ final class TumoflipInstallerTests: XCTestCase {
         let fs = FakeFS()
         fs.files[base] = oldBase
         fs.files[arf] = oldARF
-        fs.failMove = { from, to in from.contains("/staging/") && to == base }
+        fs.failMove = { from, to in from.hasSuffix(".ucnew") && to == base }
 
         let inst = TumoflipInstaller(
             fs: fs, source: FakeSource(data: ["base": newBase, "arf": newARF]))
@@ -770,14 +833,14 @@ final class TumoflipInstallerTests: XCTestCase {
         let target = "/ext/apps/a.fap"
         let p = plan([file("a", target, bytes)])
         let fs = FakeFS()
-        fs.failMoveAfterCopy = { from, to in from.contains("/staging/") && to == target }
+        fs.failMoveAfterCopy = { from, to in from.hasSuffix(".ucnew") && to == target }
 
         let inst = TumoflipInstaller(fs: fs, source: FakeSource(data: ["a": bytes]))
         let outcome = try await inst.install(p)
 
         XCTAssertEqual(outcome, .installed(files: 1, legacyMovedAside: 0))
         XCTAssertEqual(fs.files[target], bytes)
-        XCTAssertFalse(fs.files.keys.contains { $0.contains("/staging/") && $0.hasSuffix("a.fap") })
+        XCTAssertNil(fs.files[target + ".ucnew"])
     }
 
     func testBackupErrorAfterCopyIsReconciled() async throws {
