@@ -659,14 +659,9 @@ final class ESP32Updater: ObservableObject {
 
     private func checkLatest() async {
         guard let url = URL(string: "https://api.github.com/repos/\(Self.repo)/releases/latest") else { return }
-        var req = URLRequest(url: url)
-        req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         do {
-            let (data, response) = try await URLSession.shared.data(for: req)
-            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-                throw URLError(.badServerResponse)
-            }
-            if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let result = try await GitHubAPIClient.shared.data(from: url)
+            if let obj = try? JSONSerialization.jsonObject(with: result.data) as? [String: Any],
                let tag = obj["tag_name"] as? String {
                 latestTag = tag
                 latestAssets = [:]; latestAssetSizes = [:]; latestAssetSHA256 = [:]

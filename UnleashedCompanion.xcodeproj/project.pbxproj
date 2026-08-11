@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0091E2386B3AC40E8BD81D3B /* GitHubAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDC48789DECAE2A030CB71DE /* GitHubAPIClient.swift */; };
 		022F94D327300839527E7901 /* TumoVMNFCSmoke.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54C848C04983CF3B58C03C22 /* TumoVMNFCSmoke.swift */; };
 		028086AFF37EFC8952E84483 /* PluginProtectionPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3D4263C468870ABFDEB8589 /* PluginProtectionPolicyTests.swift */; };
 		03BE7BC7ADBD4866A4F4507E /* FlipperControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44CC0B1350B30151851F2958 /* FlipperControl.swift */; };
@@ -68,6 +69,7 @@
 		56630654C5F12C545C47A195 /* AIRadarBridgeClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95FA4896B7AE237BFC022E1E /* AIRadarBridgeClient.swift */; };
 		56E703AEE38BA106610D2DA5 /* FieldServiceModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B95CE7D8E715A07E4318F9D1 /* FieldServiceModels.swift */; };
 		58ADEF0B8E8D011FDB32D17F /* BridgeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A72EEDF7D1BE89A42EBAFB7D /* BridgeView.swift */; };
+		597368D182EF7A5FD2E780FA /* GitHubAPIClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF7F5D1B21FCD35496F56E26 /* GitHubAPIClientTests.swift */; };
 		5CF5B93624E1418CAC1E13A9 /* TumoNetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85A71B8014DF7BCBEAE77C5A /* TumoNetView.swift */; };
 		5EAC241A8A24322589A7FB52 /* TumoflipUpdaterService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8697965C8EA5F8D768000FC9 /* TumoflipUpdaterService.swift */; };
 		61371A51934A206CF6FF6545 /* FileEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB89F00DE286E56D6DA34162 /* FileEditorView.swift */; };
@@ -341,6 +343,7 @@
 		BE028921DD19F9BC488190F1 /* FlipperSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlipperSystem.swift; sourceTree = "<group>"; };
 		BE4449AEEFC4858417F6F97A /* TumoFabric.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoFabric.swift; sourceTree = "<group>"; };
 		BF110587D01496E5B9809C9F /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		BF7F5D1B21FCD35496F56E26 /* GitHubAPIClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubAPIClientTests.swift; sourceTree = "<group>"; };
 		C1B731E78843D6D04ECF5B60 /* ESP32FirmwareView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ESP32FirmwareView.swift; sourceTree = "<group>"; };
 		C1BBC0C91333C23488DCC52C /* WiFiNetworkClusterMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WiFiNetworkClusterMap.swift; sourceTree = "<group>"; };
 		C3C85FA6B539178BE8FD40A5 /* TumoSpectrumReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoSpectrumReport.swift; sourceTree = "<group>"; };
@@ -375,6 +378,7 @@
 		FB7E01B87B6C90282CEE9FE0 /* SettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsStore.swift; sourceTree = "<group>"; };
 		FCB5C504F3756F796BB35073 /* DolphinGalleryUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DolphinGalleryUITests.swift; sourceTree = "<group>"; };
 		FCE7269E5AB13331C01704F7 /* USBStorageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = USBStorageTests.swift; sourceTree = "<group>"; };
+		FDC48789DECAE2A030CB71DE /* GitHubAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubAPIClient.swift; sourceTree = "<group>"; };
 		FFAFC266DB9145E7CF8D0504 /* TransferActivityReporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferActivityReporterTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -651,6 +655,7 @@
 				98F04DB6042C632AC1B52D91 /* FapMetadataTests.swift */,
 				406855A4F6EC92517E41CF68 /* FirmwareArchiveTests.swift */,
 				63CF454F5F1DBADC991DD631 /* FirmwareCatalogTests.swift */,
+				BF7F5D1B21FCD35496F56E26 /* GitHubAPIClientTests.swift */,
 				8D70BBAA6C69E3FCD8488170 /* HomeAssistantDiscoveryTests.swift */,
 				3ECE4D716C1F73A551397D21 /* InstallActivityAttributesTests.swift */,
 				8F246F25BA68E90EAD73408E /* MarauderLiveAggregationTests.swift */,
@@ -705,6 +710,7 @@
 				18E9E2A54A0286AF6188F9A9 /* FapMetadata.swift */,
 				856D8627B88920587D56B850 /* FirmwareLibrary.swift */,
 				CFD10DB620EC18749FE46591 /* FirmwareLibraryView.swift */,
+				FDC48789DECAE2A030CB71DE /* GitHubAPIClient.swift */,
 				F7DFAFD2A63623B73457A3B2 /* InstallActivityController.swift */,
 				CBA5FCA0F80809900471F32E /* PluginUpdateMonitor.swift */,
 				87F2C64ACDABA1AEFFB7CCD8 /* PluginUpdater.swift */,
@@ -1070,6 +1076,7 @@
 				C9BA4C5BB222941D1B3C3FA9 /* FapMetadataTests.swift in Sources */,
 				CCE4664E2C132A8662B2F7F3 /* FirmwareArchiveTests.swift in Sources */,
 				DBF198850F9BCC58CE887DCF /* FirmwareCatalogTests.swift in Sources */,
+				597368D182EF7A5FD2E780FA /* GitHubAPIClientTests.swift in Sources */,
 				561C47A5EC74F7DF05D11A2B /* HomeAssistantDiscoveryTests.swift in Sources */,
 				55DF4154B997B215DD5CF9C6 /* InstallActivityAttributesTests.swift in Sources */,
 				558EF6327C3F312D4C1A26B7 /* MarauderLiveAggregationTests.swift in Sources */,
@@ -1149,6 +1156,7 @@
 				5441B6081BFE2F6A4CCD4970 /* FlipperRPC.swift in Sources */,
 				53CB5CFA2958BBC762C9260C /* FlipperStorage.swift in Sources */,
 				B7D3F97F8516475BDCB9C56A /* FlipperSystem.swift in Sources */,
+				0091E2386B3AC40E8BD81D3B /* GitHubAPIClient.swift in Sources */,
 				B6DB93E03F6FE5C851F2BD8F /* HomeAssistantDiscovery.swift in Sources */,
 				9D4526D85608E2635C63D0D8 /* HomeLayout.swift in Sources */,
 				3B8F9FDDE4E195CFAB92B2A1 /* InstallActivityController.swift in Sources */,
@@ -1282,7 +1290,7 @@
 				CODE_SIGNING_REQUIRED = NO;
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 218;
+				CURRENT_PROJECT_VERSION = 219;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -1302,7 +1310,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 1.10.11;
+				MARKETING_VERSION = 1.10.12;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -1507,7 +1515,7 @@
 				CODE_SIGNING_REQUIRED = NO;
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 218;
+				CURRENT_PROJECT_VERSION = 219;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = "";
 				ENABLE_NS_ASSERTIONS = NO;
@@ -1521,7 +1529,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 1.10.11;
+				MARKETING_VERSION = 1.10.12;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
