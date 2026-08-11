@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.10.12",
+      "version": "1.10.13",
       "versionDate": "2026-08-11",
-      "versionDescription": "Fixes repeated GitHub catalog failures with shared ETag caching, request coalescing and last-known-good fallback for Firmware, FW Packages, Community Apps and ESP32 updates.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.12/TumoCompanion-unsigned.ipa",
-      "size": 29626228,
+      "versionDescription": "Adds optional GitHub sign-in for a 5,000-request personal allowance across Firmware, FW Packages, Community Apps and ESP32 catalogs, with device-local Keychain storage and safe credential invalidation.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.13/TumoCompanion-unsigned.ipa",
+      "size": 29705973,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.10.13",
+          "date": "2026-08-11",
+          "localizedDescription": "Adds optional GitHub sign-in for a 5,000-request personal allowance across Firmware, FW Packages, Community Apps and ESP32 catalogs, with device-local Keychain storage and safe credential invalidation.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.13/TumoCompanion-unsigned.ipa",
+          "size": 29705973,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.10.12",
           "date": "2026-08-11",
