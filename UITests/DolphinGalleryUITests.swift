@@ -86,6 +86,20 @@ final class FWPackagesActionBarUITests: XCTestCase {
             app.staticTexts["Installed"].waitForExistence(timeout: 2),
             "Package channel metadata must remain available after expansion"
         )
+        XCTAssertEqual(
+            app.staticTexts["fw-packages-compatible-firmware"].label,
+            "v1.0.4 · t-flppr-fw-004"
+        )
+        XCTAssertTrue(
+            app.staticTexts["fw-packages-revision"].label.contains("1b0eba79c"),
+            "Package revision must be independent from the compatible firmware tag"
+        )
+        XCTAssertTrue(app.staticTexts["fw-packages-apps-only"].exists)
+
+        let revisionScreenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        revisionScreenshot.name = "FW Packages compatibility and revision"
+        revisionScreenshot.lifetime = .keepAlways
+        add(revisionScreenshot)
         channel.tap()
 
         for group in ["base", "arf", "module_one", "protocol_packs"] {

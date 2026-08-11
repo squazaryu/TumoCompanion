@@ -14,6 +14,7 @@ struct TumoflipManifest: Codable, Equatable {
     let packages: [String: [PackageFile]]
     let cleanup: [CleanupEntry]
     let safety: Safety?
+    let packageRelease: PackageRelease?
 
     struct Firmware: Codable, Equatable {
         let api: String
@@ -68,9 +69,49 @@ struct TumoflipManifest: Codable, Equatable {
         }
     }
 
+    struct PackageRelease: Codable, Equatable {
+        let id: String
+        let type: String
+        let sourceCommit: String
+        let sourceDirty: Bool
+        let sourceFirmwareVersion: String
+        let targetReleaseTag: String
+        let firmwareFlashUnchanged: Bool
+
+        enum CodingKeys: String, CodingKey {
+            case id, type
+            case sourceCommit = "source_commit"
+            case sourceDirty = "source_dirty"
+            case sourceFirmwareVersion = "source_firmware_version"
+            case targetReleaseTag = "target_release_tag"
+            case firmwareFlashUnchanged = "firmware_flash_unchanged"
+        }
+    }
+
+    init(
+        schema: Int,
+        releaseId: String,
+        firmware: Firmware,
+        artifacts: [String: Artifact],
+        packages: [String: [PackageFile]],
+        cleanup: [CleanupEntry],
+        safety: Safety?,
+        packageRelease: PackageRelease? = nil
+    ) {
+        self.schema = schema
+        self.releaseId = releaseId
+        self.firmware = firmware
+        self.artifacts = artifacts
+        self.packages = packages
+        self.cleanup = cleanup
+        self.safety = safety
+        self.packageRelease = packageRelease
+    }
+
     enum CodingKeys: String, CodingKey {
         case schema, firmware, artifacts, packages, cleanup, safety
         case releaseId = "release_id"
+        case packageRelease = "package_release"
     }
 
     /// Canonical group order; also the complete set we require to be present.
@@ -93,6 +134,7 @@ enum TumoflipManifestError: Error, Equatable {
     case unsafeTarget(String)          // traversal, non-/ext, malformed
     case duplicateTarget(String)
     case conflictingCleanup(String)
+    case invalidPackageRelease(String)
 }
 
 extension TumoflipManifest {
@@ -120,6 +162,22 @@ extension TumoflipManifest {
                       !f.target.isEmpty else {
                     throw TumoflipManifestError.invalidEntry(f.source.isEmpty ? f.target : f.source)
                 }
+            }
+        }
+        if let packageRelease {
+            guard packageRelease.type == "package-only",
+                  !packageRelease.id.isEmpty, packageRelease.id.utf8.count <= 160,
+                  packageRelease.sourceCommit.count == 40,
+                  packageRelease.sourceCommit.allSatisfy({
+                      "0123456789abcdef".contains($0)
+                  }),
+                  packageRelease.sourceDirty == false,
+                  !packageRelease.sourceFirmwareVersion.isEmpty,
+                  packageRelease.sourceFirmwareVersion.utf8.count <= 80,
+                  !packageRelease.targetReleaseTag.isEmpty,
+                  packageRelease.targetReleaseTag.utf8.count <= 80,
+                  packageRelease.firmwareFlashUnchanged else {
+                throw TumoflipManifestError.invalidPackageRelease(packageRelease.id)
             }
         }
     }

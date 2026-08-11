@@ -468,6 +468,7 @@ enum FirmwareCatalog {
 
     private static func mapRelease(_ release: GitHubRelease) -> FirmwareRelease? {
         guard !release.draft,
+              TumoflipReleaseCatalogPolicy.isVisible(body: release.body),
               let publishedAt = release.publishedAt,
               let updater = release.assets.first(where: {
                   $0.name.hasPrefix("flipper-z-f7-update-") && $0.name.hasSuffix(".tgz")

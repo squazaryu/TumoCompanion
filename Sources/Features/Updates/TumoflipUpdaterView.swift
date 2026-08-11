@@ -119,7 +119,7 @@ struct TumoflipUpdaterView: View {
     }
 
     private var groupsCard: some View {
-        SectionCard(title: "Package groups · \(updater.releaseTag)", systemImage: "shippingbox") {
+        SectionCard(title: "Package groups", systemImage: "shippingbox") {
             LazyVStack(spacing: 14) {
                 ForEach(groupLabels, id: \.key) { g in
                     groupRow(g)
@@ -186,8 +186,27 @@ struct TumoflipUpdaterView: View {
                 metadataRow("Detected", updater.firmwareRoute.detectedChannel?.packageLabel ?? "Unknown")
                 metadataRow("Selected", updater.firmwareRoute.channel.packageLabel)
                 if let manifest = updater.manifest {
-                    metadataRow("Target package", "\(manifest.firmware.version) · \(updater.releaseTag)")
+                    metadataRow(
+                        "Compatible FW",
+                        "\(updater.releaseTag) · \(manifest.firmware.version)",
+                        identifier: "fw-packages-compatible-firmware"
+                    )
+                    metadataRow(
+                        "FW Packages",
+                        packageRevisionDisplay,
+                        identifier: "fw-packages-revision"
+                    )
                     metadataRow("Package API", manifest.firmware.api)
+                    if updater.firmwareFlashUnchanged {
+                        Label(
+                            "Apps-only package update. Firmware flashing is unchanged.",
+                            systemImage: "checkmark.shield.fill"
+                        )
+                        .font(.caption2)
+                        .foregroundStyle(.green)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("fw-packages-apps-only")
+                    }
                 }
                 if let api = updater.deviceIdentity?.firmwareAPI {
                     metadataRow("Installed API", api)
@@ -199,19 +218,39 @@ struct TumoflipUpdaterView: View {
         }
     }
 
-    private func metadataRow(_ title: String, _ value: String) -> some View {
+    private func metadataRow(
+        _ title: String,
+        _ value: String,
+        identifier: String? = nil
+    ) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(title)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
-                .frame(width: 88, alignment: .leading)
-            Text(value)
-                .font(.caption2)
-                .foregroundStyle(.primary)
-                .lineLimit(2)
-                .truncationMode(.middle)
+                .frame(width: 100, alignment: .leading)
+            if let identifier {
+                Text(value)
+                    .font(.caption2)
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+                    .truncationMode(.middle)
+                    .accessibilityIdentifier(identifier)
+            } else {
+                Text(value)
+                    .font(.caption2)
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+                    .truncationMode(.middle)
+            }
             Spacer(minLength: 0)
         }
+    }
+
+    private var packageRevisionDisplay: String {
+        guard let date = updater.packageRevisionDate else {
+            return updater.packageRevision
+        }
+        return "\(updater.packageRevision) · \(date.formatted(date: .abbreviated, time: .omitted))"
     }
 
     @ViewBuilder private func groupRow(_ g: (key: String, title: String, icon: String)) -> some View {
@@ -374,7 +413,8 @@ struct TumoflipUpdaterView: View {
                 Label("Tap refresh to check the latest release", systemImage: "shippingbox").foregroundStyle(.secondary)
             } else {
                 HStack {
-                    Label("Latest: \(updater.releaseTag)", systemImage: "shippingbox").foregroundStyle(.secondary)
+                    Label("Rev \(updater.packageRevision)", systemImage: "shippingbox")
+                        .foregroundStyle(.secondary)
                     Spacer()
                     if let info = statusInfo(updater.overallStatus) {
                         StatusPill(text: info.text, color: info.color, systemImage: info.icon)

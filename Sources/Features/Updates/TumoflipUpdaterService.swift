@@ -105,6 +105,7 @@ final class TumoflipUpdater: ObservableObject {
     @Published private(set) var phase: Phase = .idle
     @Published private(set) var manifest: TumoflipManifest?
     @Published private(set) var releaseTag = ""
+    @Published private(set) var packageRevisionDate: Date?
     @Published private(set) var hasPackageZip = false
     @Published private(set) var groupStatus: [String: TumoflipInstaller.GroupStatus] = [:]
     @Published private(set) var fileStatus: [String: TumoflipInstaller.FileStatus] = [:]
@@ -167,6 +168,16 @@ final class TumoflipUpdater: ObservableObject {
         default:
             return false
         }
+    }
+
+    var packageRevision: String {
+        guard let manifest else { return "Unknown" }
+        let identity = manifest.packageRelease?.sourceCommit ?? manifest.releaseId
+        return String(identity.prefix(10))
+    }
+
+    var firmwareFlashUnchanged: Bool {
+        manifest?.packageRelease?.firmwareFlashUnchanged == true
     }
 
     var shouldLoadManifest: Bool {
@@ -351,11 +362,16 @@ final class TumoflipUpdater: ObservableObject {
                 for: firmwareRoute.channel,
                 installedVersion: packageIdentityVersion
             )
-            releaseTag = selection.release.tag
             let m = selection.manifest
             try m.validate()
+            if let packageRelease = m.packageRelease,
+               packageRelease.targetReleaseTag != selection.release.tag {
+                throw TumoflipManifestError.invalidPackageRelease(packageRelease.id)
+            }
+            releaseTag = selection.release.tag
+            packageRevisionDate = selection.manifestUpdatedAt
             manifest = m
-            packageZipURL = selection.release.asset("tumoflip-packages.zip")
+            packageZipURL = selection.release.asset("tumoflip-packages.zip")?.url
             hasPackageZip = packageZipURL != nil
             await refreshStatus()
             phase = .ready
@@ -817,12 +833,25 @@ final class TumoflipUpdater: ObservableObject {
 
     // MARK: - GitHub release discovery
 
-    private struct Release { let tag: String; let assets: [(name: String, url: URL)]
-        func asset(_ name: String) -> URL? { assets.first { $0.name == name }?.url } }
+    private struct ReleaseAsset {
+        let name: String
+        let url: URL
+        let updatedAt: Date?
+    }
+
+    private struct Release {
+        let tag: String
+        let assets: [ReleaseAsset]
+
+        func asset(_ name: String) -> ReleaseAsset? {
+            assets.first { $0.name == name }
+        }
+    }
 
     private struct ReleaseSelection {
         let release: Release
         let manifest: TumoflipManifest
+        let manifestUpdatedAt: Date?
     }
 
     private enum ReleaseDiscoveryError: LocalizedError {
@@ -844,14 +873,18 @@ final class TumoflipUpdater: ObservableObject {
         installedVersion: String?
     ) async throws -> ReleaseSelection {
         for release in try await releases() {
-            guard let manifestURL = release.asset("tumoflip-packages.json") else { continue }
-            guard let manifest = try? await manifest(from: manifestURL) else { continue }
+            guard let manifestAsset = release.asset("tumoflip-packages.json") else { continue }
+            guard let manifest = try? await manifest(from: manifestAsset.url) else { continue }
             if TumoflipPackageReleaseMatcher.matches(
                 manifestVersion: manifest.firmware.version,
                 channel: channel,
                 installedVersion: installedVersion
             ) {
-                return ReleaseSelection(release: release, manifest: manifest)
+                return ReleaseSelection(
+                    release: release,
+                    manifest: manifest,
+                    manifestUpdatedAt: manifestAsset.updatedAt
+                )
             }
         }
         throw ReleaseDiscoveryError.noMatchingPackageRelease(channel, installedVersion)
@@ -866,14 +899,22 @@ final class TumoflipUpdater: ObservableObject {
         }
         return array.compactMap { obj in
             guard let tag = obj["tag_name"] as? String,
+                  TumoflipReleaseCatalogPolicy.isVisible(body: obj["body"] as? String),
                   let assetsJSON = obj["assets"] as? [[String: Any]] else { return nil }
-            let assets: [(String, URL)] = assetsJSON.compactMap {
+            let assets: [ReleaseAsset] = assetsJSON.compactMap {
                 guard let n = $0["name"] as? String,
                       let u = ($0["browser_download_url"] as? String).flatMap(URL.init) else { return nil }
-                return (n, u)
+                let updatedAt = ($0["updated_at"] as? String).flatMap(Self.githubDate)
+                return ReleaseAsset(name: n, url: u, updatedAt: updatedAt)
             }
             return Release(tag: tag, assets: assets)
         }
+    }
+
+    private static func githubDate(_ value: String) -> Date? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.date(from: value) ?? ISO8601DateFormatter().date(from: value)
     }
 
     private func manifest(from url: URL) async throws -> TumoflipManifest {
@@ -987,7 +1028,7 @@ extension TumoflipUpdater {
             firmware: .init(
                 api: "88.0",
                 name: "tumoflip",
-                version: "t-dev-089-041-022",
+                version: "t-flppr-fw-004",
                 target: 7,
                 radioAddress: nil
             ),
@@ -999,7 +1040,16 @@ extension TumoflipUpdater {
                 "protocol_packs": [protocolPack],
             ],
             cleanup: [cleanup],
-            safety: nil
+            safety: nil,
+            packageRelease: .init(
+                id: "t-flppr-fw-004-packages-1b0eba79c",
+                type: "package-only",
+                sourceCommit: "1b0eba79c6c02a7c3307db604233aefe76cdd042",
+                sourceDirty: false,
+                sourceFirmwareVersion: "t-dev-004-014",
+                targetReleaseTag: "v1.0.4",
+                firmwareFlashUnchanged: true
+            )
         )
         let identity = TumoflipDeviceIdentity(
             firmwareVersion: manifest.firmware.version,
@@ -1012,7 +1062,10 @@ extension TumoflipUpdater {
 
         let updater = TumoflipUpdater()
         updater.manifest = manifest
-        updater.releaseTag = manifest.firmware.version
+        updater.releaseTag = "v1.0.4"
+        updater.packageRevisionDate = ISO8601DateFormatter().date(
+            from: "2026-08-11T08:21:16Z"
+        )
         updater.hasPackageZip = true
         updater.groupStatus = [
             "base": .upToDate,
