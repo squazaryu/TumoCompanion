@@ -191,7 +191,7 @@ struct TumoflipUpdaterView: View {
                 if let manifest = updater.manifest {
                     metadataRow(
                         "Compatible FW",
-                        "\(updater.releaseTag) · \(manifest.firmware.version)",
+                        firmwareCompatibilityDisplay(manifest),
                         identifier: "fw-packages-compatible-firmware"
                     )
                     metadataRow(
@@ -254,6 +254,14 @@ struct TumoflipUpdaterView: View {
             return updater.packageRevision
         }
         return "\(updater.packageRevision) · \(date.formatted(date: .abbreviated, time: .omitted))"
+    }
+
+    private func firmwareCompatibilityDisplay(_ manifest: TumoflipManifest) -> String {
+        if let release = manifest.packageRelease,
+           let channel = release.catalogChannel {
+            return "Tumoflip \(channel.capitalized) · API \(manifest.firmware.api) · f\(manifest.firmware.target)"
+        }
+        return "\(updater.releaseTag) · \(manifest.firmware.version)"
     }
 
     @ViewBuilder private func groupRow(_ g: (key: String, title: String, icon: String)) -> some View {

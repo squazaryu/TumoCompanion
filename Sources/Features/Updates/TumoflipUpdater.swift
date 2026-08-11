@@ -138,7 +138,9 @@ enum TumoflipHash {
 // MARK: - Device compatibility
 
 enum TumoflipCompat {
-    /// Fail closed unless the connected device exactly matches the package release.
+    /// Fail closed unless the connected device matches the package compatibility
+    /// contract. Legacy manifests are exact-version pinned; independent catalog
+    /// revisions use channel + API + target, matching the Community Apps lifecycle.
     static func check(deviceTarget: Int?, deviceAPI: String?,
                       deviceVersion: String?, deviceOriginFork: String? = nil,
                       manifest: TumoflipManifest) throws {
@@ -162,7 +164,14 @@ enum TumoflipCompat {
             throw TumoflipInstallError.incompatible(
                 "device API \(deviceAPI) ≠ package API \(manifest.firmware.api)")
         }
-        if deviceVersion != manifest.firmware.version {
+        if let release = manifest.packageRelease, release.isIndependentCatalog {
+            guard let expected = release.catalogChannel,
+                  TumoflipFirmwareChannel.infer(version: deviceVersion)?.rawValue == expected else {
+                throw TumoflipInstallError.incompatible(
+                    "device firmware channel is not compatible with \(release.catalogChannel ?? "unknown") FW Packages"
+                )
+            }
+        } else if deviceVersion != manifest.firmware.version {
             throw TumoflipInstallError.incompatible(
                 "device firmware \(deviceVersion) ≠ package firmware \(manifest.firmware.version)")
         }

@@ -148,7 +148,7 @@ final class TumoflipFirmwareRoutingTests: XCTestCase {
         )
     }
 
-    func testPackageReleaseMatcherRequiresExactInstalledDevVersion() {
+    func testLegacyPackageReleaseMatcherRequiresExactInstalledDevVersion() {
         XCTAssertTrue(TumoflipPackageReleaseMatcher.matches(
             manifestVersion: "t-dev-089-037-058",
             channel: .dev,
@@ -158,6 +158,62 @@ final class TumoflipFirmwareRoutingTests: XCTestCase {
             manifestVersion: "t-dev-089-037-012",
             channel: .dev,
             installedVersion: "t-dev-089-037-058"
+        ))
+    }
+
+    func testIndependentPackageCatalogMatchesChannelWithoutExactFirmwareVersion() {
+        let release = TumoflipManifest.PackageRelease(
+            id: "fw-packages-dev-001",
+            type: "package-only",
+            sourceCommit: String(repeating: "a", count: 40),
+            sourceDirty: false,
+            sourceFirmwareVersion: "t-dev-004-014",
+            targetReleaseTag: "t-dev-004-014",
+            firmwareFlashUnchanged: true,
+            catalogChannel: "dev",
+            catalogRevision: 1,
+            catalogReleaseTag: "fw-packages-dev-001"
+        )
+
+        XCTAssertTrue(TumoflipPackageReleaseMatcher.matches(
+            manifestVersion: "t-dev-004-014",
+            packageRelease: release,
+            channel: .dev,
+            installedVersion: "t-dev-004-013"
+        ))
+        XCTAssertFalse(TumoflipPackageReleaseMatcher.matches(
+            manifestVersion: "t-dev-004-014",
+            packageRelease: release,
+            channel: .stable,
+            installedVersion: "t-flppr-fw-004"
+        ))
+    }
+
+    func testIndependentStableCatalogMatchesAnotherStableFirmwareVersion() {
+        let release = TumoflipManifest.PackageRelease(
+            id: "fw-packages-stable-001",
+            type: "package-only",
+            sourceCommit: String(repeating: "b", count: 40),
+            sourceDirty: false,
+            sourceFirmwareVersion: "t-flppr-fw-004",
+            targetReleaseTag: "v1.0.4",
+            firmwareFlashUnchanged: true,
+            catalogChannel: "stable",
+            catalogRevision: 1,
+            catalogReleaseTag: "fw-packages-stable-001"
+        )
+
+        XCTAssertTrue(TumoflipPackageReleaseMatcher.matches(
+            manifestVersion: "t-flppr-fw-004",
+            packageRelease: release,
+            channel: .stable,
+            installedVersion: "t-flppr-fw-005"
+        ))
+        XCTAssertFalse(TumoflipPackageReleaseMatcher.matches(
+            manifestVersion: "t-flppr-fw-004",
+            packageRelease: release,
+            channel: .dev,
+            installedVersion: "t-dev-005-001"
         ))
     }
 

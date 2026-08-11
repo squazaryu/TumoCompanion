@@ -216,6 +216,16 @@ final class TumoflipUpdater: ObservableObject {
 
     var packageRevision: String {
         guard let manifest else { return "Unknown" }
+        if let release = manifest.packageRelease,
+           let channel = release.catalogChannel,
+           let revision = release.catalogRevision {
+            return String(
+                format: "%@ %03d · %@",
+                channel.capitalized,
+                revision,
+                String(release.sourceCommit.prefix(10))
+            )
+        }
         let identity = manifest.packageRelease?.sourceCommit ?? manifest.releaseId
         return String(identity.prefix(10))
     }
@@ -408,9 +418,13 @@ final class TumoflipUpdater: ObservableObject {
             )
             let m = selection.manifest
             try m.validate()
-            if let packageRelease = m.packageRelease,
-               packageRelease.targetReleaseTag != selection.release.tag {
-                throw TumoflipManifestError.invalidPackageRelease(packageRelease.id)
+            if let packageRelease = m.packageRelease {
+                let declaredReleaseTag = packageRelease.isIndependentCatalog
+                    ? packageRelease.catalogReleaseTag
+                    : packageRelease.targetReleaseTag
+                guard declaredReleaseTag == selection.release.tag else {
+                    throw TumoflipManifestError.invalidPackageRelease(packageRelease.id)
+                }
             }
             releaseTag = selection.release.tag
             packageRevisionDate = selection.manifestUpdatedAt
@@ -992,6 +1006,7 @@ final class TumoflipUpdater: ObservableObject {
             guard let manifest = try? await manifest(from: manifestAsset.url) else { continue }
             if TumoflipPackageReleaseMatcher.matches(
                 manifestVersion: manifest.firmware.version,
+                packageRelease: manifest.packageRelease,
                 channel: channel,
                 installedVersion: installedVersion
             ) {
