@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.10.11",
-      "versionDate": "2026-08-10",
-      "versionDescription": "Adds verified automatic ESP Flasher packages for C5 and Module One v6.1 with exact board recipes, atomic replacement, SHA-256 and on-device MD5 checks. Other boards remain available through Manual Flash.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.11/TumoCompanion-unsigned.ipa",
-      "size": 29608321,
+      "version": "1.10.12",
+      "versionDate": "2026-08-11",
+      "versionDescription": "Fixes repeated GitHub catalog failures with shared ETag caching, request coalescing and last-known-good fallback for Firmware, FW Packages, Community Apps and ESP32 updates.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.12/TumoCompanion-unsigned.ipa",
+      "size": 29626228,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.10.12",
+          "date": "2026-08-11",
+          "localizedDescription": "Fixes repeated GitHub catalog failures with shared ETag caching, request coalescing and last-known-good fallback for Firmware, FW Packages, Community Apps and ESP32 updates.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.12/TumoCompanion-unsigned.ipa",
+          "size": 29626228,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.10.11",
           "date": "2026-08-10",
