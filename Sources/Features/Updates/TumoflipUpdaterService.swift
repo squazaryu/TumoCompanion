@@ -131,6 +131,26 @@ struct ZipPackageSource: TumoflipPackageSource {
 
 // MARK: - Service / view-model
 
+/// One service owns both FW Packages mutations. The SwiftUI button becoming disabled is
+/// not a synchronization primitive: `install()` performs several awaited compatibility
+/// checks before staging, so a second task can otherwise enter and queue another write of
+/// the same `.ucnew` file. Keep the gate on the main actor and acquire it before the first
+/// suspension point.
+@MainActor
+final class TumoflipTransactionGate {
+    private(set) var isActive = false
+
+    func begin() -> Bool {
+        guard !isActive else { return false }
+        isActive = true
+        return true
+    }
+
+    func end() {
+        isActive = false
+    }
+}
+
 @MainActor
 final class TumoflipUpdater: ObservableObject {
     enum Phase: Equatable {
@@ -176,6 +196,7 @@ final class TumoflipUpdater: ObservableObject {
     /// The last downloaded package zip, cached by content-addressed release id so a
     /// package-only asset replacement under the same firmware tag cannot reuse stale bytes.
     private var cachedSource: (releaseId: String, source: ZipPackageSource)?
+    private let transactionGate = TumoflipTransactionGate()
 
     private var packageZipURL: URL?
     private let repo = "squazaryu/tumoflip"
@@ -205,6 +226,7 @@ final class TumoflipUpdater: ObservableObject {
     }
 
     var busy: Bool {
+        if transactionGate.isActive { return true }
         if validating { return true }
         switch phase {
         case .checking, .downloading, .installing, .cleaning:
@@ -480,11 +502,16 @@ final class TumoflipUpdater: ObservableObject {
 
     func install() async {
         guard let manifest, packageZipURL != nil else { return }
+        // Disable the action and reject any overlapping invocation synchronously,
+        // before compatibility/network awaits can yield back to a still-enabled UI.
+        guard transactionGate.begin() else { return }
+        defer { transactionGate.end() }
         stopRequested = false; stopToken.reset()
+        var activityTotal = max(1, selectedPendingFileCount * 200)
+        phase = .installing(done: 0, total: activityTotal, file: "Preparing…")
         beginTransactionGuards()
         defer { endTransactionGuards() }
         let live = InstallActivityController()
-        var activityTotal = max(1, selectedPendingFileCount * 200)
         do {
             let selectedTargets = self.selectedTargets
             guard !selectedTargets.isEmpty else {
@@ -668,8 +695,18 @@ final class TumoflipUpdater: ObservableObject {
             return
         }
 
+        // Installation and cleanup mutate the same package paths and journal. They
+        // share one gate so neither transaction can begin while the other is awaiting
+        // a BLE/RPC response.
+        guard transactionGate.begin() else { return }
+        defer { transactionGate.end() }
         stopRequested = false
         stopToken.reset()
+        phase = .cleaning(
+            done: 0,
+            total: max(1, selection.entries.count),
+            file: "Preparing…"
+        )
         beginTransactionGuards()
         defer { endTransactionGuards() }
         let live = InstallActivityController()
