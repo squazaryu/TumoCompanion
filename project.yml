@@ -25,6 +25,7 @@ settings:
     CODE_SIGN_STYLE: Manual
     CODE_SIGNING_REQUIRED: "NO"
     CODE_SIGNING_ALLOWED: "NO"
+    GITHUB_OAUTH_CLIENT_ID: "Ov23liKmKXYcliMvoCgL"
     TARGETED_DEVICE_FAMILY: "1,2"
 
 targets:
@@ -60,6 +61,7 @@ targets:
         CFBundleDisplayName: TumoCompanion
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        GitHubOAuthClientID: "$(GITHUB_OAUTH_CLIENT_ID)"
         NSSupportsLiveActivities: true
         CFBundleURLTypes:
           - CFBundleURLName: com.tumoflip.unleashedcompanion

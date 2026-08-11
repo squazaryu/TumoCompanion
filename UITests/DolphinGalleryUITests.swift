@@ -181,6 +181,26 @@ final class ESP32ArchivedRedownloadUITests: XCTestCase {
 }
 
 final class QualityPassUITests: XCTestCase {
+    func testGitHubAccessCardShowsAnonymousAllowance() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-onboardingDone", "YES"]
+        app.launch()
+        app.tabBars.buttons["Settings"].tap()
+
+        let signIn = app.buttons["github-auth-sign-in"]
+        for _ in 0..<4 where !signIn.isHittable { app.swipeUp() }
+        XCTAssertTrue(signIn.waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["Anonymous GitHub access"].exists)
+        XCTAssertTrue(app.staticTexts["60 / hour"].exists)
+        app.swipeUp()
+        XCTAssertTrue(signIn.isHittable)
+
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = "Settings GitHub anonymous access"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+
     func testLongFirmwareVersionWrapsWithoutClipping() {
         let app = XCUIApplication()
         app.launchArguments = [
