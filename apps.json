@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.10.15",
+      "version": "1.10.16",
       "versionDate": "2026-08-11",
-      "versionDescription": "Fixes false BLE disconnect warnings in FW Packages, retries live firmware identity checks and preserves fail-closed compatibility validation before installation.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.15/TumoCompanion-unsigned.ipa",
-      "size": 29719945,
+      "versionDescription": "Shows real progress for large FW Package uploads and lets Stop safely terminate ESP Flasher staging without changing the live FAP.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.16/TumoCompanion-unsigned.ipa",
+      "size": 29727219,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.10.16",
+          "date": "2026-08-11",
+          "localizedDescription": "Shows real progress for large FW Package uploads and lets Stop safely terminate ESP Flasher staging without changing the live FAP.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.16/TumoCompanion-unsigned.ipa",
+          "size": 29727219,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.10.15",
           "date": "2026-08-11",
