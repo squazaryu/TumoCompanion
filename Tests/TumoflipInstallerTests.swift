@@ -24,7 +24,11 @@ final class TumoflipInstallerTests: XCTestCase {
         var failMoveAfterCopy: ((String, String) -> Bool)?
         var failMoveAfterRemove: ((String, String) -> Bool)?
         var checkedMD5FailuresRemaining = 0
+        var checkedMD5FailuresByPath: [String: Int] = [:]
+        var uncheckedMD5FailuresByPath: [String: Int] = [:]
+        var checkedMD5CallsByPath: [String: Int] = [:]
         var onCheckedMD5: (() -> Void)?
+        var afterMove: ((String, String) -> Void)?
         var cancellableWriteChunkSize: Int?
         var onWriteProgress: ((Int) -> Void)?
 
@@ -73,6 +77,10 @@ final class TumoflipInstallerTests: XCTestCase {
         }
         func read(_ path: String) async -> Data? { files[path] }
         func deviceMD5(_ path: String) async -> String? {
+            if let remaining = uncheckedMD5FailuresByPath[path], remaining > 0 {
+                uncheckedMD5FailuresByPath[path] = remaining - 1
+                return nil
+            }
             if (path.contains("/staging/") || path.hasSuffix(".ucnew")),
                staleStagingMD5ReadsRemaining > 0 {
                 staleStagingMD5ReadsRemaining -= 1
@@ -81,12 +89,22 @@ final class TumoflipInstallerTests: XCTestCase {
             return files[path].map { TumoflipHash.md5($0) }
         }
         func checkedDeviceMD5(_ path: String) async throws -> String? {
+            checkedMD5CallsByPath[path, default: 0] += 1
             onCheckedMD5?()
+            if let remaining = checkedMD5FailuresByPath[path], remaining > 0 {
+                checkedMD5FailuresByPath[path] = remaining - 1
+                throw Err.injected
+            }
             if checkedMD5FailuresRemaining > 0 {
                 checkedMD5FailuresRemaining -= 1
                 throw Err.injected
             }
-            return await deviceMD5(path)
+            if (path.contains("/staging/") || path.hasSuffix(".ucnew")),
+               staleStagingMD5ReadsRemaining > 0 {
+                staleStagingMD5ReadsRemaining -= 1
+                return String(repeating: "0", count: 32)
+            }
+            return files[path].map { TumoflipHash.md5($0) }
         }
         func move(_ from: String, to: String) async throws {
             if failMove?(from, to) == true { throw Err.injected }
@@ -95,6 +113,7 @@ final class TumoflipInstallerTests: XCTestCase {
             if failMoveAfterCopy?(from, to) == true { throw Err.injected }
             files[from] = nil
             if failMoveAfterRemove?(from, to) == true { throw Err.injected }
+            afterMove?(from, to)
         }
         func delete(_ path: String) async throws { files[path] = nil }
         func deleteTree(_ path: String) async throws {
@@ -827,6 +846,71 @@ final class TumoflipInstallerTests: XCTestCase {
     }
 
     // MARK: - Flipper copy+remove move semantics
+
+    func testActivationUsesCheckedLargeFileHashInsteadOfBestEffortMD5() async throws {
+        let old = Data("old-large-fap".utf8), new = Data("new-large-fap".utf8)
+        let target = "/ext/apps/Module One/ESP32 Wi-Fi/esp_flasher.fap"
+        let fs = FakeFS()
+        fs.files[target] = old
+        // Reproduces the physical 1.10.18 failure: the legacy 20-second helper
+        // returned nil twice for the existing 6.3 MB FAP, while checked MD5 works.
+        fs.uncheckedMD5FailuresByPath[target] = 2
+        let inst = TumoflipInstaller(fs: fs, source: FakeSource(data: ["esp": new]))
+
+        let outcome = try await inst.install(plan([file("esp", target, new)]))
+
+        XCTAssertEqual(outcome, .installed(files: 1, legacyMovedAside: 0))
+        XCTAssertEqual(fs.files[target], new)
+        XCTAssertEqual(fs.uncheckedMD5FailuresByPath[target], 2, "activation must not use the lossy 20-second helper")
+        XCTAssertGreaterThanOrEqual(fs.checkedMD5CallsByPath[target, default: 0], 2)
+    }
+
+    func testActivationMD5TimeoutAfterRenameRestoresOriginal() async throws {
+        let old = Data("old-large-fap".utf8), new = Data("new-large-fap".utf8)
+        let target = "/ext/apps/Module One/ESP32 Wi-Fi/esp_flasher.fap"
+        let fs = FakeFS()
+        fs.files[target] = old
+        fs.afterMove = { from, to in
+            if from.hasSuffix(".ucnew"), to == target {
+                // Both bounded attempts fail only after the verified stage has
+                // landed. Rollback must keep and restore the verified old copy.
+                fs.checkedMD5FailuresByPath[target] = 2
+            }
+        }
+        let inst = TumoflipInstaller(fs: fs, source: FakeSource(data: ["esp": new]))
+
+        await assertThrows(
+            { try await inst.install(self.plan([self.file("esp", target, new)])) },
+            .deviceVerificationUnavailable(target)
+        )
+
+        XCTAssertEqual(fs.files[target], old)
+        XCTAssertNil(fs.files[target + ".ucnew"])
+        XCTAssertFalse(fs.files.keys.contains { $0.contains("/.tumoflip/rollback/") })
+        let timeoutState = await fs.readState()
+        XCTAssertNil(timeoutState?.txn)
+    }
+
+    func testActivationDigestMismatchRestoresOriginal() async throws {
+        let old = Data("old-large-fap".utf8), new = Data("new-large-fap".utf8)
+        let target = "/ext/apps/Module One/ESP32 Wi-Fi/esp_flasher.fap"
+        let fs = FakeFS()
+        fs.files[target] = old
+        fs.afterMove = { from, to in
+            if from.hasSuffix(".ucnew"), to == target { fs.files[to]?.append(0xFF) }
+        }
+        let inst = TumoflipInstaller(fs: fs, source: FakeSource(data: ["esp": new]))
+
+        await assertThrows(
+            { try await inst.install(self.plan([self.file("esp", target, new)])) },
+            .deviceVerifyFailed(target)
+        )
+
+        XCTAssertEqual(fs.files[target], old)
+        XCTAssertNil(fs.files[target + ".ucnew"])
+        let mismatchState = await fs.readState()
+        XCTAssertNil(mismatchState?.txn)
+    }
 
     func testActivationErrorAfterCopyIsReconciled() async throws {
         let bytes = Data("new".utf8)

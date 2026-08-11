@@ -64,6 +64,7 @@ enum TumoflipInstallError: Error, Equatable {
     case sourceMissing(String)
     case hashMismatch(String)
     case deviceVerifyFailed(String)
+    case deviceVerificationUnavailable(String)
     case stagingVerifyFailed(target: String, expectedBytes: Int, actualBytes: Int?)
     case stagingVerificationUnavailable(target: String, actualBytes: Int?)
     case incompatible(String)            // device firmware/api/target vs manifest
@@ -732,6 +733,17 @@ struct TumoflipInstaller {
         }
     }
 
+    /// Transaction-critical hashes must preserve transport failures instead of
+    /// turning a slow large-file MD5 into a false mismatch. The concrete BLE file
+    /// store gives these calls the same 60-second ceiling used for staged FAPs.
+    private func transactionDeviceMD5(_ path: String) async throws -> String? {
+        do {
+            return try await checkedDeviceMD5(path)
+        } catch {
+            throw TumoflipInstallError.deviceVerificationUnavailable(path)
+        }
+    }
+
     /// MD5 is a single RPC command with no intermediate progress frames. On a large
     /// FAP a busy SD can return a stale digest immediately after the write, so retry
     /// only a completed mismatch. A transport error remains observable and never
@@ -874,15 +886,21 @@ struct TumoflipInstaller {
                 // Firmware resources may already contain these exact bytes. Record
                 // them in the ledger without moving or rewriting an identical FAP;
                 // this also avoids touching an executable that just exited.
-                if await fs.deviceMD5(journal.ops[i].target) == journal.ops[i].md5 {
-                    try? await fs.delete(journal.ops[i].stage)
-                    journal.ops[i].state = .unchanged
-                    state.txn = journal; try await saveState(&state)
-                    continue
-                }
                 if await fs.exists(journal.ops[i].target) {
-                    guard let originalMD5 = await fs.deviceMD5(journal.ops[i].target) else {
+                    // Hash the existing app once with the large-file timeout. The old
+                    // implementation issued two 20-second best-effort hashes here;
+                    // both could become nil for ESP Flasher and falsely abort a fully
+                    // verified install before activation.
+                    guard let originalMD5 = try await transactionDeviceMD5(
+                        journal.ops[i].target
+                    ) else {
                         throw TumoflipInstallError.deviceVerifyFailed(journal.ops[i].target)
+                    }
+                    if originalMD5 == journal.ops[i].md5 {
+                        try? await fs.delete(journal.ops[i].stage)
+                        journal.ops[i].state = .unchanged
+                        state.txn = journal; try await saveState(&state)
+                        continue
                     }
                     journal.ops[i].hadOriginal = true
                     journal.ops[i].originalMD5 = originalMD5
@@ -907,7 +925,7 @@ struct TumoflipInstaller {
             // 4. CLEANUP — MOVE legacy files into the rollback area (reversible), never delete.
             for i in journal.cleanups.indices {
                 if await fs.exists(journal.cleanups[i].legacy) {
-                    guard let md5 = await fs.deviceMD5(journal.cleanups[i].legacy) else {
+                    guard let md5 = try await transactionDeviceMD5(journal.cleanups[i].legacy) else {
                         throw TumoflipInstallError.deviceVerifyFailed(journal.cleanups[i].legacy)
                     }
                     journal.cleanups[i].md5 = md5
@@ -955,9 +973,9 @@ struct TumoflipInstaller {
         where journal.cleanups[i].state != .planned {
             let c = journal.cleanups[i]
             do {
-                if let md5 = c.md5, await fs.deviceMD5(c.backup) == md5 {
+                if let md5 = c.md5, try await transactionDeviceMD5(c.backup) == md5 {
                     if await fs.exists(c.legacy) {
-                        if await fs.deviceMD5(c.legacy) == md5 {
+                        if try await transactionDeviceMD5(c.legacy) == md5 {
                             try? await fs.delete(c.backup)
                         } else {
                             throw TumoflipInstallError.deviceVerifyFailed(c.legacy)
@@ -1000,8 +1018,8 @@ struct TumoflipInstaller {
         if op.state == .planned || op.state == .staged || op.state == .unchanged { return }
 
         if op.hadOriginal == true, let oldMD5 = op.originalMD5 {
-            let targetMD5 = await fs.deviceMD5(op.target)
-            let backupMD5 = await fs.deviceMD5(op.backup)
+            let targetMD5 = try await transactionDeviceMD5(op.target)
+            let backupMD5 = try await transactionDeviceMD5(op.backup)
 
             if targetMD5 == oldMD5 {
                 if backupMD5 == oldMD5 { try? await fs.delete(op.backup) }
@@ -1018,8 +1036,8 @@ struct TumoflipInstaller {
         // No original existed. During activationPlanned/activated any target matching
         // our bytes (or a partial copy while the verified stage still exists) is ours.
         if await fs.exists(op.target) {
-            let targetMD5 = await fs.deviceMD5(op.target)
-            let stageMD5 = op.md5.isEmpty ? nil : await fs.deviceMD5(op.stage)
+            let targetMD5 = try await transactionDeviceMD5(op.target)
+            let stageMD5 = op.md5.isEmpty ? nil : try await transactionDeviceMD5(op.stage)
             let stageIsValid = stageMD5 == op.md5
             guard targetMD5 == op.md5 || stageIsValid else {
                 throw TumoflipInstallError.deviceVerifyFailed(op.target)
@@ -1034,12 +1052,14 @@ struct TumoflipInstaller {
         var moveError: Error?
         do { try await fs.move(from, to: to) } catch { moveError = error }
 
-        guard await fs.deviceMD5(to) == md5 else {
-            if await fs.exists(to) { try? await fs.delete(to) }
+        guard try await transactionDeviceMD5(to) == md5 else {
+            // Do not delete a destination whose digest could not be established.
+            // It may be the only surviving copy after a copy+remove rename; the
+            // journaled rollback below is responsible for reconciling both paths.
             throw moveError ?? TumoflipInstallError.deviceVerifyFailed(to)
         }
         if await fs.exists(from) {
-            guard await fs.deviceMD5(from) == md5 else {
+            guard try await transactionDeviceMD5(from) == md5 else {
                 throw TumoflipInstallError.deviceVerifyFailed(from)
             }
             try await fs.delete(from)
