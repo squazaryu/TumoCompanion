@@ -77,6 +77,49 @@ struct TumoflipManifest: Codable, Equatable {
         let sourceFirmwareVersion: String
         let targetReleaseTag: String
         let firmwareFlashUnchanged: Bool
+        /// Present only for the independent FW Packages catalog. Legacy package-only
+        /// overlays were attached to (and named after) a firmware release; catalog
+        /// releases have their own immutable tag and monotonically increasing revision.
+        let catalogChannel: String?
+        let catalogRevision: Int?
+        let catalogReleaseTag: String?
+
+        var isIndependentCatalog: Bool {
+            catalogChannel != nil && catalogRevision != nil && catalogReleaseTag != nil
+        }
+
+        var independentCatalogMetadataIsPartial: Bool {
+            let present = [
+                catalogChannel != nil,
+                catalogRevision != nil,
+                catalogReleaseTag != nil,
+            ].filter { $0 }.count
+            return present != 0 && present != 3
+        }
+
+        init(
+            id: String,
+            type: String,
+            sourceCommit: String,
+            sourceDirty: Bool,
+            sourceFirmwareVersion: String,
+            targetReleaseTag: String,
+            firmwareFlashUnchanged: Bool,
+            catalogChannel: String? = nil,
+            catalogRevision: Int? = nil,
+            catalogReleaseTag: String? = nil
+        ) {
+            self.id = id
+            self.type = type
+            self.sourceCommit = sourceCommit
+            self.sourceDirty = sourceDirty
+            self.sourceFirmwareVersion = sourceFirmwareVersion
+            self.targetReleaseTag = targetReleaseTag
+            self.firmwareFlashUnchanged = firmwareFlashUnchanged
+            self.catalogChannel = catalogChannel
+            self.catalogRevision = catalogRevision
+            self.catalogReleaseTag = catalogReleaseTag
+        }
 
         enum CodingKeys: String, CodingKey {
             case id, type
@@ -85,6 +128,9 @@ struct TumoflipManifest: Codable, Equatable {
             case sourceFirmwareVersion = "source_firmware_version"
             case targetReleaseTag = "target_release_tag"
             case firmwareFlashUnchanged = "firmware_flash_unchanged"
+            case catalogChannel = "catalog_channel"
+            case catalogRevision = "catalog_revision"
+            case catalogReleaseTag = "catalog_release_tag"
         }
     }
 
@@ -178,6 +224,21 @@ extension TumoflipManifest {
                   packageRelease.targetReleaseTag.utf8.count <= 80,
                   packageRelease.firmwareFlashUnchanged else {
                 throw TumoflipManifestError.invalidPackageRelease(packageRelease.id)
+            }
+            guard !packageRelease.independentCatalogMetadataIsPartial else {
+                throw TumoflipManifestError.invalidPackageRelease(packageRelease.id)
+            }
+            if packageRelease.isIndependentCatalog {
+                guard let channel = packageRelease.catalogChannel,
+                      channel == TumoflipFirmwareChannel.stable.rawValue ||
+                          channel == TumoflipFirmwareChannel.dev.rawValue,
+                      let revision = packageRelease.catalogRevision,
+                      (1...999).contains(revision),
+                      packageRelease.catalogReleaseTag == String(
+                          format: "fw-packages-%@-%03d", channel, revision
+                      ) else {
+                    throw TumoflipManifestError.invalidPackageRelease(packageRelease.id)
+                }
             }
         }
     }

@@ -207,9 +207,21 @@ enum TumoflipFirmwareRouter {
 enum TumoflipPackageReleaseMatcher {
     static func matches(
         manifestVersion: String,
+        packageRelease: TumoflipManifest.PackageRelease? = nil,
         channel: TumoflipFirmwareChannel,
         installedVersion: String?
     ) -> Bool {
+        // Independent catalog revisions follow the Community Apps lifecycle: the
+        // package channel and firmware compatibility are checked, but the package is
+        // not named after (or pinned to) one exact firmware release.
+        if let packageRelease, packageRelease.isIndependentCatalog {
+            guard packageRelease.catalogChannel == channel.rawValue else { return false }
+            guard let installedVersion, !installedVersion.isEmpty else { return true }
+            return TumoflipFirmwareChannel.infer(version: installedVersion) == channel
+        }
+
+        // Backward compatibility for package assets attached directly to old firmware
+        // releases. Those manifests remain exact-version pinned.
         guard TumoflipFirmwareChannel.infer(version: manifestVersion) == channel else {
             return false
         }

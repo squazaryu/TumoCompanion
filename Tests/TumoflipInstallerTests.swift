@@ -1031,6 +1031,32 @@ final class TumoflipInstallerTests: XCTestCase {
         }
     }
 
+    func testIndependentCatalogAcceptsAnotherFirmwareInSameChannel() throws {
+        let m = makeIndependentManifest(channel: "dev")
+        XCTAssertNoThrow(try TumoflipCompat.check(
+            deviceTarget: 7,
+            deviceAPI: "87.14",
+            deviceVersion: "t-dev-004-013",
+            deviceOriginFork: "tumoflip",
+            manifest: m
+        ))
+    }
+
+    func testIndependentCatalogRejectsDifferentFirmwareChannel() {
+        let m = makeIndependentManifest(channel: "dev")
+        XCTAssertThrowsError(try TumoflipCompat.check(
+            deviceTarget: 7,
+            deviceAPI: "87.14",
+            deviceVersion: "t-flppr-fw-004",
+            deviceOriginFork: "tumoflip",
+            manifest: m
+        )) {
+            guard case .incompatible? = $0 as? TumoflipInstallError else {
+                return XCTFail("\($0)")
+            }
+        }
+    }
+
     func testCompatOriginMismatch() {
         let m = makeManifest(target: 7, api: "87.14")
         XCTAssertThrowsError(try TumoflipCompat.check(deviceTarget: 7, deviceAPI: "87.14",
@@ -1043,6 +1069,37 @@ final class TumoflipInstallerTests: XCTestCase {
         TumoflipManifest(schema: 2, releaseId: rid,
                          firmware: .init(api: api, name: "tumoflip", version: "v", target: target, radioAddress: nil),
                          artifacts: [:], packages: [:], cleanup: [], safety: nil)
+    }
+
+    private func makeIndependentManifest(channel: String) -> TumoflipManifest {
+        let release = TumoflipManifest.PackageRelease(
+            id: "fw-packages-\(channel)-001",
+            type: "package-only",
+            sourceCommit: String(repeating: "a", count: 40),
+            sourceDirty: false,
+            sourceFirmwareVersion: "t-dev-004-014",
+            targetReleaseTag: "t-dev-004-014",
+            firmwareFlashUnchanged: true,
+            catalogChannel: channel,
+            catalogRevision: 1,
+            catalogReleaseTag: "fw-packages-\(channel)-001"
+        )
+        return TumoflipManifest(
+            schema: 2,
+            releaseId: rid,
+            firmware: .init(
+                api: "87.14",
+                name: "tumoflip",
+                version: "t-dev-004-014",
+                target: 7,
+                radioAddress: nil
+            ),
+            artifacts: [:],
+            packages: [:],
+            cleanup: [],
+            safety: nil,
+            packageRelease: release
+        )
     }
 
     // MARK: - Device-backed verification ("Verify on device", #9)

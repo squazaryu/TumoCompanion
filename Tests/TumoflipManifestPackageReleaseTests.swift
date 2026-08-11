@@ -23,6 +23,48 @@ final class TumoflipManifestPackageReleaseTests: XCTestCase {
         XCTAssertNil(manifest.packageRelease)
     }
 
+    func testDecodesIndependentCatalogRevision() throws {
+        let independent = packageRelease.replacingOccurrences(
+            of: "\"firmware_flash_unchanged\": true",
+            with: """
+            "firmware_flash_unchanged": true,
+              "catalog_channel": "dev",
+              "catalog_revision": 1,
+              "catalog_release_tag": "fw-packages-dev-001"
+            """
+        )
+        let manifest = try TumoflipManifest.decode(fixture(packageRelease: independent))
+
+        try manifest.validate()
+        XCTAssertTrue(manifest.packageRelease?.isIndependentCatalog == true)
+        XCTAssertEqual(manifest.packageRelease?.catalogChannel, "dev")
+        XCTAssertEqual(manifest.packageRelease?.catalogRevision, 1)
+        XCTAssertEqual(manifest.packageRelease?.catalogReleaseTag, "fw-packages-dev-001")
+    }
+
+    func testRejectsPartialOrMismatchedIndependentCatalogMetadata() throws {
+        let partial = packageRelease.replacingOccurrences(
+            of: "\"firmware_flash_unchanged\": true",
+            with: "\"firmware_flash_unchanged\": true, \"catalog_channel\": \"dev\""
+        )
+        XCTAssertThrowsError(
+            try TumoflipManifest.decode(fixture(packageRelease: partial)).validate()
+        )
+
+        let wrongTag = packageRelease.replacingOccurrences(
+            of: "\"firmware_flash_unchanged\": true",
+            with: """
+            "firmware_flash_unchanged": true,
+              "catalog_channel": "dev",
+              "catalog_revision": 1,
+              "catalog_release_tag": "fw-packages-dev-999"
+            """
+        )
+        XCTAssertThrowsError(
+            try TumoflipManifest.decode(fixture(packageRelease: wrongTag)).validate()
+        )
+    }
+
     func testRejectsDirtyOrFirmwareChangingPackageOverlay() throws {
         let unsafe = packageRelease
             .replacingOccurrences(of: "\"source_dirty\": false", with: "\"source_dirty\": true")
