@@ -19,6 +19,7 @@ protocol TumoflipDeviceFS {
     func read(_ path: String) async -> Data?
     func deviceMD5(_ path: String) async -> String?
     func checkedDeviceMD5(_ path: String) async throws -> String?
+    func fileSize(_ path: String) async -> Int?
     func move(_ from: String, to: String) async throws
     func delete(_ path: String) async throws
     func deleteTree(_ path: String) async throws
@@ -44,6 +45,12 @@ extension TumoflipDeviceFS {
     func checkedDeviceMD5(_ path: String) async throws -> String? {
         await deviceMD5(path)
     }
+
+    /// Compatibility fallback for test doubles. Live adapters override this with
+    /// a directory listing so diagnostics never download a multi-megabyte FAP.
+    func fileSize(_ path: String) async -> Int? {
+        await read(path)?.count
+    }
 }
 
 /// Yields the bytes for a manifest `source` path (from the downloaded package zip).
@@ -57,6 +64,7 @@ enum TumoflipInstallError: Error, Equatable {
     case sourceMissing(String)
     case hashMismatch(String)
     case deviceVerifyFailed(String)
+    case stagingVerifyFailed(target: String, expectedBytes: Int, actualBytes: Int?)
     case incompatible(String)            // device firmware/api/target vs manifest
     case rollbackIncomplete([String])    // targets that could NOT be restored
     case statePersistenceFailed(String)
@@ -88,6 +96,8 @@ private final class TumoflipByteProgress: @unchecked Sendable {
     private let name: String
     private let report: ((Int, Int, String) -> Void)?
     private var lastPercent = -1
+    private var lastAttempt = 0
+    private var highWaterPercent = 0
 
     init(
         totalBytes: Int,
@@ -103,16 +113,24 @@ private final class TumoflipByteProgress: @unchecked Sendable {
         self.report = report
     }
 
-    func update(_ bytes: Int) {
+    func update(_ bytes: Int, attempt: Int) {
         let percent = min(100, max(0, bytes * 100 / totalBytes))
         lock.lock()
-        guard percent != lastPercent else {
+        guard attempt != lastAttempt || percent != lastPercent else {
             lock.unlock()
             return
         }
         lastPercent = percent
+        lastAttempt = attempt
+        highWaterPercent = max(highWaterPercent, percent)
+        let visiblePercent = highWaterPercent
         lock.unlock()
-        report?(completedUnits + percent, totalUnits, "Uploading \(name) · \(percent)%")
+        let prefix = attempt == 1 ? "" : "Retry \(attempt)/3 · "
+        report?(
+            completedUnits + visiblePercent,
+            totalUnits,
+            "\(prefix)Uploading \(name) · \(percent)%"
+        )
     }
 }
 
@@ -723,6 +741,17 @@ struct TumoflipInstaller {
         }
     }
 
+    /// A completed RPC write may become visible to the storage service before a
+    /// slow SD card has finished flushing. Check once immediately and once after
+    /// a bounded grace period before deciding the staged copy is corrupt.
+    private func stagedMD5Matches(_ path: String, expected: String) async throws -> Bool {
+        for attempt in 0..<2 {
+            if attempt > 0 { try? await Task.sleep(nanoseconds: 500_000_000) }
+            if try await checkedDeviceMD5(path) == expected { return true }
+        }
+        return false
+    }
+
     @discardableResult
     /// `progress(done, total, label)` uses 100 units per staging file and 100 per
     /// activation, allowing a large file's byte progress to move the shared bar.
@@ -774,22 +803,62 @@ struct TumoflipInstaller {
                     name: displayName,
                     report: progress
                 )
-                byteProgress.update(0)
-                do {
-                    try await fs.write(
-                        bytes,
-                        to: journal.ops[i].stage,
-                        progress: { byteProgress.update($0) },
-                        isStopRequested: isStopRequested
-                    )
-                } catch is CancellationError {
-                    throw TumoflipInstallError.cancelled
-                }
-                if isStopRequested() { throw TumoflipInstallError.cancelled }
                 let md5 = TumoflipHash.md5(bytes)
-                progress?((i + 1) * 100, 200 * journal.ops.count, "Verifying " + displayName)
-                guard await fs.deviceMD5(journal.ops[i].stage) == md5 else {
-                    throw TumoflipInstallError.deviceVerifyFailed(f.target)
+                let stagePath = journal.ops[i].stage
+                var staged = false
+                var lastWriteError: Error?
+                var actualBytes: Int?
+
+                // Large FAPs can expose a transient BLE/SD write failure. Retry the
+                // temporary copy only; the live target remains untouched until one
+                // complete staged file passes MD5.
+                for attempt in 1...3 {
+                    if isStopRequested() { throw TumoflipInstallError.cancelled }
+                    if await fs.exists(stagePath) { try await fs.delete(stagePath) }
+                    byteProgress.update(0, attempt: attempt)
+                    do {
+                        try await fs.write(
+                            bytes,
+                            to: stagePath,
+                            progress: { byteProgress.update($0, attempt: attempt) },
+                            isStopRequested: isStopRequested
+                        )
+                        lastWriteError = nil
+                        if isStopRequested() { throw TumoflipInstallError.cancelled }
+                        progress?(
+                            (i + 1) * 100,
+                            200 * journal.ops.count,
+                            attempt == 1
+                                ? "Verifying " + displayName
+                                : "Retry \(attempt)/3 · Verifying " + displayName
+                        )
+                        if try await stagedMD5Matches(stagePath, expected: md5) {
+                            staged = true
+                            break
+                        }
+                        actualBytes = await fs.fileSize(stagePath)
+                        try? await fs.delete(stagePath)
+                    } catch is CancellationError {
+                        throw TumoflipInstallError.cancelled
+                    } catch let error as TumoflipInstallError where error == .cancelled {
+                        throw error
+                    } catch {
+                        lastWriteError = error
+                        try? await fs.delete(stagePath)
+                    }
+
+                    if attempt < 3 {
+                        try? await Task.sleep(nanoseconds: 700_000_000)
+                    }
+                }
+
+                guard staged else {
+                    if let lastWriteError { throw lastWriteError }
+                    throw TumoflipInstallError.stagingVerifyFailed(
+                        target: f.target,
+                        expectedBytes: bytes.count,
+                        actualBytes: actualBytes
+                    )
                 }
                 if isStopRequested() { throw TumoflipInstallError.cancelled }
                 journal.ops[i].md5 = md5
