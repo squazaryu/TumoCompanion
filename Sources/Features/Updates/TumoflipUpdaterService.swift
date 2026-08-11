@@ -375,15 +375,40 @@ final class TumoflipUpdater: ObservableObject {
         }
     }
 
-    /// Total selected files across all groups — drives the install bar / button.
+    /// Total selected files across all groups. This is selection state only; install
+    /// actions use `selectedPendingFileCount` so current files are never staged again.
     var selectedFileCount: Int {
         TumoflipManifest.knownGroups.reduce(0) { $0 + selectedCount($1) }
     }
 
+    private var selectedTargets: Set<String> {
+        Set(TumoflipManifest.knownGroups.flatMap { group in
+            self.files(group).lazy.filter { self.isFileSelected($0.target) }.map(\.target)
+        })
+    }
+
+    nonisolated static func pendingInstallTargets(
+        selected: Set<String>,
+        statuses: [String: TumoflipInstaller.FileStatus]
+    ) -> Set<String> {
+        selected.filter { statuses[$0] != .upToDate }
+    }
+
+    /// Selected files that still require an action according to the latest device
+    /// reconciliation. Up-to-date files remain selected in the UI but are never
+    /// counted or staged again.
+    var selectedPendingFileCount: Int {
+        Self.pendingInstallTargets(selected: selectedTargets, statuses: fileStatus).count
+    }
+
     var selectedRequiresCompatibilityIdentity: Bool {
-        TumoflipManifest.knownGroups.contains { group in
-            files(group).contains {
-                isFileSelected($0.target) && FapCompatibility.isBinary($0.target)
+        let pending = Self.pendingInstallTargets(
+            selected: selectedTargets,
+            statuses: fileStatus
+        )
+        return TumoflipManifest.knownGroups.contains { group in
+            self.files(group).contains {
+                pending.contains($0.target) && FapCompatibility.isBinary($0.target)
             }
         }
     }
@@ -459,11 +484,13 @@ final class TumoflipUpdater: ObservableObject {
         beginTransactionGuards()
         defer { endTransactionGuards() }
         let live = InstallActivityController()
+        var activityTotal = max(1, selectedPendingFileCount * 200)
         do {
-            let requestedTargets = Set(TumoflipManifest.knownGroups.flatMap { group in
-                files(group).filter { isFileSelected($0.target) }.map(\.target)
-            })
-            guard !requestedTargets.isEmpty else { phase = .failed("No files selected."); return }
+            let selectedTargets = self.selectedTargets
+            guard !selectedTargets.isEmpty else {
+                phase = .failed("No files selected.")
+                return
+            }
 
             // Compare the connected Flipper with the manifest before touching the SD.
             let channel = activeChannel
@@ -492,6 +519,37 @@ final class TumoflipUpdater: ObservableObject {
                 return
             }
 
+            // Re-check only files currently known to need an install. The screen's full
+            // reconciliation already verified the other selected files; hashing all 94
+            // again would turn a one-FAP update into another long package scan. Any
+            // transport error still fails before download or SD writes.
+            let pendingTargets = Self.pendingInstallTargets(
+                selected: selectedTargets,
+                statuses: fileStatus
+            )
+            guard !pendingTargets.isEmpty else {
+                phase = .done("Already installed — nothing to do.")
+                return
+            }
+            let statusInstaller = TumoflipInstaller(
+                fs: fs,
+                source: ZipPackageSource(entries: [:])
+            )
+            let refreshedStatuses = try await statusInstaller.verifyPackageTargets(
+                pendingTargets,
+                manifest: manifest
+            )
+            fileStatus.merge(refreshedStatuses) { _, refreshed in refreshed }
+            lastVerifiedOnDevice = true
+            let requestedTargets = Self.pendingInstallTargets(
+                selected: pendingTargets,
+                statuses: refreshedStatuses
+            )
+            guard !requestedTargets.isEmpty else {
+                phase = .done("Already installed — nothing to do.")
+                return
+            }
+
             phase = .downloading
             let source = try await packageSource()
             if stopToken.isStopped { throw TumoflipInstallError.cancelled }
@@ -513,9 +571,14 @@ final class TumoflipUpdater: ObservableObject {
                 return
             }
 
-            let effectiveExclusions = excludedFiles.union(blocked.keys)
+            let allTargets = Set(TumoflipManifest.knownGroups.flatMap { group in
+                self.files(group).map(\.target)
+            })
+            let effectiveExclusions = allTargets
+                .subtracting(requestedTargets)
+                .union(blocked.keys)
             let groups = Set(TumoflipManifest.knownGroups.filter { group in
-                files(group).contains { !effectiveExclusions.contains($0.target) }
+                self.files(group).contains { requestedTargets.contains($0.target) }
             })
             let plan = try TumoflipInstallPlan.make(
                 manifest: manifest,
@@ -523,6 +586,7 @@ final class TumoflipUpdater: ObservableObject {
                 excluding: effectiveExclusions
             ).installationOnly
             guard !plan.files.isEmpty else { phase = .failed("No compatible files selected."); return }
+            activityTotal = 200 * plan.files.count
 
             // A running external app may keep its own FAP open. Stop it before any
             // live path is backed up or replaced, and fail closed if Loader remains
@@ -531,8 +595,8 @@ final class TumoflipUpdater: ObservableObject {
                 try await ensureLoaderIdle()
             }
 
-            phase = .installing(done: 0, total: 200 * plan.files.count, file: "Starting…")
-            live.start(total: 200 * plan.files.count, title: "Installing firmware packages")
+            phase = .installing(done: 0, total: activityTotal, file: "Starting…")
+            live.start(total: activityTotal, title: "Installing firmware packages")
             let transferReporter = TransferActivityReporter(channel: channel)
             _ = await transferReporter.prepare()
             transferReporter.begin("firmware packages")
@@ -552,15 +616,15 @@ final class TumoflipUpdater: ObservableObject {
             case .alreadyInstalled:
                 phase = .done("Already installed — nothing to do.")
                 live.succeed(
-                    completed: 200 * plan.files.count,
-                    total: 200 * plan.files.count,
+                    completed: activityTotal,
+                    total: activityTotal,
                     detail: "Already installed"
                 )
             case let .installed(files, _):
                 phase = .done("Installed \(files) file\(files == 1 ? "" : "s").")
                 live.succeed(
-                    completed: 200 * plan.files.count,
-                    total: 200 * plan.files.count,
+                    completed: activityTotal,
+                    total: activityTotal,
                     detail: "Firmware packages installed"
                 )
             }
@@ -571,7 +635,7 @@ final class TumoflipUpdater: ObservableObject {
             phase = .done("Stopped — rolled back to the previous version, nothing changed.")
             live.stop(
                 completed: 0,
-                total: max(1, selectedFileCount * 2),
+                total: activityTotal,
                 detail: "Rolled back"
             )
             await refreshStatus()
@@ -579,7 +643,7 @@ final class TumoflipUpdater: ObservableObject {
             phase = .failed(installErrorText(e))
             live.fail(
                 completed: 0,
-                total: max(1, selectedFileCount * 2),
+                total: activityTotal,
                 detail: installErrorText(e)
             )
             await refreshStatus()
@@ -587,7 +651,7 @@ final class TumoflipUpdater: ObservableObject {
             phase = .failed(friendly(error))
             live.fail(
                 completed: 0,
-                total: max(1, selectedFileCount * 2),
+                total: activityTotal,
                 detail: friendly(error)
             )
             await refreshStatus()

@@ -62,4 +62,35 @@ final class TumoflipStatusTests: XCTestCase {
         XCTAssertEqual(status("base", m, l), .upToDate)
         XCTAssertEqual(status("arf", m, l), .notInstalled)
     }
+
+    func testPendingInstallTargetsExcludeOnlyVerifiedCurrentSelections() {
+        let selected: Set<String> = ["/ext/current", "/ext/changed", "/ext/missing", "/ext/unknown"]
+        let statuses: [String: TumoflipInstaller.FileStatus] = [
+            "/ext/current": .upToDate,
+            "/ext/changed": .needsUpdate,
+            "/ext/missing": .missing,
+        ]
+
+        XCTAssertEqual(
+            TumoflipUpdater.pendingInstallTargets(
+                selected: selected,
+                statuses: statuses
+            ),
+            Set(["/ext/changed", "/ext/missing", "/ext/unknown"])
+        )
+    }
+
+    func testPendingInstallTargetsKeepValidationFailuresFailClosed() {
+        XCTAssertEqual(
+            TumoflipUpdater.pendingInstallTargets(
+                selected: ["/ext/failed", "/ext/unselected"],
+                statuses: [
+                    "/ext/failed": .validationError,
+                    "/ext/unselected": .upToDate,
+                    "/ext/not-selected": .needsUpdate,
+                ]
+            ),
+            Set(["/ext/failed"])
+        )
+    }
 }

@@ -493,6 +493,45 @@ struct TumoflipInstaller {
         try await reconcileStatus(manifest: manifest, captureValidationErrors: true)
     }
 
+    /// Re-check only the files that the current install action may change. The full
+    /// screen reconciliation already established every other file's status; hashing
+    /// all selected groups again here would make a one-FAP update wait on every FAP.
+    /// Transport errors still throw after the normal retry, so planning remains
+    /// fail-closed before the package archive is downloaded or the SD is mutated.
+    func verifyPackageTargets(
+        _ targets: Set<String>,
+        manifest: TumoflipManifest
+    ) async throws -> [String: FileStatus] {
+        let manifestFiles = TumoflipManifest.knownGroups
+            .flatMap { manifest.packages[$0] ?? [] }
+        let filesByTarget = Dictionary(
+            uniqueKeysWithValues: manifestFiles.map { ($0.target, $0) }
+        )
+        guard targets.allSatisfy({ filesByTarget[$0] != nil }) else {
+            let missing = targets.first { filesByTarget[$0] == nil } ?? "manifest target"
+            throw TumoflipInstallError.sourceMissing(missing)
+        }
+
+        let ledger = (try await loadState())?.ledger ?? [:]
+        var statuses: [String: FileStatus] = [:]
+        for target in targets.sorted() {
+            guard let file = filesByTarget[target] else { continue }
+            guard let actual = try await checkedDeviceMD5(target) else {
+                statuses[target] = .missing
+                continue
+            }
+            if let expected = file.md5 {
+                statuses[target] = actual == expected ? .upToDate : .needsUpdate
+            } else if let entry = ledger[target] {
+                statuses[target] = entry.sha256 == file.sha256 && entry.md5 == actual
+                    ? .upToDate : .needsUpdate
+            } else {
+                statuses[target] = .unknown
+            }
+        }
+        return statuses
+    }
+
     private func reconcileStatus(
         manifest: TumoflipManifest,
         captureValidationErrors: Bool
