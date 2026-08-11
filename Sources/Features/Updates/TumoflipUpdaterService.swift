@@ -29,6 +29,13 @@ struct FlipperDeviceFS: TumoflipDeviceFS {
     func checkedDeviceMD5(_ path: String) async throws -> String? {
         try await storage.checkedMD5(path)
     }
+    func fileSize(_ path: String) async -> Int? {
+        let directory = (path as NSString).deletingLastPathComponent
+        let name = (path as NSString).lastPathComponent
+        guard let files = try? await storage.list(directory),
+              let file = files.first(where: { $0.name == name }) else { return nil }
+        return Int(file.size)
+    }
     func move(_ from: String, to: String) async throws { try await storage.move(from, to: to) }
     func delete(_ path: String) async throws { try await storage.delete(path, recursive: false) }
     func deleteTree(_ path: String) async throws { try await storage.delete(path, recursive: true) }
@@ -71,6 +78,13 @@ struct USBTumoflipDeviceFS: TumoflipDeviceFS {
         guard await storage.exists(path) else { return nil }
         let data = try await storage.read(path)
         return TumoflipHash.md5(data)
+    }
+    func fileSize(_ path: String) async -> Int? {
+        let directory = (path as NSString).deletingLastPathComponent
+        let name = (path as NSString).lastPathComponent
+        guard let files = try? await storage.list(directory),
+              let file = files.first(where: { $0.name == name }) else { return nil }
+        return Int(file.size)
     }
     func move(_ from: String, to: String) async throws { try await storage.move(from, to: to) }
     func delete(_ path: String) async throws { try await storage.delete(path, recursive: false) }
@@ -1034,6 +1048,15 @@ final class TumoflipUpdater: ObservableObject {
         case .sourceMissing(let s): return "Missing in archive: \(s) — rolled back."
         case .hashMismatch(let s): return "Hash mismatch: \(s) — rolled back."
         case .deviceVerifyFailed(let t): return "On-device verify failed: \(t) — rolled back."
+        case .stagingVerifyFailed(let target, let expected, let actual):
+            let name = (target as NSString).lastPathComponent
+            guard let actual else {
+                return "Staged copy missing after 3 attempts: \(name) — rolled back."
+            }
+            if actual != expected {
+                return "Staged copy incomplete after 3 attempts: \(name) · device \(actual) B vs source \(expected) B — rolled back."
+            }
+            return "Staged copy corrupted after 3 attempts: \(name) · size matches but MD5 differs — rolled back."
         case .incompatible(let m): return "Incompatible: \(m). Nothing was changed."
         case .rollbackIncomplete(let t):
             return "Install failed AND rollback could not restore \(t.count) file(s): \(t.joined(separator: ", ")). Re-open to retry recovery."
