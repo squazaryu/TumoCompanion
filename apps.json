@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.10.20",
+      "version": "1.10.21",
       "versionDate": "2026-08-11",
-      "versionDescription": "Makes FW Packages independent from firmware releases: Stable and Dev FAP catalogs now have their own revisions and remain fail-closed by Tumoflip origin, channel, API and hardware target.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.20/TumoCompanion-unsigned.ipa",
-      "size": 29740812,
+      "versionDescription": "FW Packages now counts and installs only files that actually need an update after focused on-device MD5 checks, so a single ESP Flasher update appears as Install 1 instead of Install 94.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.21/TumoCompanion-unsigned.ipa",
+      "size": 29748156,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.10.21",
+          "date": "2026-08-11",
+          "localizedDescription": "FW Packages now counts and installs only files that actually need an update after focused on-device MD5 checks, so a single ESP Flasher update appears as Install 1 instead of Install 94.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.21/TumoCompanion-unsigned.ipa",
+          "size": 29748156,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.10.20",
           "date": "2026-08-11",
