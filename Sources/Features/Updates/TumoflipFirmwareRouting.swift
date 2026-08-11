@@ -93,6 +93,22 @@ struct TumoflipDeviceIdentity: Equatable {
         return TumoflipFirmwareChannel.infer(version: firmwareVersion)
     }
 
+    /// API/target pair used to validate external FAP/FAL binaries. Keep the parsing in
+    /// one place so package routing and compatibility checks cannot disagree about the
+    /// same `device_info` response.
+    var compatibilityIdentity: TumoflipCompatibilityIdentity? {
+        guard let firmwareAPI,
+              let apiMajorText = firmwareAPI.split(separator: ".", maxSplits: 1).first,
+              let apiMajor = Int(apiMajorText),
+              let hardwareTarget else {
+            return nil
+        }
+        return TumoflipCompatibilityIdentity(
+            apiMajor: apiMajor,
+            hardwareTarget: hardwareTarget
+        )
+    }
+
     private static func parseBool(_ value: String?) -> Bool? {
         guard let raw = value?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() else {
             return nil
@@ -103,6 +119,11 @@ struct TumoflipDeviceIdentity: Equatable {
         default: return nil
         }
     }
+}
+
+struct TumoflipCompatibilityIdentity: Equatable {
+    let apiMajor: Int
+    let hardwareTarget: Int
 }
 
 struct TumoflipFirmwareRoute: Equatable {

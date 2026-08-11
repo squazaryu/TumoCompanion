@@ -85,6 +85,9 @@ struct UpdatesView: View {
         .safeAreaInset(edge: .bottom) { actionBar }
         .onAppear { updates.loadIfNeeded(recoverPackages: hasFileChannel) }
         .onChange(of: ble.state) { _, state in updates.revalidateAfterReady(state) }
+        .onChange(of: ble.serialOwner) { _, owner in
+            updates.revalidateAfterSerialOwner(owner)
+        }
         .sheet(isPresented: $showHelp) { UpdatesHelpView() }
     }
 

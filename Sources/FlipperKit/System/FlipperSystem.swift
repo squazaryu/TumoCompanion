@@ -9,8 +9,8 @@ final class FlipperSystem {
 
     /// All `device_info` key/value pairs (hardware, firmware, radio stack, …),
     /// in the order the Flipper reports them.
-    func deviceInfo() async throws -> [(String, String)] {
-        let responses = try await rpc.command(timeout: 30) { main in
+    func deviceInfo(timeout: TimeInterval = 30) async throws -> [(String, String)] {
+        let responses = try await rpc.command(timeout: timeout) { main in
             main.content = .systemDeviceInfoRequest(PBSystem_DeviceInfoRequest())
         }
         var out: [(String, String)] = []

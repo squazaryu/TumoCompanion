@@ -128,6 +128,7 @@ final class TumoflipUpdater: ObservableObject {
     @Published private(set) var compatibilityApiMajor: Int?
     @Published private(set) var compatibilityTarget: Int?
     @Published private(set) var compatibilityChecked = false
+    @Published private(set) var compatibilityIdentityFailure: String?
 
     /// The last downloaded package zip, cached by content-addressed release id so a
     /// package-only asset replacement under the same firmware tag cannot reuse stale bytes.
@@ -670,11 +671,90 @@ final class TumoflipUpdater: ObservableObject {
         return FlipperDeviceFS()
     }
 
+    private struct FreshDeviceIdentity {
+        let identity: TumoflipDeviceIdentity
+        let compatibility: TumoflipCompatibilityIdentity?
+    }
+
+    private enum DeviceIdentityReadError: LocalizedError {
+        case incomplete
+
+        var errorDescription: String? {
+            "The Flipper returned an incomplete firmware identity."
+        }
+    }
+
+    private func adopt(_ fresh: FreshDeviceIdentity) {
+        deviceIdentity = fresh.identity
+        if let compatibility = fresh.compatibility {
+            compatibilityApiMajor = compatibility.apiMajor
+            compatibilityTarget = compatibility.hardwareTarget
+        }
+        compatibilityIdentityFailure = nil
+        firmwareRoute = TumoflipFirmwareRouter.route(
+            identity: fresh.identity,
+            manualOverride: manualChannelOverride
+        )
+    }
+
+    /// Read a complete identity over the live RPC link. A ready BLE characteristic set
+    /// and an RPC response are separate states, so retry short reconnect/command races.
+    /// The install path still calls this immediately before touching the SD card.
+    private func freshDeviceIdentity(
+        attempts: Int = 3,
+        requireCompatibility: Bool = true
+    ) async throws -> FreshDeviceIdentity {
+        precondition(attempts > 0)
+        var lastError: Error = FlipperRPCError.notReady
+
+        for attempt in 0..<attempts {
+            if await FlipperBLE.shared.waitUntilReady(timeout: attempt == 0 ? 2 : 4) {
+                if FlipperBLE.shared.serialOwner == .rpc {
+                    do {
+                        let info = try await FlipperSystem().deviceInfo(timeout: 8)
+                        let identity = TumoflipDeviceIdentity(deviceInfo: info)
+                        let compatibility = identity.compatibilityIdentity
+                        if requireCompatibility && compatibility == nil {
+                            throw DeviceIdentityReadError.incomplete
+                        }
+                        return FreshDeviceIdentity(
+                            identity: identity,
+                            compatibility: compatibility
+                        )
+                    } catch {
+                        lastError = error
+                    }
+                } else {
+                    lastError = FlipperBLE.shared.serialOwner == .claudeBuddy
+                        ? FlipperRPCError.serialOwnedByClaudeBuddy
+                        : FlipperRPCError.notReady
+                }
+            } else {
+                lastError = FlipperRPCError.notReady
+            }
+
+            if attempt + 1 < attempts {
+                try? await Task.sleep(nanoseconds: 350_000_000)
+            }
+        }
+
+        throw lastError
+    }
+
     private func refreshRoutingIdentity() async {
         let identity: TumoflipDeviceIdentity?
-        if FlipperBLE.shared.state == .ready,
-           let info = try? await FlipperSystem().deviceInfo() {
-            identity = TumoflipDeviceIdentity(deviceInfo: info)
+        if FlipperBLE.shared.state == .ready {
+            do {
+                let fresh = try await freshDeviceIdentity(
+                    attempts: 2,
+                    requireCompatibility: false
+                )
+                adopt(fresh)
+                identity = fresh.identity
+            } catch {
+                compatibilityIdentityFailure = error.localizedDescription
+                identity = nil
+            }
         } else {
             identity = nil
         }
@@ -688,21 +768,12 @@ final class TumoflipUpdater: ObservableObject {
 
     /// Read the connected Flipper's identity and reject incompatible packages.
     private func checkCompatibility(_ manifest: TumoflipManifest) async throws {
-        guard FlipperBLE.shared.serialOwner == .rpc else {
-            throw FlipperRPCError.serialOwnedByClaudeBuddy
-        }
-        let info = try await FlipperSystem().deviceInfo()
-        let identity = TumoflipDeviceIdentity(deviceInfo: info)
-        deviceIdentity = identity
-        firmwareRoute = TumoflipFirmwareRouter.route(identity: identity, manualOverride: manualChannelOverride)
-        let dict = Dictionary(info, uniquingKeysWith: { a, _ in a })
-        let target = dict["hardware_target"].flatMap { Int($0) }
-        let apiParts = [dict["firmware_api_major"], dict["firmware_api_minor"]].compactMap { $0 }
-        let api = apiParts.count == 2 ? apiParts.joined(separator: ".") : nil
-        let version = dict["firmware_version"]
-        let origin = dict["firmware_origin_fork"]
-        try TumoflipCompat.check(deviceTarget: target, deviceAPI: api,
-                                 deviceVersion: version, deviceOriginFork: origin,
+        let fresh = try await freshDeviceIdentity()
+        adopt(fresh)
+        try TumoflipCompat.check(deviceTarget: fresh.identity.hardwareTarget,
+                                 deviceAPI: fresh.identity.firmwareAPI,
+                                 deviceVersion: fresh.identity.firmwareVersion,
+                                 deviceOriginFork: fresh.identity.originFork,
                                  manifest: manifest)
     }
 
@@ -711,15 +782,15 @@ final class TumoflipUpdater: ObservableObject {
     /// Fresh device firmware API major + hardware target, read immediately before use.
     /// Both nil when the Flipper is unreachable (fail-closed at the call sites).
     private func deviceApiTarget() async throws -> (api: Int?, target: Int?) {
-        guard FlipperBLE.shared.state == .ready else {
-            throw FlipperRPCError.notReady
+        let fresh = try await freshDeviceIdentity()
+        adopt(fresh)
+        guard let compatibility = fresh.compatibility else {
+            throw DeviceIdentityReadError.incomplete
         }
-        guard FlipperBLE.shared.serialOwner == .rpc else {
-            throw FlipperRPCError.serialOwnedByClaudeBuddy
-        }
-        let info = try await FlipperSystem().deviceInfo()
-        let dict = Dictionary(info, uniquingKeysWith: { a, _ in a })
-        return (dict["firmware_api_major"].flatMap(Int.init), dict["hardware_target"].flatMap(Int.init))
+        return (
+            compatibility.apiMajor,
+            compatibility.hardwareTarget
+        )
     }
 
     /// Download (or reuse) the release package zip. Cached by tag so validation and the
@@ -784,6 +855,7 @@ final class TumoflipUpdater: ObservableObject {
         } catch {
             // Preserve the last valid result during a reconnect instead of showing
             // every FAP as unknown or claiming the Flipper is disconnected.
+            compatibilityIdentityFailure = error.localizedDescription
             return
         }
         compatibilityApiMajor = api
@@ -966,13 +1038,16 @@ extension TumoflipUpdater {
         case both = "Both actions"
         case install = "Install only"
         case cleanup = "Cleanup only"
+        case identity = "Identity pending"
         case installing = "Installing"
         case cleaning = "Cleaning"
 
         var id: String { rawValue }
     }
 
-    static func actionBarQAFixture() -> TumoflipUpdater {
+    static func actionBarQAFixture(
+        initial: ActionBarQAScenario = .both
+    ) -> TumoflipUpdater {
         func file(_ source: String, _ target: String, bytes: Int) -> TumoflipManifest.PackageFile {
             TumoflipManifest.PackageFile(
                 bytes: bytes,
@@ -1090,7 +1165,7 @@ extension TumoflipUpdater {
         updater.compatibilityApiMajor = 88
         updater.compatibilityTarget = 7
         updater.compatibilityChecked = true
-        updater.setActionBarQAScenario(.both)
+        updater.setActionBarQAScenario(initial)
         return updater
     }
 
@@ -1101,6 +1176,11 @@ extension TumoflipUpdater {
         let cleanup = manifest?.cleanup ?? []
         stopRequested = false
         stopToken.reset()
+        if scenario != .identity {
+            compatibilityApiMajor = 88
+            compatibilityTarget = 7
+            compatibilityChecked = true
+        }
 
         switch scenario {
         case .both:
@@ -1114,6 +1194,13 @@ extension TumoflipUpdater {
         case .cleanup:
             excludedFiles = targets
             pendingCleanup = ["module_one": cleanup]
+            phase = .ready
+        case .identity:
+            excludedFiles = []
+            pendingCleanup = [:]
+            compatibilityApiMajor = nil
+            compatibilityTarget = nil
+            compatibilityChecked = false
             phase = .ready
         case .installing:
             excludedFiles = []

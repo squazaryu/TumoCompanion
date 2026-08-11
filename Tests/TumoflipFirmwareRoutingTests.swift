@@ -103,6 +103,49 @@ final class TumoflipFirmwareRoutingTests: XCTestCase {
         XCTAssertEqual(identity.hardwareTarget, 7)
         XCTAssertEqual(identity.firmwareCommit, "abc123")
         XCTAssertEqual(identity.firmwareCommitDirty, true)
+        XCTAssertEqual(
+            identity.compatibilityIdentity,
+            TumoflipCompatibilityIdentity(apiMajor: 87, hardwareTarget: 7)
+        )
+    }
+
+    func testIncompleteDeviceInfoDoesNotCreateCompatibilityIdentity() {
+        let missingAPI = TumoflipDeviceIdentity(deviceInfo: [
+            ("firmware_version", "t-dev-004-013"),
+            ("firmware_origin_fork", "tumoflip"),
+            ("hardware_target", "7"),
+        ])
+        let missingTarget = TumoflipDeviceIdentity(deviceInfo: [
+            ("firmware_version", "t-dev-004-013"),
+            ("firmware_origin_fork", "tumoflip"),
+            ("firmware_api_major", "88"),
+            ("firmware_api_minor", "0"),
+        ])
+
+        XCTAssertNil(missingAPI.compatibilityIdentity)
+        XCTAssertNil(missingTarget.compatibilityIdentity)
+    }
+
+    func testConnectedIdentityNoticeIsNonBlocking() {
+        let notice = FWPackagesIdentityNotice.verificationPending
+
+        XCTAssertFalse(notice.isBlocking)
+        XCTAssertEqual(notice.systemImage, "checkmark.shield")
+        XCTAssertEqual(
+            notice.text,
+            "Connected. Firmware compatibility will be verified before installation."
+        )
+    }
+
+    func testDisconnectedIdentityNoticeRequiresConnection() {
+        let notice = FWPackagesIdentityNotice.connectionRequired(.ble)
+
+        XCTAssertTrue(notice.isBlocking)
+        XCTAssertEqual(notice.systemImage, "antenna.radiowaves.left.and.right.slash")
+        XCTAssertEqual(
+            notice.text,
+            "Connect Flipper over BLE to validate apps before installing via BLE."
+        )
     }
 
     func testPackageReleaseMatcherRequiresExactInstalledDevVersion() {
