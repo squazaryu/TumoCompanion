@@ -1051,6 +1051,8 @@ final class TumoflipUpdater: ObservableObject {
         case .sourceMissing(let s): return "Missing in archive: \(s) — rolled back."
         case .hashMismatch(let s): return "Hash mismatch: \(s) — rolled back."
         case .deviceVerifyFailed(let t): return "On-device verify failed: \(t) — rolled back."
+        case .deviceVerificationUnavailable(let t):
+            return "On-device MD5 timed out: \(t) — rolled back without deleting the last verified copy."
         case .stagingVerifyFailed(let target, let expected, let actual):
             let name = (target as NSString).lastPathComponent
             guard let actual else {
