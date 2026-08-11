@@ -552,24 +552,17 @@ final class PluginUpdater: ObservableObject {
     func check() async {
         do {
             phase = .fetching
-            updates = []
-            changedFromScan = 0
-            protectedReviews = []
-            verifyResult = nil
-            catalogMeta = [:]
-            classifications = [:]
-            let (tag, assets) = try await latestRelease()
-            self.tag = tag
+            let (nextTag, assets) = try await latestRelease()
 
             phase = .downloading
             var manifest: [String: PluginUpdate] = [:]
             var protected: [PluginUpdate] = []
             var metadata: [String: PluginCatalogMetadata] = [:]
-            packURLs = []
+            var downloadedPacks: [(pack: String, url: URL)] = []
             for (pack, name) in [("base", "all-the-apps-base.zip"), ("extra", "all-the-apps-extra.zip")] {
                 guard let asset = assets[name] else { continue }
                 let url = try await download(asset, to: "atp-\(pack).zip")
-                packURLs.append((pack, url))
+                downloadedPacks.append((pack, url))
                 let extracted = try extractManifest(zipURL: url, pack: pack)
                 metadata.merge(extracted.metadata) { _, new in new }
                 for f in extracted.updates {
@@ -580,9 +573,18 @@ final class PluginUpdater: ObservableObject {
                     manifest[f.remotePath] = f
                 }
             }
+            // Commit the new catalog only after every source archive was downloaded and
+            // decoded. A transient GitHub/CDN failure must not erase the last good UI.
+            tag = nextTag
+            packURLs = downloadedPacks
             allManifest = manifest
             protectedManifest = sortUpdates(protected)
             catalogMeta = metadata
+            updates = []
+            changedFromScan = 0
+            protectedReviews = []
+            verifyResult = nil
+            classifications = [:]
             await refreshProtectedReviews()
 
             if let cacheMap = loadCache()?.map, !cacheMap.isEmpty {
@@ -605,7 +607,7 @@ final class PluginUpdater: ObservableObject {
                     }
                 }
                 updates = sortUpdates(result)
-                phase = updates.isEmpty ? .done("Everything up to date · \(tag)") : .idle
+                phase = updates.isEmpty ? .done("Everything up to date · \(nextTag)") : .idle
             } else {
                 // No baseline yet — let the user choose how to seed it.
                 phase = .needsBaseline
@@ -1095,15 +1097,12 @@ final class PluginUpdater: ObservableObject {
     /// "latest" (most recently published non-draft, non-prerelease release).
     private func latestRelease() async throws -> (String, [String: URL]) {
         let path = manualReleaseTag.map { "releases/tags/\($0)" } ?? "releases/latest"
-        var req = URLRequest(url: URL(string: "https://api.github.com/repos/\(repo)/\(path)")!)
-        req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        let (data, resp) = try await URLSession.shared.data(for: req)
-        guard (resp as? HTTPURLResponse)?.statusCode == 200,
-              let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+        let url = URL(string: "https://api.github.com/repos/\(repo)/\(path)")!
+        let result = try await GitHubAPIClient.shared.data(from: url)
+        guard let obj = try JSONSerialization.jsonObject(with: result.data) as? [String: Any],
               let tag = obj["tag_name"] as? String,
               let assets = obj["assets"] as? [[String: Any]] else {
-            throw NSError(domain: "updater", code: 1,
-                          userInfo: [NSLocalizedDescriptionKey: "GitHub API unavailable (rate limit?)"])
+            throw GitHubAPIError.invalidJSON
         }
         var map: [String: URL] = [:]
         for a in assets {
@@ -1118,11 +1117,9 @@ final class PluginUpdater: ObservableObject {
     func loadAvailableReleases() async {
         loadingReleases = true
         defer { loadingReleases = false }
-        var req = URLRequest(url: URL(string: "https://api.github.com/repos/\(repo)/releases?per_page=20")!)
-        req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        guard let (data, resp) = try? await URLSession.shared.data(for: req),
-              (resp as? HTTPURLResponse)?.statusCode == 200,
-              let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
+        let url = URL(string: "https://api.github.com/repos/\(repo)/releases?per_page=20")!
+        guard let result = try? await GitHubAPIClient.shared.data(from: url),
+              let arr = try? JSONSerialization.jsonObject(with: result.data) as? [[String: Any]] else {
             return
         }
         let formatter = ISO8601DateFormatter()

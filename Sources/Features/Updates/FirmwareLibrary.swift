@@ -365,13 +365,8 @@ final class FirmwareLibrary: ObservableObject {
             await refreshInstalledIdentity()
             var components = URLComponents(string: "https://api.github.com/repos/\(repo)/releases")!
             components.queryItems = [URLQueryItem(name: "per_page", value: "100")]
-            var request = URLRequest(url: components.url!, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 30)
-            request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard (response as? HTTPURLResponse)?.statusCode == 200 else {
-                throw FirmwareLibraryError.invalidResponse
-            }
-            releases = try FirmwareCatalog.decode(data)
+            let result = try await GitHubAPIClient.shared.data(from: components.url!)
+            releases = try FirmwareCatalog.decode(result.data)
             phase = .ready
         } catch {
             if UpdateTaskCancellation.isCancellation(error) {

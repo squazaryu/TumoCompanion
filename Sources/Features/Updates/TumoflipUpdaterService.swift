@@ -859,20 +859,9 @@ final class TumoflipUpdater: ObservableObject {
 
     private func releases() async throws -> [Release] {
         var components = URLComponents(string: "https://api.github.com/repos/\(repo)/releases")!
-        components.queryItems = [
-            URLQueryItem(name: "per_page", value: "50"),
-            URLQueryItem(name: "_tumoflip_refresh", value: String(Int(Date().timeIntervalSince1970))),
-        ]
-        var req = URLRequest(
-            url: components.url!,
-            cachePolicy: .reloadIgnoringLocalAndRemoteCacheData,
-            timeoutInterval: 30
-        )
-        req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        req.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
-        let (data, response) = try await URLSession.shared.data(for: req)
-        guard (response as? HTTPURLResponse)?.statusCode == 200,
-              let array = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
+        components.queryItems = [URLQueryItem(name: "per_page", value: "100")]
+        let result = try await GitHubAPIClient.shared.data(from: components.url!)
+        guard let array = try JSONSerialization.jsonObject(with: result.data) as? [[String: Any]] else {
             throw URLError(.badServerResponse)
         }
         return array.compactMap { obj in

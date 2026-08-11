@@ -146,19 +146,12 @@ enum PluginUpdateMonitor {
     }
 
     private static func latestTag(_ repo: String) async throws -> String {
-        var request = URLRequest(
-            url: URL(string: "https://api.github.com/repos/\(repo)/releases/latest")!,
-            cachePolicy: .reloadIgnoringLocalAndRemoteCacheData,
-            timeoutInterval: 30
-        )
-        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard (response as? HTTPURLResponse)?.statusCode == 200,
-              let object = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+        let url = URL(string: "https://api.github.com/repos/\(repo)/releases/latest")!
+        let result = try await GitHubAPIClient.shared.data(from: url)
+        guard let object = try JSONSerialization.jsonObject(with: result.data) as? [String: Any],
               let tag = object["tag_name"] as? String,
               !tag.isEmpty else {
-            throw URLError(.badServerResponse)
+            throw GitHubAPIError.invalidJSON
         }
         return tag
     }
