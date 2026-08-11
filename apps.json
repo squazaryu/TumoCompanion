@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.10.14",
+      "version": "1.10.15",
       "versionDate": "2026-08-11",
-      "versionDescription": "Separates the FW Packages revision from the compatible firmware, hides archived dev evidence releases from catalogs, and labels apps-only package updates that do not require a firmware flash.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.14/TumoCompanion-unsigned.ipa",
-      "size": 29711709,
+      "versionDescription": "Fixes false BLE disconnect warnings in FW Packages, retries live firmware identity checks and preserves fail-closed compatibility validation before installation.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.15/TumoCompanion-unsigned.ipa",
+      "size": 29719945,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.10.15",
+          "date": "2026-08-11",
+          "localizedDescription": "Fixes false BLE disconnect warnings in FW Packages, retries live firmware identity checks and preserves fail-closed compatibility validation before installation.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.15/TumoCompanion-unsigned.ipa",
+          "size": 29719945,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.10.14",
           "date": "2026-08-11",
