@@ -143,6 +143,7 @@ final class FlipperRPC: ObservableObject {
     @discardableResult
     func commandStreaming(timeout: TimeInterval = 60,
                           onFrameSent: (@Sendable (Int) -> Void)? = nil,
+                          shouldStop: @escaping @Sendable () -> Bool = { false },
                           _ configures: [(inout PB_Main) -> Void]) async throws -> [PB_Main] {
         guard !configures.isEmpty else { return [] }
 
@@ -171,16 +172,19 @@ final class FlipperRPC: ObservableObject {
         if nextCommandID == 0 { nextCommandID = 1 }
         lock.unlock()
 
-        var frames: [Data] = []
+        var frames: [(continuing: Data, final: Data)] = []
         for (index, configure) in configures.enumerated() {
             var main = PB_Main()
             main.commandID = id
             main.hasNext_p = index < configures.count - 1
             configure(&main)
-            frames.append(try Self.delimited(main))
+            let continuing = try Self.delimited(main)
+            main.hasNext_p = false
+            frames.append((continuing, try Self.delimited(main)))
         }
 
         let progress = StallClock()
+        let stopped = StreamingStopState()
         return try await withThrowingTaskGroup(of: [PB_Main].self) { group in
             group.addTask {
                 try await withCheckedThrowingContinuation { cont in
@@ -193,11 +197,21 @@ final class FlipperRPC: ObservableObject {
                     // dropped the link mid-write. Progress now tracks actual acks.
                     Task {
                         for (i, frame) in frames.enumerated() {
+                            // A multipart Storage write must still receive a final
+                            // frame. Ending at the next block boundary closes the
+                            // partial staging file instead of abandoning the RPC
+                            // server in `has_next` state.
+                            let terminate = shouldStop()
+                            let payload = terminate ? frame.final : frame.continuing
                             await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in
-                                self.ble.writeSerial(frame) { c.resume() }
+                                self.ble.writeSerial(payload) { c.resume() }
                             }
                             progress.touch()   // sync — no actor hop on the hot per-chunk path
                             onFrameSent?(i + 1)
+                            if terminate {
+                                stopped.mark()
+                                break
+                            }
                         }
                     }
                 }
@@ -214,6 +228,7 @@ final class FlipperRPC: ObservableObject {
             }
             defer { group.cancelAll() }
             let result = try await group.next()!
+            if stopped.value { throw CancellationError() }
             return result
         }
     }
@@ -231,6 +246,13 @@ final class FlipperRPC: ObservableObject {
             lock.lock(); defer { lock.unlock() }
             return Date().timeIntervalSince(last) >= timeout
         }
+    }
+
+    private final class StreamingStopState: @unchecked Sendable {
+        private let lock = NSLock()
+        private var stopped = false
+        var value: Bool { lock.lock(); defer { lock.unlock() }; return stopped }
+        func mark() { lock.lock(); stopped = true; lock.unlock() }
     }
 
     /// Fire-and-forget: send a frame without waiting for a matched response

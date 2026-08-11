@@ -11,6 +11,19 @@ struct FlipperDeviceFS: TumoflipDeviceFS {
     let storage = FlipperStorage()
 
     func write(_ data: Data, to path: String) async throws { try await storage.write(path, data: data) }
+    func write(
+        _ data: Data,
+        to path: String,
+        progress: (@Sendable (Int) -> Void)?,
+        isStopRequested: @escaping @Sendable () -> Bool
+    ) async throws {
+        try await storage.write(
+            path,
+            data: data,
+            progress: progress,
+            isStopRequested: isStopRequested
+        )
+    }
     func read(_ path: String) async -> Data? { try? await storage.read(path) }
     func deviceMD5(_ path: String) async -> String? { await storage.md5(path) }
     func checkedDeviceMD5(_ path: String) async throws -> String? {
@@ -39,6 +52,19 @@ struct USBTumoflipDeviceFS: TumoflipDeviceFS {
     let storage: USBSDStorage
 
     func write(_ data: Data, to path: String) async throws { try await storage.write(path, data: data) }
+    func write(
+        _ data: Data,
+        to path: String,
+        progress: (@Sendable (Int) -> Void)?,
+        isStopRequested: @escaping @Sendable () -> Bool
+    ) async throws {
+        try await storage.write(
+            path,
+            data: data,
+            progress: progress,
+            isStopRequested: isStopRequested
+        )
+    }
     func read(_ path: String) async -> Data? { try? await storage.read(path) }
     func deviceMD5(_ path: String) async -> String? { await storage.md5(path) }
     func checkedDeviceMD5(_ path: String) async throws -> String? {
@@ -474,8 +500,8 @@ final class TumoflipUpdater: ObservableObject {
                 try await ensureLoaderIdle()
             }
 
-            phase = .installing(done: 0, total: 2 * plan.files.count, file: "Starting…")
-            live.start(total: 2 * plan.files.count, title: "Installing firmware packages")
+            phase = .installing(done: 0, total: 200 * plan.files.count, file: "Starting…")
+            live.start(total: 200 * plan.files.count, title: "Installing firmware packages")
             let transferReporter = TransferActivityReporter(channel: channel)
             _ = await transferReporter.prepare()
             transferReporter.begin("firmware packages")
@@ -495,15 +521,15 @@ final class TumoflipUpdater: ObservableObject {
             case .alreadyInstalled:
                 phase = .done("Already installed — nothing to do.")
                 live.succeed(
-                    completed: 2 * plan.files.count,
-                    total: 2 * plan.files.count,
+                    completed: 200 * plan.files.count,
+                    total: 200 * plan.files.count,
                     detail: "Already installed"
                 )
             case let .installed(files, _):
                 phase = .done("Installed \(files) file\(files == 1 ? "" : "s").")
                 live.succeed(
-                    completed: 2 * plan.files.count,
-                    total: 2 * plan.files.count,
+                    completed: 200 * plan.files.count,
+                    total: 200 * plan.files.count,
                     detail: "Firmware packages installed"
                 )
             }

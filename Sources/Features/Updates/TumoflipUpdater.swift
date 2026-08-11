@@ -7,6 +7,15 @@ import CryptoKit
 /// app; faked in tests.
 protocol TumoflipDeviceFS {
     func write(_ data: Data, to path: String) async throws
+    /// Writes a staging file with byte progress and a safe stop checkpoint.
+    /// Live transports override this to finish the current acknowledged block,
+    /// terminate the remote write cleanly, and then throw `CancellationError`.
+    func write(
+        _ data: Data,
+        to path: String,
+        progress: (@Sendable (Int) -> Void)?,
+        isStopRequested: @escaping @Sendable () -> Bool
+    ) async throws
     func read(_ path: String) async -> Data?
     func deviceMD5(_ path: String) async -> String?
     func checkedDeviceMD5(_ path: String) async throws -> String?
@@ -18,6 +27,18 @@ protocol TumoflipDeviceFS {
 }
 
 extension TumoflipDeviceFS {
+    func write(
+        _ data: Data,
+        to path: String,
+        progress: (@Sendable (Int) -> Void)?,
+        isStopRequested: @escaping @Sendable () -> Bool
+    ) async throws {
+        if isStopRequested() { throw CancellationError() }
+        try await write(data, to: path)
+        progress?(data.count)
+        if isStopRequested() { throw CancellationError() }
+    }
+
     /// Compatibility fallback for test doubles and non-RPC stores. Live adapters
     /// override this so a missing file can be distinguished from a transport error.
     func checkedDeviceMD5(_ path: String) async throws -> String? {
@@ -44,17 +65,55 @@ enum TumoflipInstallError: Error, Equatable {
 }
 
 /// Thread-safe stop flag. `TumoflipInstaller.install` runs off the main actor and
-/// polls this at file/op boundaries; the UI sets it from the main actor via
-/// `TumoflipUpdaterService.requestStop()`. Checked once per file (not per chunk),
-/// so a plain lock is cheap and keeps it `Sendable`-safe. It is only ever read at a
-/// SAFE boundary — never mid-write of a live file — so a stopped install rolls back
-/// cleanly and never leaves a truncated app.
+/// polls this at safe boundaries; the UI sets it from the main actor via
+/// `TumoflipUpdaterService.requestStop()`. Staging writes additionally inspect it
+/// between acknowledged transport blocks. Live app paths are still changed only by
+/// complete verified moves, so a stopped install never leaves a truncated app.
 final class StopToken: @unchecked Sendable {
     private let lock = NSLock()
     private var stopped = false
     var isStopped: Bool { lock.lock(); defer { lock.unlock() }; return stopped }
     func stop() { lock.lock(); stopped = true; lock.unlock() }
     func reset() { lock.lock(); stopped = false; lock.unlock() }
+}
+
+/// Throttles a transport's per-block callbacks to one UI update per percentage point.
+/// BLE writes use 512-byte blocks, so forwarding every callback for a multi-megabyte
+/// FAP would otherwise enqueue thousands of redundant main-actor updates.
+private final class TumoflipByteProgress: @unchecked Sendable {
+    private let lock = NSLock()
+    private let totalBytes: Int
+    private let completedUnits: Int
+    private let totalUnits: Int
+    private let name: String
+    private let report: ((Int, Int, String) -> Void)?
+    private var lastPercent = -1
+
+    init(
+        totalBytes: Int,
+        completedUnits: Int,
+        totalUnits: Int,
+        name: String,
+        report: ((Int, Int, String) -> Void)?
+    ) {
+        self.totalBytes = max(totalBytes, 1)
+        self.completedUnits = completedUnits
+        self.totalUnits = totalUnits
+        self.name = name
+        self.report = report
+    }
+
+    func update(_ bytes: Int) {
+        let percent = min(100, max(0, bytes * 100 / totalBytes))
+        lock.lock()
+        guard percent != lastPercent else {
+            lock.unlock()
+            return
+        }
+        lastPercent = percent
+        lock.unlock()
+        report?(completedUnits + percent, totalUnits, "Uploading \(name) · \(percent)%")
+    }
 }
 
 enum TumoflipHash {
@@ -665,10 +724,10 @@ struct TumoflipInstaller {
     }
 
     @discardableResult
-    /// `progress(done, total, label)` — `done`/`total` step over staging (first half)
-    /// then activation (second half), `label` names the current file/action.
+    /// `progress(done, total, label)` uses 100 units per staging file and 100 per
+    /// activation, allowing a large file's byte progress to move the shared bar.
     func install(_ plan: TumoflipInstallPlan,
-                 isStopRequested: @Sendable () -> Bool = { false },
+                 isStopRequested: @escaping @Sendable () -> Bool = { false },
                  progress: ((Int, Int, String) -> Void)? = nil) async throws -> Outcome {
         var state = try await loadState() ?? TumoflipState()
 
@@ -707,15 +766,36 @@ struct TumoflipInstaller {
                 let f = plan.files[i]
                 let bytes = try await source.bytes(for: f.source)
                 guard TumoflipHash.sha256(bytes) == f.sha256 else { throw TumoflipInstallError.hashMismatch(f.source) }
-                try await fs.write(bytes, to: journal.ops[i].stage)
+                let displayName = Self.shortName(journal.ops[i].target)
+                let byteProgress = TumoflipByteProgress(
+                    totalBytes: bytes.count,
+                    completedUnits: i * 100,
+                    totalUnits: 200 * journal.ops.count,
+                    name: displayName,
+                    report: progress
+                )
+                byteProgress.update(0)
+                do {
+                    try await fs.write(
+                        bytes,
+                        to: journal.ops[i].stage,
+                        progress: { byteProgress.update($0) },
+                        isStopRequested: isStopRequested
+                    )
+                } catch is CancellationError {
+                    throw TumoflipInstallError.cancelled
+                }
+                if isStopRequested() { throw TumoflipInstallError.cancelled }
                 let md5 = TumoflipHash.md5(bytes)
+                progress?((i + 1) * 100, 200 * journal.ops.count, "Verifying " + displayName)
                 guard await fs.deviceMD5(journal.ops[i].stage) == md5 else {
                     throw TumoflipInstallError.deviceVerifyFailed(f.target)
                 }
+                if isStopRequested() { throw TumoflipInstallError.cancelled }
                 journal.ops[i].md5 = md5
                 journal.ops[i].state = .staged
                 state.txn = journal; try await saveState(&state)
-                progress?(i + 1, 2 * journal.ops.count,
+                progress?((i + 1) * 100, 200 * journal.ops.count,
                           "Preparing " + Self.shortName(journal.ops[i].target))
             }
 
@@ -731,7 +811,7 @@ struct TumoflipInstaller {
                 // rollback in the catch below, so the device returns to its prior
                 // working state; the op mid-swap when Stop was pressed has finished.
                 if isStopRequested() { throw TumoflipInstallError.cancelled }
-                progress?(journal.ops.count + i + 1, 2 * journal.ops.count,
+                progress?((journal.ops.count + i + 1) * 100, 200 * journal.ops.count,
                           "Installing " + Self.shortName(journal.ops[i].target))
                 // Firmware resources may already contain these exact bytes. Record
                 // them in the ledger without moving or rewriting an identical FAP;
