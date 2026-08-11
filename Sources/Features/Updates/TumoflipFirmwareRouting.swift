@@ -36,6 +36,17 @@ enum TumoflipFirmwareChannel: String, CaseIterable, Identifiable, Equatable {
     }
 }
 
+enum TumoflipReleaseCatalogPolicy {
+    /// A published release can be retained for source and acceptance evidence while
+    /// being removed from user-facing firmware/package pickers.
+    static let hiddenMarker = "<!-- tumoflip-catalog: hidden -->"
+
+    static func isVisible(body: String?) -> Bool {
+        guard let body else { return true }
+        return !body.localizedCaseInsensitiveContains(hiddenMarker)
+    }
+}
+
 struct TumoflipDeviceIdentity: Equatable {
     let firmwareVersion: String?
     let originFork: String?

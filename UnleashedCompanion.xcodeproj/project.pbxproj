@@ -74,6 +74,7 @@
 		56E703AEE38BA106610D2DA5 /* FieldServiceModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B95CE7D8E715A07E4318F9D1 /* FieldServiceModels.swift */; };
 		58ADEF0B8E8D011FDB32D17F /* BridgeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A72EEDF7D1BE89A42EBAFB7D /* BridgeView.swift */; };
 		597368D182EF7A5FD2E780FA /* GitHubAPIClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF7F5D1B21FCD35496F56E26 /* GitHubAPIClientTests.swift */; };
+		5B3AA404F2C6230D9FAC8795 /* TumoflipManifestPackageReleaseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78482E05DB7B6420088FF379 /* TumoflipManifestPackageReleaseTests.swift */; };
 		5CF5B93624E1418CAC1E13A9 /* TumoNetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85A71B8014DF7BCBEAE77C5A /* TumoNetView.swift */; };
 		5EAC241A8A24322589A7FB52 /* TumoflipUpdaterService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8697965C8EA5F8D768000FC9 /* TumoflipUpdaterService.swift */; };
 		61371A51934A206CF6FF6545 /* FileEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB89F00DE286E56D6DA34162 /* FileEditorView.swift */; };
@@ -303,6 +304,7 @@
 		74A081B20A8CD41C0AB51069 /* TumoSurveySessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoSurveySessionTests.swift; sourceTree = "<group>"; };
 		760947E327C818A052C25256 /* TumoNetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoNetTests.swift; sourceTree = "<group>"; };
 		76878DEC8BC405158A23294C /* SberCloud.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SberCloud.swift; sourceTree = "<group>"; };
+		78482E05DB7B6420088FF379 /* TumoflipManifestPackageReleaseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoflipManifestPackageReleaseTests.swift; sourceTree = "<group>"; };
 		7B5D803E53BDA356E1AA5784 /* TumoflipStatusTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoflipStatusTests.swift; sourceTree = "<group>"; };
 		7ECF810E2BD149C8F1726216 /* UnleashedCompanion.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = UnleashedCompanion.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		824EE059E5BDBC0F8B7419E8 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
@@ -683,6 +685,7 @@
 				985815E6A1B91675260A0A0D /* TumoFabricTests.swift */,
 				2E66A60CC5ADE5831A2D34FF /* TumoflipFirmwareRoutingTests.swift */,
 				A3CBD3609865B0C18EB48702 /* TumoflipInstallerTests.swift */,
+				78482E05DB7B6420088FF379 /* TumoflipManifestPackageReleaseTests.swift */,
 				C4333919B345598E3C08BFCD /* TumoflipManifestTests.swift */,
 				7B5D803E53BDA356E1AA5784 /* TumoflipStatusTests.swift */,
 				760947E327C818A052C25256 /* TumoNetTests.swift */,
@@ -1113,6 +1116,7 @@
 				2F479A7E15B371A4316B556B /* TumoVMNFCContractTests.swift in Sources */,
 				325E596D66161817F31CD52A /* TumoflipFirmwareRoutingTests.swift in Sources */,
 				EF56AFBD98636A14B23FEACB /* TumoflipInstallerTests.swift in Sources */,
+				5B3AA404F2C6230D9FAC8795 /* TumoflipManifestPackageReleaseTests.swift in Sources */,
 				A2FA43CE0B4A58285A1A58DA /* TumoflipManifestTests.swift in Sources */,
 				0D58380E2D1F29BB7FF7DF4B /* TumoflipStatusTests.swift in Sources */,
 				19DFE5895853A9679A01976A /* USBStorageTests.swift in Sources */,

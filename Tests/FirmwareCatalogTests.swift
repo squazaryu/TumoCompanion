@@ -58,6 +58,21 @@ final class FirmwareCatalogTests: XCTestCase {
         XCTAssertEqual(releases.map(\.version), ["t-flppr-fw-089-039"])
     }
 
+    func testCatalogHidesExplicitlyArchivedReleaseButKeepsEvidenceReleaseDecodable() throws {
+        let hidden = json.replacingOccurrences(
+            of: "\"body\": \"Dev notes\"",
+            with: "\"body\": \"<!-- tumoflip-catalog: hidden --> Archived evidence\""
+        )
+
+        let releases = try FirmwareCatalog.decode(Data(hidden.utf8))
+
+        XCTAssertEqual(releases.map(\.version), ["t-flppr-fw-089-039"])
+        XCTAssertFalse(TumoflipReleaseCatalogPolicy.isVisible(
+            body: "<!-- tumoflip-catalog: hidden --> Archived evidence"
+        ))
+        XCTAssertTrue(TumoflipReleaseCatalogPolicy.isVisible(body: "Normal release"))
+    }
+
     func testCatalogKeepsLatestReleaseForDuplicateVersion() throws {
         let duplicate = "[\(releaseJSON(tag: "new", date: "2026-07-19T10:00:00Z")),"
             + "\(releaseJSON(tag: "old", date: "2026-07-18T10:00:00Z"))]"
