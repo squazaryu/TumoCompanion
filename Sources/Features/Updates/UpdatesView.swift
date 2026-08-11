@@ -294,7 +294,7 @@ struct UpdatesView: View {
 
     // MARK: - Bottom action bar (combined — one bar, honest about two distinct transactions)
 
-    private var firmwareSelectedCount: Int { packages.selectedFileCount }
+    private var firmwareSelectedCount: Int { packages.selectedPendingFileCount }
 
     @ViewBuilder private var actionBar: some View {
         let pluginN = updater.selectedCount

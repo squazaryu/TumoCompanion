@@ -1213,6 +1213,28 @@ final class TumoflipInstallerTests: XCTestCase {
         XCTAssertEqual(snapshot.files[files[2].target], .missing)
     }
 
+    func testPreflightVerifiesOnlyPendingPackageTargets() async throws {
+        let current = Data("current".utf8)
+        let changed = Data("expected-changed".utf8)
+        let files = [
+            bundledFile("current", "/ext/apps/current.fap", current),
+            bundledFile("changed", "/ext/apps/changed.fap", changed),
+        ]
+        let fs = FakeFS()
+        fs.files[files[0].target] = current
+        fs.files[files[1].target] = Data("old".utf8)
+        let inst = TumoflipInstaller(fs: fs, source: FakeSource(data: [:]))
+
+        let statuses = try await inst.verifyPackageTargets(
+            [files[1].target],
+            manifest: manifest(files)
+        )
+
+        XCTAssertEqual(statuses, [files[1].target: .needsUpdate])
+        XCTAssertEqual(fs.checkedMD5CallsByPath[files[1].target], 1)
+        XCTAssertNil(fs.checkedMD5CallsByPath[files[0].target])
+    }
+
     func testDetailedReconcileReportsValidationErrorWithoutClaimingMissing() async throws {
         let bytes = Data("firmware".utf8)
         let file = bundledFile("app", "/ext/apps/app.fap", bytes)

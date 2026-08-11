@@ -388,11 +388,9 @@ struct TumoflipUpdaterView: View {
                 set: { updater.setFile(target, selected: $0) })
     }
 
-    private var selectedFileCount: Int { updater.selectedFileCount }
-
     private var installActionCount: Int {
         guard updater.manifest != nil, updater.hasPackageZip else { return 0 }
-        return selectedFileCount
+        return updater.selectedPendingFileCount
     }
 
     private var installNeedsIdentity: Bool {
