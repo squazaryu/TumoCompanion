@@ -93,4 +93,18 @@ final class TumoflipStatusTests: XCTestCase {
             Set(["/ext/failed"])
         )
     }
+
+    @MainActor
+    func testFWPackageTransactionGateRejectsOverlappingMutation() {
+        let gate = TumoflipTransactionGate()
+
+        XCTAssertTrue(gate.begin())
+        XCTAssertTrue(gate.isActive)
+        XCTAssertFalse(gate.begin(), "a second install must not queue another staging upload")
+
+        gate.end()
+        XCTAssertFalse(gate.isActive)
+        XCTAssertTrue(gate.begin(), "the next user transaction may start after completion")
+        gate.end()
+    }
 }
