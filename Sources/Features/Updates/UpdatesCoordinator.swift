@@ -47,6 +47,17 @@ final class UpdatesCoordinator: ObservableObject {
     /// Coalesce those events and only refresh compatibility after the link settles at ready.
     func revalidateAfterReady(_ state: FlipperConnectionState) {
         guard state == .ready else { return }
+        scheduleRevalidation()
+    }
+
+    /// Claude Buddy can release the serial pipe without changing BLE `.ready` state.
+    /// Re-run compatibility as soon as RPC owns the pipe again.
+    func revalidateAfterSerialOwner(_ owner: SerialChannelOwner) {
+        guard owner == .rpc, FlipperBLE.shared.state == .ready else { return }
+        scheduleRevalidation()
+    }
+
+    private func scheduleRevalidation() {
         revalidationTask?.cancel()
         revalidationTask = Task { [weak self] in
             do {

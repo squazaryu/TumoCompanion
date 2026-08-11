@@ -65,8 +65,11 @@ struct TumoflipUpdaterView: View {
         }
         .safeAreaInset(edge: .bottom) { actionBar }
         .onAppear {
-            if updater.manifest == nil {
-                Task { await updater.reload(recover: hasFileChannel) }
+            Task {
+                if updater.manifest == nil {
+                    await updater.reload(recover: hasFileChannel)
+                }
+                await updater.validateCompatibility()
             }
         }
         .sheet(isPresented: $showHelp) { TumoflipPackagesHelpView() }
@@ -388,18 +391,26 @@ struct TumoflipUpdaterView: View {
         updater.selectedRequiresCompatibilityIdentity && !updater.hasFreshCompatibilityIdentity
     }
 
+    private var identityNotice: FWPackagesIdentityNotice? {
+        guard installNeedsIdentity else { return nil }
+        if hasFileChannel {
+            return .verificationPending
+        }
+        return .connectionRequired(transfer.activeChannel)
+    }
+
     private var actionBar: some View {
         FWPackagesActionBar(
             phase: updater.phase,
             installCount: installActionCount,
             cleanupCount: updater.cleanupFileCount,
-            canInstall: hasFileChannel && !updater.busy && !installNeedsIdentity,
+            // install() repeats the complete identity/API/target gate before any SD
+            // mutation. A failed proactive check must not deadlock a connected user.
+            canInstall: hasFileChannel && !updater.busy,
             canCleanUp: hasFileChannel && !updater.busy,
             stopRequested: updater.stopRequested,
             transferChannel: updater.transferChannel,
-            identityWarning: installNeedsIdentity
-                ? "Connect Flipper over BLE to validate apps before installing via \(transfer.activeChannel.label)."
-                : nil,
+            identityNotice: identityNotice,
             install: { Task { await updater.install() } },
             cleanUp: { pendingCleanupCount = updater.cleanupFileCount },
             stop: updater.requestStop
@@ -586,7 +597,7 @@ struct FWPackagesActionBar: View {
     let canCleanUp: Bool
     let stopRequested: Bool
     let transferChannel: TransferChannel
-    let identityWarning: String?
+    let identityNotice: FWPackagesIdentityNotice?
     let install: () -> Void
     let cleanUp: () -> Void
     let stop: () -> Void
@@ -627,10 +638,10 @@ struct FWPackagesActionBar: View {
 
     private var actionButtons: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if installCount > 0, let identityWarning {
-                Label(identityWarning, systemImage: "antenna.radiowaves.left.and.right.slash")
+            if installCount > 0, let identityNotice {
+                Label(identityNotice.text, systemImage: identityNotice.systemImage)
                     .font(.caption2)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(identityNotice.isBlocking ? .red : .orange)
                     .fixedSize(horizontal: false, vertical: true)
             }
             HStack(spacing: 10) {
@@ -718,10 +729,45 @@ struct FWPackagesActionBar: View {
     }
 }
 
+enum FWPackagesIdentityNotice: Equatable {
+    case verificationPending
+    case connectionRequired(TransferChannel)
+
+    var text: String {
+        switch self {
+        case .verificationPending:
+            return "Connected. Firmware compatibility will be verified before installation."
+        case .connectionRequired(let channel):
+            return "Connect Flipper over BLE to validate apps before installing via \(channel.label)."
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .verificationPending: return "checkmark.shield"
+        case .connectionRequired: return "antenna.radiowaves.left.and.right.slash"
+        }
+    }
+
+    var isBlocking: Bool {
+        if case .connectionRequired = self { return true }
+        return false
+    }
+}
+
 #if DEBUG
 struct FWPackagesActionBarQAView: View {
-    @StateObject private var updater = TumoflipUpdater.actionBarQAFixture()
-    @State private var scenario: TumoflipUpdater.ActionBarQAScenario = .both
+    @StateObject private var updater: TumoflipUpdater
+    @State private var scenario: TumoflipUpdater.ActionBarQAScenario
+
+    init() {
+        let initial: TumoflipUpdater.ActionBarQAScenario = ProcessInfo.processInfo.arguments
+            .contains("-fw-packages-identity-pending") ? .identity : .both
+        _updater = StateObject(
+            wrappedValue: TumoflipUpdater.actionBarQAFixture(initial: initial)
+        )
+        _scenario = State(initialValue: initial)
+    }
 
     var body: some View {
         NavigationStack {
