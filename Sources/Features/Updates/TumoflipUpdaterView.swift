@@ -614,9 +614,10 @@ struct FWPackagesActionBar: View {
                 stopTitle: "Stop install"
             )
         case .installing(let done, let total, let file):
+            let percent = Int(Double(min(done, total)) / Double(max(total, 1)) * 100)
             transactionBar(
                 title: file,
-                detail: "\(done)/\(total) · \(transferChannel.label)",
+                detail: "\(percent)% · \(transferChannel.label)",
                 progress: Double(min(done, total)) / Double(max(total, 1)),
                 tint: Theme.accent,
                 stopTitle: "Stop install"
@@ -690,7 +691,7 @@ struct FWPackagesActionBar: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(stopRequested ? "Stopping — rolling back…" : title)
+                Text(stopRequested ? "Stopping safely…" : title)
                     .font(.callout.weight(.semibold))
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -713,7 +714,7 @@ struct FWPackagesActionBar: View {
 
             Button(role: .destructive, action: stop) {
                 Label(
-                    stopRequested ? "Stopping — rolling back…" : stopTitle,
+                    stopRequested ? "Stopping safely…" : stopTitle,
                     systemImage: "stop.circle.fill"
                 )
                 .frame(maxWidth: .infinity, minHeight: 44)

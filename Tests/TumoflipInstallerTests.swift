@@ -21,12 +21,39 @@ final class TumoflipInstallerTests: XCTestCase {
         var failMoveAfterCopy: ((String, String) -> Bool)?
         var failMoveAfterRemove: ((String, String) -> Bool)?
         var checkedMD5FailuresRemaining = 0
+        var cancellableWriteChunkSize: Int?
+        var onWriteProgress: ((Int) -> Void)?
 
         func write(_ data: Data, to path: String) async throws {
             if failWrite?(path) == true { throw Err.injected }
             writeCount += 1
             let isState = path == TumoflipInstaller.stateSlotA || path == TumoflipInstaller.stateSlotB
             files[path] = corruptWrites && !isState ? (data + Data([0xFF])) : data
+        }
+        func write(
+            _ data: Data,
+            to path: String,
+            progress: (@Sendable (Int) -> Void)?,
+            isStopRequested: @escaping @Sendable () -> Bool
+        ) async throws {
+            guard let chunkSize = cancellableWriteChunkSize else {
+                try await write(data, to: path)
+                progress?(data.count)
+                if isStopRequested() { throw CancellationError() }
+                return
+            }
+            if isStopRequested() { throw CancellationError() }
+            files[path] = Data()
+            var offset = 0
+            while offset < data.count {
+                if isStopRequested() { throw CancellationError() }
+                let end = min(offset + chunkSize, data.count)
+                files[path]?.append(data[offset..<end])
+                offset = end
+                progress?(offset)
+                onWriteProgress?(offset)
+            }
+            if isStopRequested() { throw CancellationError() }
         }
         func read(_ path: String) async -> Data? { files[path] }
         func deviceMD5(_ path: String) async -> String? { files[path].map { TumoflipHash.md5($0) } }
@@ -116,6 +143,39 @@ final class TumoflipInstallerTests: XCTestCase {
                       cleanup: [TumoflipManifest.CleanupEntry] = [],
                       groups: [String] = ["base"]) -> TumoflipInstallPlan {
         .init(releaseId: rid, groups: groups, files: files, cleanup: cleanup)
+    }
+
+    func testStopDuringLargeStagingWriteLeavesLiveFileUntouchedAndClearsJournal() async throws {
+        let fs = FakeFS()
+        let target = "/ext/apps/Module One/ESP32 Wi-Fi/esp_flasher.fap"
+        let original = Data("working-version".utf8)
+        let replacement = Data(repeating: 0xA5, count: 8 * 1024)
+        fs.files[target] = original
+        fs.cancellableWriteChunkSize = 512
+
+        let stop = StopToken()
+        fs.onWriteProgress = { bytes in
+            if bytes >= 1_024 { stop.stop() }
+        }
+        let installer = TumoflipInstaller(
+            fs: fs,
+            source: FakeSource(data: ["esp_flasher.fap": replacement])
+        )
+
+        do {
+            _ = try await installer.install(
+                plan([file("esp_flasher.fap", target, replacement)]),
+                isStopRequested: { stop.isStopped }
+            )
+            XCTFail("Expected a cancelled staging transaction")
+        } catch TumoflipInstallError.cancelled {
+            // Expected: only the partial staging file existed and rollback removed it.
+        }
+
+        XCTAssertEqual(fs.files[target], original)
+        XCTAssertFalse(fs.files.keys.contains { $0.contains("/staging/") })
+        let recoveredState = await fs.readState()
+        XCTAssertNil(recoveredState?.txn)
     }
 
     // MARK: - Success

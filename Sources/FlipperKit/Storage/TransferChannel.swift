@@ -210,7 +210,22 @@ final class USBSDStorage: DeviceFileStore {
         data: Data,
         progress: (@Sendable (Int) -> Void)? = nil
     ) async throws {
+        try await write(
+            path,
+            data: data,
+            progress: progress,
+            isStopRequested: { false }
+        )
+    }
+
+    func write(
+        _ path: String,
+        data: Data,
+        progress: (@Sendable (Int) -> Void)?,
+        isStopRequested: @escaping @Sendable () -> Bool
+    ) async throws {
         try withAccess {
+            if isStopRequested() { throw CancellationError() }
             let url = try localURL(for: path)
             let dir = url.deletingLastPathComponent()
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -226,13 +241,20 @@ final class USBSDStorage: DeviceFileStore {
             }
             do {
                 let handle = try FileHandle(forWritingTo: tmp)
-                let chunk = 256 * 1024
-                var offset = 0
-                while offset < data.count {
-                    let end = min(offset + chunk, data.count)
-                    try handle.write(contentsOf: data[offset..<end])
-                    offset = end
-                    progress?(offset)
+                do {
+                    let chunk = 256 * 1024
+                    var offset = 0
+                    while offset < data.count {
+                        if isStopRequested() { throw CancellationError() }
+                        let end = min(offset + chunk, data.count)
+                        try handle.write(contentsOf: data[offset..<end])
+                        offset = end
+                        progress?(offset)
+                    }
+                    if isStopRequested() { throw CancellationError() }
+                } catch {
+                    try? handle.close()
+                    throw error
                 }
                 try handle.close()
                 if FileManager.default.fileExists(atPath: url.path) {

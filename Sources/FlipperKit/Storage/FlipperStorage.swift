@@ -184,6 +184,25 @@ final class FlipperStorage {
     /// number of bytes pushed to the Flipper (for a live progress bar).
     func write(_ path: String, data: Data,
                progress: (@Sendable (Int) -> Void)? = nil) async throws {
+        try await write(
+            path,
+            data: data,
+            progress: progress,
+            isStopRequested: { false }
+        )
+    }
+
+    /// Cancellable streaming write used only for transaction staging. When Stop is
+    /// requested, RPC finishes the current acknowledged block as the final block so
+    /// the Flipper closes the partial staging file cleanly before cancellation is
+    /// surfaced to the installer.
+    func write(
+        _ path: String,
+        data: Data,
+        progress: (@Sendable (Int) -> Void)?,
+        isStopRequested: @escaping @Sendable () -> Bool
+    ) async throws {
+        if isStopRequested() { throw CancellationError() }
         var configures: [(inout PB_Main) -> Void] = []
         var offset = 0
         repeat {
@@ -218,9 +237,12 @@ final class FlipperStorage {
         // without progress; a genuinely dead link is still caught within ~60s of going
         // quiet, same as before this used to be a single fixed 300s ceiling on the whole
         // transfer (which large files could exceed even while healthy).
-        _ = try await rpc.commandStreaming(timeout: 60, onFrameSent: { sent in
-            progress?(min(sent * chunk, total))
-        }, configures)
+        _ = try await rpc.commandStreaming(
+            timeout: 60,
+            onFrameSent: { sent in progress?(min(sent * chunk, total)) },
+            shouldStop: isStopRequested,
+            configures
+        )
         progress?(total)
         let p = path
         DispatchQueue.main.async { Self.didChange.send(p) }
