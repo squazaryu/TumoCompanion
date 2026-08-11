@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.10.18",
+      "version": "1.10.19",
       "versionDate": "2026-08-11",
-      "versionDescription": "Stops repeated full BLE uploads during FW Package verification by sharing the proven sibling staging path, allowing slow on-device MD5 checks and failing closed without re-uploading.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.18/TumoCompanion-unsigned.ipa",
-      "size": 29734172,
+      "versionDescription": "Fixes false large-FAP activation failures by using checked device MD5 for the existing app, backup, final copy and rollback without deleting the last verified copy on a timeout.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.19/TumoCompanion-unsigned.ipa",
+      "size": 29736026,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.10.19",
+          "date": "2026-08-11",
+          "localizedDescription": "Fixes false large-FAP activation failures by using checked device MD5 for the existing app, backup, final copy and rollback without deleting the last verified copy on a timeout.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.19/TumoCompanion-unsigned.ipa",
+          "size": 29736026,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.10.18",
           "date": "2026-08-11",
