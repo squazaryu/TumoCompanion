@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.10.22",
-      "versionDate": "2026-08-11",
-      "versionDescription": "Prevents overlapping FW Packages transactions from silently restarting a large ESP Flasher upload from 0%; Install and Clean Up now acquire one immediate single-flight gate before any BLE preflight.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.22/TumoCompanion-unsigned.ipa",
-      "size": 29749159,
+      "version": "1.10.23",
+      "versionDate": "2026-08-12",
+      "versionDescription": "Uses the centralized Tumoflip audit ledger to suppress only exact, reviewed Protected Apps differences while new bytes, routes, incompatibilities and revocations remain fail-closed as Needs review.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.23/TumoCompanion-unsigned.ipa",
+      "size": 29802031,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.10.23",
+          "date": "2026-08-12",
+          "localizedDescription": "Uses the centralized Tumoflip audit ledger to suppress only exact, reviewed Protected Apps differences while new bytes, routes, incompatibilities and revocations remain fail-closed as Needs review.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.23/TumoCompanion-unsigned.ipa",
+          "size": 29802031,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.10.22",
           "date": "2026-08-11",
