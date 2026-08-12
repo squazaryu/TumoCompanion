@@ -87,6 +87,16 @@ final class TumoflipFirmwareRoutingTests: XCTestCase {
         XCTAssertTrue(route.isManualOverride)
     }
 
+    func testManualSelectionMatchingDetectedChannelIsNotWarnedAsOverride() {
+        let identity = makeIdentity(version: "t-dev-004-015", origin: "tumoflip")
+        let route = TumoflipFirmwareRouter.route(identity: identity, manualOverride: .dev)
+
+        XCTAssertEqual(route.channel, .dev)
+        XCTAssertEqual(route.detectedChannel, .dev)
+        XCTAssertNil(route.warning)
+        XCTAssertFalse(route.isManualOverride)
+    }
+
     func testDeviceInfoParsingKeepsUsefulDiagnostics() {
         let identity = TumoflipDeviceIdentity(deviceInfo: [
             ("firmware_version", "t-dev-089-035-001"),
