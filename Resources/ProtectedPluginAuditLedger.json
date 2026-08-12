@@ -63,13 +63,6 @@
           "note": "Integrated as an ARF Sub-GHz Full child module."
         },
         {
-          "remotePath": "/ext/apps/Sub-GHz/subghz_raw_edit.fap",
-          "targetPath": "/ext/apps/ARF Tools/subghz_raw_edit.fap",
-          "sourceMD5": "fdcdad31fa9afae657cc16eec7113816",
-          "disposition": "auditedDifference",
-          "note": "Protected Tumoflip RAW Edit build."
-        },
-        {
           "remotePath": "/ext/apps/Sub-GHz/subghz_wardriving.fap",
           "targetPath": "/ext/apps/Module One/Sub-GHz/subghz_wardriving.fap",
           "sourceMD5": "c5ffb294251247d10fa51dae339e4765",

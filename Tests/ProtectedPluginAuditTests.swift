@@ -11,7 +11,7 @@ final class ProtectedPluginAuditTests: XCTestCase {
         let document = try ProtectedPluginAuditValidator.decode(Data(contentsOf: url))
         let audit = try XCTUnwrap(document.audits.first { $0.sourceTag == "9aug2026" })
 
-        XCTAssertEqual(audit.entries.count, 24)
+        XCTAssertEqual(audit.entries.count, 23)
         XCTAssertEqual(audit.sourceCommit, "0b71d9f34fec8ae3ba763b8de27ef15d1d604c5b")
         XCTAssertTrue(audit.auditIssue.hasSuffix("/281"))
         XCTAssertEqual(
@@ -20,6 +20,9 @@ final class ProtectedPluginAuditTests: XCTestCase {
         XCTAssertEqual(
             audit.entries.first { $0.remotePath.hasSuffix("claude_remote_ble.fap") }?.disposition,
             .intentionallyReplaced)
+        XCTAssertNil(
+            audit.entries.first { $0.remotePath.hasSuffix("subghz_raw_edit.fap") },
+            "RAW Edit remains unresolved until FW Packages publication, device acceptance, and #281 closure")
     }
 
     func testRemoteExactAuditIsCachedAndReusedOnlyForSamePack() async throws {

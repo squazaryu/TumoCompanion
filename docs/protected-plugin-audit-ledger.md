@@ -32,6 +32,11 @@ pack, changed bytes or routes, and malformed authoritative JSON all fail closed 
 cache record is reused only for its exact tag and two archive hashes. A reachable but
 malformed ledger never falls back to cache.
 
+The bundled `9aug2026` bootstrap intentionally omits Sub-GHz RAW Edit. Issue `#281`
+still requires FW Packages publication, physical-device acceptance, and issue closure;
+until every gate is complete the exact RAW Edit binary must continue to appear as
+`DIFF`, even though the remaining protected artifacts in that pack are covered.
+
 ## Automation update sequence
 
 For every new Community Pack the automation must:
