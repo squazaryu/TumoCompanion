@@ -163,6 +163,18 @@ enum TumoflipFirmwareRouter {
     ) -> TumoflipFirmwareRoute {
         let detected = identity?.inferredChannel
         if let manualOverride {
+            // A persisted selection that matches the detected firmware channel is
+            // not a compatibility override. Keep the selected channel, but do not
+            // surface a warning that claims Dev is replacing Dev (or Stable is
+            // replacing Stable).
+            if manualOverride == detected {
+                return TumoflipFirmwareRoute(
+                    channel: manualOverride,
+                    detectedChannel: detected,
+                    warning: nil,
+                    isManualOverride: false
+                )
+            }
             return TumoflipFirmwareRoute(
                 channel: manualOverride,
                 detectedChannel: detected,
