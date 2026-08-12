@@ -1124,6 +1124,28 @@ final class TumoflipInstallerTests: XCTestCase {
         .init(bytes: bytes.count, sha256: TumoflipHash.sha256(bytes),
               md5: TumoflipHash.md5(bytes), source: source, target: target)
     }
+    private func compatibleFile(
+        _ source: String,
+        _ target: String,
+        canonical: Data,
+        compatible: Data
+    ) -> TumoflipManifest.PackageFile {
+        .init(
+            bytes: canonical.count,
+            sha256: TumoflipHash.sha256(canonical),
+            md5: TumoflipHash.md5(canonical),
+            compatibleBuilds: [
+                .init(
+                    bytes: compatible.count,
+                    sha256: TumoflipHash.sha256(compatible),
+                    md5: TumoflipHash.md5(compatible),
+                    releaseId: String(repeating: "d", count: 64)
+                ),
+            ],
+            source: source,
+            target: target
+        )
+    }
     private func entry(_ sha: String, _ bytes: Data) -> TumoflipState.LedgerEntry {
         .init(sha256: sha, md5: TumoflipHash.md5(bytes), releaseId: rid)
     }
@@ -1189,6 +1211,72 @@ final class TumoflipInstallerTests: XCTestCase {
         XCTAssertEqual(state.ledger[files[1].target]?.sha256, files[1].sha256)
         XCTAssertNotNil(fs.files["/ext/.tumoflip/install-state.json"])
         XCTAssertNotNil(fs.files["/ext/.tumoflip/package-state.txt"])
+    }
+
+    func testReconcileAdoptsExactCompatibleBuildAndPersistsActualIdentity() async throws {
+        let canonical = Data("catalog-build".utf8)
+        let compatible = Data("accepted-firmware-build".utf8)
+        let target = "/ext/apps/a.fap"
+        let file = compatibleFile("a", target, canonical: canonical, compatible: compatible)
+        let fs = FakeFS()
+        fs.files[target] = compatible
+        let installer = TumoflipInstaller(fs: fs, source: FakeSource(data: ["a": canonical]))
+
+        let snapshot = try await installer.reconcilePackageStatus(manifest: manifest([file]))
+
+        XCTAssertEqual(snapshot.groups["base"], .upToDate)
+        XCTAssertEqual(snapshot.files[target], .upToDate)
+        let loadedState = await fs.readState()
+        let state = try XCTUnwrap(loadedState)
+        XCTAssertEqual(state.ledger[target]?.md5, TumoflipHash.md5(compatible))
+        XCTAssertEqual(state.ledger[target]?.sha256, TumoflipHash.sha256(compatible))
+
+        let compatibility = try XCTUnwrap(fs.files["/ext/.tumoflip/install-state.json"])
+        let decoded = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: compatibility) as? [String: Any]
+        )
+        let projected = try XCTUnwrap(decoded["files"] as? [[String: Any]])
+        XCTAssertEqual(projected.first?["sha256"] as? String, TumoflipHash.sha256(compatible))
+
+        let preflight = try await installer.verifyPackageTargets([target], manifest: manifest([file]))
+        XCTAssertEqual(preflight[target], .upToDate)
+    }
+
+    func testCompatibleBuildDoesNotAcceptUnknownBytes() async throws {
+        let canonical = Data("catalog-build".utf8)
+        let compatible = Data("accepted-firmware-build".utf8)
+        let target = "/ext/apps/a.fap"
+        let file = compatibleFile("a", target, canonical: canonical, compatible: compatible)
+        let fs = FakeFS()
+        fs.files[target] = Data("unknown-or-corrupt".utf8)
+        let installer = TumoflipInstaller(fs: fs, source: FakeSource(data: ["a": canonical]))
+
+        let snapshot = try await installer.reconcilePackageStatus(manifest: manifest([file]))
+
+        XCTAssertEqual(snapshot.groups["base"], .updateAvailable)
+        XCTAssertEqual(snapshot.files[target], .needsUpdate)
+        let state = await fs.readState()
+        XCTAssertNil(state)
+    }
+
+    func testCleanupAcceptsExactCompatibleCanonicalBuild() async throws {
+        let canonical = Data("catalog-build".utf8)
+        let compatible = Data("accepted-firmware-build".utf8)
+        let target = "/ext/apps/new.fap"
+        let legacy = "/ext/apps/old.fap"
+        let file = compatibleFile("new", target, canonical: canonical, compatible: compatible)
+        let fs = FakeFS()
+        fs.files[target] = compatible
+        fs.files[legacy] = Data("legacy".utf8)
+        let installer = TumoflipInstaller(fs: fs, source: FakeSource(data: [:]))
+
+        let removed = try await installer.cleanupLegacy(
+            plan([file], cleanup: [.init(canonical: target, legacy: legacy)])
+        )
+
+        XCTAssertEqual(removed, 1)
+        XCTAssertNil(fs.files[legacy])
+        XCTAssertEqual(fs.files[target], compatible)
     }
 
     func testDetailedReconcileReportsEveryCompleteMD5FileStatus() async throws {

@@ -385,7 +385,19 @@ struct TumoflipInstaller {
     /// ledger above; these files are a committed, human-readable projection of it.
     func refreshCompatibilityState(manifest: TumoflipManifest,
                                    plan: TumoflipInstallPlan) async throws {
-        let (stateData, packageData) = try compatibilityPayload(manifest: manifest, plan: plan)
+        try await refreshCompatibilityState(manifest: manifest, plan: plan, ledger: nil)
+    }
+
+    private func refreshCompatibilityState(
+        manifest: TumoflipManifest,
+        plan: TumoflipInstallPlan,
+        ledger: [String: TumoflipState.LedgerEntry]?
+    ) async throws {
+        let (stateData, packageData) = try compatibilityPayload(
+            manifest: manifest,
+            plan: plan,
+            ledger: ledger
+        )
 
         try await fs.makeDirectory(Self.root)
         try await fs.write(stateData, to: Self.compatibilityStatePath)
@@ -401,8 +413,11 @@ struct TumoflipInstaller {
     private static let compatibilityStatePath = "\(root)/install-state.json"
     private static let packageStatePath = "\(root)/package-state.txt"
 
-    private func compatibilityPayload(manifest: TumoflipManifest,
-                                      plan: TumoflipInstallPlan) throws -> (Data, Data) {
+    private func compatibilityPayload(
+        manifest: TumoflipManifest,
+        plan: TumoflipInstallPlan,
+        ledger: [String: TumoflipState.LedgerEntry]? = nil
+    ) throws -> (Data, Data) {
         let transaction = "\(plan.releaseId.prefix(16))-\(plan.fingerprint.prefix(8))"
         let rollback = "/.tumoflip/rollback/\(transaction)"
         let state = TumoflipCompatibilityState(
@@ -410,7 +425,9 @@ struct TumoflipInstaller {
             releaseId: plan.releaseId,
             transaction: transaction,
             groups: plan.groups,
-            files: plan.files.map { .init(target: $0.target, sha256: $0.sha256) },
+            files: plan.files.map {
+                .init(target: $0.target, sha256: ledger?[$0.target]?.sha256 ?? $0.sha256)
+            },
             rollback: rollback
         )
 
@@ -452,7 +469,7 @@ struct TumoflipInstaller {
         for f in plan.files {
             guard let entry = ledger[f.target] else { continue }
             inLedger += 1
-            if entry.sha256 == f.sha256 { matched += 1 }
+            if f.acceptsLedger(entry) { matched += 1 }
         }
         if inLedger == 0 { return .notInstalled }
         return matched == plan.files.count ? .upToDate : .updateAvailable
@@ -470,7 +487,7 @@ struct TumoflipInstaller {
               !plan.files.isEmpty else { return .empty }
         var inLedger = 0, verified = 0
         for f in plan.files {
-            guard let entry = ledger[f.target], entry.sha256 == f.sha256 else { continue }
+            guard let entry = ledger[f.target], f.acceptsLedger(entry) else { continue }
             inLedger += 1
             if await fs.deviceMD5(f.target) == entry.md5 { verified += 1 }   // present + intact
         }
@@ -520,8 +537,9 @@ struct TumoflipInstaller {
                 statuses[target] = .missing
                 continue
             }
-            if let expected = file.md5 {
-                statuses[target] = actual == expected ? .upToDate : .needsUpdate
+            if file.md5 != nil {
+                statuses[target] = file.acceptedBuild(matchingMD5: actual) != nil
+                    ? .upToDate : .needsUpdate
             } else if let entry = ledger[target] {
                 statuses[target] = entry.sha256 == file.sha256 && entry.md5 == actual
                     ? .upToDate : .needsUpdate
@@ -571,7 +589,7 @@ struct TumoflipInstaller {
                                 continue
                             }
                             fileStatuses[file.target] =
-                                entry.sha256 == file.sha256 && entry.md5 == actual
+                                file.acceptsLedger(entry) && entry.md5 == actual
                                 ? .upToDate : .needsUpdate
                         } catch {
                             fileStatuses[file.target] = .validationError
@@ -589,6 +607,7 @@ struct TumoflipInstaller {
             var allMatch = !cleanupPending
             var validationFailed = false
             var knownDivergence = cleanupPending
+            var acceptedBuilds: [String: TumoflipManifest.PackageFile.BuildIdentity] = [:]
             for file in plan.files {
                 do {
                     let actual = try await checkedDeviceMD5(file.target)
@@ -596,8 +615,10 @@ struct TumoflipInstaller {
                         fileStatuses[file.target] = .missing
                         allMatch = false
                         knownDivergence = true
-                    } else if actual == file.md5 {
+                    } else if let actual,
+                              let accepted = file.acceptedBuild(matchingMD5: actual) {
                         fileStatuses[file.target] = .upToDate
+                        acceptedBuilds[file.target] = accepted
                     } else {
                         fileStatuses[file.target] = .needsUpdate
                         allMatch = false
@@ -620,8 +641,16 @@ struct TumoflipInstaller {
             }
 
             for file in plan.files {
+                guard let accepted = acceptedBuilds[file.target] else {
+                    throw TumoflipInstallError.incompatible(
+                        "accepted package build is unavailable for \(file.target)"
+                    )
+                }
                 state.ledger[file.target] = .init(
-                    sha256: file.sha256, md5: file.md5!, releaseId: manifest.releaseId)
+                    sha256: accepted.sha256,
+                    md5: accepted.md5,
+                    releaseId: manifest.releaseId
+                )
             }
             statuses[group] = .upToDate
             currentGroups.insert(group)
@@ -633,7 +662,11 @@ struct TumoflipInstaller {
         if !currentGroups.isEmpty {
             let plan = try TumoflipInstallPlan.make(manifest: manifest, groups: currentGroups)
             currentPlan = plan
-            let expected = try compatibilityPayload(manifest: manifest, plan: plan)
+            let expected = try compatibilityPayload(
+                manifest: manifest,
+                plan: plan,
+                ledger: state.ledger
+            )
             let currentCompatibility = await fs.read(Self.compatibilityStatePath)
             let currentPackageState = await fs.read(Self.packageStatePath)
             projectionChanged = currentCompatibility != expected.0 || currentPackageState != expected.1
@@ -651,7 +684,11 @@ struct TumoflipInstaller {
         // merely the last group encountered during adoption. Write it before the
         // authoritative ledger so a projection failure leaves adoption retryable.
         if let currentPlan, projectionChanged {
-            try await refreshCompatibilityState(manifest: manifest, plan: currentPlan)
+            try await refreshCompatibilityState(
+                manifest: manifest,
+                plan: currentPlan,
+                ledger: state.ledger
+            )
         }
         if ledgerChanged {
             try await saveState(&state)
@@ -693,12 +730,12 @@ struct TumoflipInstaller {
         var candidates: [TumoflipManifest.CleanupEntry] = []
         for entry in plan.cleanup where await fs.exists(entry.legacy) {
             if isStopRequested() { throw TumoflipInstallError.cancelled }
-            guard let canonical = filesByTarget[entry.canonical],
-                  let expectedMD5 = canonical.md5 else {
+            guard let canonical = filesByTarget[entry.canonical], canonical.md5 != nil else {
                 throw TumoflipInstallError.incompatible(
                     "cleanup cannot verify \(entry.canonical)")
             }
-            guard try await checkedDeviceMD5(entry.canonical) == expectedMD5 else {
+            guard let actual = try await checkedDeviceMD5(entry.canonical),
+                  canonical.acceptedBuild(matchingMD5: actual) != nil else {
                 throw TumoflipInstallError.deviceVerifyFailed(entry.canonical)
             }
             candidates.append(entry)

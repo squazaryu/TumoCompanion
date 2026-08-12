@@ -7,6 +7,7 @@ final class TumoflipManifestTests: XCTestCase {
 
     private let sha = String(repeating: "a", count: 64)
     private let rid = String(repeating: "b", count: 64)
+    private let compatibleRID = String(repeating: "d", count: 64)
 
     /// A faithful schema-v2 manifest mirroring the real release sidecar's keys.
     private func base() -> [String: Any] {
@@ -60,6 +61,46 @@ final class TumoflipManifestTests: XCTestCase {
 
     func testValidatePasses() throws {
         XCTAssertNoThrow(try decode(base()).validate())
+    }
+
+    func testIndependentCatalogAcceptsContentAddressedCompatibleBuild() throws {
+        var d = base()
+        var packages = d["packages"] as! [String: Any]
+        var baseFiles = packages["base"] as! [[String: Any]]
+        baseFiles[0]["compatible_builds"] = [[
+            "bytes": 21_892,
+            "sha256": String(repeating: "e", count: 64),
+            "md5": String(repeating: "f", count: 32),
+            "release_id": compatibleRID,
+        ]]
+        packages["base"] = baseFiles
+        d["packages"] = packages
+        d["package_release"] = [
+            "id": "fw-packages-dev-005",
+            "type": "package-only",
+            "source_commit": String(repeating: "1", count: 40),
+            "source_dirty": false,
+            "source_firmware_version": "t-dev-004-015",
+            "target_release_tag": "t-dev-004-015",
+            "firmware_flash_unchanged": true,
+            "catalog_channel": "dev",
+            "catalog_revision": 5,
+            "catalog_release_tag": "fw-packages-dev-005",
+            "compatible_releases": [[
+                "release_tag": "fw-packages-dev-004",
+                "release_id": compatibleRID,
+                "manifest_sha256": String(repeating: "2", count: 64),
+                "source_commit": String(repeating: "3", count: 40),
+            ]],
+        ]
+
+        let manifest = try decode(d)
+        XCTAssertNoThrow(try manifest.validate())
+        let file = try XCTUnwrap(manifest.packages["base"]?.first)
+        let accepted = try XCTUnwrap(file.acceptedBuild(
+            matchingMD5: String(repeating: "f", count: 32)
+        ))
+        XCTAssertEqual(accepted.sha256, String(repeating: "e", count: 64))
     }
 
     // MARK: - Validation failures
@@ -118,6 +159,42 @@ final class TumoflipManifestTests: XCTestCase {
             ]
             XCTAssertThrowsError(try decode(d).validate(), bad)
         }
+    }
+
+    func testRejectsCompatibleBuildWithoutExactDeclaredRelease() throws {
+        var d = base()
+        var packages = d["packages"] as! [String: Any]
+        var baseFiles = packages["base"] as! [[String: Any]]
+        baseFiles[0]["compatible_builds"] = [[
+            "bytes": 21_892,
+            "sha256": String(repeating: "e", count: 64),
+            "md5": String(repeating: "f", count: 32),
+            "release_id": compatibleRID,
+        ]]
+        packages["base"] = baseFiles
+        d["packages"] = packages
+
+        XCTAssertThrowsError(try decode(d).validate()) {
+            guard case .invalidEntry = ($0 as? TumoflipManifestError) else {
+                return XCTFail("\($0)")
+            }
+        }
+    }
+
+    func testRejectsCompatibleBuildThatDuplicatesCanonicalMD5() throws {
+        var d = base()
+        var packages = d["packages"] as! [String: Any]
+        var baseFiles = packages["base"] as! [[String: Any]]
+        baseFiles[0]["compatible_builds"] = [[
+            "bytes": 21_892,
+            "sha256": String(repeating: "e", count: 64),
+            "md5": String(repeating: "c", count: 32),
+            "release_id": compatibleRID,
+        ]]
+        packages["base"] = baseFiles
+        d["packages"] = packages
+
+        XCTAssertThrowsError(try decode(d).validate())
     }
 
     func testRejectsEmptyReleaseID() throws {
