@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.10.25",
+      "version": "1.10.26",
       "versionDate": "2026-08-12",
-      "versionDescription": "FW Packages now prefers the latest independent package revision over an older catalog embedded in a firmware release, restoring accurate Needs update status and the Install action.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.25/TumoCompanion-unsigned.ipa",
-      "size": 29804494,
+      "versionDescription": "FW Packages now accepts only exact, audited overlay builds from a previous catalog, preventing false mass updates after an accepted firmware baseline changes while unknown bytes remain fail-closed.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.26/TumoCompanion-unsigned.ipa",
+      "size": 29817518,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.10.26",
+          "date": "2026-08-12",
+          "localizedDescription": "FW Packages now accepts only exact, audited overlay builds from a previous catalog, preventing false mass updates after an accepted firmware baseline changes while unknown bytes remain fail-closed.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.26/TumoCompanion-unsigned.ipa",
+          "size": 29817518,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.10.25",
           "date": "2026-08-12",
