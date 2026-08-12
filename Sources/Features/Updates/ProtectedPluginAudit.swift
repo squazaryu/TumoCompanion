@@ -287,8 +287,23 @@ private struct ProtectedPluginAuditCacheEnvelope: Codable {
 struct ProtectedPluginAuditCache {
     let directory: URL
 
+    private func auditURL(for provenance: ProtectedPluginPackProvenance) -> URL {
+        directory.appendingPathComponent("\(provenance.cacheKey).json")
+    }
+
+    private func revocationURL(for provenance: ProtectedPluginPackProvenance) -> URL {
+        directory.appendingPathComponent("\(provenance.cacheKey).revoked")
+    }
+
+    func isRevoked(for provenance: ProtectedPluginPackProvenance) -> Bool {
+        FileManager.default.fileExists(atPath: revocationURL(for: provenance).path)
+    }
+
     func load(for provenance: ProtectedPluginPackProvenance) -> ProtectedPluginAudit? {
-        let url = directory.appendingPathComponent("\(provenance.cacheKey).json")
+        // A valid authoritative ledger can revoke an earlier positive exact-pack
+        // decision. Its tombstone takes precedence over both cache and bundle.
+        guard !isRevoked(for: provenance) else { return nil }
+        let url = auditURL(for: provenance)
         guard let data = try? Data(contentsOf: url),
               let envelope = try? JSONDecoder().decode(ProtectedPluginAuditCacheEnvelope.self, from: data) else {
             return nil
@@ -312,9 +327,19 @@ struct ProtectedPluginAuditCache {
         let data = try JSONEncoder().encode(envelope)
         try FileManager.default.createDirectory(
             at: directory, withIntermediateDirectories: true)
-        try data.write(
-            to: directory.appendingPathComponent("\(provenance.cacheKey).json"),
-            options: .atomic)
+        try data.write(to: auditURL(for: provenance), options: .atomic)
+        // Only a later authoritative exact audit clears a prior revocation.
+        try? FileManager.default.removeItem(at: revocationURL(for: provenance))
+    }
+
+    func revoke(_ provenance: ProtectedPluginPackProvenance) throws {
+        try FileManager.default.createDirectory(
+            at: directory, withIntermediateDirectories: true)
+        // Write the negative decision first. If cleanup fails, the tombstone still
+        // wins and stale positive bytes cannot be resurrected offline.
+        try Data("revoked\n".utf8).write(
+            to: revocationURL(for: provenance), options: .atomic)
+        try? FileManager.default.removeItem(at: auditURL(for: provenance))
     }
 }
 
@@ -372,11 +397,15 @@ struct ProtectedPluginAuditService {
                 return .rejected(error.localizedDescription)
             }
             guard let audit = document.audits.first(where: { $0.matches(provenance) }) else {
+                try? cache.revoke(provenance)
                 return .rejected("This Community Pack revision has not completed protected-app audit.")
             }
             try? cache.save(audit, for: provenance)
             return .accepted(audit, origin: .remote)
         } catch {
+            guard !cache.isRevoked(for: provenance) else {
+                return .rejected("This Community Pack revision was revoked by the protected-app audit ledger.")
+            }
             if let cached = cache.load(for: provenance) {
                 return .accepted(cached, origin: .cache)
             }

@@ -109,6 +109,28 @@ final class ProtectedPluginAuditTests: XCTestCase {
         XCTAssertNil(resolution.audit)
         XCTAssertNil(resolution.origin)
         XCTAssertNotNil(resolution.failure)
+
+        let offline = ProtectedPluginAuditService(
+            url: service.url,
+            cache: cache,
+            fetch: { _ in throw URLError(.notConnectedToInternet) },
+            bundledData: { try? self.makeDocumentData() })
+        let stillRevoked = await offline.resolve(for: provenance)
+        XCTAssertNil(stillRevoked.audit)
+        XCTAssertNil(stillRevoked.origin)
+        XCTAssertNotNil(stillRevoked.failure)
+        XCTAssertTrue(cache.isRevoked(for: provenance))
+
+        let reaccepted = ProtectedPluginAuditService(
+            url: service.url,
+            cache: cache,
+            fetch: { _ in try self.makeDocumentData() },
+            bundledData: { nil })
+        let refreshed = await reaccepted.resolve(for: provenance)
+        XCTAssertEqual(refreshed.origin, .remote)
+        XCTAssertFalse(cache.isRevoked(for: provenance))
+        let cachedAgain = await offline.resolve(for: provenance)
+        XCTAssertEqual(cachedAgain.origin, .cache)
     }
 
     func testOfflineBundledBootstrapRequiresExactPack() async throws {

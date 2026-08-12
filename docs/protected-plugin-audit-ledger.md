@@ -47,9 +47,13 @@ RAW Edit still requires FW Packages publication, physical-device acceptance, and
 target bytes. These 15 unresolved artifacts must continue to appear as `DIFF`.
 
 Offline cache acceptance is deliberately scoped to the exact pack identity but is not
-time-bounded. A revocation in `latest.json` therefore applies as soon as a valid online
-ledger is reached; while the raw endpoint is unreachable, the last exact validated
-record remains usable. We do not claim immediate offline revocation.
+time-bounded. Before the app has observed a newer authoritative decision, the last exact
+validated record remains usable while the raw endpoint is unreachable. Once a reachable,
+valid `latest.json` omits that exact pack identity, TumoCompanion persists an exact-pack
+negative tombstone and removes its positive cache. The tombstone blocks both cache and
+bundled bootstrap while offline; only a later reachable, valid ledger containing the exact
+audit clears it. A revocation still cannot propagate to a phone that never reaches the
+updated raw endpoint, so we do not claim immediate offline revocation.
 
 ## Automation update sequence
 
