@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.10.23",
+      "version": "1.10.24",
       "versionDate": "2026-08-12",
-      "versionDescription": "Uses the centralized Tumoflip audit ledger to suppress only exact, reviewed Protected Apps differences while new bytes, routes, incompatibilities and revocations remain fail-closed as Needs review.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.23/TumoCompanion-unsigned.ipa",
-      "size": 29802031,
+      "versionDescription": "Verify on device now refreshes the exact Protected Apps audit, clears a stale rejection only after authoritative approval, and keeps all unapproved targets fail-closed as Needs review.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.24/TumoCompanion-unsigned.ipa",
+      "size": 29803900,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.10.24",
+          "date": "2026-08-12",
+          "localizedDescription": "Verify on device now refreshes the exact Protected Apps audit, clears a stale rejection only after authoritative approval, and keeps all unapproved targets fail-closed as Needs review.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.24/TumoCompanion-unsigned.ipa",
+          "size": 29803900,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.10.23",
           "date": "2026-08-12",
