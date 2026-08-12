@@ -352,12 +352,32 @@ struct ProtectedAppsView: View {
                     ForEach(updater.pendingProtectedReview) { item in
                         ProtectedReviewRow(
                             item: item,
-                            compatibility: updater.classification(item.remotePath))
+                            compatibility: updater.classification(item.remotePath),
+                            auditStatus: .needsReview)
                     }
                 } header: {
                     Text("Needs review")
                 } footer: {
-                    Text("Protected apps that all-the-plugins also ships. Review upstream changes before deciding whether to replace your tumoflip/custom build (run “Check for updates” to refresh this).")
+                    Text(updater.protectedAuditResolution?.failure
+                         ?? "Protected apps whose current source, route, or installed target bytes have not completed the centralized audit.")
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            if !updater.auditedProtectedReviews.isEmpty {
+                Section {
+                    ForEach(updater.auditedProtectedReviews) { item in
+                        ProtectedReviewRow(
+                            item: item,
+                            compatibility: updater.classification(item.remotePath),
+                            auditStatus: updater.protectedReviewStatus(item))
+                    }
+                } header: {
+                    Text("Verified by Tumoflip audit")
+                } footer: {
+                    let source = updater.protectedAuditResolution?.origin?.rawValue ?? "ledger"
+                    let tag = updater.protectedAuditResolution?.audit?.sourceTag ?? updater.tag
+                    Text("Exact pack, source, route, and installed target bytes are covered by the centralized \(tag) audit (\(source)). Any change or incompatible metadata returns to Needs review automatically.")
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -491,11 +511,24 @@ struct HistoryView: View {
 struct ProtectedReviewRow: View {
     let item: ProtectedPluginReview
     let compatibility: FapCompatibilityState
+    let auditStatus: ProtectedPluginReviewAuditStatus
+
+    private var isAudited: Bool { auditStatus.isAudited }
+
+    private var statusText: String {
+        switch auditStatus {
+        case .verified: return "VERIFIED"
+        case .intentionallyReplaced: return "REPLACED"
+        case .sourceMatches: return "MATCH"
+        case .needsReview:
+            return item.deviceKnown ? (item.deviceMD5 == nil ? "MISSING" : "DIFF") : "CHECK"
+        }
+    }
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: item.deviceKnown ? "lock.fill" : "questionmark.circle.fill")
-                .foregroundStyle(item.deviceKnown ? .orange : .secondary)
+            Image(systemName: isAudited ? "checkmark.seal.fill" : (item.deviceKnown ? "lock.fill" : "questionmark.circle.fill"))
+                .foregroundStyle(isAudited ? .green : (item.deviceKnown ? .orange : .secondary))
                 .frame(width: 20)
             VStack(alignment: .leading, spacing: 1) {
                 Text(item.name).font(.subheadline)
@@ -514,11 +547,24 @@ struct ProtectedReviewRow: View {
                 }
             }
             Spacer()
-            Text(item.deviceKnown ? (item.deviceMD5 == nil ? "MISSING" : "DIFF") : "CHECK")
+            Text(statusText)
                 .font(.caption2)
                 .bold()
-                .foregroundStyle(item.deviceKnown ? .orange : .secondary)
+                .foregroundStyle(isAudited ? .green : (item.deviceKnown ? .orange : .secondary))
+                .accessibilityIdentifier("protected-app-review-status-\(item.name)")
         }
         .padding(.vertical, 3)
     }
 }
+
+#if DEBUG
+struct ProtectedAppsAuditQAView: View {
+    @StateObject private var updater = PluginUpdater.protectedAuditQAFixture()
+
+    var body: some View {
+        NavigationStack {
+            ProtectedAppsView(updater: updater)
+        }
+    }
+}
+#endif

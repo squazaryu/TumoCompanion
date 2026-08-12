@@ -194,6 +194,34 @@ final class ESP32ArchivedRedownloadUITests: XCTestCase {
     }
 }
 
+final class ProtectedAppsAuditUITests: XCTestCase {
+    func testAuditedDifferencesDoNotAppearAsDiff() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-onboardingDone", "YES",
+            "-protected-apps-audit-qa",
+        ]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Verified by Tumoflip audit"].waitForExistence(timeout: 3))
+        XCTAssertEqual(
+            app.staticTexts["protected-app-review-status-esp_flasher"].label,
+            "VERIFIED")
+        XCTAssertEqual(
+            app.staticTexts["protected-app-review-status-claude_remote_ble"].label,
+            "REPLACED")
+        XCTAssertTrue(app.staticTexts["Needs review"].exists)
+        XCTAssertEqual(
+            app.staticTexts["protected-app-review-status-subghz_raw_edit"].label,
+            "DIFF")
+
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = "Protected apps centralized audit statuses"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+}
+
 final class QualityPassUITests: XCTestCase {
     func testGitHubAccessCardShowsAnonymousAllowance() {
         let app = XCUIApplication()

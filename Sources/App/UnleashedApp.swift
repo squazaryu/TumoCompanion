@@ -78,7 +78,9 @@ struct RootView: View {
     @ViewBuilder
     var body: some View {
 #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("-fw-packages-action-bar-qa") {
+        if ProcessInfo.processInfo.arguments.contains("-protected-apps-audit-qa") {
+            ProtectedAppsAuditQAView()
+        } else if ProcessInfo.processInfo.arguments.contains("-fw-packages-action-bar-qa") {
             FWPackagesActionBarQAView()
         } else if ProcessInfo.processInfo.arguments.contains("-esp32-archived-redownload-qa") {
             NavigationStack {
