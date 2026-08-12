@@ -39,15 +39,72 @@ struct TumoflipManifest: Codable, Equatable {
         /// Optional content hash of the installed target. New manifests publish it so
         /// firmware-bundled resources can be adopted without trusting file presence.
         let md5: String?
+        /// Exact, content-addressed builds that are equivalent to the canonical ZIP
+        /// payload. Independent catalogs use these when an accepted newer firmware
+        /// release already contains the same package source built in a different
+        /// linker invocation. Installation still always stages and verifies the
+        /// canonical `sha256`/`md5` above.
+        let compatibleBuilds: [CompatibleBuild]?
         let source: String
         let target: String
 
-        init(bytes: Int, sha256: String, md5: String? = nil, source: String, target: String) {
+        struct CompatibleBuild: Codable, Equatable {
+            let bytes: Int
+            let sha256: String
+            let md5: String
+            let releaseId: String
+
+            enum CodingKeys: String, CodingKey {
+                case bytes, sha256, md5
+                case releaseId = "release_id"
+            }
+        }
+
+        struct BuildIdentity: Equatable {
+            let bytes: Int
+            let sha256: String
+            let md5: String
+        }
+
+        init(
+            bytes: Int,
+            sha256: String,
+            md5: String? = nil,
+            compatibleBuilds: [CompatibleBuild]? = nil,
+            source: String,
+            target: String
+        ) {
             self.bytes = bytes
             self.sha256 = sha256
             self.md5 = md5
+            self.compatibleBuilds = compatibleBuilds
             self.source = source
             self.target = target
+        }
+
+        func acceptedBuild(matchingMD5 actual: String) -> BuildIdentity? {
+            if md5 == actual {
+                return BuildIdentity(bytes: bytes, sha256: sha256, md5: actual)
+            }
+            guard let build = compatibleBuilds?.first(where: { $0.md5 == actual }) else {
+                return nil
+            }
+            return BuildIdentity(bytes: build.bytes, sha256: build.sha256, md5: build.md5)
+        }
+
+        func acceptsLedger(_ entry: TumoflipState.LedgerEntry) -> Bool {
+            if md5 == nil {
+                // Legacy manifests predate device-verifiable MD5 metadata. Preserve
+                // their existing conservative ledger contract; compatible aliases
+                // are intentionally unavailable for this less-trusted format.
+                return entry.sha256 == sha256
+            }
+            return acceptedBuild(matchingMD5: entry.md5)?.sha256 == entry.sha256
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case bytes, sha256, md5, source, target
+            case compatibleBuilds = "compatible_builds"
         }
     }
     struct CleanupEntry: Codable, Equatable {
@@ -83,6 +140,21 @@ struct TumoflipManifest: Codable, Equatable {
         let catalogChannel: String?
         let catalogRevision: Int?
         let catalogReleaseTag: String?
+        let compatibleReleases: [CompatibleRelease]?
+
+        struct CompatibleRelease: Codable, Equatable {
+            let releaseTag: String
+            let releaseId: String
+            let manifestSHA256: String
+            let sourceCommit: String
+
+            enum CodingKeys: String, CodingKey {
+                case releaseTag = "release_tag"
+                case releaseId = "release_id"
+                case manifestSHA256 = "manifest_sha256"
+                case sourceCommit = "source_commit"
+            }
+        }
 
         var isIndependentCatalog: Bool {
             catalogChannel != nil && catalogRevision != nil && catalogReleaseTag != nil
@@ -107,7 +179,8 @@ struct TumoflipManifest: Codable, Equatable {
             firmwareFlashUnchanged: Bool,
             catalogChannel: String? = nil,
             catalogRevision: Int? = nil,
-            catalogReleaseTag: String? = nil
+            catalogReleaseTag: String? = nil,
+            compatibleReleases: [CompatibleRelease]? = nil
         ) {
             self.id = id
             self.type = type
@@ -119,6 +192,7 @@ struct TumoflipManifest: Codable, Equatable {
             self.catalogChannel = catalogChannel
             self.catalogRevision = catalogRevision
             self.catalogReleaseTag = catalogReleaseTag
+            self.compatibleReleases = compatibleReleases
         }
 
         enum CodingKeys: String, CodingKey {
@@ -131,6 +205,7 @@ struct TumoflipManifest: Codable, Equatable {
             case catalogChannel = "catalog_channel"
             case catalogRevision = "catalog_revision"
             case catalogReleaseTag = "catalog_release_tag"
+            case compatibleReleases = "compatible_releases"
         }
     }
 
@@ -198,6 +273,7 @@ extension TumoflipManifest {
         for g in Self.knownGroups where packages[g] == nil {
             throw TumoflipManifestError.missingGroup(g)
         }
+        var referencedCompatibleReleaseIDs = Set<String>()
         for (_, files) in packages {
             for f in files {
                 guard f.bytes >= 0, !f.source.isEmpty,
@@ -207,6 +283,27 @@ extension TumoflipManifest {
                       } }) ?? true,
                       !f.target.isEmpty else {
                     throw TumoflipManifestError.invalidEntry(f.source.isEmpty ? f.target : f.source)
+                }
+                if let builds = f.compatibleBuilds {
+                    guard !builds.isEmpty, builds.count <= 8, f.md5 != nil else {
+                        throw TumoflipManifestError.invalidEntry(f.source)
+                    }
+                    var compatibleMD5s = Set<String>()
+                    for build in builds {
+                        guard build.bytes >= 0,
+                              build.sha256.count == 64,
+                              build.sha256.allSatisfy({ "0123456789abcdef".contains($0) }),
+                              build.md5.count == 32,
+                              build.md5.allSatisfy({ "0123456789abcdef".contains($0) }),
+                              build.releaseId.count == 64,
+                              build.releaseId.allSatisfy({ "0123456789abcdef".contains($0) }),
+                              build.sha256 != f.sha256,
+                              build.md5 != f.md5,
+                              compatibleMD5s.insert(build.md5).inserted else {
+                            throw TumoflipManifestError.invalidEntry(f.source)
+                        }
+                        referencedCompatibleReleaseIDs.insert(build.releaseId)
+                    }
                 }
             }
         }
@@ -239,7 +336,44 @@ extension TumoflipManifest {
                       ) else {
                     throw TumoflipManifestError.invalidPackageRelease(packageRelease.id)
                 }
+                let releases = packageRelease.compatibleReleases ?? []
+                guard releases.count <= 8 else {
+                    throw TumoflipManifestError.invalidPackageRelease(packageRelease.id)
+                }
+                var releaseIDs = Set<String>()
+                var releaseTags = Set<String>()
+                for release in releases {
+                    let prefix = "fw-packages-\(channel)-"
+                    let revisionText = String(release.releaseTag.dropFirst(prefix.count))
+                    guard release.releaseTag.hasPrefix(prefix),
+                          revisionText.count == 3,
+                          let compatibleRevision = Int(revisionText),
+                          compatibleRevision >= 1,
+                          compatibleRevision < revision,
+                          release.releaseTag == String(
+                              format: "fw-packages-%@-%03d", channel, compatibleRevision
+                          ),
+                          release.releaseId.count == 64,
+                          release.releaseId.allSatisfy({ "0123456789abcdef".contains($0) }),
+                          release.releaseId != releaseId,
+                          release.manifestSHA256.count == 64,
+                          release.manifestSHA256.allSatisfy({ "0123456789abcdef".contains($0) }),
+                          release.sourceCommit.count == 40,
+                          release.sourceCommit.allSatisfy({ "0123456789abcdef".contains($0) }),
+                          releaseIDs.insert(release.releaseId).inserted,
+                          releaseTags.insert(release.releaseTag).inserted else {
+                        throw TumoflipManifestError.invalidPackageRelease(packageRelease.id)
+                    }
+                }
+                guard referencedCompatibleReleaseIDs == releaseIDs else {
+                    throw TumoflipManifestError.invalidPackageRelease(packageRelease.id)
+                }
+            } else if !referencedCompatibleReleaseIDs.isEmpty ||
+                        packageRelease.compatibleReleases?.isEmpty == false {
+                throw TumoflipManifestError.invalidPackageRelease(packageRelease.id)
             }
+        } else if !referencedCompatibleReleaseIDs.isEmpty {
+            throw TumoflipManifestError.invalidEntry("compatible_builds")
         }
     }
 }
@@ -307,8 +441,14 @@ struct TumoflipInstallPlan: Equatable {
                 guard seen.insert(safe).inserted else {
                     throw TumoflipManifestError.duplicateTarget(safe)
                 }
-                files.append(TumoflipManifest.PackageFile(bytes: f.bytes, sha256: f.sha256, md5: f.md5,
-                                                          source: f.source, target: safe))
+                files.append(TumoflipManifest.PackageFile(
+                    bytes: f.bytes,
+                    sha256: f.sha256,
+                    md5: f.md5,
+                    compatibleBuilds: f.compatibleBuilds,
+                    source: f.source,
+                    target: safe
+                ))
             }
         }
         // Cleanup is only safe when its legacy path isn't itself something we're
