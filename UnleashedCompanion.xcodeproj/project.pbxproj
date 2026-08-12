@@ -16,6 +16,7 @@
 		064B636DC710B2D96484CFF2 /* UnleashedShared.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = B269822737BE205267576415 /* UnleashedShared.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		06BF7D0FEBAED3E67DB81AA8 /* UnleashedWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 02EF4133669223E43E09D659 /* UnleashedWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		08FC1F6E6EA1377927AA4124 /* AppBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3F4BFB7A552AD0967C934C /* AppBridge.swift */; };
+		0A68BD88E9E469306F4861E7 /* ProtectedPluginAuditTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C60E19A1D2DFA673E41C3F /* ProtectedPluginAuditTests.swift */; };
 		0D58380E2D1F29BB7FF7DF4B /* TumoflipStatusTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B5D803E53BDA356E1AA5784 /* TumoflipStatusTests.swift */; };
 		0D820CE7564243D692B1A3E9 /* WiFiNetworkMapPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4178D107C8E9CCE11C051E5A /* WiFiNetworkMapPresentationTests.swift */; };
 		0DC75147EFFA11291AB3D10D /* ESP32FirmwareView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1B731E78843D6D04ECF5B60 /* ESP32FirmwareView.swift */; };
@@ -35,6 +36,7 @@
 		2C2CD7524360C29B07886293 /* TumoNet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AA09E6B23CF0D4774C8E449 /* TumoNet.swift */; };
 		2ECBCE8FD84F73551EC51D94 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF110587D01496E5B9809C9F /* OnboardingView.swift */; };
 		2F479A7E15B371A4316B556B /* TumoVMNFCContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93515AAEC58847AD6DE38AE6 /* TumoVMNFCContractTests.swift */; };
+		30DE04679A29134FDF2D50BD /* ProtectedPluginAudit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DD006180A3983508A725752 /* ProtectedPluginAudit.swift */; };
 		31DE3241E429DCE7FAA6C3B2 /* CatalogClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54BC731EF974B7077777585D /* CatalogClientTests.swift */; };
 		325E596D66161817F31CD52A /* TumoflipFirmwareRoutingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E66A60CC5ADE5831A2D34FF /* TumoflipFirmwareRoutingTests.swift */; };
 		32DECC0F5D2C157C5F95F156 /* InstalledAppsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A8D772599DB1220427F1819 /* InstalledAppsView.swift */; };
@@ -162,6 +164,7 @@
 		F30B3CDE868D0D21D9B16978 /* SWCompression in Frameworks */ = {isa = PBXBuildFile; productRef = 9D0BB7285006013700BB39B4 /* SWCompression */; };
 		F4BC72E618B69CDD92EC1A6D /* TumoFabricView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61C88C49155B1D53CE4859BA /* TumoFabricView.swift */; };
 		F68E2E999E17B1FE745AE1CD /* FirmwareLibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFD10DB620EC18749FE46591 /* FirmwareLibraryView.swift */; };
+		F758C353B4ABFDA1AF6D1117 /* ProtectedPluginAuditLedger.json in Resources */ = {isa = PBXBuildFile; fileRef = 7C22AA04318D3F69B5DB9176 /* ProtectedPluginAuditLedger.json */; };
 		F787B496917BA4E1E9EC0F64 /* TumoflipManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D5AA653C25A05CF91F348E8 /* TumoflipManifest.swift */; };
 		F8120678A5AB6773D39227A6 /* RuntimeDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D7F2E9465545B42943BBBE2 /* RuntimeDiagnostics.swift */; };
 		F87A64CF22F8A48A6E86EFA2 /* DevicesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCE61D0B4EB2C9925E58FA87 /* DevicesView.swift */; };
@@ -282,6 +285,7 @@
 		4A0A014201261EED37823E5C /* RemotesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemotesView.swift; sourceTree = "<group>"; };
 		4C77746A516D982B72D1FB47 /* AppBridgeConsole.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBridgeConsole.swift; sourceTree = "<group>"; };
 		4E7FA44A3E6DC5FED65AC3A5 /* property.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = property.pb.swift; sourceTree = "<group>"; };
+		50C60E19A1D2DFA673E41C3F /* ProtectedPluginAuditTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtectedPluginAuditTests.swift; sourceTree = "<group>"; };
 		50CD66866729ECD5B550F4B7 /* DolphinProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DolphinProfile.swift; sourceTree = "<group>"; };
 		5122076A627322769B9B5014 /* UnleashedWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnleashedWidgets.swift; sourceTree = "<group>"; };
 		52741A242FCEED74C342D4D6 /* MarauderResultViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarauderResultViews.swift; sourceTree = "<group>"; };
@@ -306,6 +310,8 @@
 		76878DEC8BC405158A23294C /* SberCloud.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SberCloud.swift; sourceTree = "<group>"; };
 		78482E05DB7B6420088FF379 /* TumoflipManifestPackageReleaseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoflipManifestPackageReleaseTests.swift; sourceTree = "<group>"; };
 		7B5D803E53BDA356E1AA5784 /* TumoflipStatusTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoflipStatusTests.swift; sourceTree = "<group>"; };
+		7C22AA04318D3F69B5DB9176 /* ProtectedPluginAuditLedger.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = ProtectedPluginAuditLedger.json; sourceTree = "<group>"; };
+		7DD006180A3983508A725752 /* ProtectedPluginAudit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtectedPluginAudit.swift; sourceTree = "<group>"; };
 		7ECF810E2BD149C8F1726216 /* UnleashedCompanion.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = UnleashedCompanion.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		824EE059E5BDBC0F8B7419E8 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		856D8627B88920587D56B850 /* FirmwareLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirmwareLibrary.swift; sourceTree = "<group>"; };
@@ -608,6 +614,7 @@
 				99A7C616CDB7459049791342 /* DolphinPacks */,
 				CC55E01E623BEF12E94B15DA /* DolphinPreviews */,
 				DB003747D5AF7D07C4094F9F /* Info.plist */,
+				7C22AA04318D3F69B5DB9176 /* ProtectedPluginAuditLedger.json */,
 				3342FDAF60635FDA2E1AC94C /* russian_trusted_root_ca.pem */,
 				41F36DBBEDAD596C1AD1EAD9 /* UnleashedCompanion.entitlements */,
 			);
@@ -679,6 +686,7 @@
 				B3D4263C468870ABFDEB8589 /* PluginProtectionPolicyTests.swift */,
 				34BC23F6FD22122831005AA0 /* PluginSelectionPolicyTests.swift */,
 				D74C1AC4E19C6F9FC21C9D8D /* PluginUpdateMonitorTests.swift */,
+				50C60E19A1D2DFA673E41C3F /* ProtectedPluginAuditTests.swift */,
 				0711A5F791B6D248100D3EBD /* ProtocolTests.swift */,
 				EDD681FE18BFDF3BD90EC71D /* RuntimeDiagnosticsTests.swift */,
 				FFAFC266DB9145E7CF8D0504 /* TransferActivityReporterTests.swift */,
@@ -736,6 +744,7 @@
 				CBA5FCA0F80809900471F32E /* PluginUpdateMonitor.swift */,
 				87F2C64ACDABA1AEFFB7CCD8 /* PluginUpdater.swift */,
 				E4930E5335E77EBB9BFA70EF /* PluginUpdatesDetailView.swift */,
+				7DD006180A3983508A725752 /* ProtectedPluginAudit.swift */,
 				381F674E5A1903409E33517D /* SourceRow.swift */,
 				45807167A09B0989A1262077 /* TransferActivityReporter.swift */,
 				916BE931F747387EDB008311 /* TumoflipFirmwareRouting.swift */,
@@ -1060,6 +1069,7 @@
 				9B2BB6377BAE0FC06FCDF701 /* DolphinAnimations in Resources */,
 				71002F8061F2ADC7436D1CD5 /* DolphinPacks in Resources */,
 				7A2DB7310DAE7C8152FCD4A2 /* DolphinPreviews in Resources */,
+				F758C353B4ABFDA1AF6D1117 /* ProtectedPluginAuditLedger.json in Resources */,
 				BD4118BB0E5018BF9D2BB6C1 /* russian_trusted_root_ca.pem in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -1106,6 +1116,7 @@
 				028086AFF37EFC8952E84483 /* PluginProtectionPolicyTests.swift in Sources */,
 				497514C65E0284BC9C754AC1 /* PluginSelectionPolicyTests.swift in Sources */,
 				382D481F4B3744731A3527CE /* PluginUpdateMonitorTests.swift in Sources */,
+				0A68BD88E9E469306F4861E7 /* ProtectedPluginAuditTests.swift in Sources */,
 				EAC0D7A0739C0B6EF7565475 /* ProtocolTests.swift in Sources */,
 				C390ACDEA69EE872DDF566E0 /* RuntimeDiagnosticsTests.swift in Sources */,
 				2066FEBC29259A4E4EE5964A /* TransferActivityReporterTests.swift in Sources */,
@@ -1202,6 +1213,7 @@
 				878B98A78707C356A520BCA7 /* PluginUpdateMonitor.swift in Sources */,
 				E37D4C1411C566C54C6EED88 /* PluginUpdater.swift in Sources */,
 				6639DBE5A0696A7A75531255 /* PluginUpdatesDetailView.swift in Sources */,
+				30DE04679A29134FDF2D50BD /* ProtectedPluginAudit.swift in Sources */,
 				6EE27A21DF228E8F03A47A84 /* RelayExecutor.swift in Sources */,
 				3508D2DF378C22434730D556 /* RemotesView.swift in Sources */,
 				F8120678A5AB6773D39227A6 /* RuntimeDiagnostics.swift in Sources */,

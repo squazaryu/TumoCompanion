@@ -273,7 +273,6 @@ struct ProtectedPluginReview: Identifiable, Equatable {
     let size: Int
 
     var id: String { remotePath }
-    var needsReview: Bool { deviceKnown && deviceMD5 != newMD5 }
     var isRouted: Bool { targetPath != remotePath }
     var targetCategory: String {
         let parent = (targetPath as NSString).deletingLastPathComponent
@@ -310,13 +309,22 @@ final class PluginUpdater: ObservableObject {
     @Published var unprotectedBuiltIns: Set<String> = PluginUpdater.loadUnprotected()
     /// Protected apps present in the upstream pack, compared against the device.
     @Published var protectedReviews: [ProtectedPluginReview] = []
+    /// Automation-owned decision for the exact release tag + base/extra archive bytes.
+    /// A missing decision deliberately leaves every differing protected binary in review.
+    @Published private(set) var protectedAuditResolution: ProtectedPluginAuditResolution?
+    private let protectedAuditService: ProtectedPluginAuditService
     /// Protected items that genuinely need a look: device state unknown yet, or the
-    /// upstream pack differs from what's installed. Shared by the Updates "More" subtitle
-    /// and the Protected Apps screen's "Needs review" section.
+    /// upstream bytes/route are not covered by the exact automation-owned audit ledger.
+    /// Shared by the Updates "More" subtitle and the Protected Apps screen.
     var pendingProtectedReview: [ProtectedPluginReview] {
         protectedReviews.filter {
-            !$0.deviceKnown || $0.needsReview || !classification($0.remotePath).isCompatible
+            protectedReviewStatus($0) == .needsReview
         }
+    }
+    /// Expected Tumoflip differences covered by the exact current pack audit. They stay
+    /// visible for provenance, but no longer create a false Needs review / DIFF alert.
+    var auditedProtectedReviews: [ProtectedPluginReview] {
+        protectedReviews.filter { protectedReviewStatus($0).isAudited }
     }
     @Published var history: [InstallRecord] = PluginUpdater.loadHistory()
     /// Per-file write progress for the install currently in flight (nil when idle).
@@ -331,6 +339,17 @@ final class PluginUpdater: ObservableObject {
     @Published var manualReleaseTag: String? = PluginUpdater.loadManualReleaseTag()
     @Published var availableReleases: [PluginReleaseInfo] = []
     @Published var loadingReleases = false
+
+    init(protectedAuditService: ProtectedPluginAuditService = .live()) {
+        self.protectedAuditService = protectedAuditService
+    }
+
+    func protectedReviewStatus(_ review: ProtectedPluginReview) -> ProtectedPluginReviewAuditStatus {
+        ProtectedPluginReviewPolicy.status(
+            review,
+            compatibility: classification(review.remotePath),
+            audit: protectedAuditResolution?.audit)
+    }
 
     var shouldLoadCatalog: Bool {
         if case .idle = phase { return updates.isEmpty && tag.isEmpty }
@@ -559,10 +578,12 @@ final class PluginUpdater: ObservableObject {
             var protected: [PluginUpdate] = []
             var metadata: [String: PluginCatalogMetadata] = [:]
             var downloadedPacks: [(pack: String, url: URL)] = []
+            var archiveSHA256: [String: String] = [:]
             for (pack, name) in [("base", "all-the-apps-base.zip"), ("extra", "all-the-apps-extra.zip")] {
                 guard let asset = assets[name] else { continue }
                 let url = try await download(asset, to: "atp-\(pack).zip")
                 downloadedPacks.append((pack, url))
+                archiveSHA256[pack] = try sha256(url)
                 let extracted = try extractManifest(zipURL: url, pack: pack)
                 metadata.merge(extracted.metadata) { _, new in new }
                 for f in extracted.updates {
@@ -585,6 +606,14 @@ final class PluginUpdater: ObservableObject {
             protectedReviews = []
             verifyResult = nil
             classifications = [:]
+            if let provenance = ProtectedPluginPackProvenance(
+                sourceTag: nextTag,
+                archiveSHA256: archiveSHA256) {
+                protectedAuditResolution = await protectedAuditService.resolve(for: provenance)
+            } else {
+                protectedAuditResolution = .rejected(
+                    "Community Pack archive provenance is incomplete; protected apps remain unverified.")
+            }
             await refreshProtectedReviews()
 
             if let cacheMap = loadCache()?.map, !cacheMap.isEmpty {
@@ -1159,6 +1188,18 @@ final class PluginUpdater: ObservableObject {
         return dest
     }
 
+    private func sha256(_ url: URL) throws -> String {
+        let file = try FileHandle(forReadingFrom: url)
+        defer { try? file.close() }
+        var hasher = SHA256()
+        while let chunk = try file.read(upToCount: 1_048_576), !chunk.isEmpty {
+            hasher.update(data: chunk)
+        }
+        return hasher.finalize()
+            .map { String(format: "%02x", $0) }
+            .joined()
+    }
+
     // MARK: - Zip
 
     private struct ExtractedPack {
@@ -1277,3 +1318,74 @@ final class PluginUpdater: ObservableObject {
     }
     func clearHistory() { history = []; saveHistory() }
 }
+
+#if DEBUG
+extension PluginUpdater {
+    static func protectedAuditQAFixture() -> PluginUpdater {
+        let temp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("protected-audit-ui-\(UUID().uuidString)")
+        let service = ProtectedPluginAuditService(
+            url: URL(string: "https://example.invalid/audit.json")!,
+            cache: ProtectedPluginAuditCache(directory: temp),
+            fetch: { _ in throw URLError(.notConnectedToInternet) },
+            bundledData: { nil })
+        let updater = PluginUpdater(protectedAuditService: service)
+        let audit = ProtectedPluginAudit(
+            sourceTag: "qa-pack",
+            sourceCommit: String(repeating: "a", count: 40),
+            auditIssue: "https://github.com/squazaryu/tumoflip/issues/281",
+            archives: [
+                ProtectedPluginAuditArchive(
+                    pack: "base", fileName: "all-the-apps-base.zip",
+                    sha256: String(repeating: "1", count: 64)),
+                ProtectedPluginAuditArchive(
+                    pack: "extra", fileName: "all-the-apps-extra.zip",
+                    sha256: String(repeating: "2", count: 64)),
+            ],
+            entries: [
+                ProtectedPluginAuditEntry(
+                    remotePath: "/ext/apps/GPIO/esp_flasher.fap",
+                    targetPath: "/ext/apps/Module One/ESP32 Wi-Fi/esp_flasher.fap",
+                    sourceMD5: String(repeating: "1", count: 32),
+                    disposition: .auditedDifference,
+                    note: nil),
+                ProtectedPluginAuditEntry(
+                    remotePath: "/ext/apps/Bluetooth/claude_remote_ble.fap",
+                    targetPath: "/ext/apps/Bluetooth/claude_remote_ble.fap",
+                    sourceMD5: String(repeating: "2", count: 32),
+                    disposition: .intentionallyReplaced,
+                    note: nil),
+            ])
+        updater.tag = "qa-pack"
+        updater.protectedAuditResolution = .accepted(audit, origin: .remote)
+        updater.protectedReviews = [
+            ProtectedPluginReview(
+                remotePath: "/ext/apps/GPIO/esp_flasher.fap",
+                targetPath: "/ext/apps/Module One/ESP32 Wi-Fi/esp_flasher.fap",
+                name: "esp_flasher", category: "GPIO", pack: "extra",
+                newMD5: String(repeating: "1", count: 32),
+                deviceMD5: String(repeating: "a", count: 32),
+                deviceKnown: true, size: 6_000_000),
+            ProtectedPluginReview(
+                remotePath: "/ext/apps/Bluetooth/claude_remote_ble.fap",
+                targetPath: "/ext/apps/Bluetooth/claude_remote_ble.fap",
+                name: "claude_remote_ble", category: "Bluetooth", pack: "extra",
+                newMD5: String(repeating: "2", count: 32),
+                deviceMD5: nil, deviceKnown: true, size: 48_000),
+            ProtectedPluginReview(
+                remotePath: "/ext/apps/Sub-GHz/subghz_raw_edit.fap",
+                targetPath: "/ext/apps/ARF Tools/subghz_raw_edit.fap",
+                name: "subghz_raw_edit", category: "Sub-GHz", pack: "extra",
+                newMD5: String(repeating: "3", count: 32),
+                deviceMD5: String(repeating: "b", count: 32),
+                deviceKnown: true, size: 32_000),
+        ]
+        let metadata = FapMetadata(apiMajor: 88, apiMinor: 2, hardwareTarget: 7)
+        updater.classifications = Dictionary(
+            uniqueKeysWithValues: updater.protectedReviews.map {
+                ($0.remotePath, .compatible(metadata))
+            })
+        return updater
+    }
+}
+#endif

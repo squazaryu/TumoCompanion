@@ -1,0 +1,194 @@
+{
+  "schema": 1,
+  "sourceRepository": "xMasterX/all-the-plugins",
+  "generatedAt": "2026-08-12T00:00:00Z",
+  "audits": [
+    {
+      "sourceTag": "9aug2026",
+      "sourceCommit": "0b71d9f34fec8ae3ba763b8de27ef15d1d604c5b",
+      "auditIssue": "https://github.com/squazaryu/tumoflip/issues/281",
+      "archives": [
+        {
+          "pack": "base",
+          "fileName": "all-the-apps-base.zip",
+          "sha256": "75002c05ac1dd49774acc52407bab7adb4857d5067efd098230e10ae93522a6a"
+        },
+        {
+          "pack": "extra",
+          "fileName": "all-the-apps-extra.zip",
+          "sha256": "a084a374d9e745b7d061b9e55f8585bc1a1e5829588c29d5e2b1682a55c3a917"
+        }
+      ],
+      "entries": [
+        {
+          "remotePath": "/ext/apps/Bluetooth/claude_remote_ble.fap",
+          "targetPath": "/ext/apps/Bluetooth/claude_remote_ble.fap",
+          "sourceMD5": "5e2047a5ffadd596d17171e17268777c",
+          "disposition": "intentionallyReplaced",
+          "note": "Replaced by the protected Claude Buddy integration."
+        },
+        {
+          "remotePath": "/ext/apps/GPIO/esp32_wifi_marauder.fap",
+          "targetPath": "/ext/apps/Module One/ESP32 Wi-Fi/esp32_wifi_marauder.fap",
+          "sourceMD5": "0433a99999562c15e80db5a1d1d6eee0",
+          "disposition": "auditedDifference",
+          "note": "Tumoflip-routed protected build."
+        },
+        {
+          "remotePath": "/ext/apps/GPIO/esp_flasher.fap",
+          "targetPath": "/ext/apps/Module One/ESP32 Wi-Fi/esp_flasher.fap",
+          "sourceMD5": "5a42646fe63dafd2f44d572cbcc0ae9c",
+          "disposition": "auditedDifference",
+          "note": "Protected Tumoflip ESP Flasher fork."
+        },
+        {
+          "remotePath": "/ext/apps/Infrared/flipper_xremote.fap",
+          "targetPath": "/ext/apps/Module One/IR Blaster/tumoflip_xremote.fap",
+          "sourceMD5": "f63a2449edae6ab7c0a1c5a96e426e14",
+          "disposition": "auditedDifference",
+          "note": "Protected Tumoflip XRemote route."
+        },
+        {
+          "remotePath": "/ext/apps/Sub-GHz/proto_pirate.fap",
+          "targetPath": "/ext/apps_data/arf_subghz_full/modules/proto_pirate.fap",
+          "sourceMD5": "4e40ccf1f47c732dfbf9e891e12e0be0",
+          "disposition": "auditedDifference",
+          "note": "Integrated as an ARF Sub-GHz Full child module."
+        },
+        {
+          "remotePath": "/ext/apps/Sub-GHz/subghz_bruteforcer.fap",
+          "targetPath": "/ext/apps_data/arf_subghz_full/modules/subghz_bruteforcer.fap",
+          "sourceMD5": "3fb146392dca6613161ab3b8be08a6d9",
+          "disposition": "auditedDifference",
+          "note": "Integrated as an ARF Sub-GHz Full child module."
+        },
+        {
+          "remotePath": "/ext/apps/Sub-GHz/subghz_raw_edit.fap",
+          "targetPath": "/ext/apps/ARF Tools/subghz_raw_edit.fap",
+          "sourceMD5": "fdcdad31fa9afae657cc16eec7113816",
+          "disposition": "auditedDifference",
+          "note": "Protected Tumoflip RAW Edit build."
+        },
+        {
+          "remotePath": "/ext/apps/Sub-GHz/subghz_wardriving.fap",
+          "targetPath": "/ext/apps/Module One/Sub-GHz/subghz_wardriving.fap",
+          "sourceMD5": "c5ffb294251247d10fa51dae339e4765",
+          "disposition": "auditedDifference",
+          "note": "Tumoflip-routed protected build."
+        },
+        {
+          "remotePath": "/ext/apps/Tools/quac.fap",
+          "targetPath": "/ext/apps/Tools/quac.fap",
+          "sourceMD5": "a278d93cf3d33be6d4f15bc2b10b9643",
+          "disposition": "auditedDifference",
+          "note": "Protected Tumoflip build."
+        },
+        {
+          "remotePath": "/ext/apps/Tools/totp.fap",
+          "targetPath": "/ext/apps/Tools/totp.fap",
+          "sourceMD5": "ece2bfe5d6e5c6ccd0cc3653ccc19d13",
+          "disposition": "auditedDifference",
+          "note": "Protected TOTP application."
+        },
+        {
+          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_add_plugin.fal",
+          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_add_plugin.fal",
+          "sourceMD5": "57f902956220b2a13e0c0cdf66673b52",
+          "disposition": "auditedDifference",
+          "note": "Protected TOTP plugin family."
+        },
+        {
+          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_automation_plugin.fal",
+          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_automation_plugin.fal",
+          "sourceMD5": "7bea84a51f9af0421b48b4e9ed2046c9",
+          "disposition": "auditedDifference",
+          "note": "Protected TOTP plugin family."
+        },
+        {
+          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_delete_plugin.fal",
+          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_delete_plugin.fal",
+          "sourceMD5": "6122b7e93e54fbb33c084f41c05c78ac",
+          "disposition": "auditedDifference",
+          "note": "Protected TOTP plugin family."
+        },
+        {
+          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_details_plugin.fal",
+          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_details_plugin.fal",
+          "sourceMD5": "a77e5c18756376870f5a642b01fe0dbd",
+          "disposition": "auditedDifference",
+          "note": "Protected TOTP plugin family."
+        },
+        {
+          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_export_plugin.fal",
+          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_export_plugin.fal",
+          "sourceMD5": "a36718e896a1e3375ab8a661091e9580",
+          "disposition": "auditedDifference",
+          "note": "Protected TOTP plugin family."
+        },
+        {
+          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_help_plugin.fal",
+          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_help_plugin.fal",
+          "sourceMD5": "871f895ea5a66eacf582042c73425932",
+          "disposition": "auditedDifference",
+          "note": "Protected TOTP plugin family."
+        },
+        {
+          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_list_plugin.fal",
+          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_list_plugin.fal",
+          "sourceMD5": "2d98f3ea1e5afe00707808f19e2b6066",
+          "disposition": "auditedDifference",
+          "note": "Protected TOTP plugin family."
+        },
+        {
+          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_move_plugin.fal",
+          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_move_plugin.fal",
+          "sourceMD5": "6fc428cfa133d5368fb99a8c22a45a3b",
+          "disposition": "auditedDifference",
+          "note": "Protected TOTP plugin family."
+        },
+        {
+          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_notification_plugin.fal",
+          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_notification_plugin.fal",
+          "sourceMD5": "ef3ed8f31b0e6498cf14934aeb3421ad",
+          "disposition": "auditedDifference",
+          "note": "Protected TOTP plugin family."
+        },
+        {
+          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_pin_plugin.fal",
+          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_pin_plugin.fal",
+          "sourceMD5": "593b9575956a7c92491c2b9ddd8e2821",
+          "disposition": "auditedDifference",
+          "note": "Protected TOTP plugin family."
+        },
+        {
+          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_reset_plugin.fal",
+          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_reset_plugin.fal",
+          "sourceMD5": "0350b001b35faf6356d18c0daa9258b1",
+          "disposition": "auditedDifference",
+          "note": "Protected TOTP plugin family."
+        },
+        {
+          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_timezone_plugin.fal",
+          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_timezone_plugin.fal",
+          "sourceMD5": "e9000c460a557969eb4e69d73242c731",
+          "disposition": "auditedDifference",
+          "note": "Protected TOTP plugin family."
+        },
+        {
+          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_update_plugin.fal",
+          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_update_plugin.fal",
+          "sourceMD5": "40bc6e8ccf06679536dfb113be0c1663",
+          "disposition": "auditedDifference",
+          "note": "Protected TOTP plugin family."
+        },
+        {
+          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_version_plugin.fal",
+          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_version_plugin.fal",
+          "sourceMD5": "faa96e593c0b642aba8dda791603dc62",
+          "disposition": "auditedDifference",
+          "note": "Protected TOTP plugin family."
+        }
+      ]
+    }
+  ]
+}
