@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.10.26",
+      "version": "1.10.27",
       "versionDate": "2026-08-12",
-      "versionDescription": "FW Packages now accepts only exact, audited overlay builds from a previous catalog, preventing false mass updates after an accepted firmware baseline changes while unknown bytes remain fail-closed.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.26/TumoCompanion-unsigned.ipa",
-      "size": 29817518,
+      "versionDescription": "FW Packages no longer warns about a manual channel override when the selected package channel already matches the detected Tumoflip firmware channel.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.27/TumoCompanion-unsigned.ipa",
+      "size": 29817727,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.10.27",
+          "date": "2026-08-12",
+          "localizedDescription": "FW Packages no longer warns about a manual channel override when the selected package channel already matches the detected Tumoflip firmware channel.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.27/TumoCompanion-unsigned.ipa",
+          "size": 29817727,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.10.26",
           "date": "2026-08-12",
