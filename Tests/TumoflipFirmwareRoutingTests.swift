@@ -217,6 +217,44 @@ final class TumoflipFirmwareRoutingTests: XCTestCase {
         ))
     }
 
+    func testIndependentCatalogReplacesLaterCreatedFirmwareManifest() {
+        let catalog = packageRelease(channel: "dev", revision: 4)
+
+        XCTAssertTrue(TumoflipPackageReleaseMatcher.shouldReplaceSelection(
+            current: nil,
+            with: catalog
+        ))
+        XCTAssertFalse(TumoflipPackageReleaseMatcher.shouldReplaceSelection(
+            current: catalog,
+            with: nil
+        ))
+    }
+
+    func testHighestIndependentCatalogRevisionWinsRegardlessOfAPIOrder() {
+        let revisionThree = packageRelease(channel: "dev", revision: 3)
+        let revisionFour = packageRelease(channel: "dev", revision: 4)
+
+        XCTAssertTrue(TumoflipPackageReleaseMatcher.shouldReplaceSelection(
+            current: revisionThree,
+            with: revisionFour
+        ))
+        XCTAssertFalse(TumoflipPackageReleaseMatcher.shouldReplaceSelection(
+            current: revisionFour,
+            with: revisionThree
+        ))
+        XCTAssertFalse(TumoflipPackageReleaseMatcher.shouldReplaceSelection(
+            current: revisionFour,
+            with: revisionFour
+        ))
+    }
+
+    func testLegacyPackageOrderRemainsStableWithoutIndependentCatalog() {
+        XCTAssertFalse(TumoflipPackageReleaseMatcher.shouldReplaceSelection(
+            current: nil,
+            with: nil
+        ))
+    }
+
     func testPackageReleaseMatcherStillFiltersChannelWithoutIdentity() {
         XCTAssertTrue(TumoflipPackageReleaseMatcher.matches(
             manifestVersion: "t-dev-089-037-058",
@@ -238,6 +276,24 @@ final class TumoflipFirmwareRoutingTests: XCTestCase {
             firmwareCommitDirty: nil,
             firmwareAPI: "87.16",
             hardwareTarget: 7
+        )
+    }
+
+    private func packageRelease(
+        channel: String,
+        revision: Int
+    ) -> TumoflipManifest.PackageRelease {
+        TumoflipManifest.PackageRelease(
+            id: String(format: "fw-packages-%@-%03d", channel, revision),
+            type: "package-only",
+            sourceCommit: String(repeating: "c", count: 40),
+            sourceDirty: false,
+            sourceFirmwareVersion: "t-dev-004-015",
+            targetReleaseTag: "t-dev-004-015",
+            firmwareFlashUnchanged: true,
+            catalogChannel: channel,
+            catalogRevision: revision,
+            catalogReleaseTag: String(format: "fw-packages-%@-%03d", channel, revision)
         )
     }
 }

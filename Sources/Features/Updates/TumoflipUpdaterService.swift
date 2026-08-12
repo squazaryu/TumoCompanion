@@ -1102,6 +1102,7 @@ final class TumoflipUpdater: ObservableObject {
         for channel: TumoflipFirmwareChannel,
         installedVersion: String?
     ) async throws -> ReleaseSelection {
+        var selected: ReleaseSelection?
         for release in try await releases() {
             guard let manifestAsset = release.asset("tumoflip-packages.json") else { continue }
             guard let manifest = try? await manifest(from: manifestAsset.url) else { continue }
@@ -1111,13 +1112,20 @@ final class TumoflipUpdater: ObservableObject {
                 channel: channel,
                 installedVersion: installedVersion
             ) {
-                return ReleaseSelection(
+                let candidate = ReleaseSelection(
                     release: release,
                     manifest: manifest,
                     manifestUpdatedAt: manifestAsset.updatedAt
                 )
+                if selected == nil || TumoflipPackageReleaseMatcher.shouldReplaceSelection(
+                    current: selected?.manifest.packageRelease,
+                    with: candidate.manifest.packageRelease
+                ) {
+                    selected = candidate
+                }
             }
         }
+        if let selected { return selected }
         throw ReleaseDiscoveryError.noMatchingPackageRelease(channel, installedVersion)
     }
 
