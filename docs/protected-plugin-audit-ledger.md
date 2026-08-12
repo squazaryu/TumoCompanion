@@ -17,25 +17,39 @@ An audit matches only when all of these values match exactly:
 2. SHA-256 of both `all-the-apps-base.zip` and `all-the-apps-extra.zip`;
 3. protected binary source path;
 4. resolved Tumoflip destination path;
-5. MD5 of the binary contained in the source archive.
+5. MD5 of the binary contained in the source archive;
+6. the current on-device MD5 as an exact member of `targetMD5s`;
+7. at least one immutable target provenance tuple
+   (`channel`, `releaseTag`, `manifestSHA256`) for every accepted target MD5.
 
 The accepted dispositions are:
 
-- `auditedDifference`: a present Tumoflip protected binary is expected to differ;
+- `auditedDifference`: a present Tumoflip protected binary is expected to differ,
+  but only one of the exact audited target MD5s is accepted;
+- `sourceMatches`: the audit explicitly accepts the upstream source bytes at the
+  Tumoflip target. Local byte equality without this ledger record remains `DIFF`;
 - `intentionallyReplaced`: this exact upstream binary is expected to be absent because
   the audit names a replacement. This is the only disposition allowed to cover a missing
   target.
 
-Unknown device state, missing ordinary targets, incompatible FAP metadata, an unseen
-pack, changed bytes or routes, and malformed authoritative JSON all fail closed as
+Unknown device state, missing ordinary targets, an arbitrary non-nil target MD5,
+incompatible FAP metadata, an unseen pack, changed bytes or routes, and malformed authoritative JSON all fail closed as
 `Needs review`. If the raw endpoint is temporarily unavailable, a previously validated
 cache record is reused only for its exact tag and two archive hashes. A reachable but
 malformed ledger never falls back to cache.
 
-The bundled `9aug2026` bootstrap intentionally omits Sub-GHz RAW Edit. Issue `#281`
-still requires FW Packages publication, physical-device acceptance, and issue closure;
-until every gate is complete the exact RAW Edit binary must continue to appear as
-`DIFF`, even though the remaining protected artifacts in that pack are covered.
+The bundled `9aug2026` bootstrap is tracked by canonical audit issue `#302` and accepts
+only nine artifacts: eight FAP targets attested by the immutable
+`fw-packages-stable-001` / `fw-packages-dev-003` manifests plus the intentionally
+replaced Claude Remote. It intentionally omits Sub-GHz RAW Edit and all 14 TOTP FALs.
+RAW Edit still requires FW Packages publication, physical-device acceptance, and issue
+`#281` closure; the FALs require publication in a manifest that includes their exact
+target bytes. These 15 unresolved artifacts must continue to appear as `DIFF`.
+
+Offline cache acceptance is deliberately scoped to the exact pack identity but is not
+time-bounded. A revocation in `latest.json` therefore applies as soon as a valid online
+ledger is reached; while the raw endpoint is unreachable, the last exact validated
+record remains usable. We do not claim immediate offline revocation.
 
 ## Automation update sequence
 

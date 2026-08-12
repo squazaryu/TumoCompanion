@@ -11,18 +11,26 @@ final class ProtectedPluginAuditTests: XCTestCase {
         let document = try ProtectedPluginAuditValidator.decode(Data(contentsOf: url))
         let audit = try XCTUnwrap(document.audits.first { $0.sourceTag == "9aug2026" })
 
-        XCTAssertEqual(audit.entries.count, 23)
+        XCTAssertEqual(audit.entries.count, 9)
         XCTAssertEqual(audit.sourceCommit, "0b71d9f34fec8ae3ba763b8de27ef15d1d604c5b")
-        XCTAssertTrue(audit.auditIssue.hasSuffix("/281"))
+        XCTAssertTrue(audit.auditIssue.hasSuffix("/302"))
         XCTAssertEqual(
             audit.entries.filter { $0.remotePath.hasPrefix("/ext/apps_data/totp/") }.count,
-            14)
+            0,
+            "TOTP FALs remain fail-closed until a published package manifest attests their targets")
         XCTAssertEqual(
             audit.entries.first { $0.remotePath.hasSuffix("claude_remote_ble.fap") }?.disposition,
             .intentionallyReplaced)
         XCTAssertNil(
             audit.entries.first { $0.remotePath.hasSuffix("subghz_raw_edit.fap") },
             "RAW Edit remains unresolved until FW Packages publication, device acceptance, and #281 closure")
+        XCTAssertEqual(
+            audit.entries.first { $0.remotePath.hasSuffix("subghz_wardriving.fap") }?.targetPath,
+            "/ext/apps/Sub-GHz/subghz_wardriving.fap")
+        for entry in audit.entries where entry.disposition != .intentionallyReplaced {
+            XCTAssertFalse(entry.targetMD5s.isEmpty)
+            XCTAssertEqual(Set(entry.targetMD5s), Set(entry.targetProvenance.map(\.targetMD5)))
+        }
     }
 
     func testRemoteExactAuditIsCachedAndReusedOnlyForSamePack() async throws {
@@ -87,7 +95,7 @@ final class ProtectedPluginAuditTests: XCTestCase {
         try cache.save(try XCTUnwrap(validDocument.audits.first), for: provenance)
 
         let empty = ProtectedPluginAuditDocument(
-            schema: 1,
+            schema: ProtectedPluginAuditDocument.supportedSchema,
             sourceRepository: "xMasterX/all-the-plugins",
             generatedAt: "2026-08-12T01:00:00Z",
             audits: [])
@@ -145,7 +153,132 @@ final class ProtectedPluginAuditTests: XCTestCase {
             sourceMD5: String(repeating: "3", count: 32))))
     }
 
-    func testPolicyCoversOnlyAuditedDifferenceAndIntentionalMissingReplacement() throws {
+    func testSameTagWithCorrectedArchiveIsASeparateAuditIdentity() throws {
+        let original = try XCTUnwrap(
+            ProtectedPluginAuditValidator.decode(makeDocumentData()).audits.first)
+        let corrected = ProtectedPluginAudit(
+            sourceTag: original.sourceTag,
+            sourceCommit: original.sourceCommit,
+            auditIssue: original.auditIssue,
+            archives: [
+                ProtectedPluginAuditArchive(
+                    pack: "base", fileName: "all-the-apps-base.zip",
+                    sha256: String(repeating: "f", count: 64)),
+                ProtectedPluginAuditArchive(
+                    pack: "extra", fileName: "all-the-apps-extra.zip", sha256: extraSHA),
+            ],
+            entries: original.entries)
+        let valid = ProtectedPluginAuditDocument(
+            schema: ProtectedPluginAuditDocument.supportedSchema,
+            sourceRepository: ProtectedPluginAuditDocument.expectedRepository,
+            generatedAt: "2026-08-12T00:00:00Z",
+            audits: [original, corrected])
+
+        XCTAssertNoThrow(try ProtectedPluginAuditValidator.validate(valid))
+
+        let duplicate = ProtectedPluginAuditDocument(
+            schema: valid.schema,
+            sourceRepository: valid.sourceRepository,
+            generatedAt: valid.generatedAt,
+            audits: [original, original])
+        XCTAssertThrowsError(try ProtectedPluginAuditValidator.validate(duplicate))
+    }
+
+    func testTargetProvenanceAllowsSameBytesAcrossDistinctReleases() throws {
+        let target = String(repeating: "a", count: 32)
+        let entry = ProtectedPluginAuditEntry(
+            remotePath: "/ext/apps/GPIO/esp_flasher.fap",
+            targetPath: "/ext/apps/Module One/ESP32 Wi-Fi/esp_flasher.fap",
+            sourceMD5: String(repeating: "1", count: 32),
+            targetMD5s: [target],
+            targetProvenance: [
+                ProtectedPluginTargetProvenance(
+                    targetMD5: target, channel: .stable,
+                    releaseTag: "fw-packages-stable-001",
+                    manifestSHA256: String(repeating: "c", count: 64)),
+                ProtectedPluginTargetProvenance(
+                    targetMD5: target, channel: .dev,
+                    releaseTag: "fw-packages-dev-003",
+                    manifestSHA256: String(repeating: "d", count: 64)),
+            ],
+            disposition: .auditedDifference,
+            note: nil)
+        let audit = try XCTUnwrap(
+            ProtectedPluginAuditValidator.decode(makeDocumentData()).audits.first)
+        let document = ProtectedPluginAuditDocument(
+            schema: ProtectedPluginAuditDocument.supportedSchema,
+            sourceRepository: ProtectedPluginAuditDocument.expectedRepository,
+            generatedAt: "2026-08-12T00:00:00Z",
+            audits: [ProtectedPluginAudit(
+                sourceTag: audit.sourceTag,
+                sourceCommit: audit.sourceCommit,
+                auditIssue: audit.auditIssue,
+                archives: audit.archives,
+                entries: [entry])])
+
+        XCTAssertNoThrow(try ProtectedPluginAuditValidator.validate(document))
+
+        let duplicateProvenanceEntry = ProtectedPluginAuditEntry(
+            remotePath: entry.remotePath,
+            targetPath: entry.targetPath,
+            sourceMD5: entry.sourceMD5,
+            targetMD5s: entry.targetMD5s,
+            targetProvenance: [entry.targetProvenance[0], entry.targetProvenance[0]],
+            disposition: entry.disposition,
+            note: entry.note)
+        let invalid = ProtectedPluginAuditDocument(
+            schema: document.schema,
+            sourceRepository: document.sourceRepository,
+            generatedAt: document.generatedAt,
+            audits: [ProtectedPluginAudit(
+                sourceTag: audit.sourceTag,
+                sourceCommit: audit.sourceCommit,
+                auditIssue: audit.auditIssue,
+                archives: audit.archives,
+                entries: [duplicateProvenanceEntry])])
+        XCTAssertThrowsError(try ProtectedPluginAuditValidator.validate(invalid))
+    }
+
+    func testTargetProvenanceRejectsUnattestedOrWildcardTargets() throws {
+        let audit = try XCTUnwrap(
+            ProtectedPluginAuditValidator.decode(makeDocumentData()).audits.first)
+        let original = try XCTUnwrap(audit.entries.first)
+        let unattested = ProtectedPluginAuditEntry(
+            remotePath: original.remotePath,
+            targetPath: original.targetPath,
+            sourceMD5: original.sourceMD5,
+            targetMD5s: original.targetMD5s + [String(repeating: "b", count: 32)],
+            targetProvenance: original.targetProvenance,
+            disposition: original.disposition,
+            note: original.note)
+        let wildcard = ProtectedPluginAuditEntry(
+            remotePath: original.remotePath,
+            targetPath: original.targetPath,
+            sourceMD5: original.sourceMD5,
+            targetMD5s: original.targetMD5s,
+            targetProvenance: [ProtectedPluginTargetProvenance(
+                targetMD5: original.targetMD5s[0], channel: .dev,
+                releaseTag: "latest",
+                manifestSHA256: String(repeating: "c", count: 64))],
+            disposition: original.disposition,
+            note: original.note)
+
+        for entry in [unattested, wildcard] {
+            let document = ProtectedPluginAuditDocument(
+                schema: ProtectedPluginAuditDocument.supportedSchema,
+                sourceRepository: ProtectedPluginAuditDocument.expectedRepository,
+                generatedAt: "2026-08-12T00:00:00Z",
+                audits: [ProtectedPluginAudit(
+                    sourceTag: audit.sourceTag,
+                    sourceCommit: audit.sourceCommit,
+                    auditIssue: audit.auditIssue,
+                    archives: audit.archives,
+                    entries: [entry])])
+            XCTAssertThrowsError(try ProtectedPluginAuditValidator.validate(document))
+        }
+    }
+
+    func testPolicyRequiresExactAuditedTargetsAndIntentionalMissingReplacement() throws {
         let audit = try XCTUnwrap(
             ProtectedPluginAuditValidator.decode(makeDocumentData()).audits.first)
         let compatible = FapCompatibilityState.compatible(
@@ -155,6 +288,13 @@ final class ProtectedPluginAuditTests: XCTestCase {
             ProtectedPluginReviewPolicy.status(
                 makeReview(), compatibility: compatible, audit: audit),
             .verified)
+        XCTAssertEqual(
+            ProtectedPluginReviewPolicy.status(
+                makeReview(deviceMD5: String(repeating: "b", count: 32)),
+                compatibility: compatible,
+                audit: audit),
+            .needsReview,
+            "Any present but unattested target hash must remain a DIFF")
         XCTAssertEqual(
             ProtectedPluginReviewPolicy.status(
                 makeReview(deviceMD5: nil), compatibility: compatible, audit: audit),
@@ -198,6 +338,37 @@ final class ProtectedPluginAuditTests: XCTestCase {
                 compatibility: .incompatible(reason: "wrong target"),
                 audit: audit),
             .needsReview)
+
+        let sourceBytesWithoutAudit = makeReview(
+            deviceMD5: String(repeating: "1", count: 32))
+        XCTAssertEqual(
+            ProtectedPluginReviewPolicy.status(
+                sourceBytesWithoutAudit, compatibility: compatible, audit: nil),
+            .needsReview,
+            "A new pack must complete its canonical audit even when installed bytes match upstream")
+
+        let sourceEntry = ProtectedPluginAuditEntry(
+            remotePath: sourceBytesWithoutAudit.remotePath,
+            targetPath: sourceBytesWithoutAudit.targetPath,
+            sourceMD5: sourceBytesWithoutAudit.newMD5,
+            targetMD5s: [sourceBytesWithoutAudit.newMD5],
+            targetProvenance: [ProtectedPluginTargetProvenance(
+                targetMD5: sourceBytesWithoutAudit.newMD5,
+                channel: .dev,
+                releaseTag: "fw-packages-dev-004",
+                manifestSHA256: String(repeating: "e", count: 64))],
+            disposition: .sourceMatches,
+            note: nil)
+        let sourceAudit = ProtectedPluginAudit(
+            sourceTag: audit.sourceTag,
+            sourceCommit: audit.sourceCommit,
+            auditIssue: audit.auditIssue,
+            archives: audit.archives,
+            entries: [sourceEntry])
+        XCTAssertEqual(
+            ProtectedPluginReviewPolicy.status(
+                sourceBytesWithoutAudit, compatibility: compatible, audit: sourceAudit),
+            .sourceMatches)
     }
 
     private func makeProvenance() -> ProtectedPluginPackProvenance? {
@@ -208,13 +379,13 @@ final class ProtectedPluginAuditTests: XCTestCase {
 
     private func makeDocumentData() throws -> Data {
         let document = ProtectedPluginAuditDocument(
-            schema: 1,
+            schema: ProtectedPluginAuditDocument.supportedSchema,
             sourceRepository: "xMasterX/all-the-plugins",
             generatedAt: "2026-08-12T00:00:00Z",
             audits: [ProtectedPluginAudit(
                 sourceTag: "9aug2026",
                 sourceCommit: String(repeating: "a", count: 40),
-                auditIssue: "https://github.com/squazaryu/tumoflip/issues/281",
+                auditIssue: "https://github.com/squazaryu/tumoflip/issues/302",
                 archives: [
                     ProtectedPluginAuditArchive(
                         pack: "base", fileName: "all-the-apps-base.zip", sha256: baseSHA),
@@ -226,12 +397,20 @@ final class ProtectedPluginAuditTests: XCTestCase {
                         remotePath: "/ext/apps/GPIO/esp_flasher.fap",
                         targetPath: "/ext/apps/Module One/ESP32 Wi-Fi/esp_flasher.fap",
                         sourceMD5: String(repeating: "1", count: 32),
+                        targetMD5s: [String(repeating: "a", count: 32)],
+                        targetProvenance: [ProtectedPluginTargetProvenance(
+                            targetMD5: String(repeating: "a", count: 32),
+                            channel: .dev,
+                            releaseTag: "fw-packages-dev-003",
+                            manifestSHA256: String(repeating: "c", count: 64))],
                         disposition: .auditedDifference,
                         note: nil),
                     ProtectedPluginAuditEntry(
                         remotePath: "/ext/apps/Bluetooth/claude_remote_ble.fap",
                         targetPath: "/ext/apps/Bluetooth/claude_remote_ble.fap",
                         sourceMD5: String(repeating: "4", count: 32),
+                        targetMD5s: [],
+                        targetProvenance: [],
                         disposition: .intentionallyReplaced,
                         note: nil),
                 ])])

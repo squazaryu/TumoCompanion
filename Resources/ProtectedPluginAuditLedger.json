@@ -1,12 +1,12 @@
 {
-  "schema": 1,
+  "schema": 2,
   "sourceRepository": "xMasterX/all-the-plugins",
-  "generatedAt": "2026-08-12T00:00:00Z",
+  "generatedAt": "2026-08-12T08:30:00Z",
   "audits": [
     {
       "sourceTag": "9aug2026",
       "sourceCommit": "0b71d9f34fec8ae3ba763b8de27ef15d1d604c5b",
-      "auditIssue": "https://github.com/squazaryu/tumoflip/issues/281",
+      "auditIssue": "https://github.com/squazaryu/tumoflip/issues/302",
       "archives": [
         {
           "pack": "base",
@@ -25,161 +25,209 @@
           "targetPath": "/ext/apps/Bluetooth/claude_remote_ble.fap",
           "sourceMD5": "5e2047a5ffadd596d17171e17268777c",
           "disposition": "intentionallyReplaced",
-          "note": "Replaced by the protected Claude Buddy integration."
+          "note": "Replaced by the protected Claude Buddy integration.",
+          "targetMD5s": [],
+          "targetProvenance": []
         },
         {
           "remotePath": "/ext/apps/GPIO/esp32_wifi_marauder.fap",
           "targetPath": "/ext/apps/Module One/ESP32 Wi-Fi/esp32_wifi_marauder.fap",
           "sourceMD5": "0433a99999562c15e80db5a1d1d6eee0",
           "disposition": "auditedDifference",
-          "note": "Tumoflip-routed protected build."
+          "note": "Tumoflip-routed protected build.",
+          "targetMD5s": [
+            "4280fa5e1696248b5f21cd0157df6c07",
+            "54b2ffcdb88cf3c25eacd99269c0db52"
+          ],
+          "targetProvenance": [
+            {
+              "targetMD5": "54b2ffcdb88cf3c25eacd99269c0db52",
+              "channel": "stable",
+              "releaseTag": "fw-packages-stable-001",
+              "manifestSHA256": "62fc425cfb89417fbfc3b0c5ecc83bd3daeaf3dc8ed2b80a6a850137edc214a2"
+            },
+            {
+              "targetMD5": "4280fa5e1696248b5f21cd0157df6c07",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-003",
+              "manifestSHA256": "404ac4f3ed9055bd9094cd74e95c13559041700eeee38123f7f8c9170036798a"
+            }
+          ]
         },
         {
           "remotePath": "/ext/apps/GPIO/esp_flasher.fap",
           "targetPath": "/ext/apps/Module One/ESP32 Wi-Fi/esp_flasher.fap",
           "sourceMD5": "5a42646fe63dafd2f44d572cbcc0ae9c",
           "disposition": "auditedDifference",
-          "note": "Protected Tumoflip ESP Flasher fork."
+          "note": "Protected Tumoflip ESP Flasher fork.",
+          "targetMD5s": [
+            "0721d8da59efdfdf05c08e97b5e5b501",
+            "103a4aca9cce985b798bb705549c2ed0"
+          ],
+          "targetProvenance": [
+            {
+              "targetMD5": "0721d8da59efdfdf05c08e97b5e5b501",
+              "channel": "stable",
+              "releaseTag": "fw-packages-stable-001",
+              "manifestSHA256": "62fc425cfb89417fbfc3b0c5ecc83bd3daeaf3dc8ed2b80a6a850137edc214a2"
+            },
+            {
+              "targetMD5": "103a4aca9cce985b798bb705549c2ed0",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-003",
+              "manifestSHA256": "404ac4f3ed9055bd9094cd74e95c13559041700eeee38123f7f8c9170036798a"
+            }
+          ]
         },
         {
           "remotePath": "/ext/apps/Infrared/flipper_xremote.fap",
           "targetPath": "/ext/apps/Module One/IR Blaster/tumoflip_xremote.fap",
           "sourceMD5": "f63a2449edae6ab7c0a1c5a96e426e14",
           "disposition": "auditedDifference",
-          "note": "Protected Tumoflip XRemote route."
+          "note": "Protected Tumoflip XRemote route.",
+          "targetMD5s": [
+            "9173da206a2de38d231d4c6da8ae60d4",
+            "9b69cb41de4362ecfc5a217065916e3b"
+          ],
+          "targetProvenance": [
+            {
+              "targetMD5": "9173da206a2de38d231d4c6da8ae60d4",
+              "channel": "stable",
+              "releaseTag": "fw-packages-stable-001",
+              "manifestSHA256": "62fc425cfb89417fbfc3b0c5ecc83bd3daeaf3dc8ed2b80a6a850137edc214a2"
+            },
+            {
+              "targetMD5": "9b69cb41de4362ecfc5a217065916e3b",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-003",
+              "manifestSHA256": "404ac4f3ed9055bd9094cd74e95c13559041700eeee38123f7f8c9170036798a"
+            }
+          ]
         },
         {
           "remotePath": "/ext/apps/Sub-GHz/proto_pirate.fap",
           "targetPath": "/ext/apps_data/arf_subghz_full/modules/proto_pirate.fap",
           "sourceMD5": "4e40ccf1f47c732dfbf9e891e12e0be0",
           "disposition": "auditedDifference",
-          "note": "Integrated as an ARF Sub-GHz Full child module."
+          "note": "Integrated as an ARF Sub-GHz Full child module.",
+          "targetMD5s": [
+            "56b13f6ee3b1513482ae6be63c83fc75",
+            "c2ee0aa6e97b3b24b64d32ebbf85e40f"
+          ],
+          "targetProvenance": [
+            {
+              "targetMD5": "c2ee0aa6e97b3b24b64d32ebbf85e40f",
+              "channel": "stable",
+              "releaseTag": "fw-packages-stable-001",
+              "manifestSHA256": "62fc425cfb89417fbfc3b0c5ecc83bd3daeaf3dc8ed2b80a6a850137edc214a2"
+            },
+            {
+              "targetMD5": "56b13f6ee3b1513482ae6be63c83fc75",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-003",
+              "manifestSHA256": "404ac4f3ed9055bd9094cd74e95c13559041700eeee38123f7f8c9170036798a"
+            }
+          ]
         },
         {
           "remotePath": "/ext/apps/Sub-GHz/subghz_bruteforcer.fap",
           "targetPath": "/ext/apps_data/arf_subghz_full/modules/subghz_bruteforcer.fap",
           "sourceMD5": "3fb146392dca6613161ab3b8be08a6d9",
           "disposition": "auditedDifference",
-          "note": "Integrated as an ARF Sub-GHz Full child module."
+          "note": "Integrated as an ARF Sub-GHz Full child module.",
+          "targetMD5s": [
+            "183c69bf242e83f7775f8c35765a9965",
+            "8170a9c2ea8e70e0686b40e33ac338b9"
+          ],
+          "targetProvenance": [
+            {
+              "targetMD5": "8170a9c2ea8e70e0686b40e33ac338b9",
+              "channel": "stable",
+              "releaseTag": "fw-packages-stable-001",
+              "manifestSHA256": "62fc425cfb89417fbfc3b0c5ecc83bd3daeaf3dc8ed2b80a6a850137edc214a2"
+            },
+            {
+              "targetMD5": "183c69bf242e83f7775f8c35765a9965",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-003",
+              "manifestSHA256": "404ac4f3ed9055bd9094cd74e95c13559041700eeee38123f7f8c9170036798a"
+            }
+          ]
         },
         {
           "remotePath": "/ext/apps/Sub-GHz/subghz_wardriving.fap",
-          "targetPath": "/ext/apps/Module One/Sub-GHz/subghz_wardriving.fap",
+          "targetPath": "/ext/apps/Sub-GHz/subghz_wardriving.fap",
           "sourceMD5": "c5ffb294251247d10fa51dae339e4765",
           "disposition": "auditedDifference",
-          "note": "Tumoflip-routed protected build."
+          "note": "Tumoflip-routed protected build.",
+          "targetMD5s": [
+            "c91d7a06e4bfb8697d3dff8ad50b7502",
+            "c9c832b9172b064e249099116cc71a7d"
+          ],
+          "targetProvenance": [
+            {
+              "targetMD5": "c9c832b9172b064e249099116cc71a7d",
+              "channel": "stable",
+              "releaseTag": "fw-packages-stable-001",
+              "manifestSHA256": "62fc425cfb89417fbfc3b0c5ecc83bd3daeaf3dc8ed2b80a6a850137edc214a2"
+            },
+            {
+              "targetMD5": "c91d7a06e4bfb8697d3dff8ad50b7502",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-003",
+              "manifestSHA256": "404ac4f3ed9055bd9094cd74e95c13559041700eeee38123f7f8c9170036798a"
+            }
+          ]
         },
         {
           "remotePath": "/ext/apps/Tools/quac.fap",
           "targetPath": "/ext/apps/Tools/quac.fap",
           "sourceMD5": "a278d93cf3d33be6d4f15bc2b10b9643",
           "disposition": "auditedDifference",
-          "note": "Protected Tumoflip build."
+          "note": "Protected Tumoflip build.",
+          "targetMD5s": [
+            "6c5b8bcff802092ef008c0f39d56e250",
+            "c10c2807d5944f0c0bef7d4275f05618"
+          ],
+          "targetProvenance": [
+            {
+              "targetMD5": "c10c2807d5944f0c0bef7d4275f05618",
+              "channel": "stable",
+              "releaseTag": "fw-packages-stable-001",
+              "manifestSHA256": "62fc425cfb89417fbfc3b0c5ecc83bd3daeaf3dc8ed2b80a6a850137edc214a2"
+            },
+            {
+              "targetMD5": "6c5b8bcff802092ef008c0f39d56e250",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-003",
+              "manifestSHA256": "404ac4f3ed9055bd9094cd74e95c13559041700eeee38123f7f8c9170036798a"
+            }
+          ]
         },
         {
           "remotePath": "/ext/apps/Tools/totp.fap",
           "targetPath": "/ext/apps/Tools/totp.fap",
           "sourceMD5": "ece2bfe5d6e5c6ccd0cc3653ccc19d13",
           "disposition": "auditedDifference",
-          "note": "Protected TOTP application."
-        },
-        {
-          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_add_plugin.fal",
-          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_add_plugin.fal",
-          "sourceMD5": "57f902956220b2a13e0c0cdf66673b52",
-          "disposition": "auditedDifference",
-          "note": "Protected TOTP plugin family."
-        },
-        {
-          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_automation_plugin.fal",
-          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_automation_plugin.fal",
-          "sourceMD5": "7bea84a51f9af0421b48b4e9ed2046c9",
-          "disposition": "auditedDifference",
-          "note": "Protected TOTP plugin family."
-        },
-        {
-          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_delete_plugin.fal",
-          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_delete_plugin.fal",
-          "sourceMD5": "6122b7e93e54fbb33c084f41c05c78ac",
-          "disposition": "auditedDifference",
-          "note": "Protected TOTP plugin family."
-        },
-        {
-          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_details_plugin.fal",
-          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_details_plugin.fal",
-          "sourceMD5": "a77e5c18756376870f5a642b01fe0dbd",
-          "disposition": "auditedDifference",
-          "note": "Protected TOTP plugin family."
-        },
-        {
-          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_export_plugin.fal",
-          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_export_plugin.fal",
-          "sourceMD5": "a36718e896a1e3375ab8a661091e9580",
-          "disposition": "auditedDifference",
-          "note": "Protected TOTP plugin family."
-        },
-        {
-          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_help_plugin.fal",
-          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_help_plugin.fal",
-          "sourceMD5": "871f895ea5a66eacf582042c73425932",
-          "disposition": "auditedDifference",
-          "note": "Protected TOTP plugin family."
-        },
-        {
-          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_list_plugin.fal",
-          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_list_plugin.fal",
-          "sourceMD5": "2d98f3ea1e5afe00707808f19e2b6066",
-          "disposition": "auditedDifference",
-          "note": "Protected TOTP plugin family."
-        },
-        {
-          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_move_plugin.fal",
-          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_move_plugin.fal",
-          "sourceMD5": "6fc428cfa133d5368fb99a8c22a45a3b",
-          "disposition": "auditedDifference",
-          "note": "Protected TOTP plugin family."
-        },
-        {
-          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_notification_plugin.fal",
-          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_notification_plugin.fal",
-          "sourceMD5": "ef3ed8f31b0e6498cf14934aeb3421ad",
-          "disposition": "auditedDifference",
-          "note": "Protected TOTP plugin family."
-        },
-        {
-          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_pin_plugin.fal",
-          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_pin_plugin.fal",
-          "sourceMD5": "593b9575956a7c92491c2b9ddd8e2821",
-          "disposition": "auditedDifference",
-          "note": "Protected TOTP plugin family."
-        },
-        {
-          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_reset_plugin.fal",
-          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_reset_plugin.fal",
-          "sourceMD5": "0350b001b35faf6356d18c0daa9258b1",
-          "disposition": "auditedDifference",
-          "note": "Protected TOTP plugin family."
-        },
-        {
-          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_timezone_plugin.fal",
-          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_timezone_plugin.fal",
-          "sourceMD5": "e9000c460a557969eb4e69d73242c731",
-          "disposition": "auditedDifference",
-          "note": "Protected TOTP plugin family."
-        },
-        {
-          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_update_plugin.fal",
-          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_update_plugin.fal",
-          "sourceMD5": "40bc6e8ccf06679536dfb113be0c1663",
-          "disposition": "auditedDifference",
-          "note": "Protected TOTP plugin family."
-        },
-        {
-          "remotePath": "/ext/apps_data/totp/plugins/totp_cli_version_plugin.fal",
-          "targetPath": "/ext/apps_data/totp/plugins/totp_cli_version_plugin.fal",
-          "sourceMD5": "faa96e593c0b642aba8dda791603dc62",
-          "disposition": "auditedDifference",
-          "note": "Protected TOTP plugin family."
+          "note": "Protected TOTP application.",
+          "targetMD5s": [
+            "a34e2657e5acb0f033bd62e06f85f98e",
+            "e18e7ae0eee268f5ca1cc3429cbc9e77"
+          ],
+          "targetProvenance": [
+            {
+              "targetMD5": "e18e7ae0eee268f5ca1cc3429cbc9e77",
+              "channel": "stable",
+              "releaseTag": "fw-packages-stable-001",
+              "manifestSHA256": "62fc425cfb89417fbfc3b0c5ecc83bd3daeaf3dc8ed2b80a6a850137edc214a2"
+            },
+            {
+              "targetMD5": "a34e2657e5acb0f033bd62e06f85f98e",
+              "channel": "dev",
+              "releaseTag": "fw-packages-dev-003",
+              "manifestSHA256": "404ac4f3ed9055bd9094cd74e95c13559041700eeee38123f7f8c9170036798a"
+            }
+          ]
         }
       ]
     }

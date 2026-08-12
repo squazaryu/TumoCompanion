@@ -359,7 +359,7 @@ struct ProtectedAppsView: View {
                     Text("Needs review")
                 } footer: {
                     Text(updater.protectedAuditResolution?.failure
-                         ?? "Protected apps whose current upstream bytes or Tumoflip route have not completed the centralized audit.")
+                         ?? "Protected apps whose current source, route, or installed target bytes have not completed the centralized audit.")
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -377,7 +377,7 @@ struct ProtectedAppsView: View {
                 } footer: {
                     let source = updater.protectedAuditResolution?.origin?.rawValue ?? "ledger"
                     let tag = updater.protectedAuditResolution?.audit?.sourceTag ?? updater.tag
-                    Text("Exact source bytes and routes are covered by the centralized \(tag) audit (\(source)). New bytes, a changed route, or incompatible metadata will return to Needs review automatically.")
+                    Text("Exact pack, source, route, and installed target bytes are covered by the centralized \(tag) audit (\(source)). Any change or incompatible metadata returns to Needs review automatically.")
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }

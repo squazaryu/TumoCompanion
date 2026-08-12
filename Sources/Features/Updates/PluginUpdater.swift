@@ -40,7 +40,9 @@ enum PluginInstallRouting {
         "subghz_playlist_creator": "/ext/apps/Module One/Sub-GHz/subghz_playlist_creator.fap",
         "subghz_raw_edit": "/ext/apps/ARF Tools/subghz_raw_edit.fap",
         "subghz_signal_gen": "/ext/apps/Module One/Sub-GHz/subghz_signal_gen.fap",
-        "subghz_wardriving": "/ext/apps/Module One/Sub-GHz/subghz_wardriving.fap",
+        // Canonical Tumoflip/FW Packages route. Older builds used Module One;
+        // that path is retained only as a guarded cleanup candidate below.
+        "subghz_wardriving": "/ext/apps/Sub-GHz/subghz_wardriving.fap",
         "timed_remote": "/ext/apps/Module One/IR Blaster/timed_remote.fap",
         "tpms": "/ext/apps/Module One/Sub-GHz/tpms.fap",
         "ublox": "/ext/apps/Module One/GPS/ublox.fap",
@@ -57,6 +59,19 @@ enum PluginInstallRouting {
             .deletingPathExtension
             .lowercased()
         return targetPaths[appName] ?? remotePath
+    }
+
+    static func legacyPaths(for remotePath: String) -> [String] {
+        let appName = ((remotePath as NSString).lastPathComponent as NSString)
+            .deletingPathExtension
+            .lowercased()
+        var paths: [String] = []
+        let target = targetPath(for: remotePath)
+        if target != remotePath { paths.append(remotePath) }
+        if appName == "subghz_wardriving" {
+            paths.append("/ext/apps/Module One/Sub-GHz/subghz_wardriving.fap")
+        }
+        return Array(Set(paths)).sorted()
     }
 
     static func remotePath(for archivePath: String) -> String? {
@@ -943,24 +958,24 @@ final class PluginUpdater: ObservableObject {
                 history.insert(InstallRecord(date: Date(), tag: tag, name: u.name,
                                              pack: u.pack, wasNew: u.isNew), at: 0)
 
-                // Legacy-duplicate sweep for a routed app: the new copy is now verified at
-                // u.targetPath, so a stale pre-routing copy may linger at u.remotePath.
-                // Remove it ONLY when it byte-matches what we just installed (md5 ==
-                // newMD5); if it differs it may be your custom/older build — keep it.
-                if u.isRouted, u.remotePath != u.targetPath,
-                   let legacyMD5 = await storage.md5(u.remotePath) {
+                // Legacy-duplicate sweep: the new copy is verified at the canonical
+                // destination. Remove an old-route copy ONLY when it byte-matches what
+                // was just installed; a different custom/older build is retained.
+                for legacyPath in PluginInstallRouting.legacyPaths(for: u.remotePath)
+                where legacyPath != u.targetPath {
+                    guard let legacyMD5 = await storage.md5(legacyPath) else { continue }
                     if legacyMD5 == u.newMD5 {
                         do {
-                            try await storage.delete(u.remotePath, recursive: false)
-                            cleanedDuplicates.append(u.remotePath)
-                            ulog.notice("removed legacy duplicate \(u.remotePath, privacy: .public)")
+                            try await storage.delete(legacyPath, recursive: false)
+                            cleanedDuplicates.append(legacyPath)
+                            ulog.notice("removed legacy duplicate \(legacyPath, privacy: .public)")
                         } catch {
-                            keptDuplicates.append(u.remotePath)   // couldn't delete → leave it
-                            ulog.error("failed to remove legacy duplicate \(u.remotePath, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                            keptDuplicates.append(legacyPath)   // couldn't delete → leave it
+                            ulog.error("failed to remove legacy duplicate \(legacyPath, privacy: .public): \(error.localizedDescription, privacy: .public)")
                         }
                     } else {
-                        keptDuplicates.append(u.remotePath)
-                        ulog.notice("kept legacy file for review (md5 differs) \(u.remotePath, privacy: .public)")
+                        keptDuplicates.append(legacyPath)
+                        ulog.notice("kept legacy file for review (md5 differs) \(legacyPath, privacy: .public)")
                     }
                 }
             } else if !stoppedMidFile {
@@ -1333,7 +1348,7 @@ extension PluginUpdater {
         let audit = ProtectedPluginAudit(
             sourceTag: "qa-pack",
             sourceCommit: String(repeating: "a", count: 40),
-            auditIssue: "https://github.com/squazaryu/tumoflip/issues/281",
+            auditIssue: "https://github.com/squazaryu/tumoflip/issues/302",
             archives: [
                 ProtectedPluginAuditArchive(
                     pack: "base", fileName: "all-the-apps-base.zip",
@@ -1347,12 +1362,20 @@ extension PluginUpdater {
                     remotePath: "/ext/apps/GPIO/esp_flasher.fap",
                     targetPath: "/ext/apps/Module One/ESP32 Wi-Fi/esp_flasher.fap",
                     sourceMD5: String(repeating: "1", count: 32),
+                    targetMD5s: [String(repeating: "a", count: 32)],
+                    targetProvenance: [ProtectedPluginTargetProvenance(
+                        targetMD5: String(repeating: "a", count: 32),
+                        channel: .dev,
+                        releaseTag: "fw-packages-dev-003",
+                        manifestSHA256: String(repeating: "c", count: 64))],
                     disposition: .auditedDifference,
                     note: nil),
                 ProtectedPluginAuditEntry(
                     remotePath: "/ext/apps/Bluetooth/claude_remote_ble.fap",
                     targetPath: "/ext/apps/Bluetooth/claude_remote_ble.fap",
                     sourceMD5: String(repeating: "2", count: 32),
+                    targetMD5s: [],
+                    targetProvenance: [],
                     disposition: .intentionallyReplaced,
                     note: nil),
             ])

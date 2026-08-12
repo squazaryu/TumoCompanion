@@ -40,14 +40,35 @@ struct ProtectedPluginPackProvenance: Equatable {
 enum ProtectedPluginAuditDisposition: String, Codable, Equatable {
     /// The upstream source was audited and the different Tumoflip binary is expected.
     case auditedDifference
+    /// The audited Tumoflip target intentionally uses the exact upstream bytes.
+    /// This still requires an exact ledger record: local equality is not an audit.
+    case sourceMatches
     /// This upstream app is intentionally absent because another Tumoflip app replaces it.
     case intentionallyReplaced
+}
+
+enum ProtectedPluginTargetChannel: String, Codable, Equatable {
+    case stable
+    case dev
+}
+
+struct ProtectedPluginTargetProvenance: Codable, Equatable {
+    let targetMD5: String
+    let channel: ProtectedPluginTargetChannel
+    let releaseTag: String
+    let manifestSHA256: String
 }
 
 struct ProtectedPluginAuditEntry: Codable, Equatable {
     let remotePath: String
     let targetPath: String
     let sourceMD5: String
+    /// Exact hashes of reviewed Tumoflip binaries. A present target is accepted only
+    /// when its on-device hash is a member of this set.
+    let targetMD5s: [String]
+    /// Immutable release evidence for every accepted target hash. The same bytes may
+    /// be proven by multiple exact releases. Intentionally replaced targets use empty arrays.
+    let targetProvenance: [ProtectedPluginTargetProvenance]
     let disposition: ProtectedPluginAuditDisposition
     let note: String?
 
@@ -85,7 +106,7 @@ struct ProtectedPluginAudit: Codable, Equatable {
 }
 
 struct ProtectedPluginAuditDocument: Codable, Equatable {
-    static let supportedSchema = 1
+    static let supportedSchema = 2
     static let expectedRepository = "xMasterX/all-the-plugins"
 
     let schema: Int
@@ -123,10 +144,10 @@ enum ProtectedPluginAuditValidator {
             throw ProtectedPluginAuditValidationError.wrongRepository
         }
 
-        var tags = Set<String>()
+        var auditIdentities = Set<String>()
         for audit in document.audits {
-            guard !audit.sourceTag.isEmpty, tags.insert(audit.sourceTag).inserted else {
-                throw ProtectedPluginAuditValidationError.malformedAudit("duplicate or empty source tag")
+            guard !audit.sourceTag.isEmpty else {
+                throw ProtectedPluginAuditValidationError.malformedAudit("empty source tag")
             }
             guard audit.sourceCommit.count == 40,
                   audit.sourceCommit.allSatisfy(\.isHexDigit) else {
@@ -144,16 +165,27 @@ enum ProtectedPluginAuditValidator {
             }
             for archive in audit.archives {
                 guard archive.fileName == "all-the-apps-\(archive.pack.lowercased()).zip",
-                      ProtectedPluginPackProvenance.isSHA256(archive.sha256) else {
+                      isLowercaseSHA256(archive.sha256) else {
                     throw ProtectedPluginAuditValidationError.malformedAudit("invalid archive provenance")
                 }
+            }
+            let archiveHashes = Dictionary(uniqueKeysWithValues: audit.archives.map {
+                ($0.pack.lowercased(), $0.sha256)
+            })
+            let auditIdentity = [
+                audit.sourceTag,
+                archiveHashes["base"] ?? "",
+                archiveHashes["extra"] ?? "",
+            ].joined(separator: "\u{001F}")
+            guard auditIdentities.insert(auditIdentity).inserted else {
+                throw ProtectedPluginAuditValidationError.malformedAudit(
+                    "duplicate exact pack audit")
             }
 
             var identities = Set<String>()
             for entry in audit.entries {
                 guard entry.remotePath.hasPrefix("/ext/"), entry.targetPath.hasPrefix("/ext/"),
-                      entry.sourceMD5.count == 32,
-                      entry.sourceMD5.allSatisfy(\.isHexDigit) else {
+                      isLowercaseMD5(entry.sourceMD5) else {
                     throw ProtectedPluginAuditValidationError.malformedAudit("invalid protected entry")
                 }
                 let identity = [entry.remotePath, entry.targetPath, entry.sourceMD5.lowercased()]
@@ -161,8 +193,68 @@ enum ProtectedPluginAuditValidator {
                 guard identities.insert(identity).inserted else {
                     throw ProtectedPluginAuditValidationError.malformedAudit("duplicate protected entry")
                 }
+
+                let targetSet = Set(entry.targetMD5s)
+                let provenanceSet = Set(entry.targetProvenance.map(\.targetMD5))
+                let provenanceIdentities = Set(entry.targetProvenance.map {
+                    [
+                        $0.targetMD5,
+                        $0.channel.rawValue,
+                        $0.releaseTag,
+                        $0.manifestSHA256,
+                    ].joined(separator: "\u{001F}")
+                })
+                guard targetSet.count == entry.targetMD5s.count,
+                      entry.targetMD5s.allSatisfy(isLowercaseMD5),
+                      provenanceIdentities.count == entry.targetProvenance.count,
+                      targetSet == provenanceSet else {
+                    throw ProtectedPluginAuditValidationError.malformedAudit(
+                        "invalid target hash provenance")
+                }
+                for provenance in entry.targetProvenance {
+                    guard isLowercaseMD5(provenance.targetMD5),
+                          isReleaseTag(provenance.releaseTag),
+                          isLowercaseSHA256(provenance.manifestSHA256) else {
+                        throw ProtectedPluginAuditValidationError.malformedAudit(
+                            "invalid target release provenance")
+                    }
+                }
+                switch entry.disposition {
+                case .auditedDifference:
+                    guard !targetSet.isEmpty else {
+                        throw ProtectedPluginAuditValidationError.malformedAudit(
+                            "audited difference has no accepted target")
+                    }
+                case .sourceMatches:
+                    guard !targetSet.isEmpty, targetSet.contains(entry.sourceMD5) else {
+                        throw ProtectedPluginAuditValidationError.malformedAudit(
+                            "source match does not accept the audited source hash")
+                    }
+                case .intentionallyReplaced:
+                    guard targetSet.isEmpty, entry.targetProvenance.isEmpty else {
+                        throw ProtectedPluginAuditValidationError.malformedAudit(
+                            "intentionally replaced target must remain absent")
+                    }
+                }
             }
         }
+    }
+
+    private static func isLowercaseMD5(_ value: String) -> Bool {
+        value == value.lowercased()
+            && value.count == 32
+            && value.allSatisfy(\.isHexDigit)
+    }
+
+    private static func isLowercaseSHA256(_ value: String) -> Bool {
+        value == value.lowercased() && ProtectedPluginPackProvenance.isSHA256(value)
+    }
+
+    private static func isReleaseTag(_ value: String) -> Bool {
+        !value.isEmpty
+            && value.lowercased() != "latest"
+            && !value.contains("*")
+            && !value.contains(where: \.isWhitespace)
     }
 }
 
@@ -305,7 +397,7 @@ enum ProtectedPluginReviewAuditStatus: Equatable {
     case needsReview
 
     var isAudited: Bool {
-        self == .verified || self == .intentionallyReplaced
+        self == .sourceMatches || self == .verified || self == .intentionallyReplaced
     }
 }
 
@@ -316,22 +408,27 @@ enum ProtectedPluginReviewPolicy {
         audit: ProtectedPluginAudit?
     ) -> ProtectedPluginReviewAuditStatus {
         guard compatibility.isCompatible, review.deviceKnown else { return .needsReview }
-        if let entry = audit?.entry(matching: review),
-           entry.disposition == .intentionallyReplaced {
+        guard let entry = audit?.entry(matching: review) else {
+            // Even a byte-for-byte source match is not accepted until the automation
+            // has completed an exact audit for this pack, route, and source hash.
+            return .needsReview
+        }
+        if entry.disposition == .intentionallyReplaced {
             // A replacement disposition proves that this exact upstream app should be
             // absent. If any binary exists at its old target, surface it for review —
             // even when it byte-matches upstream — rather than silently accepting a
             // duplicate alongside the Tumoflip replacement.
             return review.deviceMD5 == nil ? .intentionallyReplaced : .needsReview
         }
-        if let deviceMD5 = review.deviceMD5,
-           deviceMD5.caseInsensitiveCompare(review.newMD5) == .orderedSame {
-            return .sourceMatches
+        guard let deviceMD5 = review.deviceMD5?.lowercased(),
+              entry.targetMD5s.contains(deviceMD5) else {
+            return .needsReview
         }
-        guard let entry = audit?.entry(matching: review) else { return .needsReview }
         switch entry.disposition {
         case .auditedDifference:
-            return review.deviceMD5 == nil ? .needsReview : .verified
+            return .verified
+        case .sourceMatches:
+            return .sourceMatches
         case .intentionallyReplaced:
             return .needsReview
         }

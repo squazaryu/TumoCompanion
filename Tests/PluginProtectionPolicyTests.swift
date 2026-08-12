@@ -63,9 +63,17 @@ final class PluginProtectionPolicyTests: XCTestCase {
     }
 
     func testAllThePluginsCannotOverwriteWardrivingOrDuplicateClaudeBuddy() {
+        let wardrivingRemote = "/ext/apps/Sub-GHz/subghz_wardriving.fap"
+        XCTAssertEqual(
+            PluginInstallRouting.targetPath(for: wardrivingRemote),
+            wardrivingRemote,
+            "Wardriving follows the canonical firmware/FW Packages route")
+        XCTAssertEqual(
+            PluginInstallRouting.legacyPaths(for: wardrivingRemote),
+            ["/ext/apps/Module One/Sub-GHz/subghz_wardriving.fap"])
         XCTAssertTrue(PluginProtectionPolicy.isProtected(
             name: "subghz_wardriving",
-            remotePath: "/ext/apps/Sub-GHz/subghz_wardriving.fap",
+            remotePath: wardrivingRemote,
             excluded: PluginUpdater.builtInExcluded,
             unprotectedBuiltIns: []))
         XCTAssertTrue(PluginProtectionPolicy.isProtected(
