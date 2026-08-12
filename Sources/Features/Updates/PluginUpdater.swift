@@ -328,6 +328,15 @@ final class PluginUpdater: ObservableObject {
     /// A missing decision deliberately leaves every differing protected binary in review.
     @Published private(set) var protectedAuditResolution: ProtectedPluginAuditResolution?
     private let protectedAuditService: ProtectedPluginAuditService
+    /// Exact archive identity retained for the loaded catalog. The audit can be
+    /// published after the Community Pack was downloaded, so every later device
+    /// verification must be able to re-resolve this same immutable identity without
+    /// downloading or guessing the pack again.
+    private var protectedAuditProvenance: ProtectedPluginPackProvenance?
+    /// Latest-started-wins token. Prevents a slow stale response from overwriting a
+    /// newer resolution, both across catalog switches and for the same exact pack.
+    private var protectedAuditGeneration: UInt64 = 0
+    private var protectedAuditResolutionTask: Task<ProtectedPluginAuditResolution, Never>?
     /// Protected items that genuinely need a look: device state unknown yet, or the
     /// upstream bytes/route are not covered by the exact automation-owned audit ledger.
     /// Shared by the Updates "More" subtitle and the Protected Apps screen.
@@ -621,14 +630,10 @@ final class PluginUpdater: ObservableObject {
             protectedReviews = []
             verifyResult = nil
             classifications = [:]
-            if let provenance = ProtectedPluginPackProvenance(
+            setProtectedAuditProvenance(ProtectedPluginPackProvenance(
                 sourceTag: nextTag,
-                archiveSHA256: archiveSHA256) {
-                protectedAuditResolution = await protectedAuditService.resolve(for: provenance)
-            } else {
-                protectedAuditResolution = .rejected(
-                    "Community Pack archive provenance is incomplete; protected apps remain unverified.")
-            }
+                archiveSHA256: archiveSHA256))
+            await refreshProtectedAuditResolution()
             await refreshProtectedReviews()
 
             if let cacheMap = loadCache()?.map, !cacheMap.isEmpty {
@@ -673,6 +678,40 @@ final class PluginUpdater: ObservableObject {
 
     private func sortProtected(_ r: [ProtectedPluginReview]) -> [ProtectedPluginReview] {
         r.sorted { ($0.pack, $0.category, $0.name) < ($1.pack, $1.category, $1.name) }
+    }
+
+    private func setProtectedAuditProvenance(_ provenance: ProtectedPluginPackProvenance?) {
+        protectedAuditResolutionTask?.cancel()
+        protectedAuditResolutionTask = nil
+        protectedAuditGeneration &+= 1
+        protectedAuditProvenance = provenance
+        protectedAuditResolution = nil
+    }
+
+    private func refreshProtectedAuditResolution(forceRemote: Bool = false) async {
+        protectedAuditResolutionTask?.cancel()
+        protectedAuditGeneration &+= 1
+        let generation = protectedAuditGeneration
+        guard let provenance = protectedAuditProvenance else {
+            // Never retain an acceptance from a previously loaded pack when the
+            // current archive identity is incomplete.
+            protectedAuditResolution = .rejected(
+                "Community Pack archive provenance is incomplete; protected apps remain unverified.")
+            return
+        }
+        // resolve() remains fail-closed. A reachable exact authoritative audit is the
+        // only path that clears a prior revocation tombstone; offline/cache fallback
+        // cannot resurrect a revision that the ledger rejected.
+        let service = protectedAuditService
+        let task = Task {
+            await service.resolve(for: provenance, forceRemote: forceRemote)
+        }
+        protectedAuditResolutionTask = task
+        let resolution = await task.value
+        guard generation == protectedAuditGeneration,
+              provenance == protectedAuditProvenance else { return }
+        protectedAuditResolutionTask = nil
+        protectedAuditResolution = resolution
     }
 
     private func refreshProtectedReviews() async {
@@ -1105,6 +1144,9 @@ final class PluginUpdater: ObservableObject {
             }
         }
         verifyResult = VerifyResult(kind: .onDevice, tag: tag, verified: verified, failed: failures)
+        // Explicit Verify must bypass GitHub/raw CDN caching: automation may have
+        // published the exact audit after this pack was checked a few minutes ago.
+        await refreshProtectedAuditResolution(forceRemote: true)
         await refreshProtectedReviews()
         if bad.isEmpty {
             phase = .done("Verified \(verified) app\(verified == 1 ? "" : "s") on device · all match \(tag)")
@@ -1336,6 +1378,18 @@ final class PluginUpdater: ObservableObject {
 
 #if DEBUG
 extension PluginUpdater {
+    /// Focused test hook for the late-ledger lifecycle. Production provenance is set
+    /// only from the SHA-256 values computed while downloading both pack archives.
+    func configureProtectedAuditProvenanceForTesting(
+        _ provenance: ProtectedPluginPackProvenance
+    ) {
+        setProtectedAuditProvenance(provenance)
+    }
+
+    func refreshProtectedAuditResolutionForTesting(forceRemote: Bool = false) async {
+        await refreshProtectedAuditResolution(forceRemote: forceRemote)
+    }
+
     static func protectedAuditQAFixture() -> PluginUpdater {
         let temp = FileManager.default.temporaryDirectory
             .appendingPathComponent("protected-audit-ui-\(UUID().uuidString)")

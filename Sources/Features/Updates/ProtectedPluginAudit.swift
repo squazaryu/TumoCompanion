@@ -353,7 +353,25 @@ struct ProtectedPluginAuditService {
     let url: URL
     let cache: ProtectedPluginAuditCache
     let fetch: Fetch
+    /// Bypasses both URLSession's local cache and intermediary caches. Used only for
+    /// an explicit Verify on device pass, where the audit may have been published
+    /// moments after the same pack was first checked.
+    let fetchFresh: Fetch
     let bundledData: BundledData
+
+    init(
+        url: URL,
+        cache: ProtectedPluginAuditCache,
+        fetch: @escaping Fetch,
+        fetchFresh: Fetch? = nil,
+        bundledData: @escaping BundledData
+    ) {
+        self.url = url
+        self.cache = cache
+        self.fetch = fetch
+        self.fetchFresh = fetchFresh ?? fetch
+        self.bundledData = bundledData
+    }
 
     static func live(bundle: Bundle = .main) -> Self {
         let base = FileManager.default.urls(
@@ -366,15 +384,10 @@ struct ProtectedPluginAuditService {
                     .appendingPathComponent("TumoCompanion", isDirectory: true)
                     .appendingPathComponent("ProtectedPluginAudits", isDirectory: true)),
             fetch: { url in
-                var request = URLRequest(url: url)
-                request.cachePolicy = .reloadIgnoringLocalCacheData
-                request.timeoutInterval = 15
-                let (data, response) = try await URLSession.shared.data(for: request)
-                guard let http = response as? HTTPURLResponse,
-                      (200..<300).contains(http.statusCode) else {
-                    throw URLError(.badServerResponse)
-                }
-                return data
+                try await fetchData(from: url, forceRemote: false)
+            },
+            fetchFresh: { url in
+                try await fetchData(from: url, forceRemote: true)
             },
             bundledData: {
                 guard let url = bundle.url(
@@ -385,9 +398,33 @@ struct ProtectedPluginAuditService {
             })
     }
 
-    func resolve(for provenance: ProtectedPluginPackProvenance) async -> ProtectedPluginAuditResolution {
+    private static func fetchData(from url: URL, forceRemote: Bool) async throws -> Data {
+        var request = URLRequest(url: url)
+        request.cachePolicy = forceRemote
+            ? .reloadIgnoringLocalAndRemoteCacheData
+            : .reloadIgnoringLocalCacheData
+        request.timeoutInterval = 15
+        if forceRemote {
+            request.setValue("no-cache, no-store, max-age=0", forHTTPHeaderField: "Cache-Control")
+            request.setValue("no-cache", forHTTPHeaderField: "Pragma")
+        }
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse,
+              (200..<300).contains(http.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+        return data
+    }
+
+    func resolve(
+        for provenance: ProtectedPluginPackProvenance,
+        forceRemote: Bool = false
+    ) async -> ProtectedPluginAuditResolution {
         do {
-            let data = try await fetch(url)
+            let data = try await (forceRemote ? fetchFresh : fetch)(url)
+            guard !Task.isCancelled else {
+                return .rejected("Protected-app audit refresh was cancelled.")
+            }
             let document: ProtectedPluginAuditDocument
             do {
                 document = try ProtectedPluginAuditValidator.decode(data)
@@ -397,8 +434,14 @@ struct ProtectedPluginAuditService {
                 return .rejected(error.localizedDescription)
             }
             guard let audit = document.audits.first(where: { $0.matches(provenance) }) else {
+                guard !Task.isCancelled else {
+                    return .rejected("Protected-app audit refresh was cancelled.")
+                }
                 try? cache.revoke(provenance)
                 return .rejected("This Community Pack revision has not completed protected-app audit.")
+            }
+            guard !Task.isCancelled else {
+                return .rejected("Protected-app audit refresh was cancelled.")
             }
             try? cache.save(audit, for: provenance)
             return .accepted(audit, origin: .remote)

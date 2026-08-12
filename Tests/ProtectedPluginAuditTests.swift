@@ -5,6 +5,50 @@ final class ProtectedPluginAuditTests: XCTestCase {
     private let baseSHA = String(repeating: "1", count: 64)
     private let extraSHA = String(repeating: "2", count: 64)
 
+    private actor MutableLedger {
+        private var data: Data
+        private var regularReads = 0
+        private var freshReads = 0
+
+        init(_ data: Data) {
+            self.data = data
+        }
+
+        func read(fresh: Bool) -> Data {
+            if fresh { freshReads += 1 } else { regularReads += 1 }
+            return data
+        }
+        func replace(with data: Data) { self.data = data }
+        func counts() -> (regular: Int, fresh: Int) { (regularReads, freshReads) }
+    }
+
+    private actor DeferredFirstLedger {
+        private let laterData: Data
+        private var calls = 0
+        private var firstContinuation: CheckedContinuation<Data, Never>?
+        private var firstIsWaiting = false
+
+        init(laterData: Data) { self.laterData = laterData }
+
+        func read() async -> Data {
+            calls += 1
+            guard calls == 1 else { return laterData }
+            return await withCheckedContinuation { continuation in
+                firstContinuation = continuation
+                firstIsWaiting = true
+            }
+        }
+
+        func waitUntilFirstIsWaiting() async {
+            while !firstIsWaiting { await Task.yield() }
+        }
+
+        func resumeFirst(with data: Data) {
+            firstContinuation?.resume(returning: data)
+            firstContinuation = nil
+        }
+    }
+
     func testBundledBootstrapLedgerContainsExact9AugustAudit() throws {
         let url = try XCTUnwrap(Bundle.main.url(
             forResource: "ProtectedPluginAuditLedger", withExtension: "json"))
@@ -131,6 +175,138 @@ final class ProtectedPluginAuditTests: XCTestCase {
         XCTAssertFalse(cache.isRevoked(for: provenance))
         let cachedAgain = await offline.resolve(for: provenance)
         XCTAssertEqual(cachedAgain.origin, .cache)
+    }
+
+    @MainActor
+    func testDeviceVerificationRefreshReacceptsAuditPublishedAfterPackCheck() async throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let provenance = try XCTUnwrap(makeProvenance())
+        let noAudits = ProtectedPluginAuditDocument(
+            schema: ProtectedPluginAuditDocument.supportedSchema,
+            sourceRepository: ProtectedPluginAuditDocument.expectedRepository,
+            generatedAt: "2026-08-12T01:00:00Z",
+            audits: [])
+        let remote = MutableLedger(try JSONEncoder().encode(noAudits))
+        let cache = ProtectedPluginAuditCache(directory: directory)
+        let service = ProtectedPluginAuditService(
+            url: URL(string: "https://example.test/latest.json")!,
+            cache: cache,
+            fetch: { _ in await remote.read(fresh: false) },
+            fetchFresh: { _ in await remote.read(fresh: true) },
+            bundledData: { nil })
+        let updater = PluginUpdater(protectedAuditService: service)
+        updater.configureProtectedAuditProvenanceForTesting(provenance)
+
+        // The pack was checked before automation published its exact audit. This
+        // creates the fail-closed revocation tombstone seen by the user as DIFF.
+        await updater.refreshProtectedAuditResolutionForTesting()
+        XCTAssertNil(updater.protectedAuditResolution?.audit)
+        XCTAssertTrue(cache.isRevoked(for: provenance))
+        XCTAssertEqual(
+            ProtectedPluginReviewPolicy.status(
+                makeReview(),
+                compatibility: .compatible(
+                    FapMetadata(apiMajor: 88, apiMinor: 2, hardwareTarget: 7)),
+                audit: updater.protectedAuditResolution?.audit),
+            .needsReview)
+
+        // Verify on device reuses the retained exact pack provenance. Once the
+        // authoritative ledger contains that identity, it clears the tombstone and
+        // the already-known exact target bytes become VERIFIED without re-downloading.
+        await remote.replace(with: try makeDocumentData())
+        await updater.refreshProtectedAuditResolutionForTesting(forceRemote: true)
+
+        XCTAssertEqual(updater.protectedAuditResolution?.origin, .remote)
+        XCTAssertFalse(cache.isRevoked(for: provenance))
+        let counts = await remote.counts()
+        XCTAssertEqual(counts.regular, 1)
+        XCTAssertEqual(counts.fresh, 1, "Verify must bypass the ordinary ledger fetch path")
+        XCTAssertEqual(
+            ProtectedPluginReviewPolicy.status(
+                makeReview(),
+                compatibility: .compatible(
+                    FapMetadata(apiMajor: 88, apiMinor: 2, hardwareTarget: 7)),
+                audit: updater.protectedAuditResolution?.audit),
+            .verified)
+    }
+
+    @MainActor
+    func testLateAuditResponseCannotOverwriteNewerCatalogResolution() async throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let firstProvenance = try XCTUnwrap(makeProvenance())
+        let nextBase = String(repeating: "3", count: 64)
+        let nextExtra = String(repeating: "4", count: 64)
+        let nextProvenance = try XCTUnwrap(ProtectedPluginPackProvenance(
+            sourceTag: "12aug2026",
+            archiveSHA256: ["base": nextBase, "extra": nextExtra]))
+        let firstData = try makeDocumentData()
+        let nextData = try makeDocumentData(
+            sourceTag: "12aug2026", baseArchiveSHA: nextBase, extraArchiveSHA: nextExtra)
+        let remote = DeferredFirstLedger(laterData: nextData)
+        let service = ProtectedPluginAuditService(
+            url: URL(string: "https://example.test/latest.json")!,
+            cache: ProtectedPluginAuditCache(directory: directory),
+            fetch: { _ in await remote.read() },
+            bundledData: { nil })
+        let updater = PluginUpdater(protectedAuditService: service)
+        updater.configureProtectedAuditProvenanceForTesting(firstProvenance)
+
+        let staleRequest = Task { @MainActor in
+            await updater.refreshProtectedAuditResolutionForTesting()
+        }
+        await remote.waitUntilFirstIsWaiting()
+
+        updater.configureProtectedAuditProvenanceForTesting(nextProvenance)
+        await updater.refreshProtectedAuditResolutionForTesting()
+        XCTAssertEqual(updater.protectedAuditResolution?.audit?.sourceTag, "12aug2026")
+
+        await remote.resumeFirst(with: firstData)
+        await staleRequest.value
+        XCTAssertEqual(
+            updater.protectedAuditResolution?.audit?.sourceTag,
+            "12aug2026",
+            "An older async response must not replace the exact audit for the current catalog")
+    }
+
+    @MainActor
+    func testLateOmissionCannotOverwriteNewerExactResolutionForSamePack() async throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let provenance = try XCTUnwrap(makeProvenance())
+        let noAudits = ProtectedPluginAuditDocument(
+            schema: ProtectedPluginAuditDocument.supportedSchema,
+            sourceRepository: ProtectedPluginAuditDocument.expectedRepository,
+            generatedAt: "2026-08-12T01:00:00Z",
+            audits: [])
+        let remote = DeferredFirstLedger(laterData: try makeDocumentData())
+        let service = ProtectedPluginAuditService(
+            url: URL(string: "https://example.test/latest.json")!,
+            cache: ProtectedPluginAuditCache(directory: directory),
+            fetch: { _ in await remote.read() },
+            fetchFresh: { _ in await remote.read() },
+            bundledData: { nil })
+        let updater = PluginUpdater(protectedAuditService: service)
+        updater.configureProtectedAuditProvenanceForTesting(provenance)
+
+        let staleOmission = Task { @MainActor in
+            await updater.refreshProtectedAuditResolutionForTesting()
+        }
+        await remote.waitUntilFirstIsWaiting()
+
+        await updater.refreshProtectedAuditResolutionForTesting(forceRemote: true)
+        XCTAssertEqual(updater.protectedAuditResolution?.origin, .remote)
+
+        await remote.resumeFirst(with: try JSONEncoder().encode(noAudits))
+        await staleOmission.value
+        XCTAssertFalse(
+            service.cache.isRevoked(for: provenance),
+            "A cancelled stale omission must not revoke the newer exact audit cache")
+        XCTAssertEqual(
+            updater.protectedAuditResolution?.origin,
+            .remote,
+            "An older omission for the same pack must not replace a newer exact audit")
     }
 
     func testOfflineBundledBootstrapRequiresExactPack() async throws {
@@ -399,20 +575,26 @@ final class ProtectedPluginAuditTests: XCTestCase {
             archiveSHA256: ["base": baseSHA, "extra": extraSHA])
     }
 
-    private func makeDocumentData() throws -> Data {
+    private func makeDocumentData(
+        sourceTag: String = "9aug2026",
+        baseArchiveSHA: String? = nil,
+        extraArchiveSHA: String? = nil
+    ) throws -> Data {
+        let documentBaseSHA = baseArchiveSHA ?? baseSHA
+        let documentExtraSHA = extraArchiveSHA ?? extraSHA
         let document = ProtectedPluginAuditDocument(
             schema: ProtectedPluginAuditDocument.supportedSchema,
             sourceRepository: "xMasterX/all-the-plugins",
             generatedAt: "2026-08-12T00:00:00Z",
             audits: [ProtectedPluginAudit(
-                sourceTag: "9aug2026",
+                sourceTag: sourceTag,
                 sourceCommit: String(repeating: "a", count: 40),
                 auditIssue: "https://github.com/squazaryu/tumoflip/issues/302",
                 archives: [
                     ProtectedPluginAuditArchive(
-                        pack: "base", fileName: "all-the-apps-base.zip", sha256: baseSHA),
+                        pack: "base", fileName: "all-the-apps-base.zip", sha256: documentBaseSHA),
                     ProtectedPluginAuditArchive(
-                        pack: "extra", fileName: "all-the-apps-extra.zip", sha256: extraSHA),
+                        pack: "extra", fileName: "all-the-apps-extra.zip", sha256: documentExtraSHA),
                 ],
                 entries: [
                     ProtectedPluginAuditEntry(
