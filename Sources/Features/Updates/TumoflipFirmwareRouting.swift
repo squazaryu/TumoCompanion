@@ -205,6 +205,35 @@ enum TumoflipFirmwareRouter {
 }
 
 enum TumoflipPackageReleaseMatcher {
+    /// Prefer the independent FW Packages catalog over package assets bundled with
+    /// a firmware release. GitHub's releases endpoint is ordered by `created_at`,
+    /// not `published_at`: a firmware draft created later can otherwise shadow a
+    /// subsequently published package revision forever.
+    static func shouldReplaceSelection(
+        current: TumoflipManifest.PackageRelease?,
+        with candidate: TumoflipManifest.PackageRelease?
+    ) -> Bool {
+        let currentRevision = current.flatMap { release in
+            release.isIndependentCatalog ? release.catalogRevision : nil
+        }
+        let candidateRevision = candidate.flatMap { release in
+            release.isIndependentCatalog ? release.catalogRevision : nil
+        }
+
+        switch (currentRevision, candidateRevision) {
+        case (nil, .some):
+            return true
+        case (.some, nil):
+            return false
+        case let (.some(current), .some(candidate)):
+            return candidate > current
+        case (nil, nil):
+            // Keep the first legacy exact-firmware match to preserve the API order
+            // used before independent package catalogs existed.
+            return false
+        }
+    }
+
     static func matches(
         manifestVersion: String,
         packageRelease: TumoflipManifest.PackageRelease? = nil,
