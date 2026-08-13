@@ -89,6 +89,91 @@ final class TumoflipPackageCatalogTests: XCTestCase {
         }
     }
 
+    func testWellFormedNewerIncompatibleRevisionFallsBackWithinPrimaryCatalog() async throws {
+        let newer = release(id: 10, tag: "fw-packages-dev-010")
+        let compatible = release(id: 9, tag: "fw-packages-dev-009")
+        let client = makeClient(
+            primaryPages: [releasesData([newer, compatible])],
+            manifests: [
+                manifestURL("fw-packages-dev-010"): manifest(
+                    tag: "fw-packages-dev-010", revision: 10, api: "89.0"),
+                manifestURL("fw-packages-dev-009"): manifest(
+                    tag: "fw-packages-dev-009", revision: 9, api: "88.0"),
+            ]
+        )
+
+        let selected = try await client.latest(
+            for: .dev,
+            installedVersion: "t-dev-004-015",
+            installedAPI: "88.0",
+            installedTarget: 7
+        )
+
+        XCTAssertEqual(selected.release.repository, .primary)
+        XCTAssertEqual(selected.release.tag, "fw-packages-dev-009")
+    }
+
+    func testWellFormedCatalogWithoutCompatibleRevisionReportsNoMatch() async throws {
+        let client = makeClient(
+            primaryPages: [releasesData([release(id: 10, tag: "fw-packages-dev-010")])],
+            manifests: [
+                manifestURL("fw-packages-dev-010"): manifest(
+                    tag: "fw-packages-dev-010", revision: 10, api: "89.0"),
+            ]
+        )
+
+        do {
+            _ = try await client.latest(
+                for: .dev,
+                installedVersion: "t-dev-004-015",
+                installedAPI: "88.0",
+                installedTarget: 7
+            )
+            XCTFail("Expected an ordinary compatibility miss")
+        } catch let error as TumoflipPackageCatalogError {
+            guard case .noMatchingRelease = error else {
+                return XCTFail("Unexpected error: \(error)")
+            }
+        }
+    }
+
+    func testRateLimitedPrimaryDoesNotFallBackToLegacy() async throws {
+        let legacy = release(id: 8, tag: "fw-packages-dev-008")
+        let client = makeClient(
+            legacyPages: [releasesData([legacy])],
+            primaryError: GitHubAPIError.rateLimited(resetAt: nil),
+            manifests: [
+                manifestURL("fw-packages-dev-008"): manifest(
+                    tag: "fw-packages-dev-008", revision: 8),
+            ]
+        )
+
+        do {
+            _ = try await client.latest(for: .dev, installedVersion: "t-dev-004-015")
+            XCTFail("Rate limiting must remain visible instead of selecting legacy data")
+        } catch let error as GitHubAPIError {
+            XCTAssertEqual(error, .rateLimited(resetAt: nil))
+        }
+    }
+
+    func testMalformedLegacyCatalogHasDistinctFailure() async throws {
+        let legacy = release(id: 8, tag: "fw-packages-dev-008")
+        let client = makeClient(
+            legacyPages: [releasesData([legacy])],
+            primaryError: GitHubAPIError.httpStatus(404),
+            manifests: [manifestURL("fw-packages-dev-008"): Data("bad".utf8)]
+        )
+
+        do {
+            _ = try await client.latest(for: .dev, installedVersion: "t-dev-004-015")
+            XCTFail("Expected malformed legacy catalog")
+        } catch let error as TumoflipPackageCatalogError {
+            guard case .malformedLegacy = error else {
+                return XCTFail("Unexpected error: \(error)")
+            }
+        }
+    }
+
     func testReleaseDiscoveryPaginatesPastFirstHundredRows() async throws {
         let filler = (1...100).map {
             release(id: Int64(10_000 + $0), tag: "firmware-archive-\($0)", includeAssets: false)
@@ -217,7 +302,8 @@ final class TumoflipPackageCatalogTests: XCTestCase {
     private func manifest(
         tag: String,
         revision: Int,
-        releaseID: String = String(repeating: "d", count: 64)
+        releaseID: String = String(repeating: "d", count: 64),
+        api: String = "88.0"
     ) -> Data {
         let channel = tag.contains("-stable-") ? "stable" : "dev"
         let firmwareVersion = channel == "stable" ? "t-flppr-fw-004" : "t-dev-004-015"
@@ -225,7 +311,7 @@ final class TumoflipPackageCatalogTests: XCTestCase {
             "schema": 2,
             "release_id": releaseID,
             "firmware": [
-                "api": "88.0",
+                "api": api,
                 "name": "tumoflip",
                 "version": firmwareVersion,
                 "target": 7,

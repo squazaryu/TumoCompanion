@@ -467,7 +467,9 @@ final class TumoflipUpdater: ObservableObject {
             await refreshRoutingIdentity()
             let selection = try await packageCatalogClient.latest(
                 for: firmwareRoute.channel,
-                installedVersion: packageIdentityVersion
+                installedVersion: packageIdentityVersion,
+                installedAPI: deviceIdentity?.firmwareAPI,
+                installedTarget: deviceIdentity?.hardwareTarget
             )
             let m = selection.manifest
             try m.validate()
@@ -551,6 +553,8 @@ final class TumoflipUpdater: ObservableObject {
             let liveSelection = try await packageCatalogClient.latest(
                 for: firmwareRoute.channel,
                 installedVersion: packageIdentityVersion,
+                installedAPI: deviceIdentity?.firmwareAPI,
+                installedTarget: deviceIdentity?.hardwareTarget,
                 forceRemote: true,
                 requiredRepository: selectedCatalogRepository
             )

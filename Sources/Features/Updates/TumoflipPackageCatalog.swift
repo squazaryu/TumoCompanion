@@ -67,6 +67,7 @@ struct TumoflipPackageCatalogSelection: Equatable {
 enum TumoflipPackageCatalogError: LocalizedError, Equatable {
     case noMatchingRelease(TumoflipFirmwareChannel, String?)
     case malformedPrimary(String)
+    case malformedLegacy(String)
     case paginationLimit(String)
 
     var errorDescription: String? {
@@ -78,6 +79,8 @@ enum TumoflipPackageCatalogError: LocalizedError, Equatable {
             return "No \(channel.packageLabel) release with tumoflip-packages.json was found."
         case .malformedPrimary(let reason):
             return "The authoritative FW Packages catalog is invalid: \(reason)"
+        case .malformedLegacy(let reason):
+            return "The legacy FW Packages catalog is invalid: \(reason)"
         case .paginationLimit(let repository):
             return "The GitHub release catalog for \(repository) is unexpectedly large."
         }
@@ -157,6 +160,8 @@ struct TumoflipPackageCatalogClient {
     func latest(
         for channel: TumoflipFirmwareChannel,
         installedVersion: String?,
+        installedAPI: String? = nil,
+        installedTarget: Int? = nil,
         forceRemote: Bool = false,
         requiredRepository: TumoflipPackageCatalogRepository? = nil
     ) async throws -> TumoflipPackageCatalogSelection {
@@ -170,6 +175,8 @@ struct TumoflipPackageCatalogClient {
                 in: requiredRepository,
                 channel: channel,
                 installedVersion: installedVersion,
+                installedAPI: installedAPI,
+                installedTarget: installedTarget,
                 forceRemote: forceRemote,
                 allowLegacyFirmwareReleases: requiredRepository.role == .legacy
             )
@@ -184,6 +191,8 @@ struct TumoflipPackageCatalogClient {
                     in: primary,
                     channel: channel,
                     installedVersion: installedVersion,
+                    installedAPI: installedAPI,
+                    installedTarget: installedTarget,
                     forceRemote: forceRemote
                 )
             }
@@ -199,6 +208,8 @@ struct TumoflipPackageCatalogClient {
             in: legacy,
             channel: channel,
             installedVersion: installedVersion,
+            installedAPI: installedAPI,
+            installedTarget: installedTarget,
             forceRemote: forceRemote,
             allowLegacyFirmwareReleases: true
         )
@@ -217,7 +228,7 @@ struct TumoflipPackageCatalogClient {
             } catch {
                 throw repository.role == .primary
                     ? TumoflipPackageCatalogError.malformedPrimary("GitHub release list cannot be decoded")
-                    : error
+                    : TumoflipPackageCatalogError.malformedLegacy("GitHub release list cannot be decoded")
             }
             output.append(contentsOf: records.compactMap { record in
                 guard !record.draft,
@@ -246,6 +257,8 @@ struct TumoflipPackageCatalogClient {
         in repository: TumoflipPackageCatalogRepository,
         channel: TumoflipFirmwareChannel,
         installedVersion: String?,
+        installedAPI: String?,
+        installedTarget: Int?,
         forceRemote: Bool,
         allowLegacyFirmwareReleases: Bool
     ) async throws -> TumoflipPackageCatalogSelection {
@@ -256,6 +269,8 @@ struct TumoflipPackageCatalogClient {
                 in: repository,
                 channel: channel,
                 installedVersion: installedVersion,
+                installedAPI: installedAPI,
+                installedTarget: installedTarget,
                 forceRemote: forceRemote
             )
         }
@@ -276,7 +291,9 @@ struct TumoflipPackageCatalogClient {
                     packageRelease: manifest.packageRelease,
                     channel: channel,
                     installedVersion: installedVersion
-                  ) else { continue }
+                  ),
+                  installedAPI.map({ $0 == manifest.firmware.api }) ?? true,
+                  installedTarget.map({ $0 == manifest.firmware.target }) ?? true else { continue }
             let candidate = TumoflipPackageCatalogSelection(
                 release: release,
                 manifest: manifest,
@@ -295,6 +312,8 @@ struct TumoflipPackageCatalogClient {
         in repository: TumoflipPackageCatalogRepository,
         channel: TumoflipFirmwareChannel,
         installedVersion: String?,
+        installedAPI: String?,
+        installedTarget: Int?,
         forceRemote: Bool
     ) async throws -> TumoflipPackageCatalogSelection {
         let ranked = releases.compactMap { release -> (Int, TumoflipPackageCatalogRelease)? in
@@ -303,37 +322,47 @@ struct TumoflipPackageCatalogClient {
             if $0.0 != $1.0 { return $0.0 > $1.0 }
             return $0.1.githubID > $1.1.githubID
         }
-        guard let (revision, release) = ranked.first else {
+        guard !ranked.isEmpty else {
             throw TumoflipPackageCatalogError.noMatchingRelease(channel, installedVersion)
         }
-        guard let manifestAsset = release.asset("tumoflip-packages.json"),
-              release.asset("tumoflip-packages.zip") != nil else {
-            throw malformed(repository, "\(release.tag) is missing manifest or package archive")
-        }
-        let manifest: TumoflipManifest
-        do {
-            manifest = try await loadManifest(from: manifestAsset.url, forceRemote: forceRemote)
-        } catch {
-            throw malformed(repository, "\(release.tag) manifest failed validation")
-        }
-        guard let packageRelease = manifest.packageRelease,
-              packageRelease.isIndependentCatalog,
-              packageRelease.catalogChannel == channel.rawValue,
-              packageRelease.catalogRevision == revision,
-              packageRelease.catalogReleaseTag == release.tag,
-              TumoflipPackageReleaseMatcher.matches(
+        for (revision, release) in ranked {
+            guard let manifestAsset = release.asset("tumoflip-packages.json"),
+                  release.asset("tumoflip-packages.zip") != nil else {
+                throw malformed(repository, "\(release.tag) is missing manifest or package archive")
+            }
+            let manifest: TumoflipManifest
+            do {
+                manifest = try await loadManifest(from: manifestAsset.url, forceRemote: forceRemote)
+            } catch {
+                throw malformed(repository, "\(release.tag) manifest failed validation")
+            }
+            guard let packageRelease = manifest.packageRelease,
+                  packageRelease.isIndependentCatalog,
+                  packageRelease.catalogChannel == channel.rawValue,
+                  packageRelease.catalogRevision == revision,
+                  packageRelease.catalogReleaseTag == release.tag else {
+                throw malformed(repository, "\(release.tag) provenance does not match its manifest")
+            }
+            let versionMatches = TumoflipPackageReleaseMatcher.matches(
                 manifestVersion: manifest.firmware.version,
                 packageRelease: packageRelease,
                 channel: channel,
                 installedVersion: installedVersion
-              ) else {
-            throw malformed(repository, "\(release.tag) provenance does not match its manifest")
+            )
+            let apiMatches = installedAPI.map { $0 == manifest.firmware.api } ?? true
+            let targetMatches = installedTarget.map { $0 == manifest.firmware.target } ?? true
+            guard versionMatches, apiMatches, targetMatches else {
+                // A newer immutable catalog can target a newer firmware API. That is
+                // not malformed provenance; continue to an older compatible revision.
+                continue
+            }
+            return TumoflipPackageCatalogSelection(
+                release: release,
+                manifest: manifest,
+                manifestUpdatedAt: manifestAsset.updatedAt
+            )
         }
-        return TumoflipPackageCatalogSelection(
-            release: release,
-            manifest: manifest,
-            manifestUpdatedAt: manifestAsset.updatedAt
-        )
+        throw TumoflipPackageCatalogError.noMatchingRelease(channel, installedVersion)
     }
 
     private func loadManifest(from url: URL, forceRemote: Bool) async throws -> TumoflipManifest {
@@ -364,7 +393,7 @@ struct TumoflipPackageCatalogClient {
     ) -> Error {
         repository.role == .primary
             ? TumoflipPackageCatalogError.malformedPrimary(reason)
-            : TumoflipPackageCatalogError.malformedPrimary("legacy catalog: \(reason)")
+            : TumoflipPackageCatalogError.malformedLegacy(reason)
     }
 
     private static func primaryUnavailable(_ error: Error) -> Bool {
