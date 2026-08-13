@@ -104,34 +104,44 @@ actor GitHubAPIClient {
 
     func data(
         from url: URL,
-        maxAge: TimeInterval? = nil
+        maxAge: TimeInterval? = nil,
+        allowStaleOnError: Bool = true
     ) async throws -> GitHubAPIResult {
         guard url.scheme == "https", url.host?.caseInsensitiveCompare("api.github.com") == .orderedSame else {
             throw GitHubAPIError.invalidResponse
         }
 
-        let key = url.absoluteString
-        let cached = loadCache(for: key)
+        let cacheKey = url.absoluteString
+        let cached = loadCache(for: cacheKey)
         let freshness = max(0, maxAge ?? defaultMaxAge)
         if let cached, now().timeIntervalSince(cached.storedAt) < freshness {
             return GitHubAPIResult(data: cached.data, source: .freshCache)
         }
-        if let task = inFlight[key] {
+        // A security-sensitive recheck must never share an in-flight request that is
+        // allowed to turn a transport failure into stale catalog data.
+        let requestKey = "\(cacheKey)\u{001F}stale=\(allowStaleOnError)"
+        if let task = inFlight[requestKey] {
             return try await task.value
         }
 
         let task = Task { [self] in
-            try await fetch(url: url, key: key, cached: cached)
+            try await fetch(
+                url: url,
+                key: cacheKey,
+                cached: cached,
+                allowStaleOnError: allowStaleOnError
+            )
         }
-        inFlight[key] = task
-        defer { inFlight[key] = nil }
+        inFlight[requestKey] = task
+        defer { inFlight[requestKey] = nil }
         return try await task.value
     }
 
     private func fetch(
         url: URL,
         key: String,
-        cached: CacheEntry?
+        cached: CacheEntry?,
+        allowStaleOnError: Bool
     ) async throws -> GitHubAPIResult {
         var request = URLRequest(
             url: url,
@@ -153,7 +163,7 @@ actor GitHubAPIClient {
             response = try await sender(request)
         } catch {
             if UpdateTaskCancellation.isCancellation(error) { throw error }
-            if let cached {
+            if allowStaleOnError, let cached {
                 return GitHubAPIResult(data: cached.data, source: .staleCache)
             }
             throw GitHubAPIError.transportFailure
@@ -162,13 +172,13 @@ actor GitHubAPIClient {
         switch response.statusCode {
         case 200:
             guard response.data.count <= Self.maximumResponseBytes else {
-                if let cached {
+                if allowStaleOnError, let cached {
                     return GitHubAPIResult(data: cached.data, source: .staleCache)
                 }
                 throw GitHubAPIError.responseTooLarge
             }
             guard (try? JSONSerialization.jsonObject(with: response.data)) != nil else {
-                if let cached {
+                if allowStaleOnError, let cached {
                     return GitHubAPIResult(data: cached.data, source: .staleCache)
                 }
                 throw GitHubAPIError.invalidJSON
@@ -190,13 +200,13 @@ actor GitHubAPIClient {
         case 401:
             try? credentials.writeToken(nil)
             NotificationCenter.default.post(name: .githubCredentialInvalidated, object: nil)
-            if let cached {
+            if allowStaleOnError, let cached {
                 return GitHubAPIResult(data: cached.data, source: .staleCache)
             }
             throw GitHubAPIError.authenticationExpired
 
         case 403, 429:
-            if let cached {
+            if allowStaleOnError, let cached {
                 return GitHubAPIResult(data: cached.data, source: .staleCache)
             }
             let resetAt = response.header("X-RateLimit-Reset")
@@ -215,7 +225,7 @@ actor GitHubAPIClient {
             throw GitHubAPIError.httpStatus(response.statusCode)
 
         case 500...599:
-            if let cached {
+            if allowStaleOnError, let cached {
                 return GitHubAPIResult(data: cached.data, source: .staleCache)
             }
             throw GitHubAPIError.httpStatus(response.statusCode)

@@ -113,6 +113,7 @@ struct UpdatesView: View {
 
     private var hasAttentionItems: Bool {
         if updater.phase == .needsBaseline { return true }
+        if updater.protectedAuditFailure != nil { return true }
         if updater.pendingProtectedReview.count > 0 { return true }
         if let vr = updater.verifyResult, !vr.ok { return true }
         if let warning = packages.firmwareRoute.warning, warning != .identityUnavailable { return true }
@@ -233,6 +234,14 @@ struct UpdatesView: View {
                                          text: "\(n) protected app\(n == 1 ? "" : "s") to review", tint: .orange)
                         }
                     }
+                    if let failure = updater.protectedAuditFailure {
+                        NavigationLink { ProtectedAppsView(updater: updater) } label: {
+                            AttentionRow(
+                                systemImage: "questionmark.shield",
+                                text: failure.failureKind?.label ?? "AUDIT UNAVAILABLE",
+                                tint: failure.failureKind == .invalid ? .red : .orange)
+                        }
+                    }
                     if let vr = updater.verifyResult, !vr.ok {
                         NavigationLink { PluginUpdatesDetailView(updater: updater) } label: {
                             AttentionRow(systemImage: "exclamationmark.triangle.fill",
@@ -267,7 +276,7 @@ struct UpdatesView: View {
         SectionCard(title: "More", systemImage: "ellipsis.circle") {
             NavigationLink { ProtectedAppsView(updater: updater) } label: {
                 navRow(icon: "lock.shield.fill", color: .indigo, title: "Protected apps",
-                       subtitle: "\(updater.builtInProtectedNames.count) built-in · \(updater.customProtectedNames.count) custom · \(updater.pendingProtectedReview.count) to review")
+                       subtitle: protectedAppsSubtitle)
             }
             Divider()
             NavigationLink { HistoryView(updater: updater) } label: {
@@ -275,6 +284,13 @@ struct UpdatesView: View {
                        subtitle: "Past installs & updates")
             }
         }
+    }
+
+    private var protectedAppsSubtitle: String {
+        if let failure = updater.protectedAuditFailure {
+            return failure.failureKind?.label ?? "AUDIT UNAVAILABLE"
+        }
+        return "\(updater.builtInProtectedNames.count) built-in · \(updater.customProtectedNames.count) custom · \(updater.pendingProtectedReview.count) to review"
     }
 
     /// Row label for a card NavigationLink — cards don't draw the List disclosure
@@ -347,6 +363,38 @@ struct ProtectedAppsView: View {
 
     var body: some View {
         List {
+            if let failure = updater.protectedAuditFailure {
+                Section {
+                    Label(
+                        failure.failureKind?.label ?? "AUDIT UNAVAILABLE",
+                        systemImage: failure.failureKind == .invalid
+                            ? "xmark.shield.fill"
+                            : "questionmark.shield.fill"
+                    )
+                    .foregroundStyle(failure.failureKind == .invalid ? .red : .orange)
+                    .accessibilityIdentifier("protected-app-audit-global-status")
+                } footer: {
+                    Text(failure.failure ?? "Protected-app audit could not be loaded.")
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            if !updater.unverifiedProtectedReviews.isEmpty {
+                Section {
+                    ForEach(updater.unverifiedProtectedReviews) { item in
+                        ProtectedReviewRow(
+                            item: item,
+                            compatibility: updater.classification(item.remotePath),
+                            auditStatus: .unverified)
+                    }
+                } header: {
+                    Text("Unverified")
+                } footer: {
+                    Text("The centralized audit was not available, so no per-file MD5 verdict was produced. Verify again when the ledger is available.")
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
             if !updater.pendingProtectedReview.isEmpty {
                 Section {
                     ForEach(updater.pendingProtectedReview) { item in
@@ -358,8 +406,7 @@ struct ProtectedAppsView: View {
                 } header: {
                     Text("Needs review")
                 } footer: {
-                    Text(updater.protectedAuditResolution?.failure
-                         ?? "Protected apps whose current source, route, or installed target bytes have not completed the centralized audit.")
+                    Text("Protected apps whose source, route, or installed target bytes differ from the successfully loaded centralized audit.")
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -514,12 +561,14 @@ struct ProtectedReviewRow: View {
     let auditStatus: ProtectedPluginReviewAuditStatus
 
     private var isAudited: Bool { auditStatus.isAudited }
+    private var isUnverified: Bool { auditStatus == .unverified }
 
     private var statusText: String {
         switch auditStatus {
         case .verified: return "VERIFIED"
         case .intentionallyReplaced: return "REPLACED"
         case .sourceMatches: return "MATCH"
+        case .unverified: return "UNVERIFIED"
         case .needsReview:
             return item.deviceKnown ? (item.deviceMD5 == nil ? "MISSING" : "DIFF") : "CHECK"
         }
@@ -527,8 +576,10 @@ struct ProtectedReviewRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: isAudited ? "checkmark.seal.fill" : (item.deviceKnown ? "lock.fill" : "questionmark.circle.fill"))
-                .foregroundStyle(isAudited ? .green : (item.deviceKnown ? .orange : .secondary))
+            Image(systemName: isAudited
+                  ? "checkmark.seal.fill"
+                  : (isUnverified || !item.deviceKnown ? "questionmark.circle.fill" : "lock.fill"))
+                .foregroundStyle(isAudited ? .green : (isUnverified || !item.deviceKnown ? .secondary : .orange))
                 .frame(width: 20)
             VStack(alignment: .leading, spacing: 1) {
                 Text(item.name).font(.subheadline)
@@ -550,7 +601,7 @@ struct ProtectedReviewRow: View {
             Text(statusText)
                 .font(.caption2)
                 .bold()
-                .foregroundStyle(isAudited ? .green : (item.deviceKnown ? .orange : .secondary))
+                .foregroundStyle(isAudited ? .green : (isUnverified || !item.deviceKnown ? .secondary : .orange))
                 .accessibilityIdentifier("protected-app-review-status-\(item.name)")
         }
         .padding(.vertical, 3)
@@ -559,7 +610,20 @@ struct ProtectedReviewRow: View {
 
 #if DEBUG
 struct ProtectedAppsAuditQAView: View {
-    @StateObject private var updater = PluginUpdater.protectedAuditQAFixture()
+    @StateObject private var updater: PluginUpdater
+
+    init(failureKind: ProtectedPluginAuditFailureKind? = nil) {
+        let fixture: PluginUpdater
+        switch failureKind {
+        case .unavailable:
+            fixture = PluginUpdater.protectedAuditUnavailableQAFixture()
+        case .invalid:
+            fixture = PluginUpdater.protectedAuditInvalidQAFixture()
+        case nil:
+            fixture = PluginUpdater.protectedAuditQAFixture()
+        }
+        _updater = StateObject(wrappedValue: fixture)
+    }
 
     var body: some View {
         NavigationStack {

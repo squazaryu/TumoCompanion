@@ -363,10 +363,23 @@ final class FirmwareLibrary: ObservableObject {
         phase = .loading
         do {
             await refreshInstalledIdentity()
-            var components = URLComponents(string: "https://api.github.com/repos/\(repo)/releases")!
-            components.queryItems = [URLQueryItem(name: "per_page", value: "100")]
-            let result = try await GitHubAPIClient.shared.data(from: components.url!)
-            releases = try FirmwareCatalog.decode(result.data)
+            var pages: [Data] = []
+            let perPage = 100
+            for page in 1...20 {
+                var components = URLComponents(string: "https://api.github.com/repos/\(repo)/releases")!
+                components.queryItems = [
+                    URLQueryItem(name: "per_page", value: String(perPage)),
+                    URLQueryItem(name: "page", value: String(page)),
+                ]
+                let result = try await GitHubAPIClient.shared.data(from: components.url!)
+                guard let array = try JSONSerialization.jsonObject(with: result.data) as? [Any] else {
+                    throw FirmwareLibraryError.invalidResponse
+                }
+                pages.append(result.data)
+                if array.count < perPage { break }
+                if page == 20 { throw FirmwareLibraryError.invalidResponse }
+            }
+            releases = try FirmwareCatalog.decode(pages)
             phase = .ready
         } catch {
             if UpdateTaskCancellation.isCancellation(error) {
@@ -459,7 +472,14 @@ final class FirmwareLibrary: ObservableObject {
 
 enum FirmwareCatalog {
     static func decode(_ data: Data) throws -> [FirmwareRelease] {
-        let sorted = try JSONDecoder.github.decode([GitHubRelease].self, from: data)
+        try decode([data])
+    }
+
+    static func decode(_ pages: [Data]) throws -> [FirmwareRelease] {
+        let records = try pages.flatMap {
+            try JSONDecoder.github.decode([GitHubRelease].self, from: $0)
+        }
+        let sorted = records
             .compactMap(mapRelease)
             .sorted { $0.publishedAt > $1.publishedAt }
         var versions = Set<String>()

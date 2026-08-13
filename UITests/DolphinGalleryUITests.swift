@@ -220,6 +220,45 @@ final class ProtectedAppsAuditUITests: XCTestCase {
         screenshot.lifetime = .keepAlways
         add(screenshot)
     }
+
+    func testUnavailableAuditIsOneGlobalFailureAndRowsAreUnverified() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-onboardingDone", "YES",
+            "-protected-apps-audit-unavailable-qa",
+        ]
+        app.launch()
+
+        let global = app.staticTexts["protected-app-audit-global-status"]
+        XCTAssertTrue(global.waitForExistence(timeout: 3))
+        XCTAssertEqual(global.label, "AUDIT UNAVAILABLE")
+        XCTAssertTrue(app.staticTexts["Unverified"].exists)
+        XCTAssertEqual(
+            app.staticTexts["protected-app-review-status-esp_flasher"].label,
+            "UNVERIFIED")
+        XCTAssertEqual(
+            app.staticTexts["protected-app-review-status-subghz_raw_edit"].label,
+            "UNVERIFIED")
+        XCTAssertFalse(app.staticTexts["DIFF"].exists)
+        XCTAssertFalse(app.staticTexts["Needs review"].exists)
+    }
+
+    func testMalformedAuditIsGlobalInvalidInsteadOfPerFileDiff() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-onboardingDone", "YES",
+            "-protected-apps-audit-invalid-qa",
+        ]
+        app.launch()
+
+        let global = app.staticTexts["protected-app-audit-global-status"]
+        XCTAssertTrue(global.waitForExistence(timeout: 3))
+        XCTAssertEqual(global.label, "AUDIT INVALID")
+        XCTAssertEqual(
+            app.staticTexts["protected-app-review-status-esp_flasher"].label,
+            "UNVERIFIED")
+        XCTAssertFalse(app.staticTexts["DIFF"].exists)
+    }
 }
 
 final class QualityPassUITests: XCTestCase {

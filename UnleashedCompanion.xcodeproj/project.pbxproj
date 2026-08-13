@@ -21,6 +21,7 @@
 		0D820CE7564243D692B1A3E9 /* WiFiNetworkMapPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4178D107C8E9CCE11C051E5A /* WiFiNetworkMapPresentationTests.swift */; };
 		0DC75147EFFA11291AB3D10D /* ESP32FirmwareView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1B731E78843D6D04ECF5B60 /* ESP32FirmwareView.swift */; };
 		0F495F54248E0EA637815AA8 /* GitHubOAuthClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2462BE494E6F4BA685D1DD95 /* GitHubOAuthClient.swift */; };
+		1090F2D6355450C8931CA7BE /* TumoflipPackageCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BF873B24AD38F74D287976F /* TumoflipPackageCatalog.swift */; };
 		1271969636C8F7AE272D9529 /* storage.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33D8A4DF0DF2880CD4231FB /* storage.pb.swift */; };
 		178F947E4834FD231F84D405 /* BuildInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7DAA192B026B24A4907283A /* BuildInfo.swift */; };
 		19DFE5895853A9679A01976A /* USBStorageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCE7269E5AB13331C01704F7 /* USBStorageTests.swift */; };
@@ -96,6 +97,7 @@
 		752AD784AC7FA646BAB74A3D /* FilesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 090EE11AA22E9A2D32CB5FBC /* FilesView.swift */; };
 		780B3810E03353B0DD280923 /* WiFiMapperMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD0C38DF6573695C9B805A24 /* WiFiMapperMapView.swift */; };
 		7A2DB7310DAE7C8152FCD4A2 /* DolphinPreviews in Resources */ = {isa = PBXBuildFile; fileRef = CC55E01E623BEF12E94B15DA /* DolphinPreviews */; };
+		7A36F37E942A5E8A7D052227 /* TumoflipPackageCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A85C1EA60100AC3C2A62346A /* TumoflipPackageCatalogTests.swift */; };
 		7C70DD575F23538982EAC3FF /* WiFiMapperGeoJSONTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3443A5546515DB6C6D192059 /* WiFiMapperGeoJSONTests.swift */; };
 		81045F2ACE03A6F7F90E76E6 /* flipper.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DB011D9C22032D6D39A1ECF /* flipper.pb.swift */; };
 		816926EE2BFA24265146ECE6 /* TumoflipUpdaterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BD911DD24B8F7F707E87CE0 /* TumoflipUpdaterView.swift */; };
@@ -336,6 +338,7 @@
 		9A8D772599DB1220427F1819 /* InstalledAppsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstalledAppsView.swift; sourceTree = "<group>"; };
 		9A900650A66F8794D717BD99 /* HomeLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeLayout.swift; sourceTree = "<group>"; };
 		9AE5EB186755A19F769225F6 /* BuddyRelay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuddyRelay.swift; sourceTree = "<group>"; };
+		9BF873B24AD38F74D287976F /* TumoflipPackageCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoflipPackageCatalog.swift; sourceTree = "<group>"; };
 		9C90997591A015CAB64F92E9 /* AppBridgeConsoleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBridgeConsoleTests.swift; sourceTree = "<group>"; };
 		9D7F2E9465545B42943BBBE2 /* RuntimeDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeDiagnostics.swift; sourceTree = "<group>"; };
 		A30560D061F3814086328E2D /* TransferChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferChannel.swift; sourceTree = "<group>"; };
@@ -344,6 +347,7 @@
 		A7C2CDE14DBC7990927949B0 /* RelayExecutor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayExecutor.swift; sourceTree = "<group>"; };
 		A7DAA192B026B24A4907283A /* BuildInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuildInfo.swift; sourceTree = "<group>"; };
 		A84647765F90EDA3EED9B484 /* WiFiMapperLiveMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WiFiMapperLiveMapView.swift; sourceTree = "<group>"; };
+		A85C1EA60100AC3C2A62346A /* TumoflipPackageCatalogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoflipPackageCatalogTests.swift; sourceTree = "<group>"; };
 		AD3F4BFB7A552AD0967C934C /* AppBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBridge.swift; sourceTree = "<group>"; };
 		AEE7477890A66103E159EB15 /* gpio.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = gpio.pb.swift; sourceTree = "<group>"; };
 		B04D2FFBE41EED4A3482CEFA /* AppBridgeRequestTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBridgeRequestTests.swift; sourceTree = "<group>"; };
@@ -695,6 +699,7 @@
 				A3CBD3609865B0C18EB48702 /* TumoflipInstallerTests.swift */,
 				78482E05DB7B6420088FF379 /* TumoflipManifestPackageReleaseTests.swift */,
 				C4333919B345598E3C08BFCD /* TumoflipManifestTests.swift */,
+				A85C1EA60100AC3C2A62346A /* TumoflipPackageCatalogTests.swift */,
 				7B5D803E53BDA356E1AA5784 /* TumoflipStatusTests.swift */,
 				760947E327C818A052C25256 /* TumoNetTests.swift */,
 				2BB98D039C72778CC12CED00 /* TumoSpectrumReportTests.swift */,
@@ -749,6 +754,7 @@
 				45807167A09B0989A1262077 /* TransferActivityReporter.swift */,
 				916BE931F747387EDB008311 /* TumoflipFirmwareRouting.swift */,
 				5D5AA653C25A05CF91F348E8 /* TumoflipManifest.swift */,
+				9BF873B24AD38F74D287976F /* TumoflipPackageCatalog.swift */,
 				2A2841D785BA1CA7A7A15B8B /* TumoflipUpdater.swift */,
 				8697965C8EA5F8D768000FC9 /* TumoflipUpdaterService.swift */,
 				0BD911DD24B8F7F707E87CE0 /* TumoflipUpdaterView.swift */,
@@ -1129,6 +1135,7 @@
 				EF56AFBD98636A14B23FEACB /* TumoflipInstallerTests.swift in Sources */,
 				5B3AA404F2C6230D9FAC8795 /* TumoflipManifestPackageReleaseTests.swift in Sources */,
 				A2FA43CE0B4A58285A1A58DA /* TumoflipManifestTests.swift in Sources */,
+				7A36F37E942A5E8A7D052227 /* TumoflipPackageCatalogTests.swift in Sources */,
 				0D58380E2D1F29BB7FF7DF4B /* TumoflipStatusTests.swift in Sources */,
 				19DFE5895853A9679A01976A /* USBStorageTests.swift in Sources */,
 				3C78180A4BD00482052340ED /* UpdateTaskCancellationTests.swift in Sources */,
@@ -1241,6 +1248,7 @@
 				022F94D327300839527E7901 /* TumoVMNFCSmoke.swift in Sources */,
 				9970C1E57A8F9C71B510102E /* TumoflipFirmwareRouting.swift in Sources */,
 				F787B496917BA4E1E9EC0F64 /* TumoflipManifest.swift in Sources */,
+				1090F2D6355450C8931CA7BE /* TumoflipPackageCatalog.swift in Sources */,
 				EAEEC9F6B54EE144CBB3E418 /* TumoflipUpdater.swift in Sources */,
 				5EAC241A8A24322589A7FB52 /* TumoflipUpdaterService.swift in Sources */,
 				816926EE2BFA24265146ECE6 /* TumoflipUpdaterView.swift in Sources */,

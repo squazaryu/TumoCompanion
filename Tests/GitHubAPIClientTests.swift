@@ -123,6 +123,27 @@ final class GitHubAPIClientTests: XCTestCase {
         XCTAssertEqual(fallback.data, json("v1"))
     }
 
+    func testSecuritySensitiveRecheckRejectsStaleCatalogOnTransportFailure() async throws {
+        let directory = temporaryDirectory()
+        let transport = StubTransport([
+            .success(response(200, data: json("v1"))),
+            .failure(URLError(.timedOut)),
+        ])
+        let client = client(directory: directory, transport: transport)
+
+        _ = try await client.data(from: url)
+        do {
+            _ = try await client.data(
+                from: url,
+                maxAge: 0,
+                allowStaleOnError: false
+            )
+            XCTFail("A pre-install recheck must not use stale catalog bytes")
+        } catch let error as GitHubAPIError {
+            XCTAssertEqual(error, .transportFailure)
+        }
+    }
+
     func testTransportFailureWithoutCacheIsActionable() async throws {
         let transport = StubTransport([
             .failure(URLError(.notConnectedToInternet)),
