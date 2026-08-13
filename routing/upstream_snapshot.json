@@ -1,5 +1,5 @@
 {
-  "release_tag": "9aug2026",
+  "release_tag": "12aug2026",
   "stems": {
     "24cxxprog": "GPIO",
     "4inrow": "Games",
@@ -70,6 +70,7 @@
     "eth_troubleshooter": "GPIO",
     "evil_portal": "GPIO",
     "executor_keychain": "Media",
+    "fake_chip_detector": "GPIO",
     "fdxb_maker": "RFID",
     "fighterjet": "Games",
     "flame_rng": "Infrared",
