@@ -199,7 +199,13 @@ final class TumoflipUpdater: ObservableObject {
     private let transactionGate = TumoflipTransactionGate()
 
     private var packageZipURL: URL?
-    private let repo = "squazaryu/tumoflip"
+    private var selectedCatalogIdentity: TumoflipPackageCatalogSelection.Identity?
+    private var selectedCatalogRepository: TumoflipPackageCatalogRepository?
+    private let packageCatalogClient: TumoflipPackageCatalogClient
+
+    init(packageCatalogClient: TumoflipPackageCatalogClient = .live()) {
+        self.packageCatalogClient = packageCatalogClient
+    }
 
     // Keep the screen awake and hold a background-task assertion for the duration of a
     // BLE install/recovery. The transaction can run for minutes; if the phone auto-locks
@@ -459,7 +465,7 @@ final class TumoflipUpdater: ObservableObject {
         phase = .checking
         do {
             await refreshRoutingIdentity()
-            let selection = try await latestRelease(
+            let selection = try await packageCatalogClient.latest(
                 for: firmwareRoute.channel,
                 installedVersion: packageIdentityVersion
             )
@@ -474,6 +480,8 @@ final class TumoflipUpdater: ObservableObject {
                 }
             }
             releaseTag = selection.release.tag
+            selectedCatalogIdentity = selection.identity
+            selectedCatalogRepository = selection.release.repository
             packageRevisionDate = selection.manifestUpdatedAt
             manifest = m
             packageZipURL = selection.release.asset("tumoflip-packages.zip")?.url
@@ -536,12 +544,18 @@ final class TumoflipUpdater: ObservableObject {
             }
             try await checkCompatibility(manifest)
 
-            let liveSelection = try await latestRelease(
+            guard let selectedCatalogIdentity, let selectedCatalogRepository else {
+                phase = .failed("Refresh Firmware packages before installing; catalog identity is unavailable.")
+                return
+            }
+            let liveSelection = try await packageCatalogClient.latest(
                 for: firmwareRoute.channel,
-                installedVersion: packageIdentityVersion
+                installedVersion: packageIdentityVersion,
+                forceRemote: true,
+                requiredRepository: selectedCatalogRepository
             )
-            guard liveSelection.release.tag == releaseTag,
-                  liveSelection.manifest.releaseId == manifest.releaseId else {
+            guard liveSelection.identity == selectedCatalogIdentity,
+                  liveSelection.manifest == manifest else {
                 phase = .failed("The package release changed after this screen loaded. Refresh Firmware packages before installing; nothing was changed.")
                 return
             }
@@ -1059,115 +1073,6 @@ final class TumoflipUpdater: ObservableObject {
             }
         }
         throw TumoflipInstallError.activeAppCouldNotStop
-    }
-
-    // MARK: - GitHub release discovery
-
-    private struct ReleaseAsset {
-        let name: String
-        let url: URL
-        let updatedAt: Date?
-    }
-
-    private struct Release {
-        let tag: String
-        let assets: [ReleaseAsset]
-
-        func asset(_ name: String) -> ReleaseAsset? {
-            assets.first { $0.name == name }
-        }
-    }
-
-    private struct ReleaseSelection {
-        let release: Release
-        let manifest: TumoflipManifest
-        let manifestUpdatedAt: Date?
-    }
-
-    private enum ReleaseDiscoveryError: LocalizedError {
-        case noMatchingPackageRelease(TumoflipFirmwareChannel, String?)
-
-        var errorDescription: String? {
-            switch self {
-            case .noMatchingPackageRelease(let channel, let version):
-                if let version {
-                    return "No \(channel.packageLabel) release matching installed firmware \(version) was found."
-                }
-                return "No \(channel.packageLabel) release with tumoflip-packages.json was found."
-            }
-        }
-    }
-
-    private func latestRelease(
-        for channel: TumoflipFirmwareChannel,
-        installedVersion: String?
-    ) async throws -> ReleaseSelection {
-        var selected: ReleaseSelection?
-        for release in try await releases() {
-            guard let manifestAsset = release.asset("tumoflip-packages.json") else { continue }
-            guard let manifest = try? await manifest(from: manifestAsset.url) else { continue }
-            if TumoflipPackageReleaseMatcher.matches(
-                manifestVersion: manifest.firmware.version,
-                packageRelease: manifest.packageRelease,
-                channel: channel,
-                installedVersion: installedVersion
-            ) {
-                let candidate = ReleaseSelection(
-                    release: release,
-                    manifest: manifest,
-                    manifestUpdatedAt: manifestAsset.updatedAt
-                )
-                if selected == nil || TumoflipPackageReleaseMatcher.shouldReplaceSelection(
-                    current: selected?.manifest.packageRelease,
-                    with: candidate.manifest.packageRelease
-                ) {
-                    selected = candidate
-                }
-            }
-        }
-        if let selected { return selected }
-        throw ReleaseDiscoveryError.noMatchingPackageRelease(channel, installedVersion)
-    }
-
-    private func releases() async throws -> [Release] {
-        var components = URLComponents(string: "https://api.github.com/repos/\(repo)/releases")!
-        components.queryItems = [URLQueryItem(name: "per_page", value: "100")]
-        let result = try await GitHubAPIClient.shared.data(from: components.url!)
-        guard let array = try JSONSerialization.jsonObject(with: result.data) as? [[String: Any]] else {
-            throw URLError(.badServerResponse)
-        }
-        return array.compactMap { obj in
-            guard let tag = obj["tag_name"] as? String,
-                  TumoflipReleaseCatalogPolicy.isVisible(body: obj["body"] as? String),
-                  let assetsJSON = obj["assets"] as? [[String: Any]] else { return nil }
-            let assets: [ReleaseAsset] = assetsJSON.compactMap {
-                guard let n = $0["name"] as? String,
-                      let u = ($0["browser_download_url"] as? String).flatMap(URL.init) else { return nil }
-                let updatedAt = ($0["updated_at"] as? String).flatMap(Self.githubDate)
-                return ReleaseAsset(name: n, url: u, updatedAt: updatedAt)
-            }
-            return Release(tag: tag, assets: assets)
-        }
-    }
-
-    private static func githubDate(_ value: String) -> Date? {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter.date(from: value) ?? ISO8601DateFormatter().date(from: value)
-    }
-
-    private func manifest(from url: URL) async throws -> TumoflipManifest {
-        var request = URLRequest(
-            url: url,
-            cachePolicy: .reloadIgnoringLocalAndRemoteCacheData,
-            timeoutInterval: 30
-        )
-        request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard (response as? HTTPURLResponse)?.statusCode == 200 else {
-            throw URLError(.badServerResponse)
-        }
-        return try TumoflipManifest.decode(data)
     }
 
     private func installErrorText(_ e: TumoflipInstallError) -> String {
