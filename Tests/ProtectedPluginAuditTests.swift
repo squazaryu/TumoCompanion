@@ -217,6 +217,118 @@ final class ProtectedPluginAuditTests: XCTestCase {
 
         XCTAssertNil(resolution.audit)
         XCTAssertTrue(service.cache.isRevoked(for: provenance))
+        XCTAssertTrue(service.cache.isRevoked(for: provenance, by: .primary))
+    }
+
+    func testPrimaryRevocationSurvivesOutageAndLegacyExactUntilPrimaryReaccepts() async throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let provenance = try XCTUnwrap(makeProvenance())
+        let primary = URL(string: "https://primary.example/latest.json")!
+        let legacy = URL(string: "https://legacy.example/latest.json")!
+        let cache = ProtectedPluginAuditCache(directory: directory)
+        let empty = ProtectedPluginAuditDocument(
+            schema: ProtectedPluginAuditDocument.supportedSchema,
+            sourceRepository: ProtectedPluginAuditDocument.expectedRepository,
+            generatedAt: "2026-08-13T10:00:00Z",
+            audits: [])
+        let emptyData = try JSONEncoder().encode(empty)
+        let exactData = try makeDocumentData()
+
+        let revoking = ProtectedPluginAuditService(
+            primaryURL: primary,
+            legacyURL: legacy,
+            cache: cache,
+            fetch: { url in url == primary ? emptyData : exactData },
+            bundledData: { exactData })
+        let rejected = await revoking.resolve(for: provenance)
+        XCTAssertNil(rejected.audit)
+        XCTAssertTrue(cache.isRevoked(for: provenance, by: .primary))
+
+        let unavailable = ProtectedPluginAuditService(
+            primaryURL: primary,
+            legacyURL: legacy,
+            cache: cache,
+            fetch: { url in
+                if url == primary { throw URLError(.notConnectedToInternet) }
+                return exactData
+            },
+            bundledData: { exactData })
+        let stillRejected = await unavailable.resolve(for: provenance)
+        XCTAssertNil(stillRejected.audit)
+        XCTAssertNil(stillRejected.origin)
+        XCTAssertEqual(
+            ProtectedPluginReviewPolicy.status(
+                makeReview(),
+                compatibility: .compatible(
+                    FapMetadata(apiMajor: 88, apiMinor: 2, hardwareTarget: 7)),
+                audit: stillRejected.audit),
+            .unverified)
+        XCTAssertTrue(cache.isRevoked(for: provenance, by: .primary))
+
+        let reaccepting = ProtectedPluginAuditService(
+            primaryURL: primary,
+            legacyURL: legacy,
+            cache: cache,
+            fetch: { url in url == primary ? exactData : emptyData },
+            bundledData: { nil })
+        let reaccepted = await reaccepting.resolve(for: provenance)
+        XCTAssertEqual(reaccepted.origin, .remote)
+        XCTAssertNotNil(reaccepted.audit)
+        XCTAssertFalse(cache.isRevoked(for: provenance))
+    }
+
+    func testMalformedPrimaryRevocationCannotBeClearedByLegacyExact() async throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let provenance = try XCTUnwrap(makeProvenance())
+        let primary = URL(string: "https://primary.example/latest.json")!
+        let legacy = URL(string: "https://legacy.example/latest.json")!
+        let cache = ProtectedPluginAuditCache(directory: directory)
+        let exactData = try makeDocumentData()
+
+        let malformed = ProtectedPluginAuditService(
+            primaryURL: primary,
+            legacyURL: legacy,
+            cache: cache,
+            fetch: { url in url == primary ? Data("malformed".utf8) : exactData },
+            bundledData: { exactData })
+        let rejected = await malformed.resolve(for: provenance)
+        XCTAssertEqual(rejected.failureKind, .invalid)
+        XCTAssertTrue(cache.isRevoked(for: provenance, by: .primary))
+
+        let fallback = ProtectedPluginAuditService(
+            primaryURL: primary,
+            legacyURL: legacy,
+            cache: cache,
+            fetch: { url in
+                if url == primary { throw ProtectedPluginAuditFetchError.httpStatus(404) }
+                return exactData
+            },
+            bundledData: { exactData })
+        let stillRejected = await fallback.resolve(for: provenance)
+        XCTAssertNil(stillRejected.audit)
+        XCTAssertTrue(cache.isRevoked(for: provenance, by: .primary))
+    }
+
+    func testPrimary5xxDoesNotFallbackOutsideMigrationContract() async throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let primary = URL(string: "https://primary.example/latest.json")!
+        let legacy = URL(string: "https://legacy.example/latest.json")!
+        let service = ProtectedPluginAuditService(
+            primaryURL: primary,
+            legacyURL: legacy,
+            cache: ProtectedPluginAuditCache(directory: directory),
+            fetch: { url in
+                if url == primary { throw ProtectedPluginAuditFetchError.httpStatus(503) }
+                return try self.makeDocumentData()
+            },
+            bundledData: { nil })
+
+        let resolution = await service.resolve(for: try XCTUnwrap(makeProvenance()))
+        XCTAssertNil(resolution.audit)
+        XCTAssertNil(resolution.origin)
     }
 
     @MainActor

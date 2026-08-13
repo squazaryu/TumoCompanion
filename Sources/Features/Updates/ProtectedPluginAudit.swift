@@ -301,6 +301,21 @@ private struct ProtectedPluginAuditCacheEnvelope: Codable {
     let audit: ProtectedPluginAudit
 }
 
+/// Identifies which network authority made a persisted negative decision.
+/// A legacy fallback may bootstrap a device before the primary endpoint exists,
+/// but it must never overturn a revocation already observed from the primary.
+enum ProtectedPluginAuditAuthority: String, Codable, Hashable {
+    case primary
+    case legacy
+}
+
+private struct ProtectedPluginAuditRevocationEnvelope: Codable {
+    static let supportedSchema = 1
+
+    let schema: Int
+    let authorities: [ProtectedPluginAuditAuthority]
+}
+
 struct ProtectedPluginAuditCache {
     let directory: URL
 
@@ -313,7 +328,14 @@ struct ProtectedPluginAuditCache {
     }
 
     func isRevoked(for provenance: ProtectedPluginPackProvenance) -> Bool {
-        FileManager.default.fileExists(atPath: revocationURL(for: provenance).path)
+        !revocations(for: provenance).isEmpty
+    }
+
+    func isRevoked(
+        for provenance: ProtectedPluginPackProvenance,
+        by authority: ProtectedPluginAuditAuthority
+    ) -> Bool {
+        revocations(for: provenance).contains(authority)
     }
 
     func load(for provenance: ProtectedPluginPackProvenance) -> ProtectedPluginAudit? {
@@ -335,7 +357,11 @@ struct ProtectedPluginAuditCache {
         return envelope.audit
     }
 
-    func save(_ audit: ProtectedPluginAudit, for provenance: ProtectedPluginPackProvenance) throws {
+    func save(
+        _ audit: ProtectedPluginAudit,
+        for provenance: ProtectedPluginPackProvenance,
+        authority: ProtectedPluginAuditAuthority = .primary
+    ) throws {
         guard audit.matches(provenance) else { return }
         let envelope = ProtectedPluginAuditCacheEnvelope(
             schema: ProtectedPluginAuditDocument.supportedSchema,
@@ -345,18 +371,72 @@ struct ProtectedPluginAuditCache {
         try FileManager.default.createDirectory(
             at: directory, withIntermediateDirectories: true)
         try data.write(to: auditURL(for: provenance), options: .atomic)
-        // Only a later authoritative exact audit clears a prior revocation.
-        try? FileManager.default.removeItem(at: revocationURL(for: provenance))
+        try clearRevocation(for: provenance, by: authority)
     }
 
-    func revoke(_ provenance: ProtectedPluginPackProvenance) throws {
+    func revoke(
+        _ provenance: ProtectedPluginPackProvenance,
+        authority: ProtectedPluginAuditAuthority = .primary
+    ) throws {
         try FileManager.default.createDirectory(
             at: directory, withIntermediateDirectories: true)
+        var authorities = revocations(for: provenance)
+        authorities.insert(authority)
         // Write the negative decision first. If cleanup fails, the tombstone still
         // wins and stale positive bytes cannot be resurrected offline.
-        try Data("revoked\n".utf8).write(
-            to: revocationURL(for: provenance), options: .atomic)
+        try writeRevocations(authorities, for: provenance)
         try? FileManager.default.removeItem(at: auditURL(for: provenance))
+    }
+
+    private func revocations(
+        for provenance: ProtectedPluginPackProvenance
+    ) -> Set<ProtectedPluginAuditAuthority> {
+        let url = revocationURL(for: provenance)
+        guard let data = try? Data(contentsOf: url) else { return [] }
+        guard let envelope = try? JSONDecoder().decode(
+            ProtectedPluginAuditRevocationEnvelope.self,
+            from: data),
+              envelope.schema == ProtectedPluginAuditRevocationEnvelope.supportedSchema,
+              !envelope.authorities.isEmpty else {
+            // Earlier migration builds wrote the literal "revoked". Treat any
+            // unrecognised existing marker as a primary decision so an upgrade
+            // remains fail closed instead of letting legacy data resurrect it.
+            return [.primary]
+        }
+        return Set(envelope.authorities)
+    }
+
+    private func clearRevocation(
+        for provenance: ProtectedPluginPackProvenance,
+        by authority: ProtectedPluginAuditAuthority
+    ) throws {
+        var authorities = revocations(for: provenance)
+        switch authority {
+        case .primary:
+            // Only a reachable, valid exact primary audit can clear a primary
+            // tombstone. It also supersedes any older legacy decision.
+            authorities.removeAll()
+        case .legacy:
+            // A valid fallback may supersede only an earlier legacy decision.
+            authorities.remove(.legacy)
+        }
+        try writeRevocations(authorities, for: provenance)
+    }
+
+    private func writeRevocations(
+        _ authorities: Set<ProtectedPluginAuditAuthority>,
+        for provenance: ProtectedPluginPackProvenance
+    ) throws {
+        let url = revocationURL(for: provenance)
+        guard !authorities.isEmpty else {
+            guard FileManager.default.fileExists(atPath: url.path) else { return }
+            try FileManager.default.removeItem(at: url)
+            return
+        }
+        let envelope = ProtectedPluginAuditRevocationEnvelope(
+            schema: ProtectedPluginAuditRevocationEnvelope.supportedSchema,
+            authorities: authorities.sorted { $0.rawValue < $1.rawValue })
+        try JSONEncoder().encode(envelope).write(to: url, options: .atomic)
     }
 }
 
@@ -476,6 +556,11 @@ struct ProtectedPluginAuditService {
                 return .rejected("Protected-app audit refresh was cancelled.")
             }
             if Self.primaryAllowsLegacyFallback(error), let legacyURL {
+                // Once this phone has observed an authoritative primary rejection,
+                // an outage or 404 cannot delegate authority back to legacy bytes.
+                guard !cache.isRevoked(for: provenance, by: .primary) else {
+                    return offlineResolution(for: provenance)
+                }
                 do {
                     let data = try await loader(legacyURL)
                     return resolveAuthoritative(
@@ -507,22 +592,33 @@ struct ProtectedPluginAuditService {
         } catch {
             // Malformed authoritative bytes are a negative trust decision. Persist the
             // tombstone so a later offline run cannot resurrect an older acceptance.
-            try? cache.revoke(provenance)
+            try? cache.revoke(provenance, authority: authority(for: origin))
             return .rejected(error.localizedDescription, kind: .invalid)
         }
         guard let audit = document.audits.first(where: { $0.matches(provenance) }) else {
             guard !Task.isCancelled else {
                 return .rejected("Protected-app audit refresh was cancelled.")
             }
-            try? cache.revoke(provenance)
+            try? cache.revoke(provenance, authority: authority(for: origin))
             return .rejected(
                 "This Community Pack revision has not completed protected-app audit.")
         }
         guard !Task.isCancelled else {
             return .rejected("Protected-app audit refresh was cancelled.")
         }
-        try? cache.save(audit, for: provenance)
+        let authority = authority(for: origin)
+        if authority == .legacy,
+           cache.isRevoked(for: provenance, by: .primary) {
+            return offlineResolution(for: provenance)
+        }
+        try? cache.save(audit, for: provenance, authority: authority)
         return .accepted(audit, origin: origin)
+    }
+
+    private func authority(
+        for origin: ProtectedPluginAuditOrigin
+    ) -> ProtectedPluginAuditAuthority {
+        origin == .legacy ? .legacy : .primary
     }
 
     private func offlineResolution(
