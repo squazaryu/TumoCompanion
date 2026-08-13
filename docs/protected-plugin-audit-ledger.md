@@ -52,8 +52,13 @@ target bytes. These 15 unresolved artifacts must continue to appear as `DIFF`.
 
 Offline cache acceptance is deliberately scoped to the exact pack identity but is not
 time-bounded. Before the app has observed a newer authoritative decision, the last exact
-validated record remains usable while the raw endpoint is unreachable. Once a reachable,
-valid primary `latest.json` omits that exact pack identity, TumoCompanion persists an
+validated record remains usable while the raw endpoint is unreachable. The cache records
+which endpoint accepted it: a legacy record may bootstrap a fresh install, but after a
+reachable primary accepts that exact pack, the positive primary authority is sticky across
+outages and app launches. TumoCompanion reuses that cached primary record without querying
+or accepting a possibly divergent legacy ledger; only another reachable primary response
+may replace it. Once a reachable, valid primary `latest.json` omits that exact pack identity,
+TumoCompanion persists an
 exact-pack, source-aware negative tombstone and removes its positive cache. The primary
 tombstone blocks cache, bundled bootstrap, and an exact legacy fallback while the primary
 is unavailable; only a later reachable, valid primary ledger containing the exact audit

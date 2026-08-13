@@ -22,6 +22,13 @@ final class ProtectedPluginAuditTests: XCTestCase {
         func counts() -> (regular: Int, fresh: Int) { (regularReads, freshReads) }
     }
 
+    private actor EndpointReads {
+        private var counts: [URL: Int] = [:]
+
+        func record(_ url: URL) { counts[url, default: 0] += 1 }
+        func count(for url: URL) -> Int { counts[url, default: 0] }
+    }
+
     private actor DeferredFirstLedger {
         private let laterData: Data
         private var calls = 0
@@ -170,6 +177,160 @@ final class ProtectedPluginAuditTests: XCTestCase {
 
         let resolution = await service.resolve(for: try XCTUnwrap(makeProvenance()))
         XCTAssertEqual(resolution.origin, .legacy)
+    }
+
+    func testAcceptedPrimaryStaysStickyAcrossOutageAndRejectsDifferentLegacy() async throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let provenance = try XCTUnwrap(makeProvenance())
+        let primary = URL(string: "https://primary.example/latest.json")!
+        let legacy = URL(string: "https://legacy.example/latest.json")!
+        let cache = ProtectedPluginAuditCache(directory: directory)
+        let primaryData = try makeDocumentData()
+        let legacyData = try makeDocumentData(targetMD5: String(repeating: "b", count: 32))
+        let reads = EndpointReads()
+
+        let online = ProtectedPluginAuditService(
+            primaryURL: primary,
+            legacyURL: legacy,
+            cache: cache,
+            fetch: { url in
+                await reads.record(url)
+                return url == primary ? primaryData : legacyData
+            },
+            bundledData: { legacyData })
+        let accepted = await online.resolve(for: provenance)
+        XCTAssertEqual(accepted.origin, .remote)
+        XCTAssertEqual(accepted.audit?.entries.first?.targetMD5s, [String(repeating: "a", count: 32)])
+        XCTAssertTrue(cache.hasAcceptedPrimary(for: provenance))
+
+        let outage = ProtectedPluginAuditService(
+            primaryURL: primary,
+            legacyURL: legacy,
+            cache: cache,
+            fetch: { url in
+                await reads.record(url)
+                if url == primary { throw URLError(.notConnectedToInternet) }
+                return legacyData
+            },
+            bundledData: { legacyData })
+        let cached = await outage.resolve(for: provenance)
+
+        XCTAssertEqual(cached.origin, .cache)
+        XCTAssertEqual(cached.audit?.entries.first?.targetMD5s, [String(repeating: "a", count: 32)])
+        let legacyReads = await reads.count(for: legacy)
+        XCTAssertEqual(legacyReads, 0, "Legacy must not be fetched after primary acceptance")
+        XCTAssertTrue(cache.hasAcceptedPrimary(for: provenance))
+    }
+
+    func testAcceptedPrimaryAuthoritySurvivesAppRelaunch() async throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let provenance = try XCTUnwrap(makeProvenance())
+        let primary = URL(string: "https://primary.example/latest.json")!
+        let legacy = URL(string: "https://legacy.example/latest.json")!
+        let primaryData = try makeDocumentData()
+        let legacyData = try makeDocumentData(targetMD5: String(repeating: "b", count: 32))
+
+        let firstLaunch = ProtectedPluginAuditService(
+            primaryURL: primary,
+            legacyURL: legacy,
+            cache: ProtectedPluginAuditCache(directory: directory),
+            fetch: { url in url == primary ? primaryData : legacyData },
+            bundledData: { nil })
+        let firstResolution = await firstLaunch.resolve(for: provenance)
+        XCTAssertEqual(firstResolution.origin, .remote)
+
+        let relaunchedCache = ProtectedPluginAuditCache(directory: directory)
+        let reads = EndpointReads()
+        let secondLaunch = ProtectedPluginAuditService(
+            primaryURL: primary,
+            legacyURL: legacy,
+            cache: relaunchedCache,
+            fetch: { url in
+                await reads.record(url)
+                if url == primary { throw ProtectedPluginAuditFetchError.httpStatus(404) }
+                return legacyData
+            },
+            bundledData: { legacyData })
+        let cached = await secondLaunch.resolve(for: provenance)
+
+        XCTAssertEqual(cached.origin, .cache)
+        XCTAssertEqual(cached.audit?.entries.first?.targetMD5s, [String(repeating: "a", count: 32)])
+        let legacyReads = await reads.count(for: legacy)
+        XCTAssertEqual(legacyReads, 0)
+        XCTAssertTrue(relaunchedCache.hasAcceptedPrimary(for: provenance))
+    }
+
+    func testLegacyBootstrapIsUpgradedAndReplacedByReachablePrimary() async throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let provenance = try XCTUnwrap(makeProvenance())
+        let primary = URL(string: "https://primary.example/latest.json")!
+        let legacy = URL(string: "https://legacy.example/latest.json")!
+        let cache = ProtectedPluginAuditCache(directory: directory)
+        let legacyData = try makeDocumentData(targetMD5: String(repeating: "b", count: 32))
+        let primaryData = try makeDocumentData()
+
+        let bootstrap = ProtectedPluginAuditService(
+            primaryURL: primary,
+            legacyURL: legacy,
+            cache: cache,
+            fetch: { url in
+                if url == primary { throw URLError(.notConnectedToInternet) }
+                return legacyData
+            },
+            bundledData: { nil })
+        let legacyAccepted = await bootstrap.resolve(for: provenance)
+        XCTAssertEqual(legacyAccepted.origin, .legacy)
+        XCTAssertEqual(legacyAccepted.audit?.entries.first?.targetMD5s, [String(repeating: "b", count: 32)])
+        XCTAssertFalse(cache.hasAcceptedPrimary(for: provenance))
+
+        let upgraded = ProtectedPluginAuditService(
+            primaryURL: primary,
+            legacyURL: legacy,
+            cache: cache,
+            fetch: { url in url == primary ? primaryData : legacyData },
+            bundledData: { nil })
+        let primaryAccepted = await upgraded.resolve(for: provenance)
+        XCTAssertEqual(primaryAccepted.origin, .remote)
+        XCTAssertEqual(primaryAccepted.audit?.entries.first?.targetMD5s, [String(repeating: "a", count: 32)])
+        XCTAssertTrue(cache.hasAcceptedPrimary(for: provenance))
+
+        let offlineAfterUpgrade = ProtectedPluginAuditService(
+            primaryURL: primary,
+            legacyURL: legacy,
+            cache: cache,
+            fetch: { url in
+                if url == primary { throw URLError(.notConnectedToInternet) }
+                return legacyData
+            },
+            bundledData: { legacyData })
+        let stickyPrimary = await offlineAfterUpgrade.resolve(for: provenance)
+        XCTAssertEqual(stickyPrimary.origin, .cache)
+        XCTAssertEqual(stickyPrimary.audit?.entries.first?.targetMD5s, [String(repeating: "a", count: 32)])
+    }
+
+    func testLateLegacyCacheDecisionCannotOverwritePrimaryAuthority() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let provenance = try XCTUnwrap(makeProvenance())
+        let cache = ProtectedPluginAuditCache(directory: directory)
+        let primary = try XCTUnwrap(
+            ProtectedPluginAuditValidator.decode(makeDocumentData()).audits.first)
+        let legacy = try XCTUnwrap(
+            ProtectedPluginAuditValidator.decode(
+                makeDocumentData(targetMD5: String(repeating: "b", count: 32)))
+            .audits.first)
+
+        try cache.save(primary, for: provenance, authority: .primary)
+        XCTAssertThrowsError(try cache.save(legacy, for: provenance, authority: .legacy))
+        XCTAssertThrowsError(try cache.revoke(provenance, authority: .legacy))
+
+        XCTAssertTrue(cache.hasAcceptedPrimary(for: provenance))
+        XCTAssertEqual(cache.load(for: provenance)?.entries.first?.targetMD5s,
+                       [String(repeating: "a", count: 32)])
+        XCTAssertFalse(cache.isRevoked(for: provenance))
     }
 
     func testMalformedPrimaryNeverFallsBackToValidLegacy() async throws {
@@ -792,7 +953,8 @@ final class ProtectedPluginAuditTests: XCTestCase {
     private func makeDocumentData(
         sourceTag: String = "9aug2026",
         baseArchiveSHA: String? = nil,
-        extraArchiveSHA: String? = nil
+        extraArchiveSHA: String? = nil,
+        targetMD5: String = String(repeating: "a", count: 32)
     ) throws -> Data {
         let documentBaseSHA = baseArchiveSHA ?? baseSHA
         let documentExtraSHA = extraArchiveSHA ?? extraSHA
@@ -815,9 +977,9 @@ final class ProtectedPluginAuditTests: XCTestCase {
                         remotePath: "/ext/apps/GPIO/esp_flasher.fap",
                         targetPath: "/ext/apps/Module One/ESP32 Wi-Fi/esp_flasher.fap",
                         sourceMD5: String(repeating: "1", count: 32),
-                        targetMD5s: [String(repeating: "a", count: 32)],
+                        targetMD5s: [targetMD5],
                         targetProvenance: [ProtectedPluginTargetProvenance(
-                            targetMD5: String(repeating: "a", count: 32),
+                            targetMD5: targetMD5,
                             channel: .dev,
                             releaseTag: "fw-packages-dev-003",
                             manifestSHA256: String(repeating: "c", count: 64))],
