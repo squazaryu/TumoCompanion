@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.10.27",
-      "versionDate": "2026-08-12",
-      "versionDescription": "FW Packages no longer warns about a manual channel override when the selected package channel already matches the detected Tumoflip firmware channel.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.27/TumoCompanion-unsigned.ipa",
-      "size": 29817727,
+      "version": "1.10.28",
+      "versionDate": "2026-08-13",
+      "versionDescription": "FW Packages now use the independent Tumoflip distribution repository with an exact legacy fallback. Protected Apps reports a global unavailable or invalid audit as UNVERIFIED instead of showing false per-app DIFF results.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.28/TumoCompanion-unsigned.ipa",
+      "size": 29863722,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.10.28",
+          "date": "2026-08-13",
+          "localizedDescription": "FW Packages now use the independent Tumoflip distribution repository with an exact legacy fallback. Protected Apps reports a global unavailable or invalid audit as UNVERIFIED instead of showing false per-app DIFF results.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.28/TumoCompanion-unsigned.ipa",
+          "size": 29863722,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.10.27",
           "date": "2026-08-12",
