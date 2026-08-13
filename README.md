@@ -110,7 +110,7 @@ Most integrations talk to a small BLE service in the [tumoflip](https://github.c
 
 ## Firmware packages (atomic updater)
 
-**Updates → Firmware packages** installs the Base / ARF / Module One / Protocol Pack files from the latest [tumoflip](https://github.com/squazaryu/tumoflip) release onto the Flipper SD over BLE or USB SD Mode as one **crash-consistent transaction**:
+**Updates → Firmware packages** installs the Base / ARF / Module One / Protocol Pack files from the independent [Tumoflip FW Packages](https://github.com/squazaryu/tumoflip-fw-packages) catalog onto the Flipper SD over BLE or USB SD Mode as one **crash-consistent transaction**:
 
 - the release manifest (schema v2) is validated and every target path is sanitised;
 - each file is staged, SHA-256-checked on download and MD5-verified on the device before any live path is touched;
@@ -118,7 +118,7 @@ Most integrations talk to a small BLE service in the [tumoflip](https://github.c
 - **Install** and **Clean Up** are separate reversible transactions: installing never deletes legacy paths implicitly, while cleanup verifies the canonical replacement's on-device MD5 before removing an obsolete duplicate;
 - the connected firmware's target / API / version must match the manifest before any FAP/FAL is written.
 
-> Needs a firmware release that publishes `tumoflip-packages.zip`; until then the screen shows “no install archive yet”. Firmware (DFU) flashing is a separate, explicit step and is not done here.
+> Package revisions and firmware releases are independent. The app selects the newest compatible package revision for the connected firmware and revalidates its exact repository, release, tag and manifest before installation. Firmware (DFU) flashing remains a separate, explicit step.
 
 ## How the relay state works
 
