@@ -128,6 +128,107 @@ final class ProtectedPluginAuditTests: XCTestCase {
         XCTAssertNil(resolution.audit)
         XCTAssertNil(resolution.origin)
         XCTAssertNotNil(resolution.failure)
+        XCTAssertEqual(resolution.failureKind, .invalid)
+        XCTAssertTrue(cache.isRevoked(for: provenance))
+    }
+
+    func testUnavailablePrimaryFallsBackToLegacyLedger() async throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let primary = URL(string: "https://primary.example/latest.json")!
+        let legacy = URL(string: "https://legacy.example/latest.json")!
+        let service = ProtectedPluginAuditService(
+            primaryURL: primary,
+            legacyURL: legacy,
+            cache: ProtectedPluginAuditCache(directory: directory),
+            fetch: { url in
+                if url == primary { throw URLError(.notConnectedToInternet) }
+                return try self.makeDocumentData()
+            },
+            bundledData: { nil })
+
+        let resolution = await service.resolve(for: try XCTUnwrap(makeProvenance()))
+
+        XCTAssertEqual(resolution.origin, .legacy)
+        XCTAssertEqual(resolution.audit?.sourceTag, "9aug2026")
+    }
+
+    func testPrimary404FallsBackToLegacyLedger() async throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let primary = URL(string: "https://primary.example/latest.json")!
+        let legacy = URL(string: "https://legacy.example/latest.json")!
+        let service = ProtectedPluginAuditService(
+            primaryURL: primary,
+            legacyURL: legacy,
+            cache: ProtectedPluginAuditCache(directory: directory),
+            fetch: { url in
+                if url == primary { throw ProtectedPluginAuditFetchError.httpStatus(404) }
+                return try self.makeDocumentData()
+            },
+            bundledData: { nil })
+
+        let resolution = await service.resolve(for: try XCTUnwrap(makeProvenance()))
+        XCTAssertEqual(resolution.origin, .legacy)
+    }
+
+    func testMalformedPrimaryNeverFallsBackToValidLegacy() async throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let provenance = try XCTUnwrap(makeProvenance())
+        let primary = URL(string: "https://primary.example/latest.json")!
+        let legacy = URL(string: "https://legacy.example/latest.json")!
+        let ledger = try makeDocumentData()
+        let service = ProtectedPluginAuditService(
+            primaryURL: primary,
+            legacyURL: legacy,
+            cache: ProtectedPluginAuditCache(directory: directory),
+            fetch: { url in url == primary ? Data("malformed".utf8) : ledger },
+            bundledData: { ledger })
+
+        let resolution = await service.resolve(for: provenance)
+
+        XCTAssertNil(resolution.audit)
+        XCTAssertEqual(resolution.failureKind, .invalid)
+        XCTAssertTrue(service.cache.isRevoked(for: provenance))
+    }
+
+    func testValidPrimaryOmissionNeverDowngradesToLegacyAcceptance() async throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let provenance = try XCTUnwrap(makeProvenance())
+        let primary = URL(string: "https://primary.example/latest.json")!
+        let legacy = URL(string: "https://legacy.example/latest.json")!
+        let empty = ProtectedPluginAuditDocument(
+            schema: ProtectedPluginAuditDocument.supportedSchema,
+            sourceRepository: ProtectedPluginAuditDocument.expectedRepository,
+            generatedAt: "2026-08-13T10:00:00Z",
+            audits: [])
+        let primaryData = try JSONEncoder().encode(empty)
+        let legacyData = try makeDocumentData()
+        let service = ProtectedPluginAuditService(
+            primaryURL: primary,
+            legacyURL: legacy,
+            cache: ProtectedPluginAuditCache(directory: directory),
+            fetch: { url in url == primary ? primaryData : legacyData },
+            bundledData: { legacyData })
+
+        let resolution = await service.resolve(for: provenance)
+
+        XCTAssertNil(resolution.audit)
+        XCTAssertTrue(service.cache.isRevoked(for: provenance))
+    }
+
+    @MainActor
+    func testGlobalAuditFailureDoesNotCreatePerFileReviewDiffs() {
+        let updater = PluginUpdater.protectedAuditUnavailableQAFixture()
+
+        XCTAssertEqual(updater.unverifiedProtectedReviews.count, 3)
+        XCTAssertTrue(updater.pendingProtectedReview.isEmpty)
+        XCTAssertEqual(updater.protectedAuditFailure?.failureKind, .unavailable)
+        XCTAssertTrue(updater.unverifiedProtectedReviews.allSatisfy {
+            updater.protectedReviewStatus($0) == .unverified
+        })
     }
 
     func testReachableValidLedgerWithoutExactPackRevokesCachedAcceptance() async throws {
@@ -199,7 +300,8 @@ final class ProtectedPluginAuditTests: XCTestCase {
         updater.configureProtectedAuditProvenanceForTesting(provenance)
 
         // The pack was checked before automation published its exact audit. This
-        // creates the fail-closed revocation tombstone seen by the user as DIFF.
+        // creates a fail-closed revocation tombstone shown once as a global audit
+        // failure; each protected row remains UNVERIFIED rather than a false DIFF.
         await updater.refreshProtectedAuditResolutionForTesting()
         XCTAssertNil(updater.protectedAuditResolution?.audit)
         XCTAssertTrue(cache.isRevoked(for: provenance))
@@ -209,7 +311,7 @@ final class ProtectedPluginAuditTests: XCTestCase {
                 compatibility: .compatible(
                     FapMetadata(apiMajor: 88, apiMinor: 2, hardwareTarget: 7)),
                 audit: updater.protectedAuditResolution?.audit),
-            .needsReview)
+            .unverified)
 
         // Verify on device reuses the retained exact pack provenance. Once the
         // authoritative ledger contains that identity, it clears the tombstone and
@@ -542,8 +644,8 @@ final class ProtectedPluginAuditTests: XCTestCase {
         XCTAssertEqual(
             ProtectedPluginReviewPolicy.status(
                 sourceBytesWithoutAudit, compatibility: compatible, audit: nil),
-            .needsReview,
-            "A new pack must complete its canonical audit even when installed bytes match upstream")
+            .unverified,
+            "A ledger outage is global and must not manufacture a per-file DIFF")
 
         let sourceEntry = ProtectedPluginAuditEntry(
             remotePath: sourceBytesWithoutAudit.remotePath,

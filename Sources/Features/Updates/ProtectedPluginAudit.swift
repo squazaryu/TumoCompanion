@@ -260,21 +260,38 @@ enum ProtectedPluginAuditValidator {
 
 enum ProtectedPluginAuditOrigin: String, Equatable {
     case remote
+    case legacy
     case cache
     case bundled
+}
+
+enum ProtectedPluginAuditFailureKind: Equatable {
+    case unavailable
+    case invalid
+
+    var label: String {
+        switch self {
+        case .unavailable: return "AUDIT UNAVAILABLE"
+        case .invalid: return "AUDIT INVALID"
+        }
+    }
 }
 
 struct ProtectedPluginAuditResolution: Equatable {
     let audit: ProtectedPluginAudit?
     let origin: ProtectedPluginAuditOrigin?
     let failure: String?
+    let failureKind: ProtectedPluginAuditFailureKind?
 
     static func accepted(_ audit: ProtectedPluginAudit, origin: ProtectedPluginAuditOrigin) -> Self {
-        Self(audit: audit, origin: origin, failure: nil)
+        Self(audit: audit, origin: origin, failure: nil, failureKind: nil)
     }
 
-    static func rejected(_ failure: String) -> Self {
-        Self(audit: nil, origin: nil, failure: failure)
+    static func rejected(
+        _ failure: String,
+        kind: ProtectedPluginAuditFailureKind = .unavailable
+    ) -> Self {
+        Self(audit: nil, origin: nil, failure: failure, failureKind: kind)
     }
 }
 
@@ -347,10 +364,16 @@ struct ProtectedPluginAuditService {
     typealias Fetch = (URL) async throws -> Data
     typealias BundledData = () -> Data?
 
-    static let remoteURL = URL(string:
+    static let primaryURL = URL(string:
+        "https://raw.githubusercontent.com/squazaryu/tumoflip-fw-packages/protected-app-audit-ledger/latest.json")!
+    static let legacyURL = URL(string:
         "https://raw.githubusercontent.com/squazaryu/tumoflip/protected-app-audit-ledger/latest.json")!
+    /// Compatibility alias for callers that only need the authoritative endpoint.
+    static let remoteURL = primaryURL
 
-    let url: URL
+    let primaryURL: URL
+    let legacyURL: URL?
+    var url: URL { primaryURL }
     let cache: ProtectedPluginAuditCache
     let fetch: Fetch
     /// Bypasses both URLSession's local cache and intermediary caches. Used only for
@@ -366,7 +389,25 @@ struct ProtectedPluginAuditService {
         fetchFresh: Fetch? = nil,
         bundledData: @escaping BundledData
     ) {
-        self.url = url
+        self.init(
+            primaryURL: url,
+            legacyURL: nil,
+            cache: cache,
+            fetch: fetch,
+            fetchFresh: fetchFresh,
+            bundledData: bundledData)
+    }
+
+    init(
+        primaryURL: URL,
+        legacyURL: URL?,
+        cache: ProtectedPluginAuditCache,
+        fetch: @escaping Fetch,
+        fetchFresh: Fetch? = nil,
+        bundledData: @escaping BundledData
+    ) {
+        self.primaryURL = primaryURL
+        self.legacyURL = legacyURL
         self.cache = cache
         self.fetch = fetch
         self.fetchFresh = fetchFresh ?? fetch
@@ -378,7 +419,8 @@ struct ProtectedPluginAuditService {
             for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
         return Self(
-            url: remoteURL,
+            primaryURL: primaryURL,
+            legacyURL: legacyURL,
             cache: ProtectedPluginAuditCache(
                 directory: base
                     .appendingPathComponent("TumoCompanion", isDirectory: true)
@@ -409,9 +451,11 @@ struct ProtectedPluginAuditService {
             request.setValue("no-cache", forHTTPHeaderField: "Pragma")
         }
         let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse,
-              (200..<300).contains(http.statusCode) else {
-            throw URLError(.badServerResponse)
+        guard let http = response as? HTTPURLResponse else {
+            throw ProtectedPluginAuditFetchError.invalidResponse
+        }
+        guard (200..<300).contains(http.statusCode) else {
+            throw ProtectedPluginAuditFetchError.httpStatus(http.statusCode)
         }
         return data
     }
@@ -420,44 +464,113 @@ struct ProtectedPluginAuditService {
         for provenance: ProtectedPluginPackProvenance,
         forceRemote: Bool = false
     ) async -> ProtectedPluginAuditResolution {
+        let loader = forceRemote ? fetchFresh : fetch
         do {
-            let data = try await (forceRemote ? fetchFresh : fetch)(url)
-            guard !Task.isCancelled else {
-                return .rejected("Protected-app audit refresh was cancelled.")
-            }
-            let document: ProtectedPluginAuditDocument
-            do {
-                document = try ProtectedPluginAuditValidator.decode(data)
-            } catch {
-                // A reachable but malformed authoritative ledger must never be replaced by
-                // stale cache: this is a trust failure, not an offline condition.
-                return .rejected(error.localizedDescription)
-            }
-            guard let audit = document.audits.first(where: { $0.matches(provenance) }) else {
-                guard !Task.isCancelled else {
-                    return .rejected("Protected-app audit refresh was cancelled.")
-                }
-                try? cache.revoke(provenance)
-                return .rejected("This Community Pack revision has not completed protected-app audit.")
-            }
-            guard !Task.isCancelled else {
-                return .rejected("Protected-app audit refresh was cancelled.")
-            }
-            try? cache.save(audit, for: provenance)
-            return .accepted(audit, origin: .remote)
+            let data = try await loader(primaryURL)
+            return resolveAuthoritative(
+                data,
+                for: provenance,
+                origin: .remote)
         } catch {
-            guard !cache.isRevoked(for: provenance) else {
-                return .rejected("This Community Pack revision was revoked by the protected-app audit ledger.")
+            guard !Task.isCancelled else {
+                return .rejected("Protected-app audit refresh was cancelled.")
             }
-            if let cached = cache.load(for: provenance) {
-                return .accepted(cached, origin: .cache)
+            if Self.primaryAllowsLegacyFallback(error), let legacyURL {
+                do {
+                    let data = try await loader(legacyURL)
+                    return resolveAuthoritative(
+                        data,
+                        for: provenance,
+                        origin: .legacy)
+                } catch {
+                    guard !Task.isCancelled else {
+                        return .rejected("Protected-app audit refresh was cancelled.")
+                    }
+                    return offlineResolution(for: provenance)
+                }
             }
-            if let data = bundledData(),
-               let document = try? ProtectedPluginAuditValidator.decode(data),
-               let audit = document.audits.first(where: { $0.matches(provenance) }) {
-                return .accepted(audit, origin: .bundled)
+            return offlineResolution(for: provenance)
+        }
+    }
+
+    private func resolveAuthoritative(
+        _ data: Data,
+        for provenance: ProtectedPluginPackProvenance,
+        origin: ProtectedPluginAuditOrigin
+    ) -> ProtectedPluginAuditResolution {
+        guard !Task.isCancelled else {
+            return .rejected("Protected-app audit refresh was cancelled.")
+        }
+        let document: ProtectedPluginAuditDocument
+        do {
+            document = try ProtectedPluginAuditValidator.decode(data)
+        } catch {
+            // Malformed authoritative bytes are a negative trust decision. Persist the
+            // tombstone so a later offline run cannot resurrect an older acceptance.
+            try? cache.revoke(provenance)
+            return .rejected(error.localizedDescription, kind: .invalid)
+        }
+        guard let audit = document.audits.first(where: { $0.matches(provenance) }) else {
+            guard !Task.isCancelled else {
+                return .rejected("Protected-app audit refresh was cancelled.")
             }
-            return .rejected("Protected-app audit ledger is unavailable for this exact Community Pack revision.")
+            try? cache.revoke(provenance)
+            return .rejected(
+                "This Community Pack revision has not completed protected-app audit.")
+        }
+        guard !Task.isCancelled else {
+            return .rejected("Protected-app audit refresh was cancelled.")
+        }
+        try? cache.save(audit, for: provenance)
+        return .accepted(audit, origin: origin)
+    }
+
+    private func offlineResolution(
+        for provenance: ProtectedPluginPackProvenance
+    ) -> ProtectedPluginAuditResolution {
+        guard !cache.isRevoked(for: provenance) else {
+            return .rejected(
+                "This Community Pack revision was revoked by the protected-app audit ledger.")
+        }
+        if let cached = cache.load(for: provenance) {
+            return .accepted(cached, origin: .cache)
+        }
+        if let data = bundledData(),
+           let document = try? ProtectedPluginAuditValidator.decode(data),
+           let audit = document.audits.first(where: { $0.matches(provenance) }) {
+            return .accepted(audit, origin: .bundled)
+        }
+        return .rejected(
+            "Protected-app audit ledger is unavailable for this exact Community Pack revision.")
+    }
+
+    private static func primaryAllowsLegacyFallback(_ error: Error) -> Bool {
+        if let fetchError = error as? ProtectedPluginAuditFetchError {
+            return fetchError == .httpStatus(404)
+        }
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .notConnectedToInternet, .networkConnectionLost, .cannotFindHost,
+                 .cannotConnectToHost, .dnsLookupFailed, .timedOut:
+                return true
+            default:
+                return false
+            }
+        }
+        return false
+    }
+}
+
+enum ProtectedPluginAuditFetchError: LocalizedError, Equatable {
+    case invalidResponse
+    case httpStatus(Int)
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidResponse:
+            return "Protected-app audit server returned an invalid response."
+        case .httpStatus(let status):
+            return "Protected-app audit server returned HTTP \(status)."
         }
     }
 }
@@ -467,6 +580,7 @@ enum ProtectedPluginReviewAuditStatus: Equatable {
     case verified
     case intentionallyReplaced
     case needsReview
+    case unverified
 
     var isAudited: Bool {
         self == .sourceMatches || self == .verified || self == .intentionallyReplaced
@@ -479,8 +593,9 @@ enum ProtectedPluginReviewPolicy {
         compatibility: FapCompatibilityState,
         audit: ProtectedPluginAudit?
     ) -> ProtectedPluginReviewAuditStatus {
+        guard let audit else { return .unverified }
         guard compatibility.isCompatible, review.deviceKnown else { return .needsReview }
-        guard let entry = audit?.entry(matching: review) else {
+        guard let entry = audit.entry(matching: review) else {
             // Even a byte-for-byte source match is not accepted until the automation
             // has completed an exact audit for this pack, route, and source hash.
             return .needsReview

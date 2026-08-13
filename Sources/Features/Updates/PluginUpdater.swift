@@ -325,7 +325,8 @@ final class PluginUpdater: ObservableObject {
     /// Protected apps present in the upstream pack, compared against the device.
     @Published var protectedReviews: [ProtectedPluginReview] = []
     /// Automation-owned decision for the exact release tag + base/extra archive bytes.
-    /// A missing decision deliberately leaves every differing protected binary in review.
+    /// A missing decision is surfaced once as a global audit failure; individual rows
+    /// remain UNVERIFIED until an authoritative comparison is available.
     @Published private(set) var protectedAuditResolution: ProtectedPluginAuditResolution?
     private let protectedAuditService: ProtectedPluginAuditService
     /// Exact archive identity retained for the loaded catalog. The audit can be
@@ -344,6 +345,18 @@ final class PluginUpdater: ObservableObject {
         protectedReviews.filter {
             protectedReviewStatus($0) == .needsReview
         }
+    }
+    /// Rows whose bytes cannot be classified because the centralized ledger itself
+    /// is unavailable or invalid. These are deliberately not DIFFs: no authoritative
+    /// comparison was possible.
+    var unverifiedProtectedReviews: [ProtectedPluginReview] {
+        guard protectedAuditFailure != nil else { return [] }
+        return protectedReviews.filter { protectedReviewStatus($0) == .unverified }
+    }
+    var protectedAuditFailure: ProtectedPluginAuditResolution? {
+        guard let resolution = protectedAuditResolution,
+              resolution.audit == nil else { return nil }
+        return resolution
     }
     /// Expected Tumoflip differences covered by the exact current pack audit. They stay
     /// visible for provenance, but no longer create a false Needs review / DIFF alert.
@@ -1462,6 +1475,22 @@ extension PluginUpdater {
             uniqueKeysWithValues: updater.protectedReviews.map {
                 ($0.remotePath, .compatible(metadata))
             })
+        return updater
+    }
+
+    static func protectedAuditUnavailableQAFixture() -> PluginUpdater {
+        let updater = protectedAuditQAFixture()
+        updater.protectedAuditResolution = .rejected(
+            "The authoritative protected-app audit endpoint could not be reached.",
+            kind: .unavailable)
+        return updater
+    }
+
+    static func protectedAuditInvalidQAFixture() -> PluginUpdater {
+        let updater = protectedAuditQAFixture()
+        updater.protectedAuditResolution = .rejected(
+            "The authoritative protected-app audit document is malformed.",
+            kind: .invalid)
         return updater
     }
 }

@@ -80,6 +80,10 @@ struct RootView: View {
 #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("-protected-apps-audit-qa") {
             ProtectedAppsAuditQAView()
+        } else if ProcessInfo.processInfo.arguments.contains("-protected-apps-audit-unavailable-qa") {
+            ProtectedAppsAuditQAView(failureKind: .unavailable)
+        } else if ProcessInfo.processInfo.arguments.contains("-protected-apps-audit-invalid-qa") {
+            ProtectedAppsAuditQAView(failureKind: .invalid)
         } else if ProcessInfo.processInfo.arguments.contains("-fw-packages-action-bar-qa") {
             FWPackagesActionBarQAView()
         } else if ProcessInfo.processInfo.arguments.contains("-esp32-archived-redownload-qa") {
