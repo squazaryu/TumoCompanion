@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.10.28",
-      "versionDate": "2026-08-13",
-      "versionDescription": "FW Packages now use the independent Tumoflip distribution repository with an exact legacy fallback. Protected Apps reports a global unavailable or invalid audit as UNVERIFIED instead of showing false per-app DIFF results.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.28/TumoCompanion-unsigned.ipa",
-      "size": 29863722,
+      "version": "1.10.29",
+      "versionDate": "2026-08-15",
+      "versionDescription": "FW Packages now manages only files explicitly changed by its independent catalog, eliminating false mass updates from an older firmware baseline. Community Pack replacements are resolved by the centralized audit, and compatible API minor changes no longer block packages.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.29/TumoCompanion-unsigned.ipa",
+      "size": 29869851,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.10.29",
+          "date": "2026-08-15",
+          "localizedDescription": "FW Packages now manages only files explicitly changed by its independent catalog, eliminating false mass updates from an older firmware baseline. Community Pack replacements are resolved by the centralized audit, and compatible API minor changes no longer block packages.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.29/TumoCompanion-unsigned.ipa",
+          "size": 29869851,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.10.28",
           "date": "2026-08-13",
