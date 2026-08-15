@@ -349,7 +349,9 @@ struct TumoflipPackageCatalogClient {
                 channel: channel,
                 installedVersion: installedVersion
             )
-            let apiMatches = installedAPI.map { $0 == manifest.firmware.api } ?? true
+            let apiMatches = installedAPI.map {
+                FirmwareAPICompatibility.hasSameMajor($0, manifest.firmware.api)
+            } ?? true
             let targetMatches = installedTarget.map { $0 == manifest.firmware.target } ?? true
             guard versionMatches, apiMatches, targetMatches else {
                 // A newer immutable catalog can target a newer firmware API. That is

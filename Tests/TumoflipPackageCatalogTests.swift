@@ -113,6 +113,51 @@ final class TumoflipPackageCatalogTests: XCTestCase {
         XCTAssertEqual(selected.release.tag, "fw-packages-dev-009")
     }
 
+    func testCatalogMinorAPIDriftRemainsCompatible() async throws {
+        let release = release(id: 9, tag: "fw-packages-dev-009")
+        let client = makeClient(
+            primaryPages: [releasesData([release])],
+            manifests: [
+                manifestURL("fw-packages-dev-009"): manifest(
+                    tag: "fw-packages-dev-009", revision: 9, api: "88.0"),
+            ]
+        )
+
+        let selected = try await client.latest(
+            for: .dev,
+            installedVersion: "t-dev-004-017",
+            installedAPI: "88.2",
+            installedTarget: 7
+        )
+
+        XCTAssertEqual(selected.release.tag, "fw-packages-dev-009")
+    }
+
+    func testMalformedInstalledAPIFailsClosed() async throws {
+        let release = release(id: 9, tag: "fw-packages-dev-009")
+        let client = makeClient(
+            primaryPages: [releasesData([release])],
+            manifests: [
+                manifestURL("fw-packages-dev-009"): manifest(
+                    tag: "fw-packages-dev-009", revision: 9, api: "88.0"),
+            ]
+        )
+
+        do {
+            _ = try await client.latest(
+                for: .dev,
+                installedVersion: "t-dev-004-017",
+                installedAPI: "88.beta",
+                installedTarget: 7
+            )
+            XCTFail("Malformed device API must not select a catalog")
+        } catch let error as TumoflipPackageCatalogError {
+            guard case .noMatchingRelease = error else {
+                return XCTFail("Unexpected error: \(error)")
+            }
+        }
+    }
+
     func testWellFormedCatalogWithoutCompatibleRevisionReportsNoMatch() async throws {
         let client = makeClient(
             primaryPages: [releasesData([release(id: 10, tag: "fw-packages-dev-010")])],

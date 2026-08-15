@@ -42,6 +42,80 @@ final class TumoflipManifestPackageReleaseTests: XCTestCase {
         XCTAssertEqual(manifest.packageRelease?.catalogReleaseTag, "fw-packages-dev-001")
     }
 
+    func testIndependentCatalogScopesStatusAndInstallToAutomationDelta() throws {
+        let independent = packageRelease.replacingOccurrences(
+            of: "\"firmware_flash_unchanged\": true",
+            with: """
+            "firmware_flash_unchanged": true,
+              "catalog_channel": "dev",
+              "catalog_revision": 8,
+              "catalog_release_tag": "fw-packages-dev-008",
+              "catalog_modified_targets": ["apps/esp.fap"],
+              "overlay_targets": ["apps/esp.fap"]
+            """
+        )
+        let manifest = try TumoflipManifest.decode(fixture(packageRelease: independent))
+        try manifest.validate()
+
+        let managed = manifest.packageManagedManifest()
+        XCTAssertEqual(managed.packages["base"]?.map(\.source), ["apps/esp.fap"])
+        XCTAssertEqual(managed.cleanup.map(\.canonical), ["/ext/apps/esp.fap"])
+    }
+
+    func testOlderCatalogUsesOverlayAllowlistAndNeverExposesBaseline() throws {
+        let independent = packageRelease.replacingOccurrences(
+            of: "\"firmware_flash_unchanged\": true",
+            with: """
+            "firmware_flash_unchanged": true,
+              "catalog_channel": "dev",
+              "catalog_revision": 4,
+              "catalog_release_tag": "fw-packages-dev-004",
+              "overlay_targets": ["apps/esp.fap"]
+            """
+        )
+        let manifest = try TumoflipManifest.decode(fixture(packageRelease: independent))
+        try manifest.validate()
+
+        let managed = manifest.packageManagedManifest()
+        XCTAssertEqual(managed.packages["base"]?.map(\.source), ["apps/esp.fap"])
+    }
+
+    func testMismatchedCatalogWithoutAllowlistFailsClosedToNoFiles() throws {
+        let independent = packageRelease.replacingOccurrences(
+            of: "\"firmware_flash_unchanged\": true",
+            with: """
+            "firmware_flash_unchanged": true,
+              "catalog_channel": "dev",
+              "catalog_revision": 1,
+              "catalog_release_tag": "fw-packages-dev-001"
+            """
+        )
+        let manifest = try TumoflipManifest.decode(fixture(packageRelease: independent))
+        try manifest.validate()
+
+        let managed = manifest.packageManagedManifest()
+        XCTAssertTrue(managed.packages.values.allSatisfy(\.isEmpty))
+        XCTAssertTrue(managed.cleanup.isEmpty)
+    }
+
+    func testRejectsUnknownOrNonCanonicalCatalogDeltaSource() throws {
+        for source in ["apps/missing.fap", "apps/../esp.fap", "/apps/esp.fap"] {
+            let independent = packageRelease.replacingOccurrences(
+                of: "\"firmware_flash_unchanged\": true",
+                with: """
+                "firmware_flash_unchanged": true,
+                  "catalog_channel": "dev",
+                  "catalog_revision": 8,
+                  "catalog_release_tag": "fw-packages-dev-008",
+                  "catalog_modified_targets": ["\(source)"],
+                  "overlay_targets": ["apps/esp.fap"]
+                """
+            )
+            let manifest = try TumoflipManifest.decode(fixture(packageRelease: independent))
+            XCTAssertThrowsError(try manifest.validate(), "source=\(source)")
+        }
+    }
+
     func testRejectsPartialOrMismatchedIndependentCatalogMetadata() throws {
         let partial = packageRelease.replacingOccurrences(
             of: "\"firmware_flash_unchanged\": true",
@@ -110,12 +184,30 @@ final class TumoflipManifestPackageReleaseTests: XCTestCase {
               \(packageRelease ?? "")
               "artifacts": {},
               "packages": {
-                "base": [],
+                "base": [
+                  {
+                    "bytes": 1,
+                    "sha256": "\(String(repeating: "b", count: 64))",
+                    "md5": "\(String(repeating: "b", count: 32))",
+                    "source": "apps/base.fap",
+                    "target": "/ext/apps/base.fap"
+                  },
+                  {
+                    "bytes": 1,
+                    "sha256": "\(String(repeating: "c", count: 64))",
+                    "md5": "\(String(repeating: "c", count: 32))",
+                    "source": "apps/esp.fap",
+                    "target": "/ext/apps/esp.fap"
+                  }
+                ],
                 "arf": [],
                 "module_one": [],
                 "protocol_packs": []
               },
-              "cleanup": []
+              "cleanup": [
+                {"canonical": "/ext/apps/base.fap", "legacy": "/ext/apps/old-base.fap"},
+                {"canonical": "/ext/apps/esp.fap", "legacy": "/ext/apps/old-esp.fap"}
+              ]
             }
             """.utf8
         )

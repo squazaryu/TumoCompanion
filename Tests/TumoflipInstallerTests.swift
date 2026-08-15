@@ -1035,7 +1035,33 @@ final class TumoflipInstallerTests: XCTestCase {
         let m = makeIndependentManifest(channel: "dev")
         XCTAssertNoThrow(try TumoflipCompat.check(
             deviceTarget: 7,
-            deviceAPI: "87.14",
+            deviceAPI: "87.99",
+            deviceVersion: "t-dev-004-013",
+            deviceOriginFork: "tumoflip",
+            manifest: m
+        ))
+    }
+
+    func testIndependentCatalogRejectsDifferentAPIMajor() {
+        let m = makeIndependentManifest(channel: "dev")
+        XCTAssertThrowsError(try TumoflipCompat.check(
+            deviceTarget: 7,
+            deviceAPI: "88.0",
+            deviceVersion: "t-dev-004-013",
+            deviceOriginFork: "tumoflip",
+            manifest: m
+        )) {
+            guard case .incompatible? = $0 as? TumoflipInstallError else {
+                return XCTFail("\($0)")
+            }
+        }
+    }
+
+    func testIndependentCatalogRejectsMalformedAPI() {
+        let m = makeIndependentManifest(channel: "dev")
+        XCTAssertThrowsError(try TumoflipCompat.check(
+            deviceTarget: 7,
+            deviceAPI: "87.beta",
             deviceVersion: "t-dev-004-013",
             deviceOriginFork: "tumoflip",
             manifest: m
