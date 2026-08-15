@@ -43,7 +43,7 @@ final class PluginProtectionPolicyTests: XCTestCase {
             "ai_dashboard", "app_bridge_terminal", "arf_frequency_analyzer",
             "arf_subghz_full", "ble_gatt_lab", "claude_buddy", "claude_remote_ble",
             "esp_flasher", "esp32_wifi_marauder",
-            "field_logger", "flipper_companion", "flipper_relay",
+            "field_logger", "flipper_companion", "flipper_relay", "freq_analyzer_ext",
             "module_one_cockpit", "module_one_sensor_logger", "nfc_ccid_bridge",
             "protocol_compiler", "proto_pirate",
             "quac", "rolljam", "runtime_trace_viewer", "signal_workbench",
@@ -55,7 +55,7 @@ final class PluginProtectionPolicyTests: XCTestCase {
             "tumonet_gateway",
             "tumoscope", "tumoscript", "tumovgm_bridge", "tumovm_peripherals",
             "tumovm_poc", "usb_sd_mode",
-            "wifi_mapper",
+            "wifi_map", "wifi_mapper",
         ]
 
         XCTAssertTrue(expected.isSubset(of: PluginUpdater.builtInExcluded))
@@ -94,6 +94,32 @@ final class PluginProtectionPolicyTests: XCTestCase {
             remotePath: routedPath,
             excluded: PluginUpdater.builtInExcluded,
             unprotectedBuiltIns: []))
+    }
+
+    func testLegacyCommunityAppsAreProtectedReplacements() {
+        let replacements: [(name: String, remote: String, target: String)] = [
+            (
+                "wifi_map",
+                "/ext/apps/GPIO/wifi_map.fap",
+                "/ext/apps/Module One/ESP32 Wi-Fi/wifi_map.fap"
+            ),
+            (
+                "freq_analyzer_ext",
+                "/ext/apps/Sub-GHz/freq_analyzer_ext.fap",
+                "/ext/apps/Module One/Sub-GHz/freq_analyzer_ext.fap"
+            ),
+        ]
+
+        for replacement in replacements {
+            let target = PluginInstallRouting.targetPath(for: replacement.remote)
+            XCTAssertEqual(target, replacement.target)
+            XCTAssertTrue(PluginProtectionPolicy.isProtected(
+                name: replacement.name,
+                remotePath: target,
+                excluded: PluginUpdater.builtInExcluded,
+                unprotectedBuiltIns: []
+            ))
+        }
     }
 
     func testCatalogCannotOverwriteProtectedClaudeBuddy() {

@@ -160,20 +160,26 @@ enum TumoflipCompat {
         if dt != manifest.firmware.target {
             throw TumoflipInstallError.incompatible("device is f\(dt), packages are for f\(manifest.firmware.target)")
         }
-        if deviceAPI != manifest.firmware.api {
-            throw TumoflipInstallError.incompatible(
-                "device API \(deviceAPI) ≠ package API \(manifest.firmware.api)")
-        }
         if let release = manifest.packageRelease, release.isIndependentCatalog {
+            guard FirmwareAPICompatibility.hasSameMajor(deviceAPI, manifest.firmware.api) else {
+                throw TumoflipInstallError.incompatible(
+                    "device API \(deviceAPI) is not compatible with package API \(manifest.firmware.api)")
+            }
             guard let expected = release.catalogChannel,
                   TumoflipFirmwareChannel.infer(version: deviceVersion)?.rawValue == expected else {
                 throw TumoflipInstallError.incompatible(
                     "device firmware channel is not compatible with \(release.catalogChannel ?? "unknown") FW Packages"
                 )
             }
-        } else if deviceVersion != manifest.firmware.version {
-            throw TumoflipInstallError.incompatible(
-                "device firmware \(deviceVersion) ≠ package firmware \(manifest.firmware.version)")
+        } else {
+            guard deviceAPI == manifest.firmware.api else {
+                throw TumoflipInstallError.incompatible(
+                    "device API \(deviceAPI) ≠ package API \(manifest.firmware.api)")
+            }
+            guard deviceVersion == manifest.firmware.version else {
+                throw TumoflipInstallError.incompatible(
+                    "device firmware \(deviceVersion) ≠ package firmware \(manifest.firmware.version)")
+            }
         }
     }
 }

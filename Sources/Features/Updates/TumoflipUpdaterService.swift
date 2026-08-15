@@ -203,6 +203,13 @@ final class TumoflipUpdater: ObservableObject {
     private var selectedCatalogRepository: TumoflipPackageCatalogRepository?
     private let packageCatalogClient: TumoflipPackageCatalogClient
 
+    /// The independently published catalog contains a full firmware baseline for
+    /// provenance. Expose only the automation-owned package delta so status checks and
+    /// install plans can never rewrite firmware-bundled resources.
+    private var managedManifest: TumoflipManifest? {
+        manifest?.packageManagedManifest()
+    }
+
     init(packageCatalogClient: TumoflipPackageCatalogClient = .live()) {
         self.packageCatalogClient = packageCatalogClient
     }
@@ -311,7 +318,7 @@ final class TumoflipUpdater: ObservableObject {
     /// Compare the durable ledger to the latest manifest and, when the manifest has
     /// expected MD5s, safely adopt complete firmware-bundled groups from the device.
     func refreshStatus() async {
-        guard let manifest else { return }
+        guard let manifest = managedManifest else { return }
         transferChannel = activeChannel
         let inst = TumoflipInstaller(fs: activeFS(), source: ZipPackageSource(entries: [:]))
         do {
@@ -343,7 +350,7 @@ final class TumoflipUpdater: ObservableObject {
     /// the ledger, so the badges reflect the ACTUAL SD contents (catches files deleted
     /// or changed outside the app). Needs a connected Flipper; slower than `refreshStatus`.
     func verifyOnDevice() async {
-        guard let manifest else { return }
+        guard let manifest = managedManifest else { return }
         verifying = true
         defer { verifying = false }
         transferChannel = activeChannel
@@ -363,9 +370,13 @@ final class TumoflipUpdater: ObservableObject {
         }
     }
 
-    func count(_ group: String) -> Int { manifest?.packages[group]?.count ?? 0 }
-    func bytes(_ group: String) -> Int { (manifest?.packages[group] ?? []).reduce(0) { $0 + $1.bytes } }
-    func files(_ group: String) -> [TumoflipManifest.PackageFile] { manifest?.packages[group] ?? [] }
+    func count(_ group: String) -> Int { managedManifest?.packages[group]?.count ?? 0 }
+    func bytes(_ group: String) -> Int {
+        (managedManifest?.packages[group] ?? []).reduce(0) { $0 + $1.bytes }
+    }
+    func files(_ group: String) -> [TumoflipManifest.PackageFile] {
+        managedManifest?.packages[group] ?? []
+    }
 
     // MARK: - Per-file selection
 
@@ -511,7 +522,9 @@ final class TumoflipUpdater: ObservableObject {
     func requestStop() { stopRequested = true; stopToken.stop() }
 
     func install() async {
-        guard let manifest, packageZipURL != nil else { return }
+        guard let sourceManifest = manifest,
+              let manifest = managedManifest,
+              packageZipURL != nil else { return }
         // Disable the action and reject any overlapping invocation synchronously,
         // before compatibility/network awaits can yield back to a still-enabled UI.
         guard transactionGate.begin() else { return }
@@ -559,7 +572,7 @@ final class TumoflipUpdater: ObservableObject {
                 requiredRepository: selectedCatalogRepository
             )
             guard liveSelection.identity == selectedCatalogIdentity,
-                  liveSelection.manifest == manifest else {
+                  liveSelection.manifest == sourceManifest else {
                 phase = .failed("The package release changed after this screen loaded. Refresh Firmware packages before installing; nothing was changed.")
                 return
             }
@@ -706,7 +719,7 @@ final class TumoflipUpdater: ObservableObject {
     /// Remove every currently pending legacy duplicate in one standalone transaction,
     /// without downloading the package archive or reinstalling a canonical FAP.
     func cleanUpPending() async {
-        guard let manifest else { return }
+        guard let manifest = managedManifest else { return }
         let selection = Self.cleanupSelection(from: pendingCleanup)
         guard !selection.entries.isEmpty else {
             phase = .done("No legacy files remain.")

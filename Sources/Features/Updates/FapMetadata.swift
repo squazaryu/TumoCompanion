@@ -1,5 +1,29 @@
 import Foundation
 
+/// The firmware loader compatibility boundary is the API major. Keep parsing in one
+/// fail-closed helper so catalog discovery, manifest checks, and the per-FAP gate cannot
+/// disagree when only the diagnostic minor changes (for example 88.0 -> 88.2).
+enum FirmwareAPICompatibility {
+    static func major(from version: String) -> Int? {
+        let parts = version.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 2,
+              parts.allSatisfy({ !$0.isEmpty && $0.allSatisfy(\.isNumber) }),
+              let major = Int(parts[0]),
+              Int(parts[1]) != nil else {
+            return nil
+        }
+        return major
+    }
+
+    static func hasSameMajor(_ lhs: String, _ rhs: String) -> Bool {
+        guard let lhsMajor = major(from: lhs),
+              let rhsMajor = major(from: rhs) else {
+            return false
+        }
+        return lhsMajor == rhsMajor
+    }
+}
+
 /// Parsed `.fapmeta` of a Flipper application binary (FAP/FAL). Mirrors the firmware
 /// struct `FlipperApplicationManifestBase`
 /// (`lib/flipper_application/application_manifest.h`):

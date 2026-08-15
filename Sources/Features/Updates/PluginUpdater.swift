@@ -419,6 +419,7 @@ final class PluginUpdater: ObservableObject {
         "flipper_companion",
         "flipper_relay",
         "flipper_xremote",
+        "freq_analyzer_ext",
         "garage_door_remote",
         "keeloq_keystore_decryptor",
         "module_one_cockpit",
@@ -454,6 +455,7 @@ final class PluginUpdater: ObservableObject {
         "tumovm_peripherals",
         "tumovm_poc",
         "usb_sd_mode",
+        "wifi_map",
         "wifi_mapper",
     ]
     private static let retiredBuiltInExcluded: Set<String> = ["ble_killer"]

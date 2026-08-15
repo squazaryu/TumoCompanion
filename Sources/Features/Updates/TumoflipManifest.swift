@@ -141,6 +141,13 @@ struct TumoflipManifest: Codable, Equatable {
         let catalogRevision: Int?
         let catalogReleaseTag: String?
         let compatibleReleases: [CompatibleRelease]?
+        /// Exact package archive sources changed by this independent catalog revision.
+        /// Only these files are package-managed; every other entry is an immutable
+        /// firmware baseline used to build and verify the release, not an install offer.
+        let catalogModifiedTargets: [String]?
+        /// Legacy name for the same package-owned source allowlist. Older immutable
+        /// catalogs predate `catalog_modified_targets` but already carried this field.
+        let overlayTargets: [String]?
 
         struct CompatibleRelease: Codable, Equatable {
             let releaseTag: String
@@ -180,7 +187,9 @@ struct TumoflipManifest: Codable, Equatable {
             catalogChannel: String? = nil,
             catalogRevision: Int? = nil,
             catalogReleaseTag: String? = nil,
-            compatibleReleases: [CompatibleRelease]? = nil
+            compatibleReleases: [CompatibleRelease]? = nil,
+            catalogModifiedTargets: [String]? = nil,
+            overlayTargets: [String]? = nil
         ) {
             self.id = id
             self.type = type
@@ -193,6 +202,8 @@ struct TumoflipManifest: Codable, Equatable {
             self.catalogRevision = catalogRevision
             self.catalogReleaseTag = catalogReleaseTag
             self.compatibleReleases = compatibleReleases
+            self.catalogModifiedTargets = catalogModifiedTargets
+            self.overlayTargets = overlayTargets
         }
 
         enum CodingKeys: String, CodingKey {
@@ -206,6 +217,8 @@ struct TumoflipManifest: Codable, Equatable {
             case catalogRevision = "catalog_revision"
             case catalogReleaseTag = "catalog_release_tag"
             case compatibleReleases = "compatible_releases"
+            case catalogModifiedTargets = "catalog_modified_targets"
+            case overlayTargets = "overlay_targets"
         }
     }
 
@@ -243,6 +256,35 @@ struct TumoflipManifest: Codable, Equatable {
     /// fields are mapped explicitly via CodingKeys instead.
     static func decode(_ data: Data) throws -> TumoflipManifest {
         try JSONDecoder().decode(TumoflipManifest.self, from: data)
+    }
+
+    /// Return the files that this independent catalog is allowed to manage on the
+    /// device. Independent catalogs carry a full immutable firmware baseline for
+    /// provenance, but those baseline entries belong to the firmware updater. FW
+    /// Packages behaves like Community Apps: its automation-owned delta allowlist is
+    /// the only install and on-device verification surface.
+    func packageManagedManifest() -> TumoflipManifest {
+        guard let release = packageRelease,
+              release.isIndependentCatalog else {
+            return self
+        }
+
+        let modifiedSources = release.catalogModifiedTargets ?? release.overlayTargets ?? []
+        let allowed = Set(modifiedSources)
+        let filteredPackages = packages.mapValues { files in
+            files.filter { allowed.contains($0.source) }
+        }
+        let managedTargets = Set(filteredPackages.values.flatMap { $0.map(\.target) })
+        return TumoflipManifest(
+            schema: schema,
+            releaseId: releaseId,
+            firmware: firmware,
+            artifacts: artifacts,
+            packages: filteredPackages,
+            cleanup: cleanup.filter { managedTargets.contains($0.canonical) },
+            safety: safety,
+            packageRelease: packageRelease
+        )
     }
 }
 
@@ -368,8 +410,35 @@ extension TumoflipManifest {
                 guard referencedCompatibleReleaseIDs == releaseIDs else {
                     throw TumoflipManifestError.invalidPackageRelease(packageRelease.id)
                 }
+                for modified in [
+                    packageRelease.catalogModifiedTargets,
+                    packageRelease.overlayTargets,
+                ].compactMap({ $0 }) {
+                    let allSources = packages.values.flatMap { $0.map(\.source) }
+                    let knownSources = Set(allSources)
+                    guard modified.count <= allSources.count,
+                          modified.count == Set(modified).count,
+                          modified.allSatisfy({ source in
+                              !source.hasPrefix("/") &&
+                                  !source.contains("\\") &&
+                                  !source.split(
+                                      separator: "/",
+                                      omittingEmptySubsequences: false
+                                  ).contains(where: { $0.isEmpty || $0 == "." || $0 == ".." }) &&
+                                  knownSources.contains(source)
+                          }) else {
+                        throw TumoflipManifestError.invalidPackageRelease(packageRelease.id)
+                    }
+                }
+                if let modified = packageRelease.catalogModifiedTargets,
+                   let overlays = packageRelease.overlayTargets,
+                   !Set(modified).isSubset(of: Set(overlays)) {
+                    throw TumoflipManifestError.invalidPackageRelease(packageRelease.id)
+                }
             } else if !referencedCompatibleReleaseIDs.isEmpty ||
-                        packageRelease.compatibleReleases?.isEmpty == false {
+                        packageRelease.compatibleReleases?.isEmpty == false ||
+                        packageRelease.catalogModifiedTargets != nil ||
+                        packageRelease.overlayTargets != nil {
                 throw TumoflipManifestError.invalidPackageRelease(packageRelease.id)
             }
         } else if !referencedCompatibleReleaseIDs.isEmpty {
