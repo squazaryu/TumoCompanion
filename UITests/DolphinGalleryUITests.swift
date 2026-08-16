@@ -168,6 +168,30 @@ final class FWPackagesActionBarUITests: XCTestCase {
     }
 }
 
+final class CommunityRouteCleanupUITests: XCTestCase {
+    func testCleanupReportSeparatesRemovedPackRoutesFromPreservedCustomFiles() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-onboardingDone", "YES",
+            "-community-route-cleanup-qa",
+        ]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["community-cleanup-removed"].waitForExistence(timeout: 3))
+        XCTAssertTrue(
+            app.staticTexts["community-cleanup-removed-paths"].label.contains(
+                "/ext/apps/Games/4inrow.fap"
+            )
+        )
+        XCTAssertTrue(app.staticTexts["community-cleanup-kept"].exists)
+        XCTAssertTrue(
+            app.staticTexts["community-cleanup-kept-paths"].label.contains(
+                "/ext/apps/GPIO/custom_sensor.fap"
+            )
+        )
+    }
+}
+
 final class ESP32ArchivedRedownloadUITests: XCTestCase {
     func testArchivedPackageKeepsRedownloadActionVisible() throws {
         let app = XCUIApplication()

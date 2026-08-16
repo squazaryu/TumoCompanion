@@ -245,13 +245,233 @@ struct VerifyResult: Equatable {
     var ok: Bool { failed.isEmpty }
 }
 
-/// Outcome of the post-install legacy-duplicate sweep: for routed apps, the old
-/// pre-routing copy at the source path is removed ONLY when it byte-matches what we
-/// just installed (md5 == newMD5); anything that differs is kept for manual review.
+/// Outcome of the post-install legacy-duplicate sweep. A path is removed only after
+/// both its canonical replacement and its own historical pack identity are verified.
 struct CleanupResult: Equatable {
-    let removed: [String]   // legacy duplicate paths deleted (exact pack match)
-    let kept: [String]      // legacy paths kept because their md5 differs
+    let removed: [String]   // obsolete paths deleted after exact pack-history verification
+    let kept: [String]      // paths kept because safe removal could not be proven/completed
     var isEmpty: Bool { removed.isEmpty && kept.isEmpty }
+}
+
+/// Persistent Community Pack baseline plus content-addressed routes retired by a
+/// newer catalog. Version 2 caches contained only `tag` and `map`; the custom decoder
+/// keeps those installations compatible while making route history explicit.
+struct PluginCatalogCache: Codable, Equatable {
+    var tag: String
+    var map: [String: String]
+    private(set) var retiredRoutes: [String: [String]]
+
+    init(
+        tag: String,
+        map: [String: String],
+        retiredRoutes: [String: [String]] = [:]
+    ) {
+        self.tag = tag
+        self.map = map
+        self.retiredRoutes = retiredRoutes.mapValues(Self.normalizedMD5s)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case tag, map
+        case retiredRoutes = "retired_routes"
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        tag = try values.decode(String.self, forKey: .tag)
+        map = try values.decode([String: String].self, forKey: .map)
+        retiredRoutes = try values.decodeIfPresent(
+            [String: [String]].self,
+            forKey: .retiredRoutes
+        )?.mapValues(Self.normalizedMD5s) ?? [:]
+    }
+
+    /// Moves paths removed by the current immutable catalog out of the active
+    /// baseline without losing the exact hashes that are safe to recognize later.
+    /// A route that becomes active again is never considered a cleanup candidate.
+    mutating func reconcileRoutes(current: [String: String]) {
+        for path in current.keys {
+            retiredRoutes.removeValue(forKey: path)
+        }
+        let retired = map.filter { current[$0.key] == nil }
+        for (path, md5) in retired {
+            var known = retiredRoutes[path] ?? []
+            known.append(md5)
+            retiredRoutes[path] = Self.normalizedMD5s(known)
+            map.removeValue(forKey: path)
+        }
+    }
+
+    mutating func forgetRetiredRoute(_ path: String) {
+        retiredRoutes.removeValue(forKey: path)
+    }
+
+    private static func normalizedMD5s(_ values: [String]) -> [String] {
+        Array(Set(
+            values.map { $0.lowercased() }
+                .filter(PluginRouteReconciliation.isMD5)
+        )).sorted()
+    }
+}
+
+struct PluginRouteCleanupCandidate: Equatable {
+    let catalogPath: String
+    let canonicalPath: String
+    let legacyPath: String
+    let canonicalMD5: String
+    let acceptedLegacyMD5s: [String]
+}
+
+enum PluginRouteCleanupDecision: Equatable {
+    case remove
+    case missing
+    case keep
+}
+
+/// Derives obsolete FAP routes from immutable Community Pack history. No folder or
+/// release-specific deletion list is trusted: a move needs a unique same-name app in
+/// the current catalog, a retired old route, and exact content identities on device.
+enum PluginRouteReconciliation {
+    static func candidates(
+        current: [PluginUpdate],
+        retiredRoutes: [String: [String]],
+        excluded: Set<String>,
+        unprotectedBuiltIns: Set<String>
+    ) -> [String: [PluginRouteCleanupCandidate]] {
+        let eligible = current.filter {
+            isSafeFAPPath($0.remotePath)
+                && isSafeFAPPath($0.targetPath)
+                && !PluginProtectionPolicy.isProtected(
+                    name: $0.name,
+                    remotePath: $0.targetPath,
+                    excluded: excluded,
+                    unprotectedBuiltIns: unprotectedBuiltIns)
+        }
+        let currentCatalogPaths = Set(current.map(\.remotePath))
+        let canonicalPaths = Set(current.map(\.targetPath))
+        let byStem = Dictionary(grouping: eligible, by: { stem($0.remotePath) })
+        var proposals: [PluginRouteCleanupCandidate] = []
+
+        for (legacyPath, historicalMD5s) in retiredRoutes {
+            let appStem = stem(legacyPath)
+            guard isSafeFAPPath(legacyPath),
+                  !currentCatalogPaths.contains(legacyPath),
+                  !canonicalPaths.contains(legacyPath),
+                  !PluginProtectionPolicy.isProtected(
+                    name: appStem,
+                    remotePath: legacyPath,
+                    excluded: excluded,
+                    unprotectedBuiltIns: unprotectedBuiltIns),
+                  let matches = byStem[appStem], matches.count == 1,
+                  let update = matches.first else { continue }
+            appendCandidate(
+                catalogPath: update.remotePath,
+                canonicalPath: update.targetPath,
+                legacyPath: legacyPath,
+                canonicalMD5: update.newMD5,
+                acceptedLegacyMD5s: historicalMD5s,
+                to: &proposals
+            )
+        }
+
+        // Preserve the small set of intentional Tumoflip install routes. These
+        // predate cache history, so only a byte-identical old copy is accepted.
+        for update in eligible {
+            for legacyPath in PluginInstallRouting.legacyPaths(for: update.remotePath)
+            where legacyPath != update.targetPath {
+                appendCandidate(
+                    catalogPath: update.remotePath,
+                    canonicalPath: update.targetPath,
+                    legacyPath: legacyPath,
+                    canonicalMD5: update.newMD5,
+                    acceptedLegacyMD5s: (retiredRoutes[legacyPath] ?? []) + [update.newMD5],
+                    to: &proposals
+                )
+            }
+        }
+
+        // If two catalog entries claim one old path, fail closed instead of choosing.
+        let unambiguous = Dictionary(grouping: proposals, by: \.legacyPath).values.compactMap {
+            group -> PluginRouteCleanupCandidate? in
+            let identities = Set(group.map {
+                "\($0.catalogPath)\u{0}\($0.canonicalPath)\u{0}\($0.canonicalMD5)"
+            })
+            guard identities.count == 1, let first = group.first else { return nil }
+            let accepted = Array(Set(group.flatMap(\.acceptedLegacyMD5s))).sorted()
+            return PluginRouteCleanupCandidate(
+                catalogPath: first.catalogPath,
+                canonicalPath: first.canonicalPath,
+                legacyPath: first.legacyPath,
+                canonicalMD5: first.canonicalMD5,
+                acceptedLegacyMD5s: accepted
+            )
+        }
+        return Dictionary(grouping: unambiguous, by: \.catalogPath).mapValues {
+            $0.sorted { $0.legacyPath < $1.legacyPath }
+        }
+    }
+
+    static func decision(
+        for candidate: PluginRouteCleanupCandidate,
+        canonicalDeviceMD5: String?,
+        legacyDeviceMD5: String?
+    ) -> PluginRouteCleanupDecision {
+        guard canonicalDeviceMD5?.lowercased() == candidate.canonicalMD5.lowercased() else {
+            return .keep
+        }
+        guard let legacyDeviceMD5 else { return .missing }
+        return candidate.acceptedLegacyMD5s.contains(legacyDeviceMD5.lowercased())
+            ? .remove : .keep
+    }
+
+    static func isMD5(_ value: String) -> Bool {
+        value.count == 32 && value.allSatisfy { "0123456789abcdef".contains($0) }
+    }
+
+    private static func appendCandidate(
+        catalogPath: String,
+        canonicalPath: String,
+        legacyPath: String,
+        canonicalMD5: String,
+        acceptedLegacyMD5s: [String],
+        to proposals: inout [PluginRouteCleanupCandidate]
+    ) {
+        let canonical = canonicalMD5.lowercased()
+        let accepted = Array(Set(
+            acceptedLegacyMD5s.map { $0.lowercased() }
+                .filter(isMD5)
+        )).sorted()
+        guard isSafeFAPPath(canonicalPath),
+              isSafeFAPPath(legacyPath),
+              canonicalPath != legacyPath,
+              isMD5(canonical),
+              !accepted.isEmpty else { return }
+        proposals.append(PluginRouteCleanupCandidate(
+            catalogPath: catalogPath,
+            canonicalPath: canonicalPath,
+            legacyPath: legacyPath,
+            canonicalMD5: canonical,
+            acceptedLegacyMD5s: accepted
+        ))
+    }
+
+    private static func stem(_ path: String) -> String {
+        (((path as NSString).lastPathComponent as NSString).deletingPathExtension)
+            .lowercased()
+    }
+
+    private static func isSafeFAPPath(_ path: String) -> Bool {
+        let roots = ["/ext/apps/", "/ext/apps_data/"]
+        guard let root = roots.first(where: { path.hasPrefix($0) }),
+              path.lowercased().hasSuffix(".fap") else {
+            return false
+        }
+        let suffix = path.dropFirst(root.count)
+        let components = suffix.split(separator: "/", omittingEmptySubsequences: false)
+        return !components.isEmpty && components.allSatisfy {
+            !$0.isEmpty && $0 != "." && $0 != ".."
+        }
+    }
 }
 
 struct InstallRecord: Codable, Identifiable {
@@ -487,7 +707,6 @@ final class PluginUpdater: ObservableObject {
     }
 
     // Per-fap md5 of the pack state we last reconciled with the device.
-    private struct Cache: Codable { var tag: String; var map: [String: String] }
     private let cacheKey = "pluginPackCache.v2"
 
     // Working files for the current check (kept for install pass).
@@ -651,22 +870,30 @@ final class PluginUpdater: ObservableObject {
             await refreshProtectedAuditResolution()
             await refreshProtectedReviews()
 
-            if let cacheMap = loadCache()?.map, !cacheMap.isEmpty {
+            var cache = loadCache()
+            if var reconciled = cache {
+                reconciled.reconcileRoutes(
+                    current: manifest.mapValues(\.newMD5)
+                )
+                saveCache(reconciled)
+                cache = reconciled
+            }
+            if let cache {
                 // Fast path: diff the new pack against what we last reconciled.
                 var result: [PluginUpdate] = []
                 for (path, f) in manifest {
-                    if cacheMap[path] != f.newMD5 {
+                    if cache.map[path] != f.newMD5 {
                         var update = PluginUpdate(
                             remotePath: path,
                             name: f.name,
                             category: f.category,
                             pack: f.pack,
                             newMD5: f.newMD5,
-                            oldMD5: cacheMap[path],
+                            oldMD5: cache.map[path],
                             size: f.size)
                         // New all-the-plugins entries should be reviewed manually; otherwise
                         // a broad pack update can quietly fill the SD with duplicates.
-                        update.selected = cacheMap[path] != nil
+                        update.selected = cache.map[path] != nil
                         result.append(update)
                     }
                 }
@@ -829,9 +1056,12 @@ final class PluginUpdater: ObservableObject {
     /// First-run option B: assume the Flipper already has this build (e.g. just
     /// flashed via SD). Seeds the baseline instantly with no scan.
     func seedBaseline() {
-        var map: [String: String] = [:]
-        for (path, f) in allManifest { map[path] = f.newMD5 }
-        saveCache(Cache(tag: tag, map: map))
+        let map = allManifest.mapValues(\.newMD5)
+        var cache = loadCache() ?? PluginCatalogCache(tag: tag, map: [:])
+        cache.reconcileRoutes(current: map)
+        cache.tag = tag
+        cache.map = map
+        saveCache(cache)
         updates = []
         phase = .done("Baseline set · \(tag)")
     }
@@ -913,12 +1143,19 @@ final class PluginUpdater: ObservableObject {
             return
         }
 
-        var cache = loadCache() ?? Cache(tag: tag, map: [:])
+        var cache = loadCache() ?? PluginCatalogCache(tag: tag, map: [:])
+        cache.reconcileRoutes(current: allManifest.mapValues(\.newMD5))
+        let cleanupCandidates = PluginRouteReconciliation.candidates(
+            current: Array(allManifest.values),
+            retiredRoutes: cache.retiredRoutes,
+            excluded: excluded,
+            unprotectedBuiltIns: unprotectedBuiltIns
+        )
 
         var installed = Set<String>()      // verified on device
         var failures: [String] = []
-        var cleanedDuplicates: [String] = []   // legacy copies removed (exact pack match)
-        var keptDuplicates: [String] = []      // legacy copies left for review (md5 differs)
+        var cleanedDuplicates: [String] = []   // verified obsolete Community Pack routes
+        var keptDuplicates: [String] = []      // routes whose safe removal was not proven/completed
         verifyResult = nil
         lastCleanup = nil
 
@@ -1012,24 +1249,45 @@ final class PluginUpdater: ObservableObject {
                 history.insert(InstallRecord(date: Date(), tag: tag, name: u.name,
                                              pack: u.pack, wasNew: u.isNew), at: 0)
 
-                // Legacy-duplicate sweep: the new copy is verified at the canonical
-                // destination. Remove an old-route copy ONLY when it byte-matches what
-                // was just installed; a different custom/older build is retained.
-                for legacyPath in PluginInstallRouting.legacyPaths(for: u.remotePath)
-                where legacyPath != u.targetPath {
-                    guard let legacyMD5 = await storage.md5(legacyPath) else { continue }
-                    if legacyMD5 == u.newMD5 {
-                        do {
-                            try await storage.delete(legacyPath, recursive: false)
-                            cleanedDuplicates.append(legacyPath)
-                            ulog.notice("removed legacy duplicate \(legacyPath, privacy: .public)")
-                        } catch {
-                            keptDuplicates.append(legacyPath)   // couldn't delete → leave it
-                            ulog.error("failed to remove legacy duplicate \(legacyPath, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                // Route reconciliation is fail-closed and content-addressed. Re-check
+                // the canonical destination immediately before touching any retired
+                // path, then accept only exact MD5s recorded by an older pack catalog.
+                let candidates = cleanupCandidates[u.remotePath] ?? []
+                if !candidates.isEmpty {
+                    do {
+                        let canonicalMD5 = try await storage.checkedMD5(u.targetPath)
+                        for candidate in candidates {
+                            let legacyMD5 = try await storage.checkedMD5(candidate.legacyPath)
+                            switch PluginRouteReconciliation.decision(
+                                for: candidate,
+                                canonicalDeviceMD5: canonicalMD5,
+                                legacyDeviceMD5: legacyMD5
+                            ) {
+                            case .missing:
+                                cache.forgetRetiredRoute(candidate.legacyPath)
+                            case .keep:
+                                keptDuplicates.append(candidate.legacyPath)
+                                ulog.notice("kept legacy file for review (untrusted md5) \(candidate.legacyPath, privacy: .public)")
+                            case .remove:
+                                do {
+                                    try await storage.delete(candidate.legacyPath, recursive: false)
+                                    guard try await storage.checkedMD5(candidate.legacyPath) == nil else {
+                                        keptDuplicates.append(candidate.legacyPath)
+                                        ulog.error("legacy duplicate remained after delete \(candidate.legacyPath, privacy: .public)")
+                                        continue
+                                    }
+                                    cache.forgetRetiredRoute(candidate.legacyPath)
+                                    cleanedDuplicates.append(candidate.legacyPath)
+                                    ulog.notice("removed verified legacy duplicate \(candidate.legacyPath, privacy: .public)")
+                                } catch {
+                                    keptDuplicates.append(candidate.legacyPath)
+                                    ulog.error("failed to remove legacy duplicate \(candidate.legacyPath, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                                }
+                            }
                         }
-                    } else {
-                        keptDuplicates.append(legacyPath)
-                        ulog.notice("kept legacy file for review (md5 differs) \(legacyPath, privacy: .public)")
+                    } catch {
+                        keptDuplicates.append(contentsOf: candidates.map(\.legacyPath))
+                        ulog.error("legacy cleanup stopped before delete: \(error.localizedDescription, privacy: .public)")
                     }
                 }
             } else if !stoppedMidFile {
@@ -1060,6 +1318,8 @@ final class PluginUpdater: ObservableObject {
         // device, so this records exactly what landed intact vs what didn't.
         verifyResult = VerifyResult(kind: .postInstall, tag: tag,
                                     verified: installed.count, failed: failures)
+        cleanedDuplicates = Array(Set(cleanedDuplicates)).sorted()
+        keptDuplicates = Array(Set(keptDuplicates).subtracting(cleanedDuplicates)).sorted()
         lastCleanup = (cleanedDuplicates.isEmpty && keptDuplicates.isEmpty)
             ? nil : CleanupResult(removed: cleanedDuplicates, kept: keptDuplicates)
 
@@ -1321,11 +1581,11 @@ final class PluginUpdater: ObservableObject {
 
     // MARK: - Cache
 
-    private func loadCache() -> Cache? {
+    private func loadCache() -> PluginCatalogCache? {
         guard let d = UserDefaults.standard.data(forKey: cacheKey) else { return nil }
-        return try? JSONDecoder().decode(Cache.self, from: d)
+        return try? JSONDecoder().decode(PluginCatalogCache.self, from: d)
     }
-    private func saveCache(_ c: Cache) {
+    private func saveCache(_ c: PluginCatalogCache) {
         if let d = try? JSONEncoder().encode(c) { UserDefaults.standard.set(d, forKey: cacheKey) }
     }
     func resetBaseline() { UserDefaults.standard.removeObject(forKey: cacheKey) }
@@ -1493,6 +1753,23 @@ extension PluginUpdater {
         updater.protectedAuditResolution = .rejected(
             "The authoritative protected-app audit document is malformed.",
             kind: .invalid)
+        return updater
+    }
+
+    static func communityRouteCleanupQAFixture() -> PluginUpdater {
+        let updater = PluginUpdater()
+        updater.tag = "16aug2026"
+        updater.phase = .done("Installed 2 apps · cleaned 1 duplicate · 16aug2026")
+        updater.verifyResult = VerifyResult(
+            kind: .postInstall,
+            tag: "16aug2026",
+            verified: 2,
+            failed: []
+        )
+        updater.lastCleanup = CleanupResult(
+            removed: ["/ext/apps/Games/4inrow.fap"],
+            kept: ["/ext/apps/GPIO/custom_sensor.fap"]
+        )
         return updater
     }
 }

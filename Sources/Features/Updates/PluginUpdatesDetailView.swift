@@ -249,18 +249,25 @@ struct PluginUpdatesDetailView: View {
 
     @ViewBuilder private func cleanupDetail(_ cl: CleanupResult) -> some View {
         if !cl.removed.isEmpty {
-            Text("Removed legacy duplicate\(cl.removed.count == 1 ? "" : "s") (exact pack match):")
+            Text("Removed obsolete Community Pack route\(cl.removed.count == 1 ? "" : "s") (verified history):")
                 .font(.caption2).foregroundStyle(.secondary)
+                .accessibilityIdentifier("community-cleanup-removed")
             Text(cl.removed.prefix(12).joined(separator: "\n") + (cl.removed.count > 12 ? "\n…" : ""))
                 .font(.system(.caption2, design: .monospaced)).foregroundStyle(.green)
                 .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("community-cleanup-removed-paths")
         }
         if !cl.kept.isEmpty {
-            Text("Kept legacy file\(cl.kept.count == 1 ? "" : "s") for review (md5 differs — possible custom/older build):")
+            Text(
+                "Kept legacy file\(cl.kept.count == 1 ? "" : "s") for review "
+                + "(not verified as an old pack build — possible custom/modified file):"
+            )
                 .font(.caption2).foregroundStyle(.secondary)
+                .accessibilityIdentifier("community-cleanup-kept")
             Text(cl.kept.prefix(12).joined(separator: "\n") + (cl.kept.count > 12 ? "\n…" : ""))
                 .font(.system(.caption2, design: .monospaced)).foregroundStyle(.orange)
                 .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("community-cleanup-kept-paths")
         }
     }
 

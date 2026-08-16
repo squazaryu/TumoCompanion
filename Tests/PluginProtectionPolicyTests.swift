@@ -2,6 +2,22 @@ import XCTest
 @testable import UnleashedCompanion
 
 final class PluginProtectionPolicyTests: XCTestCase {
+    private func routeUpdate(
+        _ name: String,
+        remotePath: String,
+        md5: String
+    ) -> PluginUpdate {
+        PluginUpdate(
+            remotePath: remotePath,
+            name: name,
+            category: (remotePath as NSString).deletingLastPathComponent,
+            pack: "extra",
+            newMD5: md5,
+            oldMD5: nil,
+            size: 1
+        )
+    }
+
     func testArchiveRoutingIncludesAppsAndAppsDataBinaries() {
         XCTAssertEqual(
             PluginInstallRouting.remotePath(
@@ -120,6 +136,160 @@ final class PluginProtectionPolicyTests: XCTestCase {
                 unprotectedBuiltIns: []
             ))
         }
+    }
+
+    func testLegacyV2CacheMigratesRemovedRoutesIntoContentAddressedHistory() throws {
+        let oldPath = "/ext/apps/Games/4inrow.fap"
+        let oldMD5 = "67067213b636a3a5f3bba182390c0bde"
+        let data = try JSONSerialization.data(withJSONObject: [
+            "tag": "15aug2026",
+            "map": [oldPath: oldMD5],
+        ])
+        var cache = try JSONDecoder().decode(PluginCatalogCache.self, from: data)
+
+        cache.reconcileRoutes(current: [
+            "/ext/apps/Games/Board/4inrow.fap": oldMD5,
+        ])
+
+        XCTAssertTrue(cache.map.isEmpty)
+        XCTAssertEqual(cache.retiredRoutes[oldPath], [oldMD5])
+
+        let roundTrip = try JSONDecoder().decode(
+            PluginCatalogCache.self,
+            from: JSONEncoder().encode(cache)
+        )
+        XCTAssertEqual(roundTrip, cache)
+    }
+
+    func test16AugustMovesAreDerivedWithoutReleaseSpecificDeleteList() throws {
+        let sameMD5 = "67067213b636a3a5f3bba182390c0bde"
+        let rebuiltOldMD5 = "1980d96bf22dbac11b3c2402562cd4ee"
+        let rebuiltNewMD5 = "3d380c9c7adaa8175c4f7af1e49243de"
+        let protectedMD5 = "11111111111111111111111111111111"
+        let current = [
+            routeUpdate(
+                "4inrow",
+                remotePath: "/ext/apps/Games/Board/4inrow.fap",
+                md5: sameMD5
+            ),
+            routeUpdate(
+                "24cxxprog",
+                remotePath: "/ext/apps/GPIO/Programmers/24cxxprog.fap",
+                md5: rebuiltNewMD5
+            ),
+            routeUpdate(
+                "esp_flasher",
+                remotePath: "/ext/apps/GPIO/ESP32/esp_flasher.fap",
+                md5: protectedMD5
+            ),
+        ]
+
+        let result = PluginRouteReconciliation.candidates(
+            current: current,
+            retiredRoutes: [
+                "/ext/apps/Games/4inrow.fap": [sameMD5],
+                "/ext/apps/GPIO/24cxxprog.fap": [rebuiltOldMD5],
+                "/ext/apps/GPIO/esp_flasher.fap": [protectedMD5],
+            ],
+            excluded: ["esp_flasher"],
+            unprotectedBuiltIns: []
+        )
+        let candidates = result.values.flatMap { $0 }
+
+        XCTAssertEqual(Set(candidates.map(\.legacyPath)), [
+            "/ext/apps/Games/4inrow.fap",
+            "/ext/apps/GPIO/24cxxprog.fap",
+        ])
+        let rebuilt = try XCTUnwrap(candidates.first {
+            $0.legacyPath == "/ext/apps/GPIO/24cxxprog.fap"
+        })
+        XCTAssertEqual(rebuilt.canonicalPath, "/ext/apps/GPIO/Programmers/24cxxprog.fap")
+        XCTAssertEqual(rebuilt.canonicalMD5, rebuiltNewMD5)
+        XCTAssertEqual(rebuilt.acceptedLegacyMD5s, [rebuiltOldMD5])
+        XCTAssertFalse(candidates.contains { $0.legacyPath.contains("esp_flasher") })
+    }
+
+    func testRouteCleanupRequiresBothCanonicalAndHistoricalDeviceMD5() {
+        let candidate = PluginRouteCleanupCandidate(
+            catalogPath: "/ext/apps/GPIO/Programmers/24cxxprog.fap",
+            canonicalPath: "/ext/apps/GPIO/Programmers/24cxxprog.fap",
+            legacyPath: "/ext/apps/GPIO/24cxxprog.fap",
+            canonicalMD5: "33333333333333333333333333333333",
+            acceptedLegacyMD5s: ["11111111111111111111111111111111"]
+        )
+
+        XCTAssertEqual(
+            PluginRouteReconciliation.decision(
+                for: candidate,
+                canonicalDeviceMD5: candidate.canonicalMD5,
+                legacyDeviceMD5: candidate.acceptedLegacyMD5s[0]
+            ),
+            .remove
+        )
+        XCTAssertEqual(
+            PluginRouteReconciliation.decision(
+                for: candidate,
+                canonicalDeviceMD5: "22222222222222222222222222222222",
+                legacyDeviceMD5: candidate.acceptedLegacyMD5s[0]
+            ),
+            .keep,
+            "A non-canonical replacement must make cleanup fail closed"
+        )
+        XCTAssertEqual(
+            PluginRouteReconciliation.decision(
+                for: candidate,
+                canonicalDeviceMD5: candidate.canonicalMD5,
+                legacyDeviceMD5: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            ),
+            .keep,
+            "A custom or unknown legacy build must be preserved"
+        )
+        XCTAssertEqual(
+            PluginRouteReconciliation.decision(
+                for: candidate,
+                canonicalDeviceMD5: candidate.canonicalMD5,
+                legacyDeviceMD5: nil
+            ),
+            .missing
+        )
+    }
+
+    func testAmbiguousOrUnsafeRetiredRoutesAreNeverCandidates() {
+        let md5 = "11111111111111111111111111111111"
+        let duplicateNames = [
+            routeUpdate("clock", remotePath: "/ext/apps/Tools/Clocks/clock.fap", md5: md5),
+            routeUpdate("clock", remotePath: "/ext/apps/Media/Clocks/clock.fap", md5: md5),
+        ]
+        let result = PluginRouteReconciliation.candidates(
+            current: duplicateNames,
+            retiredRoutes: [
+                "/ext/apps/Tools/clock.fap": [md5],
+                "/ext/apps/../protected/clock.fap": [md5],
+            ],
+            excluded: [],
+            unprotectedBuiltIns: []
+        )
+
+        XCTAssertTrue(result.isEmpty)
+    }
+
+    func testIntentionalAppsDataRouteStillUsesGuardedCleanup() throws {
+        let md5 = "11111111111111111111111111111111"
+        let remotePath = "/ext/apps/Sub-GHz/proto_pirate.fap"
+        let result = PluginRouteReconciliation.candidates(
+            current: [routeUpdate("proto_pirate", remotePath: remotePath, md5: md5)],
+            retiredRoutes: [:],
+            excluded: [],
+            unprotectedBuiltIns: []
+        )
+
+        let candidate = try XCTUnwrap(result[remotePath]?.first)
+        XCTAssertEqual(
+            candidate.canonicalPath,
+            "/ext/apps_data/arf_subghz_full/modules/proto_pirate.fap"
+        )
+        XCTAssertEqual(candidate.legacyPath, remotePath)
+        XCTAssertEqual(candidate.acceptedLegacyMD5s, [md5])
     }
 
     func testCatalogCannotOverwriteProtectedClaudeBuddy() {

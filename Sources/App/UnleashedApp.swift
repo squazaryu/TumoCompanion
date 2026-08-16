@@ -86,6 +86,8 @@ struct RootView: View {
             ProtectedAppsAuditQAView(failureKind: .invalid)
         } else if ProcessInfo.processInfo.arguments.contains("-fw-packages-action-bar-qa") {
             FWPackagesActionBarQAView()
+        } else if ProcessInfo.processInfo.arguments.contains("-community-route-cleanup-qa") {
+            CommunityRouteCleanupQAView()
         } else if ProcessInfo.processInfo.arguments.contains("-esp32-archived-redownload-qa") {
             NavigationStack {
                 ESP32FirmwareView(updater: .archivedRedownloadQA())
@@ -157,6 +159,18 @@ struct RootView: View {
     }
 
 }
+
+#if DEBUG
+private struct CommunityRouteCleanupQAView: View {
+    @StateObject private var updater = PluginUpdater.communityRouteCleanupQAFixture()
+
+    var body: some View {
+        NavigationStack {
+            PluginUpdatesDetailView(updater: updater)
+        }
+    }
+}
+#endif
 
 #if DEBUG
 private struct LiveActivityLayoutQAView: View {
