@@ -295,6 +295,68 @@ final class PluginProtectionPolicyTests: XCTestCase {
         )
     }
 
+    func testCleanupExecutorRevalidatesBothPathsImmediatelyBeforeDelete() async {
+        let oldMD5 = "11111111111111111111111111111111"
+        let newMD5 = "22222222222222222222222222222222"
+        let canonical = "/ext/apps/Games/Board/chess.fap"
+        let legacy = "/ext/apps/Games/chess.fap"
+        let candidate = PluginRouteCleanupCandidate(
+            catalogPath: canonical,
+            canonicalPath: canonical,
+            legacyPath: legacy,
+            canonicalMD5: newMD5,
+            acceptedLegacyMD5s: [oldMD5]
+        )
+        let storage = PluginRouteMemoryStore(hashes: [
+            canonical: newMD5,
+            legacy: oldMD5,
+        ])
+
+        let result = await PluginRouteCleanupExecutor.execute(
+            [candidate],
+            storage: storage
+        )
+
+        XCTAssertEqual(result.removed, [legacy])
+        XCTAssertTrue(result.kept.isEmpty)
+        XCTAssertTrue(result.failures.isEmpty)
+        let canonicalAfter = await storage.hash(at: canonical)
+        let legacyAfter = await storage.hash(at: legacy)
+        let events = await storage.recordedEvents()
+        XCTAssertEqual(canonicalAfter, newMD5)
+        XCTAssertNil(legacyAfter)
+        XCTAssertEqual(events, [
+            "md5:\(canonical)",
+            "md5:\(legacy)",
+            "delete:\(legacy)",
+            "md5:\(legacy)",
+        ])
+    }
+
+    @MainActor
+    func testCommunityMutationGateRejectsConcurrentTransaction() async {
+        let gate = PluginTransactionGate()
+        let entered = expectation(description: "first mutation entered")
+        let release = PluginRouteTestLatch()
+        let first = Task { @MainActor in
+            XCTAssertTrue(gate.begin())
+            entered.fulfill()
+            await release.wait()
+            gate.end()
+        }
+
+        await fulfillment(of: [entered], timeout: 1)
+        XCTAssertFalse(
+            gate.begin(),
+            "cleanup must not overlap an install suspended on device I/O"
+        )
+
+        await release.open()
+        await first.value
+        XCTAssertTrue(gate.begin(), "the next mutation may start after completion")
+        gate.end()
+    }
+
     func testIntentionalAppsDataRouteStillUsesGuardedCleanup() throws {
         let md5 = "11111111111111111111111111111111"
         let remotePath = "/ext/apps/Sub-GHz/proto_pirate.fap"
@@ -324,5 +386,101 @@ final class PluginProtectionPolicyTests: XCTestCase {
         XCTAssertNotNil(CatalogInstallPolicy.protectionReason(alias: "tumokey"))
         XCTAssertNotNil(CatalogInstallPolicy.protectionReason(alias: "tumokey.fap"))
         XCTAssertNotNil(CatalogInstallPolicy.protectionReason(alias: "tumokey_phase_a"))
+    }
+}
+
+private enum PluginRouteTestStoreError: Error {
+    case unsupported
+}
+
+private actor PluginRouteMemoryStore: DeviceFileStore {
+    nonisolated let channel: TransferChannel = .usb
+    private var hashes: [String: String]
+    private var events: [String] = []
+
+    init(hashes: [String: String]) {
+        self.hashes = Dictionary(
+            uniqueKeysWithValues: hashes.map {
+                (PluginRouteReconciliation.pathIdentity($0.key), $0.value)
+            }
+        )
+    }
+
+    func hash(at path: String) -> String? {
+        hashes[PluginRouteReconciliation.pathIdentity(path)]
+    }
+
+    func recordedEvents() -> [String] {
+        events
+    }
+
+    func list(_ path: String) async throws -> [FlipperFile] {
+        throw PluginRouteTestStoreError.unsupported
+    }
+
+    func read(_ path: String) async throws -> Data {
+        throw PluginRouteTestStoreError.unsupported
+    }
+
+    func write(
+        _ path: String,
+        data: Data,
+        progress: (@Sendable (Int) -> Void)?
+    ) async throws {
+        throw PluginRouteTestStoreError.unsupported
+    }
+
+    func makeDirectory(_ path: String) async throws {}
+
+    func delete(_ path: String, recursive: Bool) async throws {
+        events.append("delete:\(path)")
+        hashes.removeValue(forKey: PluginRouteReconciliation.pathIdentity(path))
+    }
+
+    func move(_ from: String, to newPath: String) async throws {
+        let source = PluginRouteReconciliation.pathIdentity(from)
+        guard let hash = hashes.removeValue(forKey: source) else {
+            throw PluginRouteTestStoreError.unsupported
+        }
+        hashes[PluginRouteReconciliation.pathIdentity(newPath)] = hash
+    }
+
+    func md5(_ path: String) async -> String? {
+        hashes[PluginRouteReconciliation.pathIdentity(path)]
+    }
+
+    func checkedMD5(_ path: String) async throws -> String? {
+        events.append("md5:\(path)")
+        return hashes[PluginRouteReconciliation.pathIdentity(path)]
+    }
+
+    func exists(_ path: String) async -> Bool {
+        hashes[PluginRouteReconciliation.pathIdentity(path)] != nil
+    }
+
+    func uploadFolder(
+        localURL: URL,
+        to destination: String,
+        progress: @escaping (UploadProgress) -> Void
+    ) async throws {
+        throw PluginRouteTestStoreError.unsupported
+    }
+}
+
+private actor PluginRouteTestLatch {
+    private var isOpen = false
+    private var continuation: CheckedContinuation<Void, Never>?
+
+    func wait() async {
+        guard !isOpen else { return }
+        await withCheckedContinuation { continuation in
+            self.continuation = continuation
+        }
+    }
+
+    func open() {
+        isOpen = true
+        continuation?.resume()
+        continuation = nil
     }
 }

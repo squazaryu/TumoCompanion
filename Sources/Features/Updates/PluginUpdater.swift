@@ -328,6 +328,74 @@ enum PluginRouteCleanupDecision: Equatable {
     case keep
 }
 
+struct PluginRouteCleanupExecution: Equatable {
+    var removed: [String] = []
+    var missing: [String] = []
+    var kept: [String] = []
+    var failures: [String] = []
+
+    mutating func normalize() {
+        removed = Array(Set(removed)).sorted()
+        missing = Array(Set(missing)).sorted()
+        kept = Array(Set(kept).subtracting(removed).subtracting(missing)).sorted()
+        failures = Array(Set(failures)).sorted()
+    }
+}
+
+/// Executes only exact-path cleanup candidates. Every candidate is re-read from the
+/// device immediately before deletion; a transport failure stops the sweep and leaves
+/// that route plus every unvisited route untouched.
+enum PluginRouteCleanupExecutor {
+    static func execute(
+        _ candidates: [PluginRouteCleanupCandidate],
+        storage: any DeviceFileStore
+    ) async -> PluginRouteCleanupExecution {
+        let ordered = candidates.sorted {
+            PluginRouteReconciliation.pathIdentity($0.legacyPath)
+                < PluginRouteReconciliation.pathIdentity($1.legacyPath)
+        }
+        var result = PluginRouteCleanupExecution()
+
+        for (index, candidate) in ordered.enumerated() {
+            do {
+                // These are fresh device reads, not values retained by Check/Verify.
+                // Keep the legacy read adjacent to the guarded delete so an in-app
+                // transaction cannot act on an earlier scan result.
+                let canonicalMD5 = try await storage.checkedMD5(candidate.canonicalPath)
+                let legacyMD5 = try await storage.checkedMD5(candidate.legacyPath)
+                switch PluginRouteReconciliation.decision(
+                    for: candidate,
+                    canonicalDeviceMD5: canonicalMD5,
+                    legacyDeviceMD5: legacyMD5
+                ) {
+                case .missing:
+                    result.missing.append(candidate.legacyPath)
+                case .keep:
+                    result.kept.append(candidate.legacyPath)
+                case .remove:
+                    try await storage.delete(candidate.legacyPath, recursive: false)
+                    guard try await storage.checkedMD5(candidate.legacyPath) == nil else {
+                        result.kept.append(candidate.legacyPath)
+                        result.failures.append(
+                            "\(candidate.legacyPath): file remained after delete"
+                        )
+                        continue
+                    }
+                    result.removed.append(candidate.legacyPath)
+                }
+            } catch {
+                result.kept.append(contentsOf: ordered[index...].map(\.legacyPath))
+                result.failures.append(
+                    "\(candidate.legacyPath): \(error.localizedDescription)"
+                )
+                break
+            }
+        }
+        result.normalize()
+        return result
+    }
+}
+
 /// Derives obsolete FAP routes from immutable Community Pack history. No folder or
 /// release-specific deletion list is trusted: a move needs a unique same-name app in
 /// the current catalog, a retired old route, and exact content identities on device.
@@ -499,6 +567,24 @@ struct InstallRecord: Codable, Identifiable {
     let name: String
     let pack: String
     let wasNew: Bool
+}
+
+/// The Community installer and standalone cleanup mutate overlapping SD paths. UI
+/// disabling is not synchronization, so both entry points acquire this main-actor gate
+/// synchronously before their first suspension point.
+@MainActor
+final class PluginTransactionGate {
+    private(set) var isActive = false
+
+    func begin() -> Bool {
+        guard !isActive else { return false }
+        isActive = true
+        return true
+    }
+
+    func end() {
+        isActive = false
+    }
 }
 
 /// One dated build in the all-the-plugins release history — xMasterX sometimes ships
@@ -731,6 +817,7 @@ final class PluginUpdater: ObservableObject {
     private var packURLs: [(pack: String, url: URL)] = []
     private var allManifest: [String: PluginUpdate] = [:]   // remotePath -> entry (no data)
     private var protectedManifest: [PluginUpdate] = []
+    private let transactionGate = PluginTransactionGate()
 
     var selectedCount: Int { installableSelectedCount }
 
@@ -1111,6 +1198,8 @@ final class PluginUpdater: ObservableObject {
     func install() async {
         let requested = updates.filter(\.selected)
         guard !requested.isEmpty else { return }
+        guard transactionGate.begin() else { return }
+        defer { transactionGate.end() }
         stopRequested = false
         // Mark busy immediately so the Install button disables before any
         // await point — `phase` stayed `.idle` (not busy) through the
@@ -1272,40 +1361,17 @@ final class PluginUpdater: ObservableObject {
                 // path, then accept only exact MD5s recorded by an older pack catalog.
                 let candidates = cleanupCandidates[u.remotePath] ?? []
                 if !candidates.isEmpty {
-                    do {
-                        let canonicalMD5 = try await storage.checkedMD5(u.targetPath)
-                        for candidate in candidates {
-                            let legacyMD5 = try await storage.checkedMD5(candidate.legacyPath)
-                            switch PluginRouteReconciliation.decision(
-                                for: candidate,
-                                canonicalDeviceMD5: canonicalMD5,
-                                legacyDeviceMD5: legacyMD5
-                            ) {
-                            case .missing:
-                                cache.forgetRetiredRoute(candidate.legacyPath)
-                            case .keep:
-                                keptDuplicates.append(candidate.legacyPath)
-                                ulog.notice("kept legacy file for review (untrusted md5) \(candidate.legacyPath, privacy: .public)")
-                            case .remove:
-                                do {
-                                    try await storage.delete(candidate.legacyPath, recursive: false)
-                                    guard try await storage.checkedMD5(candidate.legacyPath) == nil else {
-                                        keptDuplicates.append(candidate.legacyPath)
-                                        ulog.error("legacy duplicate remained after delete \(candidate.legacyPath, privacy: .public)")
-                                        continue
-                                    }
-                                    cache.forgetRetiredRoute(candidate.legacyPath)
-                                    cleanedDuplicates.append(candidate.legacyPath)
-                                    ulog.notice("removed verified legacy duplicate \(candidate.legacyPath, privacy: .public)")
-                                } catch {
-                                    keptDuplicates.append(candidate.legacyPath)
-                                    ulog.error("failed to remove legacy duplicate \(candidate.legacyPath, privacy: .public): \(error.localizedDescription, privacy: .public)")
-                                }
-                            }
-                        }
-                    } catch {
-                        keptDuplicates.append(contentsOf: candidates.map(\.legacyPath))
-                        ulog.error("legacy cleanup stopped before delete: \(error.localizedDescription, privacy: .public)")
+                    let cleanup = await PluginRouteCleanupExecutor.execute(
+                        candidates,
+                        storage: storage
+                    )
+                    for path in cleanup.removed + cleanup.missing {
+                        cache.forgetRetiredRoute(path)
+                    }
+                    cleanedDuplicates.append(contentsOf: cleanup.removed)
+                    keptDuplicates.append(contentsOf: cleanup.kept)
+                    for failure in cleanup.failures {
+                        ulog.error("legacy cleanup stopped safely: \(failure, privacy: .public)")
                     }
                 }
             } else if !stoppedMidFile {

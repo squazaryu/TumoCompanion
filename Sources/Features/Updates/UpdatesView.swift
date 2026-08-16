@@ -104,6 +104,14 @@ struct UpdatesView: View {
         }
     }
 
+    private var pluginBusy: Bool {
+        if updater.validating { return true }
+        switch updater.phase {
+        case .fetching, .downloading, .scanning, .installing, .verifying: return true
+        default: return false
+        }
+    }
+
     private var firmwareChecking: Bool {
         switch packages.phase {
         case .checking, .downloading: return true
@@ -317,7 +325,7 @@ struct UpdatesView: View {
         // No install archive published yet for this release → nothing to install, even
         // though the manifest (and a default group selection) already loaded.
         let firmwareN = packages.hasPackageZip ? firmwareSelectedCount : 0
-        if (pluginN > 0 || firmwareN > 0), !pluginChecking, !packages.busy {
+        if (pluginN > 0 || firmwareN > 0), !pluginBusy, !packages.busy {
             VStack(spacing: firmwareN > 0 && pluginN > 0 ? 6 : 0) {
                 if firmwareN > 0 {
                     let firmwareBlocked = packages.validating ||
