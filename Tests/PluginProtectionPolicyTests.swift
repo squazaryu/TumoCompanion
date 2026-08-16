@@ -635,8 +635,8 @@ final class PluginProtectionPolicyTests: XCTestCase {
             canonicalMD5: newMD5,
             acceptedLegacyMD5s: [oldMD5]
         )
-        journal.record([candidate])
-        journal.markStaging(candidate)
+        XCTAssertTrue(journal.record([candidate]))
+        XCTAssertTrue(journal.markStaging(candidate))
 
         let updater = PluginUpdater(
             cleanupJournalStore: journal,
@@ -675,6 +675,104 @@ final class PluginProtectionPolicyTests: XCTestCase {
             persistenceDefaults: defaults
         )
         XCTAssertEqual(finalLaunch.pendingCleanupCount, 0)
+    }
+
+    @MainActor
+    func testProtectedActiveRecoveryRemainsVisibleAndRollsBackOnly() async {
+        let suite = "PluginRouteProtectedRecoveryTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let journal = PluginRouteCleanupJournalStore(
+            defaults: defaults,
+            key: "cleanup-journal"
+        )
+        let oldMD5 = "11111111111111111111111111111111"
+        let newMD5 = "22222222222222222222222222222222"
+        let canonical = "/ext/apps/Games/Board/chess.fap"
+        let legacy = "/ext/apps/Games/chess.fap"
+        let candidate = PluginRouteCleanupCandidate(
+            catalogPath: canonical,
+            canonicalPath: canonical,
+            legacyPath: legacy,
+            canonicalMD5: newMD5,
+            acceptedLegacyMD5s: [oldMD5]
+        )
+        XCTAssertTrue(journal.record([candidate]))
+        XCTAssertTrue(journal.markStaging(candidate))
+
+        let updater = PluginUpdater(
+            cleanupJournalStore: journal,
+            persistenceDefaults: defaults
+        )
+        updater.addExclusion("chess")
+        defer { updater.removeExclusion("chess") }
+        XCTAssertEqual(
+            updater.pendingCleanupCount,
+            1,
+            "protecting after a crash must not hide the active recovery"
+        )
+
+        let relaunched = PluginUpdater(
+            cleanupJournalStore: journal,
+            persistenceDefaults: defaults
+        )
+        XCTAssertTrue(relaunched.isProtected("chess"))
+        XCTAssertEqual(relaunched.pendingCleanupCount, 1)
+        let staged = PluginRouteCleanupExecutor.cleanupStagePath(for: candidate)
+        let storage = PluginRouteMemoryStore(hashes: [
+            canonical: newMD5,
+            staged: oldMD5,
+        ])
+        let recoveryPaths = journal.recoveryPathIdentities()
+        let result = await PluginRouteCleanupExecutor.execute(
+            relaunched.pendingRouteCleanup,
+            storage: storage,
+            stagedRecoveryPaths: recoveryPaths,
+            rollbackOnlyPaths: recoveryPaths
+        )
+        XCTAssertTrue(journal.remove(legacyPaths: result.rolledBack))
+
+        XCTAssertTrue(result.removed.isEmpty)
+        XCTAssertEqual(result.rolledBack, [legacy])
+        let canonicalAfter = await storage.hash(at: canonical)
+        let legacyAfter = await storage.hash(at: legacy)
+        let stagedAfter = await storage.hash(at: staged)
+        XCTAssertEqual(canonicalAfter, newMD5)
+        XCTAssertEqual(legacyAfter, oldMD5)
+        XCTAssertNil(stagedAfter)
+        XCTAssertTrue(journal.load().isEmpty)
+    }
+
+    func testCleanupDoesNotMoveWhenActiveJournalCannotBePersisted() async {
+        let oldMD5 = "11111111111111111111111111111111"
+        let newMD5 = "22222222222222222222222222222222"
+        let canonical = "/ext/apps/Games/Board/chess.fap"
+        let legacy = "/ext/apps/Games/chess.fap"
+        let candidate = PluginRouteCleanupCandidate(
+            catalogPath: canonical,
+            canonicalPath: canonical,
+            legacyPath: legacy,
+            canonicalMD5: newMD5,
+            acceptedLegacyMD5s: [oldMD5]
+        )
+        let storage = PluginRouteMemoryStore(hashes: [
+            canonical: newMD5,
+            legacy: oldMD5,
+        ])
+
+        let result = await PluginRouteCleanupExecutor.execute(
+            [candidate],
+            storage: storage,
+            willStage: { _ in throw PluginRouteTestStoreError.unsupported }
+        )
+
+        XCTAssertTrue(result.removed.isEmpty)
+        XCTAssertEqual(result.kept, [legacy])
+        XCTAssertEqual(result.failures.count, 1)
+        let legacyAfter = await storage.hash(at: legacy)
+        let events = await storage.recordedEvents()
+        XCTAssertEqual(legacyAfter, oldMD5)
+        XCTAssertFalse(events.contains { $0.hasPrefix("move:") || $0.hasPrefix("delete:") })
     }
 
     func testModifiedLegacyFileIsNeverMovedOrDeleted() async {

@@ -361,35 +361,43 @@ struct PluginRouteCleanupJournalStore {
         return [PluginRouteReconciliation.pathIdentity(candidate.legacyPath)]
     }
 
-    func markStaging(_ candidate: PluginRouteCleanupCandidate) {
+    @discardableResult
+    func markStaging(_ candidate: PluginRouteCleanupCandidate) -> Bool {
         guard let validated = PluginRouteReconciliation.normalizedCandidates([candidate]).first,
-              let data = try? JSONEncoder().encode(validated) else { return }
+              let data = try? JSONEncoder().encode(validated) else { return false }
         defaults.set(data, forKey: activeKey)
-        _ = defaults.synchronize()
+        guard defaults.synchronize(), activeStagingCandidate() == validated else {
+            return false
+        }
+        return true
     }
 
-    func markPending(_ candidate: PluginRouteCleanupCandidate) {
+    @discardableResult
+    func markPending(_ candidate: PluginRouteCleanupCandidate) -> Bool {
         guard let active = activeStagingCandidate(),
               PluginRouteReconciliation.pathIdentity(active.legacyPath)
-                == PluginRouteReconciliation.pathIdentity(candidate.legacyPath) else { return }
+                == PluginRouteReconciliation.pathIdentity(candidate.legacyPath) else { return true }
         defaults.removeObject(forKey: activeKey)
-        _ = defaults.synchronize()
+        return defaults.synchronize() && activeStagingCandidate() == nil
     }
 
-    func record(_ candidates: [PluginRouteCleanupCandidate]) {
+    @discardableResult
+    func record(_ candidates: [PluginRouteCleanupCandidate]) -> Bool {
         save(load() + candidates)
     }
 
-    func remove(legacyPaths: [String]) {
+    @discardableResult
+    func remove(legacyPaths: [String]) -> Bool {
         let identities = Set(legacyPaths.map(PluginRouteReconciliation.pathIdentity))
-        save(load().filter {
+        let saved = save(load().filter {
             !identities.contains(PluginRouteReconciliation.pathIdentity($0.legacyPath))
         })
         if let active = activeStagingCandidate(),
            identities.contains(PluginRouteReconciliation.pathIdentity(active.legacyPath)) {
             defaults.removeObject(forKey: activeKey)
-            _ = defaults.synchronize()
+            return saved && defaults.synchronize() && activeStagingCandidate() == nil
         }
+        return saved
     }
 
     private func activeStagingCandidate() -> PluginRouteCleanupCandidate? {
@@ -401,16 +409,21 @@ struct PluginRouteCleanupJournalStore {
         return PluginRouteReconciliation.normalizedCandidates([decoded]).first
     }
 
-    private func save(_ candidates: [PluginRouteCleanupCandidate]) {
+    private func save(_ candidates: [PluginRouteCleanupCandidate]) -> Bool {
         let normalized = PluginRouteReconciliation.normalizedCandidates(candidates)
         guard !normalized.isEmpty else {
             defaults.removeObject(forKey: key)
-            _ = defaults.synchronize()
-            return
+            return defaults.synchronize() && defaults.data(forKey: key) == nil
         }
-        guard let data = try? JSONEncoder().encode(normalized) else { return }
+        guard let data = try? JSONEncoder().encode(normalized) else { return false }
         defaults.set(data, forKey: key)
-        _ = defaults.synchronize()
+        guard defaults.synchronize(),
+              let persisted = defaults.data(forKey: key),
+              let decoded = try? JSONDecoder().decode(
+                [PluginRouteCleanupCandidate].self,
+                from: persisted
+              ) else { return false }
+        return PluginRouteReconciliation.normalizedCandidates(decoded) == normalized
     }
 }
 
@@ -423,13 +436,17 @@ enum PluginRouteCleanupDecision: Equatable {
 struct PluginRouteCleanupExecution: Equatable {
     var removed: [String] = []
     var missing: [String] = []
+    var rolledBack: [String] = []
     var kept: [String] = []
     var failures: [String] = []
 
     mutating func normalize() {
         removed = Array(Set(removed)).sorted()
         missing = Array(Set(missing)).sorted()
-        kept = Array(Set(kept).subtracting(removed).subtracting(missing)).sorted()
+        rolledBack = Array(Set(rolledBack)).sorted()
+        kept = Array(
+            Set(kept).subtracting(removed).subtracting(missing).subtracting(rolledBack)
+        ).sorted()
         failures = Array(Set(failures)).sorted()
     }
 }
@@ -448,8 +465,9 @@ enum PluginRouteCleanupExecutor {
         _ candidates: [PluginRouteCleanupCandidate],
         storage: any DeviceFileStore,
         stagedRecoveryPaths: Set<String> = [],
+        rollbackOnlyPaths: Set<String> = [],
         didObserveNoStage: ((PluginRouteCleanupCandidate) -> Void)? = nil,
-        willStage: ((PluginRouteCleanupCandidate) -> Void)? = nil,
+        willStage: ((PluginRouteCleanupCandidate) throws -> Void)? = nil,
         progress: ((Int, Int, String) -> Void)? = nil
     ) async -> PluginRouteCleanupExecution {
         let ordered = candidates.sorted {
@@ -470,15 +488,47 @@ enum PluginRouteCleanupExecutor {
                 var canonicalMD5 = try await storage.checkedMD5(candidate.canonicalPath)
                 var legacyMD5 = try await storage.checkedMD5(candidate.legacyPath)
                 var stagedMD5 = try await storage.checkedMD5(stagedPath)
+                let legacyIdentity = PluginRouteReconciliation.pathIdentity(
+                    candidate.legacyPath
+                )
 
                 if stagedMD5 != nil,
-                   !stagedRecoveryPaths.contains(
-                    PluginRouteReconciliation.pathIdentity(candidate.legacyPath)
-                   ) {
+                   !stagedRecoveryPaths.contains(legacyIdentity) {
                     result.kept.append(candidate.legacyPath)
                     result.failures.append(
                         "\(candidate.legacyPath): unowned recovery marker was preserved"
                     )
+                    continue
+                }
+
+                // Protection may be enabled after a crash (or become built-in in a
+                // newer app). An owned active marker still has to be reconciled, but
+                // this path is rollback-only: never delete the protected legacy FAP.
+                if rollbackOnlyPaths.contains(legacyIdentity) {
+                    if let stagedMD5 {
+                        if legacyMD5 == nil {
+                            guard isAcceptedLegacyMD5(stagedMD5, for: candidate) else {
+                                throw PluginRouteCleanupFailure(
+                                    message: "protected recovery marker is incomplete"
+                                )
+                            }
+                            try await restore(
+                                candidate: candidate,
+                                stagedPath: stagedPath,
+                                expectedMD5: stagedMD5,
+                                storage: storage
+                            )
+                        } else {
+                            try await storage.delete(stagedPath, recursive: false)
+                            guard try await storage.checkedMD5(stagedPath) == nil else {
+                                throw PluginRouteCleanupFailure(
+                                    message: "protected recovery marker remained"
+                                )
+                            }
+                        }
+                    }
+                    didObserveNoStage?(candidate)
+                    result.rolledBack.append(candidate.legacyPath)
                     continue
                 }
 
@@ -632,7 +682,7 @@ enum PluginRouteCleanupExecutor {
                 case .remove:
                     // The stage path was observed absent above. Persist ownership
                     // synchronously before copy+remove can create even partial bytes.
-                    willStage?(candidate)
+                    try willStage?(candidate)
                     try await storage.move(candidate.legacyPath, to: stagedPath)
 
                     // Re-read both identities after the move. If anything changed,
@@ -1441,7 +1491,13 @@ final class PluginUpdater: ObservableObject {
     }
 
     private func eligibleJournalCleanupCandidates() -> [PluginRouteCleanupCandidate] {
-        cleanupJournalStore.load().filter(isCleanupAllowed)
+        let activePaths = cleanupJournalStore.recoveryPathIdentities()
+        return cleanupJournalStore.load().filter {
+            isCleanupAllowed($0)
+                || activePaths.contains(
+                    PluginRouteReconciliation.pathIdentity($0.legacyPath)
+                )
+        }
     }
 
     private func cleanupCandidates(
@@ -1456,7 +1512,6 @@ final class PluginUpdater: ObservableObject {
             !journalPaths.contains(PluginRouteReconciliation.pathIdentity($0.legacyPath))
         }
         return PluginRouteReconciliation.normalizedCandidates(journal + newHistorical)
-            .filter(isCleanupAllowed)
     }
 
     private func refreshPendingRouteCleanup() {
@@ -1899,18 +1954,31 @@ final class PluginUpdater: ObservableObject {
 
         // Persist exact recovery context before the first device mutation. This
         // journal intentionally survives Reset baseline and app/device restarts.
-        cleanupJournalStore.record(candidates)
+        guard cleanupJournalStore.record(candidates) else {
+            phase = .failed("Cleanup recovery journal could not be persisted; nothing was removed.")
+            return
+        }
         let stagedRecoveryPaths = cleanupJournalStore.recoveryPathIdentities()
+        let rollbackOnlyPaths = Set(candidates.compactMap { candidate -> String? in
+            let identity = PluginRouteReconciliation.pathIdentity(candidate.legacyPath)
+            return stagedRecoveryPaths.contains(identity) && !isCleanupAllowed(candidate)
+                ? identity : nil
+        })
         phase = .cleaning(0, candidates.count)
         let cleanup = await PluginRouteCleanupExecutor.execute(
             candidates,
             storage: storage,
             stagedRecoveryPaths: stagedRecoveryPaths,
+            rollbackOnlyPaths: rollbackOnlyPaths,
             didObserveNoStage: { [cleanupJournalStore] candidate in
                 cleanupJournalStore.markPending(candidate)
             },
             willStage: { [cleanupJournalStore] candidate in
-                cleanupJournalStore.markStaging(candidate)
+                guard cleanupJournalStore.markStaging(candidate) else {
+                    throw PluginRouteCleanupFailure(
+                        message: "active cleanup marker could not be persisted"
+                    )
+                }
             },
             progress: { [weak self] done, total, _ in
                 self?.phase = .cleaning(done, total)
@@ -1920,13 +1988,19 @@ final class PluginUpdater: ObservableObject {
             cache?.forgetRetiredRoute(path)
         }
         if let cache { saveCache(cache) }
-        cleanupJournalStore.remove(legacyPaths: cleanup.removed + cleanup.missing)
+        let journalUpdated = cleanupJournalStore.remove(
+            legacyPaths: cleanup.removed + cleanup.missing + cleanup.rolledBack
+        )
         pendingRouteCleanup = cleanupCandidates(cache: cache)
         lastCleanup = (cleanup.removed.isEmpty && cleanup.kept.isEmpty)
             ? nil
             : CleanupResult(removed: cleanup.removed, kept: cleanup.kept)
 
-        if let failure = cleanup.failures.first {
+        if !journalUpdated {
+            phase = .failed(
+                "Device files are safe, but cleanup recovery state could not be updated. Retry cleanup."
+            )
+        } else if let failure = cleanup.failures.first {
             phase = .failed(
                 "Cleanup stopped safely; unverified files were kept. \(failure)"
             )
@@ -1935,6 +2009,8 @@ final class PluginUpdater: ObservableObject {
                 "Removed \(cleanup.removed.count) obsolete Community Pack route"
                 + (cleanup.removed.count == 1 ? "." : "s.")
             )
+        } else if !cleanup.rolledBack.isEmpty {
+            phase = .done("Restored protected Community app route safely.")
         } else if !cleanup.kept.isEmpty {
             phase = .done("Nothing removed — custom or unverified files were kept.")
         } else {
