@@ -206,6 +206,80 @@ final class TumoflipPackageCatalogTests: XCTestCase {
         }
     }
 
+    func testFrozenLegacyStable003ContractSelectsAndInstallsOnlyOnExactBuild() async throws {
+        let tag = "fw-packages-stable-003"
+        let manifestData = try frozenLegacyStable003Manifest()
+        let client = makeClient(
+            primaryPages: [releasesData([release(id: 3, tag: tag)])],
+            manifests: [manifestURL(tag): manifestData]
+        )
+
+        let selected = try await client.latest(
+            for: .stable,
+            installedVersion: "t-flppr-fw-006",
+            installedAPI: "88.0",
+            installedTarget: 7,
+            installedCommit: "8ab2ccdf",
+            installedCommitDirty: false
+        )
+        let managed = selected.manifest.packageManagedManifest()
+        XCTAssertNil(selected.manifest.packageRelease?.catalogInstallScope)
+        XCTAssertTrue(selected.manifest.isFirmwareSnapshotCatalog)
+        XCTAssertEqual(managed.packages["base"]?.count, 23)
+        XCTAssertEqual(managed.packages["arf"]?.count, 12)
+        XCTAssertEqual(managed.packages["module_one"]?.count, 43)
+        XCTAssertEqual(managed.packages["protocol_packs"]?.count, 31)
+        XCTAssertEqual(managed.cleanup.count, 34)
+
+        let plan = try TumoflipInstallPlan.make(
+            manifest: managed,
+            groups: Set(TumoflipManifest.knownGroups)
+        )
+        XCTAssertEqual(plan.files.count, 109)
+        XCTAssertEqual(plan.cleanup.count, 34)
+        XCTAssertNoThrow(try TumoflipCompat.check(
+            deviceTarget: 7,
+            deviceAPI: "88.0",
+            deviceVersion: "t-flppr-fw-006",
+            deviceOriginFork: "tumoflip",
+            deviceCommit: "8ab2ccdf",
+            deviceCommitDirty: false,
+            manifest: managed
+        ))
+
+        let rejected: [(commit: String?, dirty: Bool?)] = [
+            (nil, false),
+            ("deadbeef", false),
+            ("8ab2ccdf", true),
+        ]
+        for identity in rejected {
+            do {
+                _ = try await client.latest(
+                    for: .stable,
+                    installedVersion: "t-flppr-fw-006",
+                    installedAPI: "88.0",
+                    installedTarget: 7,
+                    installedCommit: identity.commit,
+                    installedCommitDirty: identity.dirty
+                )
+                XCTFail("Legacy Stable003 must reject identity \(identity)")
+            } catch let error as TumoflipPackageCatalogError {
+                guard case .noMatchingRelease = error else {
+                    return XCTFail("Unexpected error: \(error)")
+                }
+            }
+            XCTAssertThrowsError(try TumoflipCompat.check(
+                deviceTarget: 7,
+                deviceAPI: "88.0",
+                deviceVersion: "t-flppr-fw-006",
+                deviceOriginFork: "tumoflip",
+                deviceCommit: identity.commit,
+                deviceCommitDirty: identity.dirty,
+                manifest: managed
+            ))
+        }
+    }
+
     func testMalformedInstalledAPIFailsClosed() async throws {
         let release = release(id: 9, tag: "fw-packages-dev-009")
         let client = makeClient(
@@ -415,6 +489,58 @@ final class TumoflipPackageCatalogTests: XCTestCase {
 
     private func manifestURL(_ tag: String) -> URL {
         URL(string: "https://example.test/\(tag)/tumoflip-packages.json")!
+    }
+
+    /// Freeze Stable003's public identity and aggregate surface without checking a
+    /// 1000-line release manifest into the app repository. The fixture values are the
+    /// immutable release metadata; deterministic entries exercise the same decoder,
+    /// catalog selector and install-plan contract at the exact published cardinality.
+    private func frozenLegacyStable003Manifest() throws -> Data {
+        let fixtureURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .appendingPathComponent("Fixtures/fw-packages-stable-003-contract.json")
+        let fixtureData = try Data(contentsOf: fixtureURL)
+        guard var object = try JSONSerialization.jsonObject(with: fixtureData) as? [String: Any],
+              let expectations = object.removeValue(forKey: "fixture_expectations")
+                as? [String: Any],
+              let packageCounts = expectations["package_counts"] as? [String: Int],
+              let cleanupCount = expectations["cleanup_count"] as? Int else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+
+        var packages: [String: [[String: Any]]] = [:]
+        var targets: [String] = []
+        for group in TumoflipManifest.knownGroups {
+            guard let count = packageCounts[group] else {
+                throw CocoaError(.fileReadCorruptFile)
+            }
+            let entries = (0..<count).map { index -> [String: Any] in
+                let source = "apps/\(group)/snapshot-\(index).fap"
+                let target = "/ext/apps/\(group)/snapshot-\(index).fap"
+                targets.append(target)
+                return [
+                    "bytes": 1,
+                    "sha256": String(repeating: "a", count: 64),
+                    "md5": String(repeating: "b", count: 32),
+                    "source": source,
+                    "target": target,
+                ]
+            }
+            packages[group] = entries
+        }
+        guard cleanupCount <= targets.count else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        object["schema"] = 2
+        object["artifacts"] = [String: Any]()
+        object["packages"] = packages
+        object["cleanup"] = targets.prefix(cleanupCount).enumerated().map { index, target in
+            [
+                "canonical": target,
+                "legacy": "/ext/apps/legacy/stable003-\(index).fap",
+            ]
+        }
+        return try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
     }
 
     private func manifest(
