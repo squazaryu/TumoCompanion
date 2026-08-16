@@ -273,6 +273,28 @@ final class PluginProtectionPolicyTests: XCTestCase {
         XCTAssertTrue(result.isEmpty)
     }
 
+    func testCaseOnlyLegacyAliasCanNeverBecomeCleanupCandidate() {
+        let md5 = "11111111111111111111111111111111"
+        let canonical = "/ext/apps/Games/Board/Chess.fap"
+        let caseOnlyAlias = "/EXT/APPS/GAMES/BOARD/chess.FAP"
+
+        XCTAssertEqual(
+            PluginRouteReconciliation.pathIdentity(canonical),
+            PluginRouteReconciliation.pathIdentity(caseOnlyAlias)
+        )
+        let result = PluginRouteReconciliation.candidates(
+            current: [routeUpdate("Chess", remotePath: canonical, md5: md5)],
+            retiredRoutes: [caseOnlyAlias: [md5]],
+            excluded: [],
+            unprotectedBuiltIns: []
+        )
+
+        XCTAssertTrue(
+            result.isEmpty,
+            "A FAT case-only alias is the canonical file, never an obsolete route"
+        )
+    }
+
     func testIntentionalAppsDataRouteStillUsesGuardedCleanup() throws {
         let md5 = "11111111111111111111111111111111"
         let remotePath = "/ext/apps/Sub-GHz/proto_pirate.fap"

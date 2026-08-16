@@ -347,16 +347,17 @@ enum PluginRouteReconciliation {
                     excluded: excluded,
                     unprotectedBuiltIns: unprotectedBuiltIns)
         }
-        let currentCatalogPaths = Set(current.map(\.remotePath))
-        let canonicalPaths = Set(current.map(\.targetPath))
+        let currentCatalogPaths = Set(current.map { pathIdentity($0.remotePath) })
+        let canonicalPaths = Set(current.map { pathIdentity($0.targetPath) })
         let byStem = Dictionary(grouping: eligible, by: { stem($0.remotePath) })
         var proposals: [PluginRouteCleanupCandidate] = []
 
         for (legacyPath, historicalMD5s) in retiredRoutes {
             let appStem = stem(legacyPath)
+            let legacyIdentity = pathIdentity(legacyPath)
             guard isSafeFAPPath(legacyPath),
-                  !currentCatalogPaths.contains(legacyPath),
-                  !canonicalPaths.contains(legacyPath),
+                  !currentCatalogPaths.contains(legacyIdentity),
+                  !canonicalPaths.contains(legacyIdentity),
                   !PluginProtectionPolicy.isProtected(
                     name: appStem,
                     remotePath: legacyPath,
@@ -391,7 +392,10 @@ enum PluginRouteReconciliation {
         }
 
         // If two catalog entries claim one old path, fail closed instead of choosing.
-        let unambiguous = Dictionary(grouping: proposals, by: \.legacyPath).values.compactMap {
+        let unambiguous = Dictionary(
+            grouping: proposals,
+            by: { pathIdentity($0.legacyPath) }
+        ).values.compactMap {
             group -> PluginRouteCleanupCandidate? in
             let identities = Set(group.map {
                 "\($0.catalogPath)\u{0}\($0.canonicalPath)\u{0}\($0.canonicalMD5)"
@@ -443,7 +447,7 @@ enum PluginRouteReconciliation {
         )).sorted()
         guard isSafeFAPPath(canonicalPath),
               isSafeFAPPath(legacyPath),
-              canonicalPath != legacyPath,
+              pathIdentity(canonicalPath) != pathIdentity(legacyPath),
               isMD5(canonical),
               !accepted.isEmpty else { return }
         proposals.append(PluginRouteCleanupCandidate(
@@ -457,16 +461,30 @@ enum PluginRouteReconciliation {
 
     private static func stem(_ path: String) -> String {
         (((path as NSString).lastPathComponent as NSString).deletingPathExtension)
-            .lowercased()
+            .folding(
+                options: [.caseInsensitive],
+                locale: Locale(identifier: "en_US_POSIX")
+            )
+    }
+
+    /// Flipper SD storage is FAT-backed, so path identity is case-insensitive even
+    /// when the spelling returned by a manifest or cache differs. Never compare raw
+    /// strings when deciding whether one path may be deleted in favor of another.
+    static func pathIdentity(_ path: String) -> String {
+        path.precomposedStringWithCanonicalMapping.folding(
+            options: [.caseInsensitive],
+            locale: Locale(identifier: "en_US_POSIX")
+        )
     }
 
     private static func isSafeFAPPath(_ path: String) -> Bool {
+        let identity = pathIdentity(path)
         let roots = ["/ext/apps/", "/ext/apps_data/"]
-        guard let root = roots.first(where: { path.hasPrefix($0) }),
-              path.lowercased().hasSuffix(".fap") else {
+        guard let root = roots.first(where: { identity.hasPrefix($0) }),
+              identity.hasSuffix(".fap") else {
             return false
         }
-        let suffix = path.dropFirst(root.count)
+        let suffix = identity.dropFirst(root.count)
         let components = suffix.split(separator: "/", omittingEmptySubsequences: false)
         return !components.isEmpty && components.allSatisfy {
             !$0.isEmpty && $0 != "." && $0 != ".."
