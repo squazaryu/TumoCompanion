@@ -15,6 +15,7 @@ final class TumoflipInstallerTests: XCTestCase {
         var files: [String: Data] = [:]
         var dirs = Set<String>()
         var writeCount = 0
+        var mutationCount = 0
         var corruptWrites = false
         var corruptStagingWritesRemaining = 0
         var staleStagingMD5ReadsRemaining = 0
@@ -35,6 +36,7 @@ final class TumoflipInstallerTests: XCTestCase {
         func write(_ data: Data, to path: String) async throws {
             if failWrite?(path) == true { throw Err.injected }
             writeCount += 1
+            mutationCount += 1
             let isState = path == TumoflipInstaller.stateSlotA || path == TumoflipInstaller.stateSlotB
             let isStaging = path.contains("/staging/") || path.hasSuffix(".ucnew")
             if isStaging { stagingWriteCount += 1 }
@@ -59,6 +61,7 @@ final class TumoflipInstallerTests: XCTestCase {
             if isStopRequested() { throw CancellationError() }
             let isStaging = path.contains("/staging/") || path.hasSuffix(".ucnew")
             if isStaging { stagingWriteCount += 1 }
+            mutationCount += 1
             files[path] = Data()
             var offset = 0
             while offset < data.count {
@@ -107,6 +110,7 @@ final class TumoflipInstallerTests: XCTestCase {
             return files[path].map { TumoflipHash.md5($0) }
         }
         func move(_ from: String, to: String) async throws {
+            mutationCount += 1
             if failMove?(from, to) == true { throw Err.injected }
             guard let d = files[from] else { throw Err.notFound }
             files[to] = d
@@ -115,12 +119,19 @@ final class TumoflipInstallerTests: XCTestCase {
             if failMoveAfterRemove?(from, to) == true { throw Err.injected }
             afterMove?(from, to)
         }
-        func delete(_ path: String) async throws { files[path] = nil }
+        func delete(_ path: String) async throws {
+            mutationCount += 1
+            files[path] = nil
+        }
         func deleteTree(_ path: String) async throws {
+            mutationCount += 1
             files = files.filter { $0.key != path && !$0.key.hasPrefix(path + "/") }
             dirs = dirs.filter { $0 != path && !$0.hasPrefix(path + "/") }
         }
-        func makeDirectory(_ path: String) async throws { dirs.insert(path) }
+        func makeDirectory(_ path: String) async throws {
+            mutationCount += 1
+            dirs.insert(path)
+        }
         func exists(_ path: String) async -> Bool { files[path] != nil }
         func readState() async -> TumoflipState? {
             [TumoflipInstaller.stateSlotA, TumoflipInstaller.stateSlotB]
@@ -1123,6 +1134,56 @@ final class TumoflipInstallerTests: XCTestCase {
                 manifest: manifest
             ))
         }
+    }
+
+    func testFinalPrewriteIdentityChangePerformsNoFSMutations() async throws {
+        let commit = "8ab2ccdf7a34bbf3e07f2d4cbd459de1c6de8758"
+        let manifest = makeFirmwareSnapshotManifest(commit: commit)
+        let earlyIdentity = TumoflipDeviceIdentity(
+            firmwareVersion: "t-flppr-fw-006",
+            originFork: "tumoflip",
+            firmwareCommit: "8ab2ccdf",
+            firmwareCommitDirty: false,
+            firmwareAPI: "88.0",
+            hardwareTarget: 7
+        )
+        XCTAssertNoThrow(try TumoflipCompat.check(
+            deviceTarget: earlyIdentity.hardwareTarget,
+            deviceAPI: earlyIdentity.firmwareAPI,
+            deviceVersion: earlyIdentity.firmwareVersion,
+            deviceOriginFork: earlyIdentity.originFork,
+            deviceCommit: earlyIdentity.firmwareCommit,
+            deviceCommitDirty: earlyIdentity.firmwareCommitDirty,
+            manifest: manifest
+        ))
+
+        let changedIdentity = TumoflipDeviceIdentity(
+            firmwareVersion: earlyIdentity.firmwareVersion,
+            originFork: earlyIdentity.originFork,
+            firmwareCommit: "deadbeef",
+            firmwareCommitDirty: false,
+            firmwareAPI: earlyIdentity.firmwareAPI,
+            hardwareTarget: earlyIdentity.hardwareTarget
+        )
+        let fs = FakeFS()
+        do {
+            _ = try await TumoflipPrewriteIdentityGate.authorize(
+                manifest: manifest,
+                readIdentity: { changedIdentity }
+            ) { _ in
+                try await fs.makeDirectory("/ext/should-never-exist")
+                return true
+            }
+            XCTFail("Changed final identity must fail before the mutation closure")
+        } catch let error as TumoflipInstallError {
+            guard case .incompatible = error else {
+                return XCTFail("Unexpected error: \(error)")
+            }
+        }
+        XCTAssertEqual(fs.mutationCount, 0)
+        XCTAssertEqual(fs.writeCount, 0)
+        XCTAssertTrue(fs.files.isEmpty)
+        XCTAssertTrue(fs.dirs.isEmpty)
     }
 
     func testCompatOriginMismatch() {

@@ -208,6 +208,42 @@ enum TumoflipCompat {
     }
 }
 
+/// The final authorization boundary before Loader is stopped or any package path is
+/// mutated. It deliberately reads one complete identity and passes the compatibility
+/// projection from that same response into the authorized operation, so exact snapshot
+/// validation and embedded FAP validation cannot observe different firmware builds.
+struct TumoflipPrewriteIdentity: Equatable {
+    let identity: TumoflipDeviceIdentity
+    let compatibility: TumoflipCompatibilityIdentity
+}
+
+enum TumoflipPrewriteIdentityGate {
+    static func authorize<Result>(
+        manifest: TumoflipManifest,
+        readIdentity: () async throws -> TumoflipDeviceIdentity,
+        operation: (TumoflipPrewriteIdentity) async throws -> Result
+    ) async throws -> Result {
+        let identity = try await readIdentity()
+        try TumoflipCompat.check(
+            deviceTarget: identity.hardwareTarget,
+            deviceAPI: identity.firmwareAPI,
+            deviceVersion: identity.firmwareVersion,
+            deviceOriginFork: identity.originFork,
+            deviceCommit: identity.firmwareCommit,
+            deviceCommitDirty: identity.firmwareCommitDirty,
+            manifest: manifest
+        )
+        guard let compatibility = identity.compatibilityIdentity else {
+            throw TumoflipInstallError.incompatible(
+                "device firmware API or hardware target is unavailable")
+        }
+        return try await operation(TumoflipPrewriteIdentity(
+            identity: identity,
+            compatibility: compatibility
+        ))
+    }
+}
+
 // MARK: - Persisted state (durable ledger + in-flight write-ahead transaction)
 
 /// Whole persisted state, written atomically (temp + rename). Holds the cumulative
