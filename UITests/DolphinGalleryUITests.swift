@@ -177,6 +177,11 @@ final class CommunityRouteCleanupUITests: XCTestCase {
         ]
         app.launch()
 
+        XCTAssertTrue(
+            app.buttons["community-cleanup-action"].waitForExistence(timeout: 3),
+            "cleanup-only must stay available when there are no app updates to reinstall"
+        )
+        XCTAssertTrue(app.buttons["community-cleanup-action"].label.contains("Clean Up 1"))
         XCTAssertTrue(app.staticTexts["community-cleanup-removed"].waitForExistence(timeout: 3))
         XCTAssertTrue(
             app.staticTexts["community-cleanup-removed-paths"].label.contains(

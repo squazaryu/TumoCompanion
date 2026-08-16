@@ -107,7 +107,8 @@ struct UpdatesView: View {
     private var pluginBusy: Bool {
         if updater.validating { return true }
         switch updater.phase {
-        case .fetching, .downloading, .scanning, .installing, .verifying: return true
+        case .fetching, .downloading, .scanning, .installing, .cleaning, .verifying:
+            return true
         default: return false
         }
     }
@@ -123,6 +124,7 @@ struct UpdatesView: View {
         if updater.phase == .needsBaseline { return true }
         if updater.protectedAuditFailure != nil { return true }
         if updater.pendingProtectedReview.count > 0 { return true }
+        if updater.pendingCleanupCount > 0 { return true }
         if let vr = updater.verifyResult, !vr.ok { return true }
         if let warning = packages.firmwareRoute.warning, warning != .identityUnavailable { return true }
         if case .failed = packages.phase { return true }
@@ -218,7 +220,10 @@ struct UpdatesView: View {
                 Divider()
                 NavigationLink { PluginUpdatesDetailView(updater: updater) } label: {
                     SourceRow(icon: "puzzlepiece.extension.fill", tint: .indigo, title: "Community apps",
-                              subtitle: "all-the-plugins", badge: pluginBadge, busy: pluginChecking)
+                              subtitle: updater.pendingCleanupCount > 0
+                                ? "\(updater.pendingCleanupCount) old routes to clean"
+                                : "all-the-plugins",
+                              badge: pluginBadge, busy: pluginChecking)
                 }
             }
         }
@@ -240,6 +245,15 @@ struct UpdatesView: View {
                         NavigationLink { ProtectedAppsView(updater: updater) } label: {
                             AttentionRow(systemImage: "lock.trianglebadge.exclamationmark",
                                          text: "\(n) protected app\(n == 1 ? "" : "s") to review", tint: .orange)
+                        }
+                    }
+                    if updater.pendingCleanupCount > 0 {
+                        NavigationLink { PluginUpdatesDetailView(updater: updater) } label: {
+                            AttentionRow(
+                                systemImage: "trash",
+                                text: "\(updater.pendingCleanupCount) old Community app routes to clean",
+                                tint: .orange
+                            )
                         }
                     }
                     if let failure = updater.protectedAuditFailure {

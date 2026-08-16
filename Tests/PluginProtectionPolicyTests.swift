@@ -323,14 +323,199 @@ final class PluginProtectionPolicyTests: XCTestCase {
         let canonicalAfter = await storage.hash(at: canonical)
         let legacyAfter = await storage.hash(at: legacy)
         let events = await storage.recordedEvents()
+        let staged = PluginRouteCleanupExecutor.cleanupStagePath(for: candidate)
+        let stagedAfter = await storage.hash(at: staged)
         XCTAssertEqual(canonicalAfter, newMD5)
         XCTAssertNil(legacyAfter)
+        XCTAssertNil(stagedAfter)
         XCTAssertEqual(events, [
             "md5:\(canonical)",
             "md5:\(legacy)",
-            "delete:\(legacy)",
-            "md5:\(legacy)",
+            "md5:\(staged)",
+            "move:\(legacy)->\(staged)",
+            "md5:\(canonical)",
+            "md5:\(staged)",
+            "delete:\(staged)",
+            "md5:\(staged)",
         ])
+    }
+
+    func testInstalled15And16RoutesCanBeCleanedWithoutReinstall() async throws {
+        let oldPath = "/ext/apps/Games/4inrow.fap"
+        let newPath = "/ext/apps/Games/Board/4inrow.fap"
+        let md5 = "67067213b636a3a5f3bba182390c0bde"
+
+        // This is the exact legacy state produced when the old app cached 15aug,
+        // installed 16aug at its new path, but never removed the old cache entry.
+        var cache = PluginCatalogCache(
+            tag: "16aug2026",
+            map: [oldPath: md5, newPath: md5]
+        )
+        let current = [routeUpdate("4inrow", remotePath: newPath, md5: md5)]
+        cache.reconcileRoutes(current: [newPath: md5])
+        let pending = PluginRouteReconciliation.candidates(
+            current: current,
+            retiredRoutes: cache.retiredRoutes,
+            excluded: [],
+            unprotectedBuiltIns: [],
+            includeInstallRoutes: false
+        ).values.flatMap { $0 }
+        XCTAssertEqual(pending.count, 1)
+
+        let storage = PluginRouteMemoryStore(hashes: [
+            oldPath: md5,
+            newPath: md5,
+        ])
+        let cleanup = await PluginRouteCleanupExecutor.execute(
+            pending,
+            storage: storage
+        )
+        for path in cleanup.removed + cleanup.missing {
+            cache.forgetRetiredRoute(path)
+        }
+
+        XCTAssertEqual(cleanup.removed, [oldPath])
+        let canonicalAfter = await storage.hash(at: newPath)
+        let legacyAfter = await storage.hash(at: oldPath)
+        XCTAssertEqual(canonicalAfter, md5)
+        XCTAssertNil(legacyAfter)
+        XCTAssertNil(cache.retiredRoutes[oldPath])
+        XCTAssertTrue(PluginRouteReconciliation.candidates(
+            current: current,
+            retiredRoutes: cache.retiredRoutes,
+            excluded: [],
+            unprotectedBuiltIns: [],
+            includeInstallRoutes: false
+        ).isEmpty)
+    }
+
+    func testInterruptedCleanupMarkerIsRecoveredContentSafely() async {
+        let oldMD5 = "11111111111111111111111111111111"
+        let newMD5 = "22222222222222222222222222222222"
+        let canonical = "/ext/apps/Games/Board/chess.fap"
+        let legacy = "/ext/apps/Games/chess.fap"
+        let candidate = PluginRouteCleanupCandidate(
+            catalogPath: canonical,
+            canonicalPath: canonical,
+            legacyPath: legacy,
+            canonicalMD5: newMD5,
+            acceptedLegacyMD5s: [oldMD5]
+        )
+        let staged = PluginRouteCleanupExecutor.cleanupStagePath(for: candidate)
+        let storage = PluginRouteMemoryStore(hashes: [
+            canonical: newMD5,
+            staged: oldMD5,
+        ])
+
+        let result = await PluginRouteCleanupExecutor.execute(
+            [candidate],
+            storage: storage
+        )
+
+        XCTAssertEqual(result.removed, [legacy])
+        let canonicalAfter = await storage.hash(at: canonical)
+        let stagedAfter = await storage.hash(at: staged)
+        XCTAssertEqual(canonicalAfter, newMD5)
+        XCTAssertNil(stagedAfter)
+    }
+
+    func testInterruptedCleanupRestoresLegacyWhenCanonicalIsNoLongerVerified() async {
+        let oldMD5 = "11111111111111111111111111111111"
+        let expectedCanonicalMD5 = "22222222222222222222222222222222"
+        let changedCanonicalMD5 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        let canonical = "/ext/apps/Games/Board/chess.fap"
+        let legacy = "/ext/apps/Games/chess.fap"
+        let candidate = PluginRouteCleanupCandidate(
+            catalogPath: canonical,
+            canonicalPath: canonical,
+            legacyPath: legacy,
+            canonicalMD5: expectedCanonicalMD5,
+            acceptedLegacyMD5s: [oldMD5]
+        )
+        let staged = PluginRouteCleanupExecutor.cleanupStagePath(for: candidate)
+        let storage = PluginRouteMemoryStore(hashes: [
+            canonical: changedCanonicalMD5,
+            staged: oldMD5,
+        ])
+
+        let result = await PluginRouteCleanupExecutor.execute(
+            [candidate],
+            storage: storage
+        )
+
+        XCTAssertTrue(result.removed.isEmpty)
+        XCTAssertEqual(result.kept, [legacy])
+        let legacyAfter = await storage.hash(at: legacy)
+        let stagedAfter = await storage.hash(at: staged)
+        XCTAssertEqual(legacyAfter, oldMD5)
+        XCTAssertNil(stagedAfter)
+    }
+
+    func testModifiedLegacyFileIsNeverMovedOrDeleted() async {
+        let acceptedOldMD5 = "11111111111111111111111111111111"
+        let customMD5 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        let newMD5 = "22222222222222222222222222222222"
+        let canonical = "/ext/apps/Games/Board/chess.fap"
+        let legacy = "/ext/apps/Games/chess.fap"
+        let candidate = PluginRouteCleanupCandidate(
+            catalogPath: canonical,
+            canonicalPath: canonical,
+            legacyPath: legacy,
+            canonicalMD5: newMD5,
+            acceptedLegacyMD5s: [acceptedOldMD5]
+        )
+        let storage = PluginRouteMemoryStore(hashes: [
+            canonical: newMD5,
+            legacy: customMD5,
+        ])
+
+        let result = await PluginRouteCleanupExecutor.execute(
+            [candidate],
+            storage: storage
+        )
+
+        XCTAssertEqual(result.kept, [legacy])
+        XCTAssertTrue(result.removed.isEmpty)
+        let legacyAfter = await storage.hash(at: legacy)
+        let events = await storage.recordedEvents()
+        XCTAssertEqual(legacyAfter, customMD5)
+        XCTAssertFalse(events.contains { $0.hasPrefix("move:") || $0.hasPrefix("delete:") })
+    }
+
+    func testCanonicalChangeAfterStagingRestoresLegacyInsteadOfDeleting() async {
+        let oldMD5 = "11111111111111111111111111111111"
+        let newMD5 = "22222222222222222222222222222222"
+        let changedMD5 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        let canonical = "/ext/apps/Games/Board/chess.fap"
+        let legacy = "/ext/apps/Games/chess.fap"
+        let candidate = PluginRouteCleanupCandidate(
+            catalogPath: canonical,
+            canonicalPath: canonical,
+            legacyPath: legacy,
+            canonicalMD5: newMD5,
+            acceptedLegacyMD5s: [oldMD5]
+        )
+        let storage = PluginRouteMemoryStore(
+            hashes: [canonical: newMD5, legacy: oldMD5],
+            hashesAfterMove: [canonical: changedMD5]
+        )
+
+        let result = await PluginRouteCleanupExecutor.execute(
+            [candidate],
+            storage: storage
+        )
+
+        XCTAssertTrue(result.removed.isEmpty)
+        XCTAssertEqual(result.kept, [legacy])
+        XCTAssertEqual(result.failures.count, 1)
+        let canonicalAfter = await storage.hash(at: canonical)
+        let legacyAfter = await storage.hash(at: legacy)
+        let stagedAfter = await storage.hash(
+            at: PluginRouteCleanupExecutor.cleanupStagePath(for: candidate)
+        )
+        XCTAssertEqual(canonicalAfter, changedMD5)
+        XCTAssertEqual(legacyAfter, oldMD5)
+        XCTAssertNil(stagedAfter)
     }
 
     @MainActor
@@ -396,11 +581,17 @@ private enum PluginRouteTestStoreError: Error {
 private actor PluginRouteMemoryStore: DeviceFileStore {
     nonisolated let channel: TransferChannel = .usb
     private var hashes: [String: String]
+    private let hashesAfterMove: [String: String]
     private var events: [String] = []
 
-    init(hashes: [String: String]) {
+    init(hashes: [String: String], hashesAfterMove: [String: String] = [:]) {
         self.hashes = Dictionary(
             uniqueKeysWithValues: hashes.map {
+                (PluginRouteReconciliation.pathIdentity($0.key), $0.value)
+            }
+        )
+        self.hashesAfterMove = Dictionary(
+            uniqueKeysWithValues: hashesAfterMove.map {
                 (PluginRouteReconciliation.pathIdentity($0.key), $0.value)
             }
         )
@@ -438,11 +629,13 @@ private actor PluginRouteMemoryStore: DeviceFileStore {
     }
 
     func move(_ from: String, to newPath: String) async throws {
+        events.append("move:\(from)->\(newPath)")
         let source = PluginRouteReconciliation.pathIdentity(from)
         guard let hash = hashes.removeValue(forKey: source) else {
             throw PluginRouteTestStoreError.unsupported
         }
         hashes[PluginRouteReconciliation.pathIdentity(newPath)] = hash
+        hashes.merge(hashesAfterMove) { _, replacement in replacement }
     }
 
     func md5(_ path: String) async -> String? {

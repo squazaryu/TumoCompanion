@@ -231,7 +231,9 @@ enum PluginSelectionPolicy {
 }
 
 enum UpdaterPhase: Equatable {
-    case idle, fetching, downloading, needsBaseline, scanning(Int, Int), installing(Int, Int), verifying(Int, Int), done(String), failed(String)
+    case idle, fetching, downloading, needsBaseline
+    case scanning(Int, Int), installing(Int, Int), cleaning(Int, Int), verifying(Int, Int)
+    case done(String), failed(String)
 }
 
 /// Outcome of a signature check — either the per-file verification done during an
@@ -245,8 +247,8 @@ struct VerifyResult: Equatable {
     var ok: Bool { failed.isEmpty }
 }
 
-/// Outcome of the post-install legacy-duplicate sweep. A path is removed only after
-/// both its canonical replacement and its own historical pack identity are verified.
+/// Outcome of an explicit legacy-route cleanup. A path is removed only after both its
+/// canonical replacement and its own historical pack identity are verified.
 struct CleanupResult: Equatable {
     let removed: [String]   // obsolete paths deleted after exact pack-history verification
     let kept: [String]      // paths kept because safe removal could not be proven/completed
@@ -342,13 +344,15 @@ struct PluginRouteCleanupExecution: Equatable {
     }
 }
 
-/// Executes only exact-path cleanup candidates. Every candidate is re-read from the
-/// device immediately before deletion; a transport failure stops the sweep and leaves
-/// that route plus every unvisited route untouched.
+/// Executes only exact-path cleanup candidates. The legacy file is first moved to a
+/// durable sibling marker, then its hash and the canonical replacement are re-read
+/// immediately before deletion. A crash leaves a recoverable marker for the next run;
+/// a transport failure stops the sweep and leaves every unvisited route untouched.
 enum PluginRouteCleanupExecutor {
     static func execute(
         _ candidates: [PluginRouteCleanupCandidate],
-        storage: any DeviceFileStore
+        storage: any DeviceFileStore,
+        progress: ((Int, Int, String) -> Void)? = nil
     ) async -> PluginRouteCleanupExecution {
         let ordered = candidates.sorted {
             PluginRouteReconciliation.pathIdentity($0.legacyPath)
@@ -357,12 +361,81 @@ enum PluginRouteCleanupExecutor {
         var result = PluginRouteCleanupExecution()
 
         for (index, candidate) in ordered.enumerated() {
+            progress?(index, ordered.count, candidate.legacyPath)
+            defer { progress?(index + 1, ordered.count, candidate.legacyPath) }
             do {
-                // These are fresh device reads, not values retained by Check/Verify.
-                // Keep the legacy read adjacent to the guarded delete so an in-app
-                // transaction cannot act on an earlier scan result.
+                let stagedPath = cleanupStagePath(for: candidate)
                 let canonicalMD5 = try await storage.checkedMD5(candidate.canonicalPath)
                 let legacyMD5 = try await storage.checkedMD5(candidate.legacyPath)
+                let stagedMD5 = try await storage.checkedMD5(stagedPath)
+
+                // Recover an interrupted cleanup before considering a new move. The
+                // marker is app-owned, but its bytes still need the same old-pack proof.
+                if let stagedMD5 {
+                    guard legacyMD5 == nil else {
+                        result.kept.append(candidate.legacyPath)
+                        result.failures.append(
+                            "\(candidate.legacyPath): legacy and recovery marker both exist"
+                        )
+                        continue
+                    }
+                    guard PluginRouteReconciliation.decision(
+                        for: candidate,
+                        canonicalDeviceMD5: canonicalMD5,
+                        legacyDeviceMD5: stagedMD5
+                    ) == .remove else {
+                        if isAcceptedLegacyMD5(stagedMD5, for: candidate) {
+                            try await restore(
+                                candidate: candidate,
+                                stagedPath: stagedPath,
+                                expectedMD5: stagedMD5,
+                                storage: storage
+                            )
+                        }
+                        result.kept.append(candidate.legacyPath)
+                        continue
+                    }
+
+                    // The marker may have survived a previous app/device crash. Do
+                    // not trust even the reads at the top of this iteration: repeat
+                    // the two content proofs adjacently at the actual delete boundary.
+                    let currentCanonicalMD5 = try await storage.checkedMD5(
+                        candidate.canonicalPath
+                    )
+                    let currentStagedMD5 = try await storage.checkedMD5(stagedPath)
+                    guard PluginRouteReconciliation.decision(
+                        for: candidate,
+                        canonicalDeviceMD5: currentCanonicalMD5,
+                        legacyDeviceMD5: currentStagedMD5
+                    ) == .remove else {
+                        if let currentStagedMD5,
+                           isAcceptedLegacyMD5(currentStagedMD5, for: candidate) {
+                            try await restore(
+                                candidate: candidate,
+                                stagedPath: stagedPath,
+                                expectedMD5: currentStagedMD5,
+                                storage: storage
+                            )
+                        }
+                        result.kept.append(candidate.legacyPath)
+                        continue
+                    }
+                    try await storage.delete(stagedPath, recursive: false)
+                    guard try await storage.checkedMD5(stagedPath) == nil else {
+                        result.kept.append(candidate.legacyPath)
+                        result.failures.append(
+                            "\(candidate.legacyPath): recovery marker remained after delete"
+                        )
+                        continue
+                    }
+                    result.removed.append(candidate.legacyPath)
+                    continue
+                }
+
+                guard legacyMD5 != nil else {
+                    result.missing.append(candidate.legacyPath)
+                    continue
+                }
                 switch PluginRouteReconciliation.decision(
                     for: candidate,
                     canonicalDeviceMD5: canonicalMD5,
@@ -373,11 +446,37 @@ enum PluginRouteCleanupExecutor {
                 case .keep:
                     result.kept.append(candidate.legacyPath)
                 case .remove:
-                    try await storage.delete(candidate.legacyPath, recursive: false)
-                    guard try await storage.checkedMD5(candidate.legacyPath) == nil else {
+                    try await storage.move(candidate.legacyPath, to: stagedPath)
+
+                    // Re-read both identities after the move. If anything changed,
+                    // restore the exact legacy bytes instead of deleting the marker.
+                    let currentCanonicalMD5 = try await storage.checkedMD5(
+                        candidate.canonicalPath
+                    )
+                    let currentStagedMD5 = try await storage.checkedMD5(stagedPath)
+                    guard PluginRouteReconciliation.decision(
+                        for: candidate,
+                        canonicalDeviceMD5: currentCanonicalMD5,
+                        legacyDeviceMD5: currentStagedMD5
+                    ) == .remove else {
+                        try await restore(
+                            candidate: candidate,
+                            stagedPath: stagedPath,
+                            expectedMD5: legacyMD5,
+                            storage: storage
+                        )
                         result.kept.append(candidate.legacyPath)
                         result.failures.append(
-                            "\(candidate.legacyPath): file remained after delete"
+                            "\(candidate.legacyPath): device bytes changed during cleanup"
+                        )
+                        continue
+                    }
+
+                    try await storage.delete(stagedPath, recursive: false)
+                    guard try await storage.checkedMD5(stagedPath) == nil else {
+                        result.kept.append(candidate.legacyPath)
+                        result.failures.append(
+                            "\(candidate.legacyPath): recovery marker remained after delete"
                         )
                         continue
                     }
@@ -394,6 +493,33 @@ enum PluginRouteCleanupExecutor {
         result.normalize()
         return result
     }
+
+    static func cleanupStagePath(for candidate: PluginRouteCleanupCandidate) -> String {
+        candidate.legacyPath + ".ucobsolete"
+    }
+
+    private static func isAcceptedLegacyMD5(
+        _ md5: String,
+        for candidate: PluginRouteCleanupCandidate
+    ) -> Bool {
+        candidate.acceptedLegacyMD5s.contains(md5.lowercased())
+    }
+
+    private static func restore(
+        candidate: PluginRouteCleanupCandidate,
+        stagedPath: String,
+        expectedMD5: String?,
+        storage: any DeviceFileStore
+    ) async throws {
+        guard try await storage.checkedMD5(candidate.legacyPath) == nil else {
+            return
+        }
+        try await storage.move(stagedPath, to: candidate.legacyPath)
+        guard try await storage.checkedMD5(candidate.legacyPath) == expectedMD5,
+              try await storage.checkedMD5(stagedPath) == nil else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+    }
 }
 
 /// Derives obsolete FAP routes from immutable Community Pack history. No folder or
@@ -404,7 +530,8 @@ enum PluginRouteReconciliation {
         current: [PluginUpdate],
         retiredRoutes: [String: [String]],
         excluded: Set<String>,
-        unprotectedBuiltIns: Set<String>
+        unprotectedBuiltIns: Set<String>,
+        includeInstallRoutes: Bool = true
     ) -> [String: [PluginRouteCleanupCandidate]] {
         let eligible = current.filter {
             isSafeFAPPath($0.remotePath)
@@ -445,17 +572,19 @@ enum PluginRouteReconciliation {
 
         // Preserve the small set of intentional Tumoflip install routes. These
         // predate cache history, so only a byte-identical old copy is accepted.
-        for update in eligible {
-            for legacyPath in PluginInstallRouting.legacyPaths(for: update.remotePath)
-            where legacyPath != update.targetPath {
-                appendCandidate(
-                    catalogPath: update.remotePath,
-                    canonicalPath: update.targetPath,
-                    legacyPath: legacyPath,
-                    canonicalMD5: update.newMD5,
-                    acceptedLegacyMD5s: (retiredRoutes[legacyPath] ?? []) + [update.newMD5],
-                    to: &proposals
-                )
+        if includeInstallRoutes {
+            for update in eligible {
+                for legacyPath in PluginInstallRouting.legacyPaths(for: update.remotePath)
+                where legacyPath != update.targetPath {
+                    appendCandidate(
+                        catalogPath: update.remotePath,
+                        canonicalPath: update.targetPath,
+                        legacyPath: legacyPath,
+                        canonicalMD5: update.newMD5,
+                        acceptedLegacyMD5s: (retiredRoutes[legacyPath] ?? []) + [update.newMD5],
+                        to: &proposals
+                    )
+                }
             }
         }
 
@@ -692,8 +821,11 @@ final class PluginUpdater: ObservableObject {
     @Published var installDetail: InstallDetail?
     /// Result of the last install verification or on-device verify (nil until one runs).
     @Published var verifyResult: VerifyResult?
-    /// Result of the post-install legacy-duplicate sweep (nil until an install runs).
+    /// Result of the last explicit legacy-route cleanup transaction.
     @Published var lastCleanup: CleanupResult?
+    /// Immutable-history route moves that can be checked in a standalone cleanup.
+    /// No device path is touched until the user starts the separate transaction.
+    @Published private(set) var pendingRouteCleanup: [PluginRouteCleanupCandidate] = []
     /// nil = always use GitHub's "latest" release; set = pin to this exact tag (e.g. to
     /// pick up a same-day "p2" follow-up that "latest" hasn't reflected yet, or to roll
     /// back to a known-good build). Persisted so the pin survives relaunches.
@@ -820,6 +952,7 @@ final class PluginUpdater: ObservableObject {
     private let transactionGate = PluginTransactionGate()
 
     var selectedCount: Int { installableSelectedCount }
+    var pendingCleanupCount: Int { pendingRouteCleanup.count }
 
     // MARK: - FAP/FAL compatibility (issue #19)
 
@@ -911,7 +1044,10 @@ final class PluginUpdater: ObservableObject {
         // card heights mid-animation (visible z-fight) and contending with the
         // transfer over RPC (issue #21). install() runs its own inline gate, so
         // skipping here loses nothing; the post-install .ready settle revalidates.
-        if case .installing = phase { return }
+        switch phase {
+        case .installing, .cleaning: return
+        default: break
+        }
         validating = true
         defer { validating = false }
         let api: Int?
@@ -983,6 +1119,7 @@ final class PluginUpdater: ObservableObject {
                 saveCache(reconciled)
                 cache = reconciled
             }
+            pendingRouteCleanup = cache.map(standaloneCleanupCandidates) ?? []
             if let cache {
                 // Fast path: diff the new pack against what we last reconciled.
                 var result: [PluginUpdate] = []
@@ -1025,6 +1162,25 @@ final class PluginUpdater: ObservableObject {
 
     private func sortProtected(_ r: [ProtectedPluginReview]) -> [ProtectedPluginReview] {
         r.sorted { ($0.pack, $0.category, $0.name) < ($1.pack, $1.category, $1.name) }
+    }
+
+    private func standaloneCleanupCandidates(
+        _ cache: PluginCatalogCache
+    ) -> [PluginRouteCleanupCandidate] {
+        PluginRouteReconciliation.candidates(
+            current: Array(allManifest.values),
+            retiredRoutes: cache.retiredRoutes,
+            excluded: excluded,
+            unprotectedBuiltIns: unprotectedBuiltIns,
+            includeInstallRoutes: false
+        ).values.flatMap { $0 }.sorted {
+            PluginRouteReconciliation.pathIdentity($0.legacyPath)
+                < PluginRouteReconciliation.pathIdentity($1.legacyPath)
+        }
+    }
+
+    private func refreshPendingRouteCleanup() {
+        pendingRouteCleanup = loadCache().map(standaloneCleanupCandidates) ?? []
     }
 
     private func setProtectedAuditProvenance(_ provenance: ProtectedPluginPackProvenance?) {
@@ -1167,6 +1323,7 @@ final class PluginUpdater: ObservableObject {
         cache.tag = tag
         cache.map = map
         saveCache(cache)
+        pendingRouteCleanup = standaloneCleanupCandidates(cache)
         updates = []
         phase = .done("Baseline set · \(tag)")
     }
@@ -1252,17 +1409,9 @@ final class PluginUpdater: ObservableObject {
 
         var cache = loadCache() ?? PluginCatalogCache(tag: tag, map: [:])
         cache.reconcileRoutes(current: allManifest.mapValues(\.newMD5))
-        let cleanupCandidates = PluginRouteReconciliation.candidates(
-            current: Array(allManifest.values),
-            retiredRoutes: cache.retiredRoutes,
-            excluded: excluded,
-            unprotectedBuiltIns: unprotectedBuiltIns
-        )
 
         var installed = Set<String>()      // verified on device
         var failures: [String] = []
-        var cleanedDuplicates: [String] = []   // verified obsolete Community Pack routes
-        var keptDuplicates: [String] = []      // routes whose safe removal was not proven/completed
         verifyResult = nil
         lastCleanup = nil
 
@@ -1355,25 +1504,6 @@ final class PluginUpdater: ObservableObject {
                 cache.map[u.remotePath] = u.newMD5
                 history.insert(InstallRecord(date: Date(), tag: tag, name: u.name,
                                              pack: u.pack, wasNew: u.isNew), at: 0)
-
-                // Route reconciliation is fail-closed and content-addressed. Re-check
-                // the canonical destination immediately before touching any retired
-                // path, then accept only exact MD5s recorded by an older pack catalog.
-                let candidates = cleanupCandidates[u.remotePath] ?? []
-                if !candidates.isEmpty {
-                    let cleanup = await PluginRouteCleanupExecutor.execute(
-                        candidates,
-                        storage: storage
-                    )
-                    for path in cleanup.removed + cleanup.missing {
-                        cache.forgetRetiredRoute(path)
-                    }
-                    cleanedDuplicates.append(contentsOf: cleanup.removed)
-                    keptDuplicates.append(contentsOf: cleanup.kept)
-                    for failure in cleanup.failures {
-                        ulog.error("legacy cleanup stopped safely: \(failure, privacy: .public)")
-                    }
-                }
             } else if !stoppedMidFile {
                 failures.append("\(u.name): \(lastReason)")
             }
@@ -1394,6 +1524,7 @@ final class PluginUpdater: ObservableObject {
         }
         cache.tag = tag
         saveCache(cache)
+        pendingRouteCleanup = standaloneCleanupCandidates(cache)
 
         // Keep failed/skipped in the list; drop only the verified ones.
         updates.removeAll { installed.contains($0.remotePath) }
@@ -1402,18 +1533,13 @@ final class PluginUpdater: ObservableObject {
         // device, so this records exactly what landed intact vs what didn't.
         verifyResult = VerifyResult(kind: .postInstall, tag: tag,
                                     verified: installed.count, failed: failures)
-        cleanedDuplicates = Array(Set(cleanedDuplicates)).sorted()
-        keptDuplicates = Array(Set(keptDuplicates).subtracting(cleanedDuplicates)).sorted()
-        lastCleanup = (cleanedDuplicates.isEmpty && keptDuplicates.isEmpty)
-            ? nil : CleanupResult(removed: cleanedDuplicates, kept: keptDuplicates)
 
-        let cleanNote = cleanedDuplicates.isEmpty ? "" : " · cleaned \(cleanedDuplicates.count) duplicate\(cleanedDuplicates.count == 1 ? "" : "s")"
         if stopRequested {
             // Files that were stopped (mid-temp-write or not yet started) kept their
             // previous working version — neither installed nor failed. Any genuine
             // failure (e.g. a verify mismatch) is still surfaced separately.
             let kept = max(0, selected.count - installed.count - failures.count)
-            var msg = "Stopped — installed \(installed.count) of \(selected.count)\(cleanNote)."
+            var msg = "Stopped — installed \(installed.count) of \(selected.count)."
             if kept > 0 { msg += " \(kept) kept their current version." }
             if failures.isEmpty {
                 phase = .done(msg)
@@ -1428,7 +1554,7 @@ final class PluginUpdater: ObservableObject {
                 detail: failures.isEmpty ? "Install stopped" : "Stopped with failures"
             )
         } else if failures.isEmpty {
-            phase = .done("Installed \(installed.count) app\(installed.count == 1 ? "" : "s")\(cleanNote) · \(tag)")
+            phase = .done("Installed \(installed.count) app\(installed.count == 1 ? "" : "s") · \(tag)")
             live.succeed(
                 completed: installed.count,
                 total: selected.count,
@@ -1436,7 +1562,7 @@ final class PluginUpdater: ObservableObject {
             )
         } else {
             let head = installed.isEmpty ? "Install failed" : "Installed \(installed.count), \(failures.count) failed"
-            phase = .failed("\(head)\(cleanNote): " + failures.prefix(4).joined(separator: "; ")
+            phase = .failed("\(head): " + failures.prefix(4).joined(separator: "; ")
                             + (failures.count > 4 ? " …" : ""))
             if installed.isEmpty {
                 live.fail(
@@ -1451,6 +1577,80 @@ final class PluginUpdater: ObservableObject {
                     detail: "\(failures.count) failed"
                 )
             }
+        }
+    }
+
+    /// Separate, user-triggered reconciliation for routes retired by an immutable
+    /// Community Pack catalog. It never downloads or reinstalls an app. Each path is
+    /// independently content-verified and moved through a durable recovery marker.
+    func cleanUpPendingRoutes() async {
+        guard !pendingRouteCleanup.isEmpty else {
+            phase = .done("No obsolete Community Pack routes remain.")
+            return
+        }
+        guard transactionGate.begin() else { return }
+        defer { transactionGate.end() }
+
+        phase = .cleaning(0, pendingRouteCleanup.count)
+        verifyResult = nil
+        lastCleanup = nil
+        let channel = activeChannel
+        let storage = activeStorage
+        guard await fileChannelReady(channel) else {
+            phase = .failed(
+                "Flipper isn't ready — connect it or select its SD card, then retry cleanup."
+            )
+            return
+        }
+        guard channel != .ble || ble().serialOwner != .claudeBuddy else {
+            phase = .failed(FlipperRPCError.serialOwnedByClaudeBuddy.localizedDescription)
+            return
+        }
+
+        guard var cache = loadCache() else {
+            pendingRouteCleanup = []
+            phase = .failed("Community Pack history is unavailable; nothing was removed.")
+            return
+        }
+        cache.reconcileRoutes(current: allManifest.mapValues(\.newMD5))
+        let candidates = standaloneCleanupCandidates(cache)
+        pendingRouteCleanup = candidates
+        guard !candidates.isEmpty else {
+            saveCache(cache)
+            phase = .done("No obsolete Community Pack routes remain.")
+            return
+        }
+
+        phase = .cleaning(0, candidates.count)
+        let cleanup = await PluginRouteCleanupExecutor.execute(
+            candidates,
+            storage: storage,
+            progress: { [weak self] done, total, _ in
+                self?.phase = .cleaning(done, total)
+            }
+        )
+        for path in cleanup.removed + cleanup.missing {
+            cache.forgetRetiredRoute(path)
+        }
+        saveCache(cache)
+        pendingRouteCleanup = standaloneCleanupCandidates(cache)
+        lastCleanup = (cleanup.removed.isEmpty && cleanup.kept.isEmpty)
+            ? nil
+            : CleanupResult(removed: cleanup.removed, kept: cleanup.kept)
+
+        if let failure = cleanup.failures.first {
+            phase = .failed(
+                "Cleanup stopped safely; unverified files were kept. \(failure)"
+            )
+        } else if !cleanup.removed.isEmpty {
+            phase = .done(
+                "Removed \(cleanup.removed.count) obsolete Community Pack route"
+                + (cleanup.removed.count == 1 ? "." : "s.")
+            )
+        } else if !cleanup.kept.isEmpty {
+            phase = .done("Nothing removed — custom or unverified files were kept.")
+        } else {
+            phase = .done("No obsolete Community Pack routes remain.")
         }
     }
 
@@ -1672,7 +1872,10 @@ final class PluginUpdater: ObservableObject {
     private func saveCache(_ c: PluginCatalogCache) {
         if let d = try? JSONEncoder().encode(c) { UserDefaults.standard.set(d, forKey: cacheKey) }
     }
-    func resetBaseline() { UserDefaults.standard.removeObject(forKey: cacheKey) }
+    func resetBaseline() {
+        UserDefaults.standard.removeObject(forKey: cacheKey)
+        pendingRouteCleanup = []
+    }
 
     // MARK: - Exclusions (protect locally-modified apps)
 
@@ -1707,6 +1910,7 @@ final class PluginUpdater: ObservableObject {
         unprotectedBuiltIns.remove(n)   // re-protecting a built-in clears its override
         saveExcluded(); saveUnprotected()
         updates.removeAll { $0.name.lowercased() == n }   // drop it from the current list
+        refreshPendingRouteCleanup()
     }
     func removeExclusion(_ name: String) {
         let n = name.lowercased().trimmingCharacters(in: .whitespaces)
@@ -1718,6 +1922,7 @@ final class PluginUpdater: ObservableObject {
         } else {
             excluded.remove(n); saveExcluded()
         }
+        refreshPendingRouteCleanup()
     }
 
     // MARK: - History
@@ -1854,6 +2059,13 @@ extension PluginUpdater {
             removed: ["/ext/apps/Games/4inrow.fap"],
             kept: ["/ext/apps/GPIO/custom_sensor.fap"]
         )
+        updater.pendingRouteCleanup = [PluginRouteCleanupCandidate(
+            catalogPath: "/ext/apps/Games/Board/chess.fap",
+            canonicalPath: "/ext/apps/Games/Board/chess.fap",
+            legacyPath: "/ext/apps/Games/chess.fap",
+            canonicalMD5: "22222222222222222222222222222222",
+            acceptedLegacyMD5s: ["11111111111111111111111111111111"]
+        )]
         return updater
     }
 }
