@@ -18,6 +18,12 @@ final class PluginProtectionPolicyTests: XCTestCase {
         )
     }
 
+    private func recoveryPaths(
+        for candidate: PluginRouteCleanupCandidate
+    ) -> Set<String> {
+        [PluginRouteReconciliation.pathIdentity(candidate.legacyPath)]
+    }
+
     func testArchiveRoutingIncludesAppsAndAppsDataBinaries() {
         XCTAssertEqual(
             PluginInstallRouting.remotePath(
@@ -314,7 +320,8 @@ final class PluginProtectionPolicyTests: XCTestCase {
 
         let result = await PluginRouteCleanupExecutor.execute(
             [candidate],
-            storage: storage
+            storage: storage,
+            stagedRecoveryPaths: recoveryPaths(for: candidate)
         )
 
         XCTAssertEqual(result.removed, [legacy])
@@ -334,6 +341,7 @@ final class PluginProtectionPolicyTests: XCTestCase {
             "md5:\(staged)",
             "move:\(legacy)->\(staged)",
             "md5:\(canonical)",
+            "md5:\(legacy)",
             "md5:\(staged)",
             "delete:\(staged)",
             "md5:\(staged)",
@@ -409,7 +417,8 @@ final class PluginProtectionPolicyTests: XCTestCase {
 
         let result = await PluginRouteCleanupExecutor.execute(
             [candidate],
-            storage: storage
+            storage: storage,
+            stagedRecoveryPaths: recoveryPaths(for: candidate)
         )
 
         XCTAssertEqual(result.removed, [legacy])
@@ -440,7 +449,8 @@ final class PluginProtectionPolicyTests: XCTestCase {
 
         let result = await PluginRouteCleanupExecutor.execute(
             [candidate],
-            storage: storage
+            storage: storage,
+            stagedRecoveryPaths: recoveryPaths(for: candidate)
         )
 
         XCTAssertTrue(result.removed.isEmpty)
@@ -449,6 +459,222 @@ final class PluginProtectionPolicyTests: XCTestCase {
         let stagedAfter = await storage.hash(at: staged)
         XCTAssertEqual(legacyAfter, oldMD5)
         XCTAssertNil(stagedAfter)
+    }
+
+    func testCompletedCopyWithSourceStillPresentFinishesRecovery() async {
+        let oldMD5 = "11111111111111111111111111111111"
+        let newMD5 = "22222222222222222222222222222222"
+        let canonical = "/ext/apps/Games/Board/chess.fap"
+        let legacy = "/ext/apps/Games/chess.fap"
+        let candidate = PluginRouteCleanupCandidate(
+            catalogPath: canonical,
+            canonicalPath: canonical,
+            legacyPath: legacy,
+            canonicalMD5: newMD5,
+            acceptedLegacyMD5s: [oldMD5]
+        )
+        let staged = PluginRouteCleanupExecutor.cleanupStagePath(for: candidate)
+        let storage = PluginRouteMemoryStore(hashes: [
+            canonical: newMD5,
+            legacy: oldMD5,
+            staged: oldMD5,
+        ])
+
+        let result = await PluginRouteCleanupExecutor.execute(
+            [candidate],
+            storage: storage,
+            stagedRecoveryPaths: recoveryPaths(for: candidate)
+        )
+
+        XCTAssertEqual(result.removed, [legacy])
+        XCTAssertTrue(result.failures.isEmpty)
+        let canonicalAfter = await storage.hash(at: canonical)
+        let legacyAfter = await storage.hash(at: legacy)
+        let stagedAfter = await storage.hash(at: staged)
+        XCTAssertEqual(canonicalAfter, newMD5)
+        XCTAssertNil(legacyAfter)
+        XCTAssertNil(stagedAfter)
+    }
+
+    func testPartialRecoveryMarkerWithIntactSourceSelfHeals() async {
+        let oldMD5 = "11111111111111111111111111111111"
+        let partialMD5 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        let newMD5 = "22222222222222222222222222222222"
+        let canonical = "/ext/apps/Games/Board/chess.fap"
+        let legacy = "/ext/apps/Games/chess.fap"
+        let candidate = PluginRouteCleanupCandidate(
+            catalogPath: canonical,
+            canonicalPath: canonical,
+            legacyPath: legacy,
+            canonicalMD5: newMD5,
+            acceptedLegacyMD5s: [oldMD5]
+        )
+        let staged = PluginRouteCleanupExecutor.cleanupStagePath(for: candidate)
+        let storage = PluginRouteMemoryStore(hashes: [
+            canonical: newMD5,
+            legacy: oldMD5,
+            staged: partialMD5,
+        ])
+
+        let result = await PluginRouteCleanupExecutor.execute(
+            [candidate],
+            storage: storage,
+            stagedRecoveryPaths: recoveryPaths(for: candidate)
+        )
+
+        XCTAssertEqual(result.removed, [legacy])
+        XCTAssertTrue(result.failures.isEmpty)
+        let canonicalAfter = await storage.hash(at: canonical)
+        let legacyAfter = await storage.hash(at: legacy)
+        let stagedAfter = await storage.hash(at: staged)
+        XCTAssertEqual(canonicalAfter, newMD5)
+        XCTAssertNil(legacyAfter)
+        XCTAssertNil(stagedAfter)
+        let events = await storage.recordedEvents()
+        XCTAssertTrue(
+            events.contains("delete:\(staged)"),
+            "the journal-owned partial marker must be removed before retrying"
+        )
+    }
+
+    func testUnownedPartialMarkerIsPreserved() async {
+        let oldMD5 = "11111111111111111111111111111111"
+        let partialMD5 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        let newMD5 = "22222222222222222222222222222222"
+        let canonical = "/ext/apps/Games/Board/chess.fap"
+        let legacy = "/ext/apps/Games/chess.fap"
+        let candidate = PluginRouteCleanupCandidate(
+            catalogPath: canonical,
+            canonicalPath: canonical,
+            legacyPath: legacy,
+            canonicalMD5: newMD5,
+            acceptedLegacyMD5s: [oldMD5]
+        )
+        let staged = PluginRouteCleanupExecutor.cleanupStagePath(for: candidate)
+        let storage = PluginRouteMemoryStore(hashes: [
+            canonical: newMD5,
+            legacy: oldMD5,
+            staged: partialMD5,
+        ])
+
+        let result = await PluginRouteCleanupExecutor.execute(
+            [candidate],
+            storage: storage
+        )
+
+        XCTAssertTrue(result.removed.isEmpty)
+        XCTAssertEqual(result.kept, [legacy])
+        XCTAssertEqual(result.failures.count, 1)
+        let legacyAfter = await storage.hash(at: legacy)
+        let stagedAfter = await storage.hash(at: staged)
+        XCTAssertEqual(legacyAfter, oldMD5)
+        XCTAssertEqual(stagedAfter, partialMD5)
+    }
+
+    func testActiveRecoveryRunsBeforeNewCleanupCandidates() async {
+        let oldMD5 = "11111111111111111111111111111111"
+        let newMD5 = "22222222222222222222222222222222"
+        let firstCanonical = "/ext/apps/Games/Board/alpha.fap"
+        let firstLegacy = "/ext/apps/Games/alpha.fap"
+        let recoveryCanonical = "/ext/apps/Games/Board/zulu.fap"
+        let recoveryLegacy = "/ext/apps/Games/zulu.fap"
+        let first = PluginRouteCleanupCandidate(
+            catalogPath: firstCanonical,
+            canonicalPath: firstCanonical,
+            legacyPath: firstLegacy,
+            canonicalMD5: newMD5,
+            acceptedLegacyMD5s: [oldMD5]
+        )
+        let recovery = PluginRouteCleanupCandidate(
+            catalogPath: recoveryCanonical,
+            canonicalPath: recoveryCanonical,
+            legacyPath: recoveryLegacy,
+            canonicalMD5: newMD5,
+            acceptedLegacyMD5s: [oldMD5]
+        )
+        let recoveryStage = PluginRouteCleanupExecutor.cleanupStagePath(for: recovery)
+        let storage = PluginRouteMemoryStore(hashes: [
+            firstCanonical: newMD5,
+            firstLegacy: oldMD5,
+            recoveryCanonical: newMD5,
+            recoveryStage: oldMD5,
+        ])
+
+        let result = await PluginRouteCleanupExecutor.execute(
+            [first, recovery],
+            storage: storage,
+            stagedRecoveryPaths: recoveryPaths(for: recovery)
+        )
+
+        XCTAssertEqual(Set(result.removed), Set([firstLegacy, recoveryLegacy]))
+        let events = await storage.recordedEvents()
+        XCTAssertEqual(
+            events.first,
+            "md5:\(recoveryCanonical)",
+            "the durable active marker must be reconciled before a new candidate can replace it"
+        )
+    }
+
+    @MainActor
+    func testCleanupJournalSurvivesBaselineResetAndRecoversCrashMarker() async {
+        let suite = "PluginRouteCleanupJournalTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let journal = PluginRouteCleanupJournalStore(
+            defaults: defaults,
+            key: "cleanup-journal"
+        )
+        let oldMD5 = "11111111111111111111111111111111"
+        let newMD5 = "22222222222222222222222222222222"
+        let canonical = "/ext/apps/Games/Board/chess.fap"
+        let legacy = "/ext/apps/Games/chess.fap"
+        let candidate = PluginRouteCleanupCandidate(
+            catalogPath: canonical,
+            canonicalPath: canonical,
+            legacyPath: legacy,
+            canonicalMD5: newMD5,
+            acceptedLegacyMD5s: [oldMD5]
+        )
+        journal.record([candidate])
+        journal.markStaging(candidate)
+
+        let updater = PluginUpdater(
+            cleanupJournalStore: journal,
+            persistenceDefaults: defaults
+        )
+        XCTAssertEqual(updater.pendingCleanupCount, 1)
+        updater.resetBaseline()
+        XCTAssertEqual(
+            updater.pendingCleanupCount,
+            1,
+            "Reset baseline must preserve in-flight cleanup recovery context"
+        )
+
+        // Simulate relaunch/check after a crash between move and marker delete.
+        let relaunched = PluginUpdater(
+            cleanupJournalStore: journal,
+            persistenceDefaults: defaults
+        )
+        XCTAssertEqual(relaunched.pendingCleanupCount, 1)
+        let staged = PluginRouteCleanupExecutor.cleanupStagePath(for: candidate)
+        let storage = PluginRouteMemoryStore(hashes: [
+            canonical: newMD5,
+            staged: oldMD5,
+        ])
+        let result = await PluginRouteCleanupExecutor.execute(
+            relaunched.pendingRouteCleanup,
+            storage: storage,
+            stagedRecoveryPaths: journal.recoveryPathIdentities()
+        )
+        journal.remove(legacyPaths: result.removed + result.missing)
+
+        XCTAssertEqual(result.removed, [legacy])
+        XCTAssertTrue(journal.load().isEmpty)
+        let finalLaunch = PluginUpdater(
+            cleanupJournalStore: journal,
+            persistenceDefaults: defaults
+        )
+        XCTAssertEqual(finalLaunch.pendingCleanupCount, 0)
     }
 
     func testModifiedLegacyFileIsNeverMovedOrDeleted() async {
