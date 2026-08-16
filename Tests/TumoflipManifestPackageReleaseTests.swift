@@ -50,6 +50,7 @@ final class TumoflipManifestPackageReleaseTests: XCTestCase {
               "catalog_channel": "dev",
               "catalog_revision": 8,
               "catalog_release_tag": "fw-packages-dev-008",
+              "catalog_install_scope": "delta",
               "catalog_modified_targets": ["apps/esp.fap"],
               "overlay_targets": ["apps/esp.fap"]
             """
@@ -96,6 +97,49 @@ final class TumoflipManifestPackageReleaseTests: XCTestCase {
         let managed = manifest.packageManagedManifest()
         XCTAssertTrue(managed.packages.values.allSatisfy(\.isEmpty))
         XCTAssertTrue(managed.cleanup.isEmpty)
+    }
+
+    func testProducerFirmwareSnapshotFixtureExposesCompleteManifest() throws {
+        let manifest = try TumoflipManifest.decode(
+            fixture(packageRelease: firmwareSnapshotPackageRelease(explicitScope: true))
+        )
+
+        try manifest.validate()
+        XCTAssertTrue(manifest.isFirmwareSnapshotCatalog)
+        XCTAssertEqual(manifest.packageManagedManifest().packages["base"]?.count, 2)
+        XCTAssertEqual(manifest.packageManagedManifest().cleanup.count, 2)
+    }
+
+    func testStable002And003LegacySnapshotShapeRemainsInstallable() throws {
+        let manifest = try TumoflipManifest.decode(
+            fixture(packageRelease: firmwareSnapshotPackageRelease(explicitScope: false))
+        )
+
+        try manifest.validate()
+        XCTAssertTrue(manifest.isFirmwareSnapshotCatalog)
+        XCTAssertEqual(manifest.packageManagedManifest().packages["base"]?.count, 2)
+    }
+
+    func testExplicitEmptyDeltaCannotMasqueradeAsSnapshot() throws {
+        let invalid = firmwareSnapshotPackageRelease(explicitScope: true)
+            .replacingOccurrences(
+                of: "\"catalog_install_scope\": \"firmwareSnapshot\"",
+                with: "\"catalog_install_scope\": \"delta\""
+            )
+        let manifest = try TumoflipManifest.decode(fixture(packageRelease: invalid))
+
+        XCTAssertThrowsError(try manifest.validate())
+    }
+
+    func testExplicitSnapshotRequiresExactFirmwareEvidence() throws {
+        let invalid = firmwareSnapshotPackageRelease(explicitScope: true)
+            .replacingOccurrences(
+                of: "\"target_firmware_commit\": \"\(String(repeating: "1", count: 40))\"",
+                with: "\"target_firmware_commit\": \"\(String(repeating: "2", count: 40))\""
+            )
+        let manifest = try TumoflipManifest.decode(fixture(packageRelease: invalid))
+
+        XCTAssertThrowsError(try manifest.validate())
     }
 
     func testRejectsUnknownOrNonCanonicalCatalogDeltaSource() throws {
@@ -165,6 +209,35 @@ final class TumoflipManifestPackageReleaseTests: XCTestCase {
           "source_firmware_version": "t-dev-004-014",
           "target_release_tag": "v1.0.4",
           "firmware_flash_unchanged": true
+        },
+        """
+    }
+
+    /// Consumer fixture matching the native publisher's package_release payload.
+    /// Stable002/003 are the same shape without `catalog_install_scope`.
+    private func firmwareSnapshotPackageRelease(explicitScope: Bool) -> String {
+        let commit = String(repeating: "1", count: 40)
+        let scope = explicitScope
+            ? "\"catalog_install_scope\": \"firmwareSnapshot\","
+            : ""
+        return """
+        "package_release": {
+          "id": "fw-packages-stable-003",
+          "type": "package-only",
+          "source_commit": "\(commit)",
+          "source_dirty": false,
+          "source_firmware_version": "t-flppr-fw-004",
+          "target_release_tag": "v1.0.4",
+          "target_release_id": "\(String(repeating: "e", count: 64))",
+          "target_source_commit": "\(commit)",
+          "target_firmware_commit": "\(commit)",
+          "firmware_flash_unchanged": true,
+          "catalog_channel": "stable",
+          "catalog_revision": 3,
+          "catalog_release_tag": "fw-packages-stable-003",
+          \(scope)
+          "overlay_targets": [],
+          "compatible_releases": []
         },
         """
     }

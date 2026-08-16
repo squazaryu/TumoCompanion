@@ -203,9 +203,9 @@ final class TumoflipUpdater: ObservableObject {
     private var selectedCatalogRepository: TumoflipPackageCatalogRepository?
     private let packageCatalogClient: TumoflipPackageCatalogClient
 
-    /// The independently published catalog contains a full firmware baseline for
-    /// provenance. Expose only the automation-owned package delta so status checks and
-    /// install plans can never rewrite firmware-bundled resources.
+    /// Resolve the catalog's declared install surface. Deltas expose only their
+    /// automation-owned allowlist; an exact firmware snapshot exposes its bundled
+    /// package files only after source-firmware identity checks pass.
     private var managedManifest: TumoflipManifest? {
         manifest?.packageManagedManifest()
     }
@@ -480,7 +480,9 @@ final class TumoflipUpdater: ObservableObject {
                 for: firmwareRoute.channel,
                 installedVersion: packageIdentityVersion,
                 installedAPI: deviceIdentity?.firmwareAPI,
-                installedTarget: deviceIdentity?.hardwareTarget
+                installedTarget: deviceIdentity?.hardwareTarget,
+                installedCommit: deviceIdentity?.firmwareCommit,
+                installedCommitDirty: deviceIdentity?.firmwareCommitDirty
             )
             let m = selection.manifest
             try m.validate()
@@ -568,6 +570,8 @@ final class TumoflipUpdater: ObservableObject {
                 installedVersion: packageIdentityVersion,
                 installedAPI: deviceIdentity?.firmwareAPI,
                 installedTarget: deviceIdentity?.hardwareTarget,
+                installedCommit: deviceIdentity?.firmwareCommit,
+                installedCommitDirty: deviceIdentity?.firmwareCommitDirty,
                 forceRemote: true,
                 requiredRepository: selectedCatalogRepository
             )
@@ -963,6 +967,8 @@ final class TumoflipUpdater: ObservableObject {
                                  deviceAPI: fresh.identity.firmwareAPI,
                                  deviceVersion: fresh.identity.firmwareVersion,
                                  deviceOriginFork: fresh.identity.originFork,
+                                 deviceCommit: fresh.identity.firmwareCommit,
+                                 deviceCommitDirty: fresh.identity.firmwareCommitDirty,
                                  manifest: manifest)
     }
 

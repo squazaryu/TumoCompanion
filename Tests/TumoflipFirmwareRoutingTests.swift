@@ -227,6 +227,67 @@ final class TumoflipFirmwareRoutingTests: XCTestCase {
         ))
     }
 
+    func testFirmwareSnapshotCatalogRequiresExactInstalledVersion() {
+        let commit = String(repeating: "b", count: 40)
+        let release = TumoflipManifest.PackageRelease(
+            id: "fw-packages-stable-003",
+            type: "package-only",
+            sourceCommit: commit,
+            sourceDirty: false,
+            sourceFirmwareVersion: "t-flppr-fw-006",
+            targetReleaseTag: "v1.0.6",
+            firmwareFlashUnchanged: true,
+            catalogChannel: "stable",
+            catalogRevision: 3,
+            catalogReleaseTag: "fw-packages-stable-003",
+            catalogInstallScope: .firmwareSnapshot,
+            compatibleReleases: [],
+            overlayTargets: [],
+            targetFirmwareCommit: commit,
+            targetSourceCommit: commit,
+            targetReleaseId: String(repeating: "d", count: 64)
+        )
+
+        XCTAssertTrue(TumoflipPackageReleaseMatcher.matches(
+            manifestVersion: "t-flppr-fw-006",
+            packageRelease: release,
+            channel: .stable,
+            installedVersion: "t-flppr-fw-006"
+        ))
+        XCTAssertFalse(TumoflipPackageReleaseMatcher.matches(
+            manifestVersion: "t-flppr-fw-006",
+            packageRelease: release,
+            channel: .stable,
+            installedVersion: "t-flppr-fw-005"
+        ))
+        XCTAssertFalse(TumoflipPackageReleaseMatcher.matches(
+            manifestVersion: "t-flppr-fw-006",
+            packageRelease: release,
+            channel: .stable,
+            installedVersion: nil
+        ))
+    }
+
+    func testFirmwareCommitIdentityAcceptsOnlyValidReportedPrefix() {
+        let expected = "8ab2ccdf7a34bbf3e07f2d4cbd459de1c6de8758"
+        XCTAssertTrue(TumoflipFirmwareCommitIdentity.matches(
+            reported: "8ab2ccdf",
+            expected: expected
+        ))
+        XCTAssertFalse(TumoflipFirmwareCommitIdentity.matches(
+            reported: "8ab2cc",
+            expected: expected
+        ))
+        XCTAssertFalse(TumoflipFirmwareCommitIdentity.matches(
+            reported: "8ab2ccd",
+            expected: expected
+        ))
+        XCTAssertFalse(TumoflipFirmwareCommitIdentity.matches(
+            reported: "deadbeef",
+            expected: expected
+        ))
+    }
+
     func testIndependentCatalogReplacesLaterCreatedFirmwareManifest() {
         let catalog = packageRelease(channel: "dev", revision: 4)
 

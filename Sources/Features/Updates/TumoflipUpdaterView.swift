@@ -202,7 +202,9 @@ struct TumoflipUpdaterView: View {
                     metadataRow("Package API", manifest.firmware.api)
                     if updater.firmwareFlashUnchanged {
                         Label(
-                            "Apps-only package update. Firmware flashing is unchanged.",
+                            manifest.isFirmwareSnapshotCatalog
+                                ? "Exact firmware package snapshot. Missing or changed bundled files can be reinstalled; firmware flashing is unchanged."
+                                : "Apps-only package update. Firmware flashing is unchanged.",
                             systemImage: "checkmark.shield.fill"
                         )
                         .font(.caption2)
@@ -257,6 +259,9 @@ struct TumoflipUpdaterView: View {
     }
 
     private func firmwareCompatibilityDisplay(_ manifest: TumoflipManifest) -> String {
+        if manifest.isFirmwareSnapshotCatalog {
+            return "Exact \(manifest.firmware.version) · API \(manifest.firmware.api) · f\(manifest.firmware.target)"
+        }
         if let release = manifest.packageRelease,
            let channel = release.catalogChannel {
             return "Tumoflip \(channel.capitalized) · API \(manifest.firmware.api) · f\(manifest.firmware.target)"

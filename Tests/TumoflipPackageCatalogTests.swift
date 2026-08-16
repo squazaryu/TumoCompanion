@@ -133,6 +133,79 @@ final class TumoflipPackageCatalogTests: XCTestCase {
         XCTAssertEqual(selected.release.tag, "fw-packages-dev-009")
     }
 
+    func testFirmwareSnapshotRequiresExactCleanFirmwareIdentity() async throws {
+        let tag = "fw-packages-stable-003"
+        let commit = "8ab2ccdf7a34bbf3e07f2d4cbd459de1c6de8758"
+        for explicitScope in [true, false] {
+            let client = makeClient(
+                primaryPages: [releasesData([release(id: 3, tag: tag)])],
+                manifests: [
+                    manifestURL(tag): manifest(
+                        tag: tag,
+                        revision: 3,
+                        api: "88.0",
+                        firmwareVersion: "t-flppr-fw-006",
+                        snapshotCommit: commit,
+                        snapshotExplicitScope: explicitScope
+                    ),
+                ]
+            )
+
+            let selected = try await client.latest(
+                for: .stable,
+                installedVersion: "t-flppr-fw-006",
+                installedAPI: "88.0",
+                installedTarget: 7,
+                installedCommit: "8ab2ccdf",
+                installedCommitDirty: false
+            )
+
+            XCTAssertEqual(selected.release.tag, tag)
+            XCTAssertTrue(selected.manifest.isFirmwareSnapshotCatalog)
+            XCTAssertEqual(selected.manifest.packageManagedManifest().packages["base"]?.count, 1)
+        }
+    }
+
+    func testFirmwareSnapshotRejectsWrongOrDirtyBuild() async throws {
+        let tag = "fw-packages-stable-003"
+        let commit = "8ab2ccdf7a34bbf3e07f2d4cbd459de1c6de8758"
+        let client = makeClient(
+            primaryPages: [releasesData([release(id: 3, tag: tag)])],
+            manifests: [
+                manifestURL(tag): manifest(
+                    tag: tag,
+                    revision: 3,
+                    firmwareVersion: "t-flppr-fw-006",
+                    snapshotCommit: commit
+                ),
+            ]
+        )
+
+        let identities: [(commit: String?, dirty: Bool?)] = [
+            ("deadbeef", false),
+            ("8ab2ccdf", true),
+            (nil, false),
+            ("8ab2ccdf", nil),
+        ]
+        for identity in identities {
+            do {
+                _ = try await client.latest(
+                    for: .stable,
+                    installedVersion: "t-flppr-fw-006",
+                    installedAPI: "88.0",
+                    installedTarget: 7,
+                    installedCommit: identity.commit,
+                    installedCommitDirty: identity.dirty
+                )
+                XCTFail("Snapshot must reject identity \(identity)")
+            } catch let error as TumoflipPackageCatalogError {
+                guard case .noMatchingRelease = error else {
+                    return XCTFail("Unexpected error: \(error)")
+                }
+            }
+        }
+    }
+
     func testMalformedInstalledAPIFailsClosed() async throws {
         let release = release(id: 9, tag: "fw-packages-dev-009")
         let client = makeClient(
@@ -348,10 +421,36 @@ final class TumoflipPackageCatalogTests: XCTestCase {
         tag: String,
         revision: Int,
         releaseID: String = String(repeating: "d", count: 64),
-        api: String = "88.0"
+        api: String = "88.0",
+        firmwareVersion explicitFirmwareVersion: String? = nil,
+        snapshotCommit: String? = nil,
+        snapshotExplicitScope: Bool = true
     ) -> Data {
         let channel = tag.contains("-stable-") ? "stable" : "dev"
-        let firmwareVersion = channel == "stable" ? "t-flppr-fw-004" : "t-dev-004-015"
+        let firmwareVersion = explicitFirmwareVersion ??
+            (channel == "stable" ? "t-flppr-fw-004" : "t-dev-004-015")
+        var packageRelease: [String: Any] = [
+            "id": tag,
+            "type": "package-only",
+            "source_commit": snapshotCommit ?? String(repeating: "c", count: 40),
+            "source_dirty": false,
+            "source_firmware_version": firmwareVersion,
+            "target_release_tag": channel == "stable" ? "v1.0.4" : "t-dev-004-015",
+            "firmware_flash_unchanged": true,
+            "catalog_channel": channel,
+            "catalog_revision": revision,
+            "catalog_release_tag": tag,
+        ]
+        if let snapshotCommit {
+            if snapshotExplicitScope {
+                packageRelease["catalog_install_scope"] = "firmwareSnapshot"
+            }
+            packageRelease["overlay_targets"] = []
+            packageRelease["compatible_releases"] = []
+            packageRelease["target_firmware_commit"] = snapshotCommit
+            packageRelease["target_source_commit"] = snapshotCommit
+            packageRelease["target_release_id"] = String(repeating: "e", count: 64)
+        }
         let object: [String: Any] = [
             "schema": 2,
             "release_id": releaseID,
@@ -363,24 +462,19 @@ final class TumoflipPackageCatalogTests: XCTestCase {
             ],
             "artifacts": [:],
             "packages": [
-                "base": [],
+                "base": snapshotCommit == nil ? [] : [[
+                    "bytes": 1,
+                    "sha256": String(repeating: "a", count: 64),
+                    "md5": String(repeating: "a", count: 32),
+                    "source": "apps/fixture.fap",
+                    "target": "/ext/apps/fixture.fap",
+                ]],
                 "arf": [],
                 "module_one": [],
                 "protocol_packs": [],
             ],
             "cleanup": [],
-            "package_release": [
-                "id": tag,
-                "type": "package-only",
-                "source_commit": String(repeating: "c", count: 40),
-                "source_dirty": false,
-                "source_firmware_version": firmwareVersion,
-                "target_release_tag": channel == "stable" ? "v1.0.4" : "t-dev-004-015",
-                "firmware_flash_unchanged": true,
-                "catalog_channel": channel,
-                "catalog_revision": revision,
-                "catalog_release_tag": tag,
-            ],
+            "package_release": packageRelease,
         ]
         return try! JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
     }

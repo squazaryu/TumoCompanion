@@ -1083,6 +1083,48 @@ final class TumoflipInstallerTests: XCTestCase {
         }
     }
 
+    func testFirmwareSnapshotAcceptsOnlyExactCleanBuild() throws {
+        let commit = "8ab2ccdf7a34bbf3e07f2d4cbd459de1c6de8758"
+        for explicitScope in [true, false] {
+            let manifest = makeFirmwareSnapshotManifest(
+                commit: commit,
+                explicitScope: explicitScope
+            )
+            XCTAssertNoThrow(try TumoflipCompat.check(
+                deviceTarget: 7,
+                deviceAPI: "88.0",
+                deviceVersion: "t-flppr-fw-006",
+                deviceOriginFork: "tumoflip",
+                deviceCommit: "8ab2ccdf",
+                deviceCommitDirty: false,
+                manifest: manifest
+            ))
+        }
+    }
+
+    func testFirmwareSnapshotRejectsSameChannelButDifferentIdentity() {
+        let commit = "8ab2ccdf7a34bbf3e07f2d4cbd459de1c6de8758"
+        let manifest = makeFirmwareSnapshotManifest(commit: commit)
+        let identities: [(String, String, String, Bool)] = [
+            ("t-flppr-fw-005", "88.0", "8ab2ccdf", false),
+            ("t-flppr-fw-006", "88.1", "8ab2ccdf", false),
+            ("t-flppr-fw-006", "88.0", "deadbeef", false),
+            ("t-flppr-fw-006", "88.0", "8ab2ccdf", true),
+        ]
+
+        for identity in identities {
+            XCTAssertThrowsError(try TumoflipCompat.check(
+                deviceTarget: 7,
+                deviceAPI: identity.1,
+                deviceVersion: identity.0,
+                deviceOriginFork: "tumoflip",
+                deviceCommit: identity.2,
+                deviceCommitDirty: identity.3,
+                manifest: manifest
+            ))
+        }
+    }
+
     func testCompatOriginMismatch() {
         let m = makeManifest(target: 7, api: "87.14")
         XCTAssertThrowsError(try TumoflipCompat.check(deviceTarget: 7, deviceAPI: "87.14",
@@ -1122,6 +1164,46 @@ final class TumoflipInstallerTests: XCTestCase {
             ),
             artifacts: [:],
             packages: [:],
+            cleanup: [],
+            safety: nil,
+            packageRelease: release
+        )
+    }
+
+    private func makeFirmwareSnapshotManifest(
+        commit: String,
+        explicitScope: Bool = true
+    ) -> TumoflipManifest {
+        let release = TumoflipManifest.PackageRelease(
+            id: "fw-packages-stable-003",
+            type: "package-only",
+            sourceCommit: commit,
+            sourceDirty: false,
+            sourceFirmwareVersion: "t-flppr-fw-006",
+            targetReleaseTag: "v1.0.6",
+            firmwareFlashUnchanged: true,
+            catalogChannel: "stable",
+            catalogRevision: 3,
+            catalogReleaseTag: "fw-packages-stable-003",
+            catalogInstallScope: explicitScope ? .firmwareSnapshot : nil,
+            compatibleReleases: [],
+            overlayTargets: [],
+            targetFirmwareCommit: commit,
+            targetSourceCommit: commit,
+            targetReleaseId: String(repeating: "d", count: 64)
+        )
+        return TumoflipManifest(
+            schema: 2,
+            releaseId: rid,
+            firmware: .init(
+                api: "88.0",
+                name: "tumoflip",
+                version: "t-flppr-fw-006",
+                target: 7,
+                radioAddress: nil
+            ),
+            artifacts: [:],
+            packages: ["base": [], "arf": [], "module_one": [], "protocol_packs": []],
             cleanup: [],
             safety: nil,
             packageRelease: release

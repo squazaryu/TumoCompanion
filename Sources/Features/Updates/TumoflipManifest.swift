@@ -127,6 +127,11 @@ struct TumoflipManifest: Codable, Equatable {
     }
 
     struct PackageRelease: Codable, Equatable {
+        enum CatalogInstallScope: String, Codable, Equatable {
+            case delta
+            case firmwareSnapshot
+        }
+
         let id: String
         let type: String
         let sourceCommit: String
@@ -140,6 +145,10 @@ struct TumoflipManifest: Codable, Equatable {
         let catalogChannel: String?
         let catalogRevision: Int?
         let catalogReleaseTag: String?
+        /// Producer-declared package surface. Delta releases manage only their
+        /// cumulative source allowlist. Firmware snapshots manage every package in
+        /// the manifest, but only on the exact firmware build they were copied from.
+        let catalogInstallScope: CatalogInstallScope?
         let compatibleReleases: [CompatibleRelease]?
         /// Exact package archive sources changed by this independent catalog revision.
         /// Only these files are package-managed; every other entry is an immutable
@@ -148,6 +157,13 @@ struct TumoflipManifest: Codable, Equatable {
         /// Legacy name for the same package-owned source allowlist. Older immutable
         /// catalogs predate `catalog_modified_targets` but already carried this field.
         let overlayTargets: [String]?
+        /// Exact firmware-release evidence emitted by the native publisher. Older
+        /// snapshot releases predate `catalog_install_scope`; these fields let the
+        /// client recognize that narrow legacy contract without treating an arbitrary
+        /// empty overlay as a full install offer.
+        let targetFirmwareCommit: String?
+        let targetSourceCommit: String?
+        let targetReleaseId: String?
 
         struct CompatibleRelease: Codable, Equatable {
             let releaseTag: String
@@ -187,9 +203,13 @@ struct TumoflipManifest: Codable, Equatable {
             catalogChannel: String? = nil,
             catalogRevision: Int? = nil,
             catalogReleaseTag: String? = nil,
+            catalogInstallScope: CatalogInstallScope? = nil,
             compatibleReleases: [CompatibleRelease]? = nil,
             catalogModifiedTargets: [String]? = nil,
-            overlayTargets: [String]? = nil
+            overlayTargets: [String]? = nil,
+            targetFirmwareCommit: String? = nil,
+            targetSourceCommit: String? = nil,
+            targetReleaseId: String? = nil
         ) {
             self.id = id
             self.type = type
@@ -201,9 +221,13 @@ struct TumoflipManifest: Codable, Equatable {
             self.catalogChannel = catalogChannel
             self.catalogRevision = catalogRevision
             self.catalogReleaseTag = catalogReleaseTag
+            self.catalogInstallScope = catalogInstallScope
             self.compatibleReleases = compatibleReleases
             self.catalogModifiedTargets = catalogModifiedTargets
             self.overlayTargets = overlayTargets
+            self.targetFirmwareCommit = targetFirmwareCommit
+            self.targetSourceCommit = targetSourceCommit
+            self.targetReleaseId = targetReleaseId
         }
 
         enum CodingKeys: String, CodingKey {
@@ -216,9 +240,50 @@ struct TumoflipManifest: Codable, Equatable {
             case catalogChannel = "catalog_channel"
             case catalogRevision = "catalog_revision"
             case catalogReleaseTag = "catalog_release_tag"
+            case catalogInstallScope = "catalog_install_scope"
             case compatibleReleases = "compatible_releases"
             case catalogModifiedTargets = "catalog_modified_targets"
             case overlayTargets = "overlay_targets"
+            case targetFirmwareCommit = "target_firmware_commit"
+            case targetSourceCommit = "target_source_commit"
+            case targetReleaseId = "target_release_id"
+        }
+
+        func resolvedCatalogInstallScope(
+            manifestFirmwareVersion: String
+        ) -> CatalogInstallScope {
+            if let catalogInstallScope { return catalogInstallScope }
+            return hasLegacyFirmwareSnapshotIdentity(
+                manifestFirmwareVersion: manifestFirmwareVersion
+            ) ? .firmwareSnapshot : .delta
+        }
+
+        func hasFirmwareSnapshotIdentity(
+            manifestFirmwareVersion: String
+        ) -> Bool {
+            guard catalogChannel == TumoflipFirmwareChannel.stable.rawValue,
+                  sourceFirmwareVersion == manifestFirmwareVersion,
+                  overlayTargets?.isEmpty == true,
+                  catalogModifiedTargets == nil,
+                  compatibleReleases?.isEmpty != false,
+                  let targetFirmwareCommit,
+                  let targetSourceCommit,
+                  targetFirmwareCommit == sourceCommit,
+                  targetSourceCommit == sourceCommit,
+                  let targetReleaseId,
+                  targetReleaseId.count == 64,
+                  targetReleaseId.allSatisfy({ "0123456789abcdef".contains($0) }) else {
+                return false
+            }
+            return true
+        }
+
+        private func hasLegacyFirmwareSnapshotIdentity(
+            manifestFirmwareVersion: String
+        ) -> Bool {
+            catalogInstallScope == nil && hasFirmwareSnapshotIdentity(
+                manifestFirmwareVersion: manifestFirmwareVersion
+            )
         }
     }
 
@@ -259,13 +324,18 @@ struct TumoflipManifest: Codable, Equatable {
     }
 
     /// Return the files that this independent catalog is allowed to manage on the
-    /// device. Independent catalogs carry a full immutable firmware baseline for
-    /// provenance, but those baseline entries belong to the firmware updater. FW
-    /// Packages behaves like Community Apps: its automation-owned delta allowlist is
-    /// the only install and on-device verification surface.
+    /// device. Delta catalogs expose only their automation-owned allowlist. An exact
+    /// firmware snapshot intentionally exposes its complete package surface; catalog
+    /// selection and install compatibility gate that surface to the source firmware.
     func packageManagedManifest() -> TumoflipManifest {
         guard let release = packageRelease,
               release.isIndependentCatalog else {
+            return self
+        }
+
+        if release.resolvedCatalogInstallScope(
+            manifestFirmwareVersion: firmware.version
+        ) == .firmwareSnapshot {
             return self
         }
 
@@ -285,6 +355,15 @@ struct TumoflipManifest: Codable, Equatable {
             safety: safety,
             packageRelease: packageRelease
         )
+    }
+
+    var isFirmwareSnapshotCatalog: Bool {
+        guard let release = packageRelease, release.isIndependentCatalog else {
+            return false
+        }
+        return release.resolvedCatalogInstallScope(
+            manifestFirmwareVersion: firmware.version
+        ) == .firmwareSnapshot
     }
 }
 
@@ -409,6 +488,22 @@ extension TumoflipManifest {
                 }
                 guard referencedCompatibleReleaseIDs == releaseIDs else {
                     throw TumoflipManifestError.invalidPackageRelease(packageRelease.id)
+                }
+                let resolvedScope = packageRelease.resolvedCatalogInstallScope(
+                    manifestFirmwareVersion: firmware.version
+                )
+                if resolvedScope == .firmwareSnapshot {
+                    guard packageRelease.hasFirmwareSnapshotIdentity(
+                        manifestFirmwareVersion: firmware.version
+                    ) else {
+                        throw TumoflipManifestError.invalidPackageRelease(packageRelease.id)
+                    }
+                } else if packageRelease.catalogInstallScope == .delta {
+                    let delta = packageRelease.catalogModifiedTargets ??
+                        packageRelease.overlayTargets ?? []
+                    guard !delta.isEmpty else {
+                        throw TumoflipManifestError.invalidPackageRelease(packageRelease.id)
+                    }
                 }
                 for modified in [
                     packageRelease.catalogModifiedTargets,

@@ -126,6 +126,22 @@ struct TumoflipCompatibilityIdentity: Equatable {
     let hardwareTarget: Int
 }
 
+enum TumoflipFirmwareCommitIdentity {
+    /// Flipper reports the source commit as a short Git hash. Treat it as the exact
+    /// manifest commit only when it is a valid, unambiguous-length hexadecimal prefix.
+    static func matches(reported: String?, expected: String?) -> Bool {
+        guard let reported = reported?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+              let expected = expected?.lowercased(),
+              (8...40).contains(reported.count),
+              expected.count == 40,
+              reported.allSatisfy({ "0123456789abcdef".contains($0) }),
+              expected.allSatisfy({ "0123456789abcdef".contains($0) }) else {
+            return false
+        }
+        return expected.hasPrefix(reported)
+    }
+}
+
 struct TumoflipFirmwareRoute: Equatable {
     enum Warning: Equatable {
         case identityUnavailable
@@ -257,6 +273,11 @@ enum TumoflipPackageReleaseMatcher {
         // not named after (or pinned to) one exact firmware release.
         if let packageRelease, packageRelease.isIndependentCatalog {
             guard packageRelease.catalogChannel == channel.rawValue else { return false }
+            if packageRelease.resolvedCatalogInstallScope(
+                manifestFirmwareVersion: manifestVersion
+            ) == .firmwareSnapshot {
+                return installedVersion == manifestVersion
+            }
             guard let installedVersion, !installedVersion.isEmpty else { return true }
             return TumoflipFirmwareChannel.infer(version: installedVersion) == channel
         }
