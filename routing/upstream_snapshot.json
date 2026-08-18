@@ -1,5 +1,5 @@
 {
-  "release_tag": "16aug2026p2",
+  "release_tag": "18aug2026",
   "stems": {
     "24cxxprog": "Programmers",
     "4inrow": "Board",
@@ -19,6 +19,7 @@
     "atm": "Players",
     "avr_isp": "Programmers",
     "barcode_app": "Tools",
+    "battery_reader": "GPIO",
     "bc_scanner": "GPIO",
     "blackjack": "Board",
     "ble_spam": "Bluetooth",
@@ -177,6 +178,7 @@
     "myblab": "Games",
     "nearby_files": "GPS",
     "nfc_apdu_runner": "NFC",
+    "nfc_canary": "NFC",
     "nfc_comparator": "NFC",
     "nfc_eink": "NFC",
     "nfc_login": "NFC",
