@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.10.30",
+      "version": "1.10.31",
       "versionDate": "2026-08-20",
-      "versionDescription": "Shows the exact matching firmware snapshot instead of 0/0, adds a separate recoverable cleanup for Community Pack apps moved to new folders, and hardens protected-app and package-write verification.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.30/TumoCompanion-unsigned.ipa",
-      "size": 29953858,
+      "versionDescription": "Fixes false TOTP MISSING after the Community Pack category move by verifying the audited Tumoflip target path.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.31/TumoCompanion-unsigned.ipa",
+      "size": 29954942,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.10.31",
+          "date": "2026-08-20",
+          "localizedDescription": "Fixes false TOTP MISSING after the Community Pack category move by verifying the audited Tumoflip target path.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.31/TumoCompanion-unsigned.ipa",
+          "size": 29954942,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.10.30",
           "date": "2026-08-20",
