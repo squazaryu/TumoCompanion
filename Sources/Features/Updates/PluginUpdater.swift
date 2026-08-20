@@ -2184,9 +2184,16 @@ final class PluginUpdater: ObservableObject {
             }
             phase = .done(message)
             await live.succeed(
-                completed: installed.count,
+                // A protected app can be intentionally skipped after the
+                // transaction begins. The operation itself is still complete;
+                // report terminal progress rather than leaving the Live Activity
+                // on a misleading partial bar. The UI message keeps the exact
+                // installed/skipped counts above.
+                completed: selected.count,
                 total: selected.count,
-                detail: "Plugins installed"
+                detail: protectedSkipped.isEmpty
+                    ? "Plugins installed"
+                    : "Installed \(installed.count); kept \(protectedSkipped.count) protected"
             )
         } else {
             let head = installed.isEmpty ? "Install failed" : "Installed \(installed.count), \(failures.count) failed"

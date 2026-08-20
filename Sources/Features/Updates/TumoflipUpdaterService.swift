@@ -835,9 +835,14 @@ final class TumoflipUpdater: ObservableObject {
                 }
             }
             await live.succeed(
-                completed: removed,
+                // Cleanup may find that a legacy path was already absent. That
+                // is still a completed reconciliation transaction, so finish the
+                // Live Activity at 100% and keep the real removal count in text.
+                completed: selection.entries.count,
                 total: selection.entries.count,
-                detail: removed == 0 ? "Nothing to clean" : "Cleanup completed"
+                detail: removed == 0
+                    ? "Nothing to clean"
+                    : "Removed \(removed) legacy file\(removed == 1 ? "" : "s")"
             )
             phase = .done(
                 removed == 0
