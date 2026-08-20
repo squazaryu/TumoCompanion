@@ -2172,7 +2172,7 @@ final class PluginUpdater: ObservableObject {
                     + failures.prefix(3).joined(separator: "; ") + (failures.count > 3 ? " …" : "")
                 phase = .failed(msg)
             }
-            live.stop(
+            await live.stop(
                 completed: installed.count,
                 total: selected.count,
                 detail: failures.isEmpty ? "Install stopped" : "Stopped with failures"
@@ -2183,23 +2183,30 @@ final class PluginUpdater: ObservableObject {
                 message += " · kept \(protectedSkipped.count) newly protected"
             }
             phase = .done(message)
-            live.succeed(
-                completed: installed.count,
+            await live.succeed(
+                // A protected app can be intentionally skipped after the
+                // transaction begins. The operation itself is still complete;
+                // report terminal progress rather than leaving the Live Activity
+                // on a misleading partial bar. The UI message keeps the exact
+                // installed/skipped counts above.
+                completed: selected.count,
                 total: selected.count,
-                detail: "Plugins installed"
+                detail: protectedSkipped.isEmpty
+                    ? "Plugins installed"
+                    : "Installed \(installed.count); kept \(protectedSkipped.count) protected"
             )
         } else {
             let head = installed.isEmpty ? "Install failed" : "Installed \(installed.count), \(failures.count) failed"
             phase = .failed("\(head): " + failures.prefix(4).joined(separator: "; ")
                             + (failures.count > 4 ? " …" : ""))
             if installed.isEmpty {
-                live.fail(
+                await live.fail(
                     completed: 0,
                     total: selected.count,
                     detail: "Install failed"
                 )
             } else {
-                live.completeWithIssues(
+                await live.completeWithIssues(
                     completed: installed.count,
                     total: selected.count,
                     detail: "\(failures.count) failed"

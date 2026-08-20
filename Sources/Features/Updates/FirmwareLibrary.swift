@@ -288,7 +288,7 @@ final class FirmwareLibrary: ObservableObject {
                 )
             }
 
-            activity.succeed(
+            await activity.succeed(
                 completed: ordered.count,
                 total: ordered.count,
                 detail: "Firmware package staged"
@@ -297,14 +297,14 @@ final class FirmwareLibrary: ObservableObject {
         } catch {
             try? await store.delete(remoteRoot, recursive: true)
             if UpdateTaskCancellation.isCancellation(error) {
-                activity.stop(
+                await activity.stop(
                     completed: activityCompleted,
                     total: activityTotal,
                     detail: "Staging stopped"
                 )
                 phase = .ready
             } else {
-                activity.fail(
+                await activity.fail(
                     completed: activityCompleted,
                     total: activityTotal,
                     detail: error.localizedDescription
