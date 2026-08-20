@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.10.29",
-      "versionDate": "2026-08-15",
-      "versionDescription": "FW Packages now manages only files explicitly changed by its independent catalog, eliminating false mass updates from an older firmware baseline. Community Pack replacements are resolved by the centralized audit, and compatible API minor changes no longer block packages.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.29/TumoCompanion-unsigned.ipa",
-      "size": 29869851,
+      "version": "1.10.30",
+      "versionDate": "2026-08-20",
+      "versionDescription": "Shows the exact matching firmware snapshot instead of 0/0, adds a separate recoverable cleanup for Community Pack apps moved to new folders, and hardens protected-app and package-write verification.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.30/TumoCompanion-unsigned.ipa",
+      "size": 29953858,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.10.30",
+          "date": "2026-08-20",
+          "localizedDescription": "Shows the exact matching firmware snapshot instead of 0/0, adds a separate recoverable cleanup for Community Pack apps moved to new folders, and hardens protected-app and package-write verification.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.30/TumoCompanion-unsigned.ipa",
+          "size": 29953858,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.10.29",
           "date": "2026-08-15",
