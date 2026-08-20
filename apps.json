@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.10.31",
+      "version": "1.10.32",
       "versionDate": "2026-08-20",
-      "versionDescription": "Fixes false TOTP MISSING after the Community Pack category move by verifying the audited Tumoflip target path.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.31/TumoCompanion-unsigned.ipa",
-      "size": 29954942,
+      "versionDescription": "Fixes Live Activity progress for firmware, FW Packages, and Community Apps: progress is coalesced, stays fresh during long writes, ends reliably at 100% on success, and no longer appears late after completion.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.32/TumoCompanion-unsigned.ipa",
+      "size": 29966867,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.10.32",
+          "date": "2026-08-20",
+          "localizedDescription": "Fixes Live Activity progress for firmware, FW Packages, and Community Apps: progress is coalesced, stays fresh during long writes, ends reliably at 100% on success, and no longer appears late after completion.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.32/TumoCompanion-unsigned.ipa",
+          "size": 29966867,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.10.31",
           "date": "2026-08-20",
