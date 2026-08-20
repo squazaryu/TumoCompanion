@@ -87,40 +87,53 @@ final class StopToken: @unchecked Sendable {
     func reset() { lock.lock(); stopped = false; lock.unlock() }
 }
 
-/// Throttles a transport's per-block callbacks to one UI update per percentage point.
-/// BLE writes use 512-byte blocks, so forwarding every callback for a multi-megabyte
-/// FAP would otherwise enqueue thousands of redundant main-actor updates.
-private final class TumoflipByteProgress: @unchecked Sendable {
+/// Throttles a transport's per-block callbacks to a bounded UI cadence.
+/// BLE writes use 512-byte blocks, so forwarding every percentage point for a
+/// multi-megabyte FAP would otherwise enqueue hundreds of main-actor updates per
+/// file (and thousands per package transaction). Start and finish are always sent.
+final class TumoflipByteProgress: @unchecked Sendable {
     private let lock = NSLock()
     private let totalBytes: Int
     private let completedUnits: Int
     private let totalUnits: Int
     private let name: String
     private let report: ((Int, Int, String) -> Void)?
+    private let minimumInterval: TimeInterval
+    private let now: () -> Date
     private var lastPercent = -1
+    private var lastReportedAt: Date?
 
     init(
         totalBytes: Int,
         completedUnits: Int,
         totalUnits: Int,
         name: String,
-        report: ((Int, Int, String) -> Void)?
+        report: ((Int, Int, String) -> Void)?,
+        minimumInterval: TimeInterval = 1,
+        now: @escaping () -> Date = Date.init
     ) {
         self.totalBytes = max(totalBytes, 1)
         self.completedUnits = completedUnits
         self.totalUnits = totalUnits
         self.name = name
         self.report = report
+        self.minimumInterval = max(0, minimumInterval)
+        self.now = now
     }
 
     func update(_ bytes: Int) {
         let percent = min(100, max(0, bytes * 100 / totalBytes))
         lock.lock()
-        guard percent != lastPercent else {
+        let date = now()
+        let elapsed = lastReportedAt.map { date.timeIntervalSince($0) } ?? .infinity
+        let isBoundary = percent == 0 || percent == 100
+        guard percent != lastPercent,
+              isBoundary || elapsed >= minimumInterval else {
             lock.unlock()
             return
         }
         lastPercent = percent
+        lastReportedAt = date
         lock.unlock()
         report?(completedUnits + percent, totalUnits, "Uploading \(name) · \(percent)%")
     }

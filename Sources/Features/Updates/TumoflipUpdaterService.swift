@@ -705,14 +705,14 @@ final class TumoflipUpdater: ObservableObject {
             switch outcome {
             case .alreadyInstalled:
                 phase = .done("Already installed — nothing to do.")
-                live.succeed(
+                await live.succeed(
                     completed: activityTotal,
                     total: activityTotal,
                     detail: "Already installed"
                 )
             case let .installed(files, _):
                 phase = .done("Installed \(files) file\(files == 1 ? "" : "s").")
-                live.succeed(
+                await live.succeed(
                     completed: activityTotal,
                     total: activityTotal,
                     detail: "Firmware packages installed"
@@ -723,7 +723,7 @@ final class TumoflipUpdater: ObservableObject {
             // Stop requested: the transaction rolled back, so the device is exactly as
             // before — every prior version intact and fully functional.
             phase = .done("Stopped — rolled back to the previous version, nothing changed.")
-            live.stop(
+            await live.stop(
                 completed: 0,
                 total: activityTotal,
                 detail: "Rolled back"
@@ -731,7 +731,7 @@ final class TumoflipUpdater: ObservableObject {
             if enteredDeviceMutationPhase { await refreshStatus() }
         } catch let e as TumoflipInstallError {
             phase = .failed(installErrorText(e))
-            live.fail(
+            await live.fail(
                 completed: 0,
                 total: activityTotal,
                 detail: installErrorText(e)
@@ -739,7 +739,7 @@ final class TumoflipUpdater: ObservableObject {
             if enteredDeviceMutationPhase { await refreshStatus() }
         } catch {
             phase = .failed(friendly(error))
-            live.fail(
+            await live.fail(
                 completed: 0,
                 total: activityTotal,
                 detail: friendly(error)
@@ -834,7 +834,7 @@ final class TumoflipUpdater: ObservableObject {
                     transferReporter.progress(file, force: true)
                 }
             }
-            live.succeed(
+            await live.succeed(
                 completed: removed,
                 total: selection.entries.count,
                 detail: removed == 0 ? "Nothing to clean" : "Cleanup completed"
@@ -846,7 +846,7 @@ final class TumoflipUpdater: ObservableObject {
             await refreshStatus()
         } catch TumoflipInstallError.cancelled {
             phase = .done("Stopped — cleanup rolled back, nothing changed.")
-            live.stop(
+            await live.stop(
                 completed: 0,
                 total: selection.entries.count,
                 detail: "Cleanup rolled back"
@@ -854,7 +854,7 @@ final class TumoflipUpdater: ObservableObject {
             await refreshStatus()
         } catch let error as TumoflipInstallError {
             phase = .failed(installErrorText(error))
-            live.fail(
+            await live.fail(
                 completed: 0,
                 total: selection.entries.count,
                 detail: installErrorText(error)
@@ -862,7 +862,7 @@ final class TumoflipUpdater: ObservableObject {
             await refreshStatus()
         } catch {
             phase = .failed(friendly(error))
-            live.fail(
+            await live.fail(
                 completed: 0,
                 total: selection.entries.count,
                 detail: friendly(error)

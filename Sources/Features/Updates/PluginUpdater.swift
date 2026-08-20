@@ -2172,7 +2172,7 @@ final class PluginUpdater: ObservableObject {
                     + failures.prefix(3).joined(separator: "; ") + (failures.count > 3 ? " …" : "")
                 phase = .failed(msg)
             }
-            live.stop(
+            await live.stop(
                 completed: installed.count,
                 total: selected.count,
                 detail: failures.isEmpty ? "Install stopped" : "Stopped with failures"
@@ -2183,7 +2183,7 @@ final class PluginUpdater: ObservableObject {
                 message += " · kept \(protectedSkipped.count) newly protected"
             }
             phase = .done(message)
-            live.succeed(
+            await live.succeed(
                 completed: installed.count,
                 total: selected.count,
                 detail: "Plugins installed"
@@ -2193,13 +2193,13 @@ final class PluginUpdater: ObservableObject {
             phase = .failed("\(head): " + failures.prefix(4).joined(separator: "; ")
                             + (failures.count > 4 ? " …" : ""))
             if installed.isEmpty {
-                live.fail(
+                await live.fail(
                     completed: 0,
                     total: selected.count,
                     detail: "Install failed"
                 )
             } else {
-                live.completeWithIssues(
+                await live.completeWithIssues(
                     completed: installed.count,
                     total: selected.count,
                     detail: "\(failures.count) failed"
