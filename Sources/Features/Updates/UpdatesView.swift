@@ -104,6 +104,15 @@ struct UpdatesView: View {
         }
     }
 
+    private var pluginBusy: Bool {
+        if updater.validating { return true }
+        switch updater.phase {
+        case .fetching, .downloading, .scanning, .installing, .cleaning, .verifying:
+            return true
+        default: return false
+        }
+    }
+
     private var firmwareChecking: Bool {
         switch packages.phase {
         case .checking, .downloading: return true
@@ -115,6 +124,7 @@ struct UpdatesView: View {
         if updater.phase == .needsBaseline { return true }
         if updater.protectedAuditFailure != nil { return true }
         if updater.pendingProtectedReview.count > 0 { return true }
+        if updater.pendingCleanupCount > 0 { return true }
         if let vr = updater.verifyResult, !vr.ok { return true }
         if let warning = packages.firmwareRoute.warning, warning != .identityUnavailable { return true }
         if case .failed = packages.phase { return true }
@@ -210,7 +220,10 @@ struct UpdatesView: View {
                 Divider()
                 NavigationLink { PluginUpdatesDetailView(updater: updater) } label: {
                     SourceRow(icon: "puzzlepiece.extension.fill", tint: .indigo, title: "Community apps",
-                              subtitle: "all-the-plugins", badge: pluginBadge, busy: pluginChecking)
+                              subtitle: updater.pendingCleanupCount > 0
+                                ? "\(updater.pendingCleanupCount) old routes to clean"
+                                : "all-the-plugins",
+                              badge: pluginBadge, busy: pluginChecking)
                 }
             }
         }
@@ -232,6 +245,15 @@ struct UpdatesView: View {
                         NavigationLink { ProtectedAppsView(updater: updater) } label: {
                             AttentionRow(systemImage: "lock.trianglebadge.exclamationmark",
                                          text: "\(n) protected app\(n == 1 ? "" : "s") to review", tint: .orange)
+                        }
+                    }
+                    if updater.pendingCleanupCount > 0 {
+                        NavigationLink { PluginUpdatesDetailView(updater: updater) } label: {
+                            AttentionRow(
+                                systemImage: "trash",
+                                text: "\(updater.pendingCleanupCount) old Community app routes to clean",
+                                tint: .orange
+                            )
                         }
                     }
                     if let failure = updater.protectedAuditFailure {
@@ -317,7 +339,7 @@ struct UpdatesView: View {
         // No install archive published yet for this release → nothing to install, even
         // though the manifest (and a default group selection) already loaded.
         let firmwareN = packages.hasPackageZip ? firmwareSelectedCount : 0
-        if (pluginN > 0 || firmwareN > 0), !pluginChecking, !packages.busy {
+        if (pluginN > 0 || firmwareN > 0), !pluginBusy, !packages.busy {
             VStack(spacing: firmwareN > 0 && pluginN > 0 ? 6 : 0) {
                 if firmwareN > 0 {
                     let firmwareBlocked = packages.validating ||
@@ -502,8 +524,9 @@ struct ProtectedAppsView: View {
     private func addCurrent() {
         let name = newExclusion.trimmingCharacters(in: .whitespaces)
         guard !name.isEmpty else { return }
-        updater.addExclusion(name)
-        newExclusion = ""
+        if updater.addExclusion(name) {
+            newExclusion = ""
+        }
     }
 }
 

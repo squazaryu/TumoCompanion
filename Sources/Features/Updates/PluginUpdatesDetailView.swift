@@ -12,6 +12,7 @@ struct PluginUpdatesDetailView: View {
     @State private var expandedCategories: Set<String> = []   // collapsed by default
     @State private var incompatibleExpanded = false
     @State private var showHelp = false
+    @State private var showCleanupConfirmation = false
 
     var body: some View {
         CardScroll {
@@ -87,17 +88,35 @@ struct PluginUpdatesDetailView: View {
                 }
                 .padding()
                 .background(.bar)
-            } else if updater.selectedCount > 0, !busy {
+            } else if !busy,
+                      updater.selectedCount > 0 || updater.pendingCleanupCount > 0 {
                 VStack(spacing: 6) {
-                    Button {
-                        Task { await updater.install() }
-                    } label: {
-                        Label("Install \(updater.selectedCount) selected via \(transfer.activeChannel.label)",
-                              systemImage: "square.and.arrow.down.on.square")
-                            .frame(maxWidth: .infinity)
+                    if updater.selectedCount > 0 {
+                        Button {
+                            Task { await updater.install() }
+                        } label: {
+                            Label("Install \(updater.selectedCount) selected via \(transfer.activeChannel.label)",
+                                  systemImage: "square.and.arrow.down.on.square")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(!hasFileChannel || ble.state != .ready || updater.validating)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(!hasFileChannel || ble.state != .ready || updater.validating)
+                    if updater.pendingCleanupCount > 0 {
+                        Button(role: .destructive) {
+                            showCleanupConfirmation = true
+                        } label: {
+                            Label(
+                                "Clean Up \(updater.pendingCleanupCount)",
+                                systemImage: "trash"
+                            )
+                            .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.orange)
+                        .disabled(!hasFileChannel)
+                        .accessibilityIdentifier("community-cleanup-action")
+                    }
                 }
                 .padding()
                 .background(.bar)
@@ -108,6 +127,17 @@ struct PluginUpdatesDetailView: View {
             NavigationStack { PluginReleasePickerView(updater: updater) }
         }
         .sheet(isPresented: $showHelp) { CommunityAppsHelpView() }
+        .alert("Clean up old Community app routes?", isPresented: $showCleanupConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Clean Up \(updater.pendingCleanupCount)", role: .destructive) {
+                Task { await updater.cleanUpPendingRoutes() }
+            }
+        } message: {
+            Text(
+                "Only exact files recorded from an older Community Pack are eligible. "
+                + "Tumoflip-protected, custom, modified, or unverified files are kept."
+            )
+        }
     }
 
     /// xMasterX occasionally ships a same-day follow-up build (tag suffixed p2, p3, …)
@@ -162,7 +192,8 @@ struct PluginUpdatesDetailView: View {
     private var busy: Bool {
         if updater.validating { return true }
         switch updater.phase {
-        case .fetching, .downloading, .scanning, .installing, .verifying: return true
+        case .fetching, .downloading, .scanning, .installing, .cleaning, .verifying:
+            return true
         default: return false
         }
     }
@@ -249,18 +280,25 @@ struct PluginUpdatesDetailView: View {
 
     @ViewBuilder private func cleanupDetail(_ cl: CleanupResult) -> some View {
         if !cl.removed.isEmpty {
-            Text("Removed legacy duplicate\(cl.removed.count == 1 ? "" : "s") (exact pack match):")
+            Text("Removed obsolete Community Pack route\(cl.removed.count == 1 ? "" : "s") (verified history):")
                 .font(.caption2).foregroundStyle(.secondary)
+                .accessibilityIdentifier("community-cleanup-removed")
             Text(cl.removed.prefix(12).joined(separator: "\n") + (cl.removed.count > 12 ? "\n…" : ""))
                 .font(.system(.caption2, design: .monospaced)).foregroundStyle(.green)
                 .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("community-cleanup-removed-paths")
         }
         if !cl.kept.isEmpty {
-            Text("Kept legacy file\(cl.kept.count == 1 ? "" : "s") for review (md5 differs — possible custom/older build):")
+            Text(
+                "Kept legacy file\(cl.kept.count == 1 ? "" : "s") for review "
+                + "(not verified as an old pack build — possible custom/modified file):"
+            )
                 .font(.caption2).foregroundStyle(.secondary)
+                .accessibilityIdentifier("community-cleanup-kept")
             Text(cl.kept.prefix(12).joined(separator: "\n") + (cl.kept.count > 12 ? "\n…" : ""))
                 .font(.system(.caption2, design: .monospaced)).foregroundStyle(.orange)
                 .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("community-cleanup-kept-paths")
         }
     }
 
@@ -405,6 +443,7 @@ struct PluginUpdatesDetailView: View {
         case .scanning(let i, let n): progress("Scanning via \(transfer.activeChannel.label)… \(i)/\(n)")
         case .verifying(let i, let n): progress("Verifying on device… \(i)/\(n)")
         case .installing(let i, let n): installingRow(i, n)
+        case .cleaning(let i, let n): progress("Cleaning old routes… \(i)/\(n)")
         case .done(let m):
             Label(m, systemImage: "checkmark.circle.fill").foregroundStyle(.green)
                 .fixedSize(horizontal: false, vertical: true)
@@ -514,6 +553,8 @@ private struct CommunityAppsHelpView: View {
                       systemImage: "exclamationmark.shield")
                 Label("Protected Tumoflip apps are never replaced automatically.",
                       systemImage: "lock.shield")
+                Label("Clean Up is a separate transaction and removes only old pack bytes after both paths are verified.",
+                      systemImage: "trash")
                 Label("A stopped transfer discards only the incomplete app file.",
                       systemImage: "stop.circle")
             }

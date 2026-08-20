@@ -1,0 +1,35 @@
+{
+  "release_id": "e98adf556a4ef3028a97ce524d1385151626af628b3b038c949938bcf2c93c97",
+  "firmware": {
+    "api": "88.0",
+    "name": "tumoflip",
+    "version": "t-flppr-fw-006",
+    "target": 7
+  },
+  "package_release": {
+    "id": "fw-packages-stable-003",
+    "type": "package-only",
+    "source_commit": "8ab2ccdf7a34bbf3e07f2d4cbd459de1c6de8758",
+    "source_dirty": false,
+    "source_firmware_version": "t-flppr-fw-006",
+    "target_release_tag": "v1.0.6",
+    "target_release_id": "d5e4bc3b1c5e1e1d9eab97deb39e8ccea9b7339aa6da968a931a035099c6eb43",
+    "target_source_commit": "8ab2ccdf7a34bbf3e07f2d4cbd459de1c6de8758",
+    "target_firmware_commit": "8ab2ccdf7a34bbf3e07f2d4cbd459de1c6de8758",
+    "firmware_flash_unchanged": true,
+    "catalog_channel": "stable",
+    "catalog_revision": 3,
+    "catalog_release_tag": "fw-packages-stable-003",
+    "overlay_targets": [],
+    "compatible_releases": []
+  },
+  "fixture_expectations": {
+    "package_counts": {
+      "base": 23,
+      "arf": 12,
+      "module_one": 43,
+      "protocol_packs": 31
+    },
+    "cleanup_count": 34
+  }
+}

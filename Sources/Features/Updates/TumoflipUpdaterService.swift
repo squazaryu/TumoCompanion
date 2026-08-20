@@ -203,9 +203,9 @@ final class TumoflipUpdater: ObservableObject {
     private var selectedCatalogRepository: TumoflipPackageCatalogRepository?
     private let packageCatalogClient: TumoflipPackageCatalogClient
 
-    /// The independently published catalog contains a full firmware baseline for
-    /// provenance. Expose only the automation-owned package delta so status checks and
-    /// install plans can never rewrite firmware-bundled resources.
+    /// Resolve the catalog's declared install surface. Deltas expose only their
+    /// automation-owned allowlist; an exact firmware snapshot exposes its bundled
+    /// package files only after source-firmware identity checks pass.
     private var managedManifest: TumoflipManifest? {
         manifest?.packageManagedManifest()
     }
@@ -480,7 +480,9 @@ final class TumoflipUpdater: ObservableObject {
                 for: firmwareRoute.channel,
                 installedVersion: packageIdentityVersion,
                 installedAPI: deviceIdentity?.firmwareAPI,
-                installedTarget: deviceIdentity?.hardwareTarget
+                installedTarget: deviceIdentity?.hardwareTarget,
+                installedCommit: deviceIdentity?.firmwareCommit,
+                installedCommitDirty: deviceIdentity?.firmwareCommitDirty
             )
             let m = selection.manifest
             try m.validate()
@@ -535,6 +537,7 @@ final class TumoflipUpdater: ObservableObject {
         beginTransactionGuards()
         defer { endTransactionGuards() }
         let live = InstallActivityController()
+        var enteredDeviceMutationPhase = false
         do {
             let selectedTargets = self.selectedTargets
             guard !selectedTargets.isEmpty else {
@@ -568,6 +571,8 @@ final class TumoflipUpdater: ObservableObject {
                 installedVersion: packageIdentityVersion,
                 installedAPI: deviceIdentity?.firmwareAPI,
                 installedTarget: deviceIdentity?.hardwareTarget,
+                installedCommit: deviceIdentity?.firmwareCommit,
+                installedCommitDirty: deviceIdentity?.firmwareCommitDirty,
                 forceRemote: true,
                 requiredRepository: selectedCatalogRepository
             )
@@ -612,64 +617,91 @@ final class TumoflipUpdater: ObservableObject {
             let source = try await packageSource()
             if stopToken.isStopped { throw TumoflipInstallError.cancelled }
 
-            // Issue #19: reject any selected FAP/FAL whose embedded `.fapmeta` is
-            // incompatible with the CONNECTED firmware. Read fresh device_info now and
-            // gate BEFORE ensureLoaderIdle / staging / backup / cleanup, so nothing is
-            // written for a rejected binary. Non-FAP data files keep their SHA/size checks.
-            let (devApi, devTarget) = try await deviceApiTarget()
-            compatibilityApiMajor = devApi
-            compatibilityTarget = devTarget
-            compatibilityChecked = true
-            blocked = PackageCompatibilityGate.blocked(
-                fapCandidates(source, groups: Set(TumoflipManifest.knownGroups)),
-                deviceApiMajor: devApi, deviceTarget: devTarget)
-            let hits = blocked.filter { requestedTargets.contains($0.key) }
-            if !hits.isEmpty {
-                phase = .failed(PackageCompatibilityGate.summary(hits))
-                return
-            }
-
-            let allTargets = Set(TumoflipManifest.knownGroups.flatMap { group in
-                self.files(group).map(\.target)
-            })
-            let effectiveExclusions = allTargets
-                .subtracting(requestedTargets)
-                .union(blocked.keys)
-            let groups = Set(TumoflipManifest.knownGroups.filter { group in
-                self.files(group).contains { requestedTargets.contains($0.target) }
-            })
-            let plan = try TumoflipInstallPlan.make(
-                manifest: manifest,
-                groups: groups,
-                excluding: effectiveExclusions
-            ).installationOnly
-            guard !plan.files.isEmpty else { phase = .failed("No compatible files selected."); return }
-            activityTotal = 200 * plan.files.count
-
-            // A running external app may keep its own FAP open. Stop it before any
-            // live path is backed up or replaced, and fail closed if Loader remains
-            // locked. Core BLE/RPC stays available after the external app exits.
-            if channel == .ble {
-                try await ensureLoaderIdle()
-            }
-
-            phase = .installing(done: 0, total: activityTotal, file: "Starting…")
-            live.start(total: activityTotal, title: "Installing firmware packages")
+            // Prepare transfer UI before the final device identity read. From the
+            // authorization boundary below to Loader shutdown / the first SD mutation,
+            // only synchronous FAP validation and install-plan construction may occur.
             let transferReporter = TransferActivityReporter(channel: channel)
             _ = await transferReporter.prepare()
-            transferReporter.begin("firmware packages")
-            defer { transferReporter.end() }
-            let installer = TumoflipInstaller(fs: fs, source: source)
-            let outcome = try await installer.install(
-                plan, isStopRequested: { [stopToken] in stopToken.isStopped }
-            ) { [weak self] done, total, file in
-                Task { @MainActor in
-                    self?.phase = .installing(done: done, total: total, file: file)
-                    live.update(current: done, total: total, detail: file)
-                    transferReporter.progress(file)
+
+            let outcome = try await TumoflipPrewriteIdentityGate.authorize(
+                manifest: manifest,
+                readIdentity: {
+                    let fresh = try await self.freshDeviceIdentity()
+                    return fresh.identity
                 }
+            ) { finalIdentity -> TumoflipInstaller.Outcome? in
+                // Adopt and reuse the SAME full device_info response for both the exact
+                // snapshot contract and FAP metadata gate. A firmware swap after the
+                // earlier catalog recheck therefore fails before Loader or the SD changes.
+                self.adopt(FreshDeviceIdentity(
+                    identity: finalIdentity.identity,
+                    compatibility: finalIdentity.compatibility
+                ))
+                let devApi = finalIdentity.compatibility.apiMajor
+                let devTarget = finalIdentity.compatibility.hardwareTarget
+                self.compatibilityApiMajor = devApi
+                self.compatibilityTarget = devTarget
+                self.compatibilityChecked = true
+                self.blocked = PackageCompatibilityGate.blocked(
+                    self.fapCandidates(source, groups: Set(TumoflipManifest.knownGroups)),
+                    deviceApiMajor: devApi,
+                    deviceTarget: devTarget
+                )
+                let hits = self.blocked.filter { requestedTargets.contains($0.key) }
+                if !hits.isEmpty {
+                    self.phase = .failed(PackageCompatibilityGate.summary(hits))
+                    return nil
+                }
+
+                let allTargets = Set(TumoflipManifest.knownGroups.flatMap { group in
+                    self.files(group).map(\.target)
+                })
+                let effectiveExclusions = allTargets
+                    .subtracting(requestedTargets)
+                    .union(self.blocked.keys)
+                let groups = Set(TumoflipManifest.knownGroups.filter { group in
+                    self.files(group).contains { requestedTargets.contains($0.target) }
+                })
+                let plan = try TumoflipInstallPlan.make(
+                    manifest: manifest,
+                    groups: groups,
+                    excluding: effectiveExclusions
+                ).installationOnly
+                guard !plan.files.isEmpty else {
+                    self.phase = .failed("No compatible files selected.")
+                    return nil
+                }
+                activityTotal = 200 * plan.files.count
+
+                // A running external app may keep its own FAP open. Stop it only after
+                // the final exact identity and FAP checks have passed.
+                if channel == .ble {
+                    try await self.ensureLoaderIdle()
+                }
+
+                self.phase = .installing(done: 0, total: activityTotal, file: "Starting…")
+                live.start(total: activityTotal, title: "Installing firmware packages")
+                transferReporter.begin("firmware packages")
+                defer { transferReporter.end() }
+                let installer = TumoflipInstaller(fs: fs, source: source)
+                // The installer is the first code below this point allowed to mutate
+                // package state. Error handling must not run write-capable reconciliation
+                // when authorization failed before reaching this boundary.
+                enteredDeviceMutationPhase = true
+                let result = try await installer.install(
+                    plan,
+                    isStopRequested: { [stopToken] in stopToken.isStopped }
+                ) { [weak self] done, total, file in
+                    Task { @MainActor in
+                        self?.phase = .installing(done: done, total: total, file: file)
+                        live.update(current: done, total: total, detail: file)
+                        transferReporter.progress(file)
+                    }
+                }
+                try await installer.refreshCompatibilityState(manifest: manifest, plan: plan)
+                return result
             }
-            try await installer.refreshCompatibilityState(manifest: manifest, plan: plan)
+            guard let outcome else { return }
             switch outcome {
             case .alreadyInstalled:
                 phase = .done("Already installed — nothing to do.")
@@ -696,7 +728,7 @@ final class TumoflipUpdater: ObservableObject {
                 total: activityTotal,
                 detail: "Rolled back"
             )
-            await refreshStatus()
+            if enteredDeviceMutationPhase { await refreshStatus() }
         } catch let e as TumoflipInstallError {
             phase = .failed(installErrorText(e))
             live.fail(
@@ -704,7 +736,7 @@ final class TumoflipUpdater: ObservableObject {
                 total: activityTotal,
                 detail: installErrorText(e)
             )
-            await refreshStatus()
+            if enteredDeviceMutationPhase { await refreshStatus() }
         } catch {
             phase = .failed(friendly(error))
             live.fail(
@@ -712,7 +744,7 @@ final class TumoflipUpdater: ObservableObject {
                 total: activityTotal,
                 detail: friendly(error)
             )
-            await refreshStatus()
+            if enteredDeviceMutationPhase { await refreshStatus() }
         }
     }
 
@@ -963,6 +995,8 @@ final class TumoflipUpdater: ObservableObject {
                                  deviceAPI: fresh.identity.firmwareAPI,
                                  deviceVersion: fresh.identity.firmwareVersion,
                                  deviceOriginFork: fresh.identity.originFork,
+                                 deviceCommit: fresh.identity.firmwareCommit,
+                                 deviceCommitDirty: fresh.identity.firmwareCommitDirty,
                                  manifest: manifest)
     }
 

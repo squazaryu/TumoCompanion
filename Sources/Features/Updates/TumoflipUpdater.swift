@@ -139,10 +139,12 @@ enum TumoflipHash {
 
 enum TumoflipCompat {
     /// Fail closed unless the connected device matches the package compatibility
-    /// contract. Legacy manifests are exact-version pinned; independent catalog
-    /// revisions use channel + API + target, matching the Community Apps lifecycle.
+    /// contract. Legacy manifests and firmware snapshots are exact-build pinned;
+    /// independent delta revisions use channel + API + target, matching the Community
+    /// Apps lifecycle.
     static func check(deviceTarget: Int?, deviceAPI: String?,
                       deviceVersion: String?, deviceOriginFork: String? = nil,
+                      deviceCommit: String? = nil, deviceCommitDirty: Bool? = nil,
                       manifest: TumoflipManifest) throws {
         guard let dt = deviceTarget else {
             throw TumoflipInstallError.incompatible("device target is unavailable")
@@ -160,7 +162,29 @@ enum TumoflipCompat {
         if dt != manifest.firmware.target {
             throw TumoflipInstallError.incompatible("device is f\(dt), packages are for f\(manifest.firmware.target)")
         }
-        if let release = manifest.packageRelease, release.isIndependentCatalog {
+        if let release = manifest.packageRelease,
+           release.isIndependentCatalog,
+           manifest.isFirmwareSnapshotCatalog {
+            guard deviceAPI == manifest.firmware.api else {
+                throw TumoflipInstallError.incompatible(
+                    "device API \(deviceAPI) ≠ snapshot API \(manifest.firmware.api)")
+            }
+            guard deviceVersion == manifest.firmware.version else {
+                throw TumoflipInstallError.incompatible(
+                    "device firmware \(deviceVersion) ≠ snapshot firmware \(manifest.firmware.version)")
+            }
+            guard deviceCommitDirty == false else {
+                throw TumoflipInstallError.incompatible(
+                    "device firmware build is dirty or its clean state is unavailable")
+            }
+            guard TumoflipFirmwareCommitIdentity.matches(
+                reported: deviceCommit,
+                expected: release.targetFirmwareCommit
+            ) else {
+                throw TumoflipInstallError.incompatible(
+                    "device firmware commit does not match this package snapshot")
+            }
+        } else if let release = manifest.packageRelease, release.isIndependentCatalog {
             guard FirmwareAPICompatibility.hasSameMajor(deviceAPI, manifest.firmware.api) else {
                 throw TumoflipInstallError.incompatible(
                     "device API \(deviceAPI) is not compatible with package API \(manifest.firmware.api)")
@@ -181,6 +205,42 @@ enum TumoflipCompat {
                     "device firmware \(deviceVersion) ≠ package firmware \(manifest.firmware.version)")
             }
         }
+    }
+}
+
+/// The final authorization boundary before Loader is stopped or any package path is
+/// mutated. It deliberately reads one complete identity and passes the compatibility
+/// projection from that same response into the authorized operation, so exact snapshot
+/// validation and embedded FAP validation cannot observe different firmware builds.
+struct TumoflipPrewriteIdentity: Equatable {
+    let identity: TumoflipDeviceIdentity
+    let compatibility: TumoflipCompatibilityIdentity
+}
+
+enum TumoflipPrewriteIdentityGate {
+    static func authorize<Result>(
+        manifest: TumoflipManifest,
+        readIdentity: () async throws -> TumoflipDeviceIdentity,
+        operation: (TumoflipPrewriteIdentity) async throws -> Result
+    ) async throws -> Result {
+        let identity = try await readIdentity()
+        try TumoflipCompat.check(
+            deviceTarget: identity.hardwareTarget,
+            deviceAPI: identity.firmwareAPI,
+            deviceVersion: identity.firmwareVersion,
+            deviceOriginFork: identity.originFork,
+            deviceCommit: identity.firmwareCommit,
+            deviceCommitDirty: identity.firmwareCommitDirty,
+            manifest: manifest
+        )
+        guard let compatibility = identity.compatibilityIdentity else {
+            throw TumoflipInstallError.incompatible(
+                "device firmware API or hardware target is unavailable")
+        }
+        return try await operation(TumoflipPrewriteIdentity(
+            identity: identity,
+            compatibility: compatibility
+        ))
     }
 }
 

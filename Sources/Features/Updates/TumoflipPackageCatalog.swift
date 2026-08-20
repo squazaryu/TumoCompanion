@@ -162,6 +162,8 @@ struct TumoflipPackageCatalogClient {
         installedVersion: String?,
         installedAPI: String? = nil,
         installedTarget: Int? = nil,
+        installedCommit: String? = nil,
+        installedCommitDirty: Bool? = nil,
         forceRemote: Bool = false,
         requiredRepository: TumoflipPackageCatalogRepository? = nil
     ) async throws -> TumoflipPackageCatalogSelection {
@@ -177,6 +179,8 @@ struct TumoflipPackageCatalogClient {
                 installedVersion: installedVersion,
                 installedAPI: installedAPI,
                 installedTarget: installedTarget,
+                installedCommit: installedCommit,
+                installedCommitDirty: installedCommitDirty,
                 forceRemote: forceRemote,
                 allowLegacyFirmwareReleases: requiredRepository.role == .legacy
             )
@@ -193,6 +197,8 @@ struct TumoflipPackageCatalogClient {
                     installedVersion: installedVersion,
                     installedAPI: installedAPI,
                     installedTarget: installedTarget,
+                    installedCommit: installedCommit,
+                    installedCommitDirty: installedCommitDirty,
                     forceRemote: forceRemote
                 )
             }
@@ -210,6 +216,8 @@ struct TumoflipPackageCatalogClient {
             installedVersion: installedVersion,
             installedAPI: installedAPI,
             installedTarget: installedTarget,
+            installedCommit: installedCommit,
+            installedCommitDirty: installedCommitDirty,
             forceRemote: forceRemote,
             allowLegacyFirmwareReleases: true
         )
@@ -259,6 +267,8 @@ struct TumoflipPackageCatalogClient {
         installedVersion: String?,
         installedAPI: String?,
         installedTarget: Int?,
+        installedCommit: String?,
+        installedCommitDirty: Bool?,
         forceRemote: Bool,
         allowLegacyFirmwareReleases: Bool
     ) async throws -> TumoflipPackageCatalogSelection {
@@ -271,6 +281,8 @@ struct TumoflipPackageCatalogClient {
                 installedVersion: installedVersion,
                 installedAPI: installedAPI,
                 installedTarget: installedTarget,
+                installedCommit: installedCommit,
+                installedCommitDirty: installedCommitDirty,
                 forceRemote: forceRemote
             )
         }
@@ -314,6 +326,8 @@ struct TumoflipPackageCatalogClient {
         installedVersion: String?,
         installedAPI: String?,
         installedTarget: Int?,
+        installedCommit: String?,
+        installedCommitDirty: Bool?,
         forceRemote: Bool
     ) async throws -> TumoflipPackageCatalogSelection {
         let ranked = releases.compactMap { release -> (Int, TumoflipPackageCatalogRelease)? in
@@ -349,6 +363,23 @@ struct TumoflipPackageCatalogClient {
                 channel: channel,
                 installedVersion: installedVersion
             )
+            if manifest.isFirmwareSnapshotCatalog {
+                guard versionMatches,
+                      installedAPI == manifest.firmware.api,
+                      installedTarget == manifest.firmware.target,
+                      installedCommitDirty == false,
+                      TumoflipFirmwareCommitIdentity.matches(
+                          reported: installedCommit,
+                          expected: packageRelease.targetFirmwareCommit
+                      ) else {
+                    continue
+                }
+                return TumoflipPackageCatalogSelection(
+                    release: release,
+                    manifest: manifest,
+                    manifestUpdatedAt: manifestAsset.updatedAt
+                )
+            }
             let apiMatches = installedAPI.map {
                 FirmwareAPICompatibility.hasSameMajor($0, manifest.firmware.api)
             } ?? true

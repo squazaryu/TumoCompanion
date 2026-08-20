@@ -99,16 +99,39 @@ enum PluginProtectionPolicy {
     ]
 
     static func protectionKeys(name: String, remotePath: String) -> Set<String> {
+        // Flipper storage is FAT-backed. A catalog/archive spelling such as
+        // `PLUGINS` must retain the same protection-family owner as `plugins`,
+        // otherwise the generic apps_data fallback can silently classify a
+        // protected protocol FAL as the unrelated `subghz` family.
+        let path = PluginRouteReconciliation.pathIdentity(remotePath)
         var keys = [name.lowercased()]
-        if let family = dataFamilyOwners.first(where: { remotePath.hasPrefix($0.prefix) }) {
+        if let family = dataFamilyOwners.first(where: { path.hasPrefix($0.prefix) }) {
             keys.append(family.owner)
-        } else if remotePath.hasPrefix("/ext/apps_data/") {
-            let suffix = remotePath.dropFirst("/ext/apps_data/".count)
+        } else if path.hasPrefix("/ext/apps_data/") {
+            let suffix = path.dropFirst("/ext/apps_data/".count)
             if let root = suffix.split(separator: "/").first {
                 keys.append(String(root).lowercased())
             }
         }
         return Set(keys)
+    }
+
+    static func normalizedName(_ value: String) -> String? {
+        var name = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        if name.hasSuffix(".fap") {
+            name.removeLast(4)
+        }
+        guard !name.isEmpty,
+              name.count <= 255,
+              !name.contains("/"),
+              !name.contains("\\"),
+              name.unicodeScalars.allSatisfy({
+                !CharacterSet.controlCharacters.contains($0)
+              }) else {
+            return nil
+        }
+        return name
     }
 
     static func isProtected(
@@ -231,7 +254,9 @@ enum PluginSelectionPolicy {
 }
 
 enum UpdaterPhase: Equatable {
-    case idle, fetching, downloading, needsBaseline, scanning(Int, Int), installing(Int, Int), verifying(Int, Int), done(String), failed(String)
+    case idle, fetching, downloading, needsBaseline
+    case scanning(Int, Int), installing(Int, Int), cleaning(Int, Int), verifying(Int, Int)
+    case done(String), failed(String)
 }
 
 /// Outcome of a signature check — either the per-file verification done during an
@@ -245,13 +270,907 @@ struct VerifyResult: Equatable {
     var ok: Bool { failed.isEmpty }
 }
 
-/// Outcome of the post-install legacy-duplicate sweep: for routed apps, the old
-/// pre-routing copy at the source path is removed ONLY when it byte-matches what we
-/// just installed (md5 == newMD5); anything that differs is kept for manual review.
+/// Outcome of an explicit legacy-route cleanup. A path is removed only after both its
+/// canonical replacement and its own historical pack identity are verified.
 struct CleanupResult: Equatable {
-    let removed: [String]   // legacy duplicate paths deleted (exact pack match)
-    let kept: [String]      // legacy paths kept because their md5 differs
+    let removed: [String]   // obsolete paths deleted after exact pack-history verification
+    let kept: [String]      // paths kept because safe removal could not be proven/completed
     var isEmpty: Bool { removed.isEmpty && kept.isEmpty }
+}
+
+/// Persistent Community Pack baseline plus content-addressed routes retired by a
+/// newer catalog. Version 2 caches contained only `tag` and `map`; the custom decoder
+/// keeps those installations compatible while making route history explicit.
+struct PluginCatalogCache: Codable, Equatable {
+    var tag: String
+    var map: [String: String]
+    private(set) var retiredRoutes: [String: [String]]
+
+    init(
+        tag: String,
+        map: [String: String],
+        retiredRoutes: [String: [String]] = [:]
+    ) {
+        self.tag = tag
+        self.map = map
+        self.retiredRoutes = retiredRoutes.mapValues(Self.normalizedMD5s)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case tag, map
+        case retiredRoutes = "retired_routes"
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        tag = try values.decode(String.self, forKey: .tag)
+        map = try values.decode([String: String].self, forKey: .map)
+        retiredRoutes = try values.decodeIfPresent(
+            [String: [String]].self,
+            forKey: .retiredRoutes
+        )?.mapValues(Self.normalizedMD5s) ?? [:]
+    }
+
+    /// Moves paths removed by the current immutable catalog out of the active
+    /// baseline without losing the exact hashes that are safe to recognize later.
+    /// A route that becomes active again is never considered a cleanup candidate.
+    mutating func reconcileRoutes(current: [String: String]) {
+        for path in current.keys {
+            retiredRoutes.removeValue(forKey: path)
+        }
+        let retired = map.filter { current[$0.key] == nil }
+        for (path, md5) in retired {
+            var known = retiredRoutes[path] ?? []
+            known.append(md5)
+            retiredRoutes[path] = Self.normalizedMD5s(known)
+            map.removeValue(forKey: path)
+        }
+    }
+
+    mutating func forgetRetiredRoute(_ path: String) {
+        retiredRoutes.removeValue(forKey: path)
+    }
+
+    private static func normalizedMD5s(_ values: [String]) -> [String] {
+        Array(Set(
+            values.map { $0.lowercased() }
+                .filter(PluginRouteReconciliation.isMD5)
+        )).sorted()
+    }
+}
+
+struct PluginRouteCleanupCandidate: Codable, Equatable {
+    let catalogPath: String
+    let canonicalPath: String
+    let legacyPath: String
+    let canonicalMD5: String
+    let acceptedLegacyMD5s: [String]
+}
+
+/// Cleanup recovery is intentionally independent from the Community Pack baseline.
+/// Resetting/reseeding that baseline must not orphan a `.ucobsolete` marker left by a
+/// device or app crash. The journal contains only validated exact paths and hashes.
+struct PluginRouteCleanupJournalStore {
+    private let defaults: UserDefaults
+    private let key: String
+    private var activeKey: String { key + ".active-staging" }
+
+    init(
+        defaults: UserDefaults = .standard,
+        key: String = "pluginRouteCleanupJournal.v1"
+    ) {
+        self.defaults = defaults
+        self.key = key
+    }
+
+    func load() -> [PluginRouteCleanupCandidate] {
+        let decoded: [PluginRouteCleanupCandidate]
+        if let data = defaults.data(forKey: key),
+           let stored = try? JSONDecoder().decode(
+                [PluginRouteCleanupCandidate].self,
+                from: data
+           ) {
+            decoded = stored
+        } else {
+            decoded = []
+        }
+        return PluginRouteReconciliation.normalizedCandidates(
+            decoded + [activeStagingCandidate()].compactMap { $0 }
+        )
+    }
+
+    func recoveryPathIdentities() -> Set<String> {
+        guard let candidate = activeStagingCandidate() else { return [] }
+        return [PluginRouteReconciliation.pathIdentity(candidate.legacyPath)]
+    }
+
+    @discardableResult
+    func markStaging(_ candidate: PluginRouteCleanupCandidate) -> Bool {
+        guard let validated = PluginRouteReconciliation.normalizedCandidates([candidate]).first,
+              let data = try? JSONEncoder().encode(validated) else { return false }
+        defaults.set(data, forKey: activeKey)
+        guard defaults.synchronize(), activeStagingCandidate() == validated else {
+            return false
+        }
+        return true
+    }
+
+    @discardableResult
+    func markPending(_ candidate: PluginRouteCleanupCandidate) -> Bool {
+        guard let active = activeStagingCandidate(),
+              PluginRouteReconciliation.pathIdentity(active.legacyPath)
+                == PluginRouteReconciliation.pathIdentity(candidate.legacyPath) else { return true }
+        defaults.removeObject(forKey: activeKey)
+        return defaults.synchronize() && activeStagingCandidate() == nil
+    }
+
+    @discardableResult
+    func record(_ candidates: [PluginRouteCleanupCandidate]) -> Bool {
+        save(load() + candidates)
+    }
+
+    @discardableResult
+    func remove(legacyPaths: [String]) -> Bool {
+        let identities = Set(legacyPaths.map(PluginRouteReconciliation.pathIdentity))
+        let saved = save(load().filter {
+            !identities.contains(PluginRouteReconciliation.pathIdentity($0.legacyPath))
+        })
+        if let active = activeStagingCandidate(),
+           identities.contains(PluginRouteReconciliation.pathIdentity(active.legacyPath)) {
+            defaults.removeObject(forKey: activeKey)
+            return saved && defaults.synchronize() && activeStagingCandidate() == nil
+        }
+        return saved
+    }
+
+    private func activeStagingCandidate() -> PluginRouteCleanupCandidate? {
+        guard let data = defaults.data(forKey: activeKey),
+              let decoded = try? JSONDecoder().decode(
+                PluginRouteCleanupCandidate.self,
+                from: data
+              ) else { return nil }
+        return PluginRouteReconciliation.normalizedCandidates([decoded]).first
+    }
+
+    private func save(_ candidates: [PluginRouteCleanupCandidate]) -> Bool {
+        let normalized = PluginRouteReconciliation.normalizedCandidates(candidates)
+        guard !normalized.isEmpty else {
+            defaults.removeObject(forKey: key)
+            return defaults.synchronize() && defaults.data(forKey: key) == nil
+        }
+        guard let data = try? JSONEncoder().encode(normalized) else { return false }
+        defaults.set(data, forKey: key)
+        guard defaults.synchronize(),
+              let persisted = defaults.data(forKey: key),
+              let decoded = try? JSONDecoder().decode(
+                [PluginRouteCleanupCandidate].self,
+                from: persisted
+              ) else { return false }
+        return PluginRouteReconciliation.normalizedCandidates(decoded) == normalized
+    }
+}
+
+enum PluginRouteCleanupDecision: Equatable {
+    case remove
+    case missing
+    case keep
+}
+
+struct PluginRouteCleanupExecution: Equatable {
+    var removed: [String] = []
+    var missing: [String] = []
+    var rolledBack: [String] = []
+    var kept: [String] = []
+    var failures: [String] = []
+
+    mutating func normalize() {
+        removed = Array(Set(removed)).sorted()
+        missing = Array(Set(missing)).sorted()
+        rolledBack = Array(Set(rolledBack)).sorted()
+        kept = Array(
+            Set(kept).subtracting(removed).subtracting(missing).subtracting(rolledBack)
+        ).sorted()
+        failures = Array(Set(failures)).sorted()
+    }
+}
+
+private struct PluginRouteCleanupFailure: LocalizedError {
+    let message: String
+    var errorDescription: String? { message }
+}
+
+/// Executes only exact-path cleanup candidates. The legacy file is first moved to a
+/// durable sibling marker, then its hash and the canonical replacement are re-read
+/// immediately before deletion. A crash leaves a recoverable marker for the next run;
+/// a transport failure stops the sweep and leaves every unvisited route untouched.
+enum PluginRouteCleanupExecutor {
+    /// `shouldPreserve` is evaluated at each device-mutation boundary, rather than
+    /// only while candidates are assembled. `beginIrreversibleMutation` keeps a
+    /// successful policy request from interleaving with the small copy/remove or
+    /// delete operation that follows. Long hash reads and recoverable staging stay
+    /// outside that fence so the UI remains responsive.
+    @MainActor
+    static func execute(
+        _ candidates: [PluginRouteCleanupCandidate],
+        storage: any DeviceFileStore,
+        stagedRecoveryPaths: Set<String> = [],
+        rollbackOnlyPaths: Set<String> = [],
+        shouldPreserve: ((PluginRouteCleanupCandidate) -> Bool)? = nil,
+        beginIrreversibleMutation: (() -> Bool)? = nil,
+        endIrreversibleMutation: (() -> Void)? = nil,
+        didObserveNoStage: ((PluginRouteCleanupCandidate) -> Void)? = nil,
+        willStage: ((PluginRouteCleanupCandidate) throws -> Void)? = nil,
+        progress: ((Int, Int, String) -> Void)? = nil
+    ) async -> PluginRouteCleanupExecution {
+        let ordered = candidates.sorted {
+            let lhsIdentity = PluginRouteReconciliation.pathIdentity($0.legacyPath)
+            let rhsIdentity = PluginRouteReconciliation.pathIdentity($1.legacyPath)
+            let lhsIsRecovery = stagedRecoveryPaths.contains(lhsIdentity)
+            let rhsIsRecovery = stagedRecoveryPaths.contains(rhsIdentity)
+            if lhsIsRecovery != rhsIsRecovery { return lhsIsRecovery }
+            return lhsIdentity < rhsIdentity
+        }
+        var result = PluginRouteCleanupExecution()
+
+        for (index, candidate) in ordered.enumerated() {
+            progress?(index, ordered.count, candidate.legacyPath)
+            defer { progress?(index + 1, ordered.count, candidate.legacyPath) }
+            do {
+                let stagedPath = cleanupStagePath(for: candidate)
+                var canonicalMD5 = try await storage.checkedMD5(candidate.canonicalPath)
+                var legacyMD5 = try await storage.checkedMD5(candidate.legacyPath)
+                var stagedMD5 = try await storage.checkedMD5(stagedPath)
+                let legacyIdentity = PluginRouteReconciliation.pathIdentity(
+                    candidate.legacyPath
+                )
+
+                if stagedMD5 != nil,
+                   !stagedRecoveryPaths.contains(legacyIdentity) {
+                    result.kept.append(candidate.legacyPath)
+                    result.failures.append(
+                        "\(candidate.legacyPath): unowned recovery marker was preserved"
+                    )
+                    continue
+                }
+
+                // Protection may be enabled after a crash (or become built-in in a
+                // newer app). An owned active marker still has to be reconciled, but
+                // this path is rollback-only: never delete the protected legacy FAP.
+                if rollbackOnlyPaths.contains(legacyIdentity)
+                    || shouldPreserve?(candidate) == true {
+                    if let stagedMD5 {
+                        if legacyMD5 == nil {
+                            guard isAcceptedLegacyMD5(stagedMD5, for: candidate) else {
+                                throw PluginRouteCleanupFailure(
+                                    message: "protected recovery marker is incomplete"
+                                )
+                            }
+                            try await restore(
+                                candidate: candidate,
+                                stagedPath: stagedPath,
+                                expectedMD5: stagedMD5,
+                                storage: storage
+                            )
+                        } else {
+                            try await storage.delete(stagedPath, recursive: false)
+                            guard try await storage.checkedMD5(stagedPath) == nil else {
+                                throw PluginRouteCleanupFailure(
+                                    message: "protected recovery marker remained"
+                                )
+                            }
+                        }
+                    }
+                    didObserveNoStage?(candidate)
+                    result.rolledBack.append(candidate.legacyPath)
+                    continue
+                }
+
+                // Flipper's BLE rename is implemented as copy + remove. If the link
+                // dies between those operations, both the source and marker survive.
+                // A persisted cleanup journal proves the marker belongs to this exact
+                // transaction. Heal a partial copy by discarding only the marker while
+                // the exact source is intact; if both copies are complete, keep the
+                // marker as rollback material and finish the interrupted transaction.
+                if let currentLegacyMD5 = legacyMD5,
+                   let currentStagedMD5 = stagedMD5 {
+                    guard isAcceptedLegacyMD5(currentLegacyMD5, for: candidate) else {
+                        throw PluginRouteCleanupFailure(
+                            message: "legacy changed while recovery marker exists"
+                        )
+                    }
+
+                    if !isAcceptedLegacyMD5(currentStagedMD5, for: candidate) {
+                        try await storage.delete(stagedPath, recursive: false)
+                        guard try await storage.checkedMD5(stagedPath) == nil else {
+                            throw PluginRouteCleanupFailure(
+                                message: "partial recovery marker remained"
+                            )
+                        }
+                        stagedMD5 = nil
+                        canonicalMD5 = try await storage.checkedMD5(
+                            candidate.canonicalPath
+                        )
+                        legacyMD5 = try await storage.checkedMD5(candidate.legacyPath)
+                    } else {
+                        let verifiedCanonicalMD5 = try await storage.checkedMD5(
+                            candidate.canonicalPath
+                        )
+                        let verifiedLegacyMD5 = try await storage.checkedMD5(
+                            candidate.legacyPath
+                        )
+                        let verifiedStagedMD5 = try await storage.checkedMD5(stagedPath)
+                        guard let verifiedLegacyMD5,
+                              let verifiedStagedMD5,
+                              isAcceptedLegacyMD5(verifiedLegacyMD5, for: candidate),
+                              isAcceptedLegacyMD5(verifiedStagedMD5, for: candidate) else {
+                            throw PluginRouteCleanupFailure(
+                                message: "recovery copies changed during verification"
+                            )
+                        }
+
+                        guard verifiedCanonicalMD5?.lowercased()
+                                == candidate.canonicalMD5.lowercased() else {
+                            // Roll back the interrupted copy while the exact source is
+                            // still present. No installed FAP is removed in this path.
+                            try await storage.delete(stagedPath, recursive: false)
+                            guard try await storage.checkedMD5(stagedPath) == nil else {
+                                throw CocoaError(.fileWriteUnknown)
+                            }
+                            result.kept.append(candidate.legacyPath)
+                            continue
+                        }
+
+                        if shouldPreserve?(candidate) == true {
+                            try await storage.delete(stagedPath, recursive: false)
+                            guard try await storage.checkedMD5(stagedPath) == nil else {
+                                throw PluginRouteCleanupFailure(
+                                    message: "protected recovery marker remained"
+                                )
+                            }
+                            didObserveNoStage?(candidate)
+                            result.rolledBack.append(candidate.legacyPath)
+                            continue
+                        }
+
+                        let removedLegacy = try await performIrreversibleMutation(
+                            candidate: candidate,
+                            shouldPreserve: shouldPreserve,
+                            begin: beginIrreversibleMutation,
+                            end: endIrreversibleMutation
+                        ) {
+                            try await storage.delete(candidate.legacyPath, recursive: false)
+                        }
+                        guard removedLegacy else {
+                            try await storage.delete(stagedPath, recursive: false)
+                            guard try await storage.checkedMD5(stagedPath) == nil else {
+                                throw PluginRouteCleanupFailure(
+                                    message: "protected recovery marker remained"
+                                )
+                            }
+                            didObserveNoStage?(candidate)
+                            result.rolledBack.append(candidate.legacyPath)
+                            continue
+                        }
+                        guard try await storage.checkedMD5(candidate.legacyPath) == nil else {
+                            throw PluginRouteCleanupFailure(
+                                message: "source remained after recovery delete"
+                            )
+                        }
+                        canonicalMD5 = verifiedCanonicalMD5
+                        legacyMD5 = nil
+                        stagedMD5 = verifiedStagedMD5
+                    }
+                }
+
+                if stagedMD5 == nil {
+                    didObserveNoStage?(candidate)
+                }
+
+                // Recover an interrupted cleanup before considering a new move. The
+                // marker is app-owned, but its bytes still need the same old-pack proof.
+                if let stagedMD5 {
+                    guard legacyMD5 == nil else { throw CocoaError(.fileWriteUnknown) }
+                    guard PluginRouteReconciliation.decision(
+                        for: candidate,
+                        canonicalDeviceMD5: canonicalMD5,
+                        legacyDeviceMD5: stagedMD5
+                    ) == .remove else {
+                        if isAcceptedLegacyMD5(stagedMD5, for: candidate) {
+                            try await restore(
+                                candidate: candidate,
+                                stagedPath: stagedPath,
+                                expectedMD5: stagedMD5,
+                                storage: storage
+                            )
+                        } else {
+                            throw PluginRouteCleanupFailure(
+                                message: "recovery marker bytes are not an accepted old build"
+                            )
+                        }
+                        result.kept.append(candidate.legacyPath)
+                        continue
+                    }
+
+                    // The marker may have survived a previous app/device crash. Do
+                    // not trust even the reads at the top of this iteration: repeat
+                    // the two content proofs adjacently at the actual delete boundary.
+                    let currentCanonicalMD5 = try await storage.checkedMD5(
+                        candidate.canonicalPath
+                    )
+                    let currentStagedMD5 = try await storage.checkedMD5(stagedPath)
+                    guard PluginRouteReconciliation.decision(
+                        for: candidate,
+                        canonicalDeviceMD5: currentCanonicalMD5,
+                        legacyDeviceMD5: currentStagedMD5
+                    ) == .remove else {
+                        if let currentStagedMD5,
+                           isAcceptedLegacyMD5(currentStagedMD5, for: candidate) {
+                            try await restore(
+                                candidate: candidate,
+                                stagedPath: stagedPath,
+                                expectedMD5: currentStagedMD5,
+                                storage: storage
+                            )
+                        } else {
+                            throw PluginRouteCleanupFailure(
+                                message: "recovery marker changed during verification"
+                            )
+                        }
+                        result.kept.append(candidate.legacyPath)
+                        continue
+                    }
+
+                    if shouldPreserve?(candidate) == true {
+                        try await restore(
+                            candidate: candidate,
+                            stagedPath: stagedPath,
+                            expectedMD5: currentStagedMD5,
+                            storage: storage
+                        )
+                        didObserveNoStage?(candidate)
+                        result.rolledBack.append(candidate.legacyPath)
+                        continue
+                    }
+
+                    let removedStage = try await performIrreversibleMutation(
+                        candidate: candidate,
+                        shouldPreserve: shouldPreserve,
+                        begin: beginIrreversibleMutation,
+                        end: endIrreversibleMutation
+                    ) {
+                        try await storage.delete(stagedPath, recursive: false)
+                    }
+                    guard removedStage else {
+                        try await restore(
+                            candidate: candidate,
+                            stagedPath: stagedPath,
+                            expectedMD5: currentStagedMD5,
+                            storage: storage
+                        )
+                        didObserveNoStage?(candidate)
+                        result.rolledBack.append(candidate.legacyPath)
+                        continue
+                    }
+                    guard try await storage.checkedMD5(stagedPath) == nil else {
+                        throw PluginRouteCleanupFailure(
+                            message: "recovery marker remained after delete"
+                        )
+                    }
+                    result.removed.append(candidate.legacyPath)
+                    continue
+                }
+
+                guard legacyMD5 != nil else {
+                    result.missing.append(candidate.legacyPath)
+                    continue
+                }
+                switch PluginRouteReconciliation.decision(
+                    for: candidate,
+                    canonicalDeviceMD5: canonicalMD5,
+                    legacyDeviceMD5: legacyMD5
+                ) {
+                case .missing:
+                    result.missing.append(candidate.legacyPath)
+                case .keep:
+                    result.kept.append(candidate.legacyPath)
+                case .remove:
+                    if shouldPreserve?(candidate) == true {
+                        didObserveNoStage?(candidate)
+                        result.rolledBack.append(candidate.legacyPath)
+                        continue
+                    }
+
+                    // The stage path was observed absent above. Persist ownership
+                    // synchronously before copy+remove can create even partial bytes.
+                    try willStage?(candidate)
+                    let staged = try await performIrreversibleMutation(
+                        candidate: candidate,
+                        shouldPreserve: shouldPreserve,
+                        begin: beginIrreversibleMutation,
+                        end: endIrreversibleMutation
+                    ) {
+                        try await storage.move(candidate.legacyPath, to: stagedPath)
+                    }
+                    guard staged else {
+                        didObserveNoStage?(candidate)
+                        result.rolledBack.append(candidate.legacyPath)
+                        continue
+                    }
+
+                    // Re-read both identities after the move. If anything changed,
+                    // restore the exact legacy bytes instead of deleting the marker.
+                    let currentCanonicalMD5 = try await storage.checkedMD5(
+                        candidate.canonicalPath
+                    )
+                    let currentLegacyMD5 = try await storage.checkedMD5(
+                        candidate.legacyPath
+                    )
+                    let currentStagedMD5 = try await storage.checkedMD5(stagedPath)
+                    if let currentLegacyMD5, let currentStagedMD5 {
+                        guard isAcceptedLegacyMD5(currentLegacyMD5, for: candidate),
+                              isAcceptedLegacyMD5(currentStagedMD5, for: candidate),
+                              currentCanonicalMD5?.lowercased()
+                                == candidate.canonicalMD5.lowercased() else {
+                            throw PluginRouteCleanupFailure(
+                                message: "copy-and-remove did not finish safely"
+                            )
+                        }
+
+                        if shouldPreserve?(candidate) == true {
+                            try await storage.delete(stagedPath, recursive: false)
+                            guard try await storage.checkedMD5(stagedPath) == nil else {
+                                throw PluginRouteCleanupFailure(
+                                    message: "protected recovery marker remained"
+                                )
+                            }
+                            didObserveNoStage?(candidate)
+                            result.rolledBack.append(candidate.legacyPath)
+                            continue
+                        }
+
+                        let removedLegacy = try await performIrreversibleMutation(
+                            candidate: candidate,
+                            shouldPreserve: shouldPreserve,
+                            begin: beginIrreversibleMutation,
+                            end: endIrreversibleMutation
+                        ) {
+                            try await storage.delete(candidate.legacyPath, recursive: false)
+                        }
+                        guard removedLegacy else {
+                            try await storage.delete(stagedPath, recursive: false)
+                            guard try await storage.checkedMD5(stagedPath) == nil else {
+                                throw PluginRouteCleanupFailure(
+                                    message: "protected recovery marker remained"
+                                )
+                            }
+                            didObserveNoStage?(candidate)
+                            result.rolledBack.append(candidate.legacyPath)
+                            continue
+                        }
+                        guard try await storage.checkedMD5(candidate.legacyPath) == nil else {
+                            throw CocoaError(.fileWriteUnknown)
+                        }
+                    }
+                    guard PluginRouteReconciliation.decision(
+                        for: candidate,
+                        canonicalDeviceMD5: currentCanonicalMD5,
+                        legacyDeviceMD5: currentStagedMD5
+                    ) == .remove else {
+                        try await restore(
+                            candidate: candidate,
+                            stagedPath: stagedPath,
+                            expectedMD5: legacyMD5,
+                            storage: storage
+                        )
+                        result.kept.append(candidate.legacyPath)
+                        result.failures.append(
+                            "\(candidate.legacyPath): device bytes changed during cleanup"
+                        )
+                        continue
+                    }
+
+                    if shouldPreserve?(candidate) == true {
+                        try await restore(
+                            candidate: candidate,
+                            stagedPath: stagedPath,
+                            expectedMD5: legacyMD5,
+                            storage: storage
+                        )
+                        didObserveNoStage?(candidate)
+                        result.rolledBack.append(candidate.legacyPath)
+                        continue
+                    }
+
+                    let removedStage = try await performIrreversibleMutation(
+                        candidate: candidate,
+                        shouldPreserve: shouldPreserve,
+                        begin: beginIrreversibleMutation,
+                        end: endIrreversibleMutation
+                    ) {
+                        try await storage.delete(stagedPath, recursive: false)
+                    }
+                    guard removedStage else {
+                        try await restore(
+                            candidate: candidate,
+                            stagedPath: stagedPath,
+                            expectedMD5: legacyMD5,
+                            storage: storage
+                        )
+                        didObserveNoStage?(candidate)
+                        result.rolledBack.append(candidate.legacyPath)
+                        continue
+                    }
+                    guard try await storage.checkedMD5(stagedPath) == nil else {
+                        throw PluginRouteCleanupFailure(
+                            message: "recovery marker remained after delete"
+                        )
+                    }
+                    result.removed.append(candidate.legacyPath)
+                }
+            } catch {
+                result.kept.append(contentsOf: ordered[index...].map(\.legacyPath))
+                result.failures.append(
+                    "\(candidate.legacyPath): \(error.localizedDescription)"
+                )
+                break
+            }
+        }
+        result.normalize()
+        return result
+    }
+
+    static func cleanupStagePath(for candidate: PluginRouteCleanupCandidate) -> String {
+        candidate.legacyPath + ".ucobsolete"
+    }
+
+    @MainActor
+    private static func performIrreversibleMutation(
+        candidate: PluginRouteCleanupCandidate,
+        shouldPreserve: ((PluginRouteCleanupCandidate) -> Bool)?,
+        begin: (() -> Bool)?,
+        end: (() -> Void)?,
+        operation: () async throws -> Void
+    ) async throws -> Bool {
+        guard shouldPreserve?(candidate) != true else { return false }
+        guard begin?() ?? true else {
+            throw PluginRouteCleanupFailure(
+                message: "another Community mutation owns the protection fence"
+            )
+        }
+        defer { end?() }
+        guard shouldPreserve?(candidate) != true else { return false }
+        try await operation()
+        return true
+    }
+
+    private static func isAcceptedLegacyMD5(
+        _ md5: String,
+        for candidate: PluginRouteCleanupCandidate
+    ) -> Bool {
+        candidate.acceptedLegacyMD5s.contains(md5.lowercased())
+    }
+
+    private static func restore(
+        candidate: PluginRouteCleanupCandidate,
+        stagedPath: String,
+        expectedMD5: String?,
+        storage: any DeviceFileStore
+    ) async throws {
+        guard try await storage.checkedMD5(candidate.legacyPath) == nil else {
+            return
+        }
+        try await storage.move(stagedPath, to: candidate.legacyPath)
+        guard try await storage.checkedMD5(candidate.legacyPath) == expectedMD5,
+              try await storage.checkedMD5(stagedPath) == nil else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+    }
+}
+
+/// Derives obsolete FAP routes from immutable Community Pack history. No folder or
+/// release-specific deletion list is trusted: a move needs a unique same-name app in
+/// the current catalog, a retired old route, and exact content identities on device.
+enum PluginRouteReconciliation {
+    static func candidates(
+        current: [PluginUpdate],
+        retiredRoutes: [String: [String]],
+        excluded: Set<String>,
+        unprotectedBuiltIns: Set<String>,
+        includeInstallRoutes: Bool = true
+    ) -> [String: [PluginRouteCleanupCandidate]] {
+        let eligible = current.filter {
+            isSafeFAPPath($0.remotePath)
+                && isSafeFAPPath($0.targetPath)
+                && !PluginProtectionPolicy.isProtected(
+                    name: $0.name,
+                    remotePath: $0.targetPath,
+                    excluded: excluded,
+                    unprotectedBuiltIns: unprotectedBuiltIns)
+        }
+        let currentCatalogPaths = Set(current.map { pathIdentity($0.remotePath) })
+        let canonicalPaths = Set(current.map { pathIdentity($0.targetPath) })
+        let byStem = Dictionary(grouping: eligible, by: { stem($0.remotePath) })
+        var proposals: [PluginRouteCleanupCandidate] = []
+
+        for (legacyPath, historicalMD5s) in retiredRoutes {
+            let appStem = stem(legacyPath)
+            let legacyIdentity = pathIdentity(legacyPath)
+            guard isSafeFAPPath(legacyPath),
+                  !currentCatalogPaths.contains(legacyIdentity),
+                  !canonicalPaths.contains(legacyIdentity),
+                  !PluginProtectionPolicy.isProtected(
+                    name: appStem,
+                    remotePath: legacyPath,
+                    excluded: excluded,
+                    unprotectedBuiltIns: unprotectedBuiltIns),
+                  let matches = byStem[appStem], matches.count == 1,
+                  let update = matches.first else { continue }
+            appendCandidate(
+                catalogPath: update.remotePath,
+                canonicalPath: update.targetPath,
+                legacyPath: legacyPath,
+                canonicalMD5: update.newMD5,
+                acceptedLegacyMD5s: historicalMD5s,
+                to: &proposals
+            )
+        }
+
+        // Preserve the small set of intentional Tumoflip install routes. These
+        // predate cache history, so only a byte-identical old copy is accepted.
+        if includeInstallRoutes {
+            for update in eligible {
+                for legacyPath in PluginInstallRouting.legacyPaths(for: update.remotePath)
+                where legacyPath != update.targetPath {
+                    appendCandidate(
+                        catalogPath: update.remotePath,
+                        canonicalPath: update.targetPath,
+                        legacyPath: legacyPath,
+                        canonicalMD5: update.newMD5,
+                        acceptedLegacyMD5s: (retiredRoutes[legacyPath] ?? []) + [update.newMD5],
+                        to: &proposals
+                    )
+                }
+            }
+        }
+
+        // If two catalog entries claim one old path, fail closed instead of choosing.
+        let unambiguous = Dictionary(
+            grouping: proposals,
+            by: { pathIdentity($0.legacyPath) }
+        ).values.compactMap {
+            group -> PluginRouteCleanupCandidate? in
+            let identities = Set(group.map {
+                "\($0.catalogPath)\u{0}\($0.canonicalPath)\u{0}\($0.canonicalMD5)"
+            })
+            guard identities.count == 1, let first = group.first else { return nil }
+            let accepted = Array(Set(group.flatMap(\.acceptedLegacyMD5s))).sorted()
+            return PluginRouteCleanupCandidate(
+                catalogPath: first.catalogPath,
+                canonicalPath: first.canonicalPath,
+                legacyPath: first.legacyPath,
+                canonicalMD5: first.canonicalMD5,
+                acceptedLegacyMD5s: accepted
+            )
+        }
+        return Dictionary(grouping: unambiguous, by: \.catalogPath).mapValues {
+            $0.sorted { $0.legacyPath < $1.legacyPath }
+        }
+    }
+
+    /// Validates persisted candidates again on every load and collapses duplicate
+    /// journal/cache entries. Conflicting claims for one FAT path are discarded.
+    static func normalizedCandidates(
+        _ candidates: [PluginRouteCleanupCandidate]
+    ) -> [PluginRouteCleanupCandidate] {
+        let validated = candidates.compactMap { candidate -> PluginRouteCleanupCandidate? in
+            guard isSafeFAPPath(candidate.catalogPath) else { return nil }
+            var result: [PluginRouteCleanupCandidate] = []
+            appendCandidate(
+                catalogPath: candidate.catalogPath,
+                canonicalPath: candidate.canonicalPath,
+                legacyPath: candidate.legacyPath,
+                canonicalMD5: candidate.canonicalMD5,
+                acceptedLegacyMD5s: candidate.acceptedLegacyMD5s,
+                to: &result
+            )
+            return result.first
+        }
+        return Dictionary(grouping: validated, by: { pathIdentity($0.legacyPath) })
+            .values.compactMap { group -> PluginRouteCleanupCandidate? in
+                let identities = Set(group.map {
+                    pathIdentity($0.catalogPath) + "\u{0}"
+                        + pathIdentity($0.canonicalPath) + "\u{0}"
+                        + $0.canonicalMD5.lowercased()
+                })
+                guard identities.count == 1, let first = group.first else { return nil }
+                return PluginRouteCleanupCandidate(
+                    catalogPath: first.catalogPath,
+                    canonicalPath: first.canonicalPath,
+                    legacyPath: first.legacyPath,
+                    canonicalMD5: first.canonicalMD5.lowercased(),
+                    acceptedLegacyMD5s: Array(Set(
+                        group.flatMap(\.acceptedLegacyMD5s).map { $0.lowercased() }
+                    )).filter(isMD5).sorted()
+                )
+            }
+            .sorted { pathIdentity($0.legacyPath) < pathIdentity($1.legacyPath) }
+    }
+
+    static func decision(
+        for candidate: PluginRouteCleanupCandidate,
+        canonicalDeviceMD5: String?,
+        legacyDeviceMD5: String?
+    ) -> PluginRouteCleanupDecision {
+        guard canonicalDeviceMD5?.lowercased() == candidate.canonicalMD5.lowercased() else {
+            return .keep
+        }
+        guard let legacyDeviceMD5 else { return .missing }
+        return candidate.acceptedLegacyMD5s.contains(legacyDeviceMD5.lowercased())
+            ? .remove : .keep
+    }
+
+    static func isMD5(_ value: String) -> Bool {
+        value.count == 32 && value.allSatisfy { "0123456789abcdef".contains($0) }
+    }
+
+    private static func appendCandidate(
+        catalogPath: String,
+        canonicalPath: String,
+        legacyPath: String,
+        canonicalMD5: String,
+        acceptedLegacyMD5s: [String],
+        to proposals: inout [PluginRouteCleanupCandidate]
+    ) {
+        let canonical = canonicalMD5.lowercased()
+        let accepted = Array(Set(
+            acceptedLegacyMD5s.map { $0.lowercased() }
+                .filter(isMD5)
+        )).sorted()
+        guard isSafeFAPPath(canonicalPath),
+              isSafeFAPPath(legacyPath),
+              pathIdentity(canonicalPath) != pathIdentity(legacyPath),
+              isMD5(canonical),
+              !accepted.isEmpty else { return }
+        proposals.append(PluginRouteCleanupCandidate(
+            catalogPath: catalogPath,
+            canonicalPath: canonicalPath,
+            legacyPath: legacyPath,
+            canonicalMD5: canonical,
+            acceptedLegacyMD5s: accepted
+        ))
+    }
+
+    private static func stem(_ path: String) -> String {
+        (((path as NSString).lastPathComponent as NSString).deletingPathExtension)
+            .folding(
+                options: [.caseInsensitive],
+                locale: Locale(identifier: "en_US_POSIX")
+            )
+    }
+
+    /// Flipper SD storage is FAT-backed, so path identity is case-insensitive even
+    /// when the spelling returned by a manifest or cache differs. Never compare raw
+    /// strings when deciding whether one path may be deleted in favor of another.
+    static func pathIdentity(_ path: String) -> String {
+        path.precomposedStringWithCanonicalMapping.folding(
+            options: [.caseInsensitive],
+            locale: Locale(identifier: "en_US_POSIX")
+        )
+    }
+
+    private static func isSafeFAPPath(_ path: String) -> Bool {
+        let identity = pathIdentity(path)
+        let roots = ["/ext/apps/", "/ext/apps_data/"]
+        guard let root = roots.first(where: { identity.hasPrefix($0) }),
+              identity.hasSuffix(".fap") else {
+            return false
+        }
+        let suffix = identity.dropFirst(root.count)
+        let components = suffix.split(separator: "/", omittingEmptySubsequences: false)
+        return !components.isEmpty && components.allSatisfy {
+            !$0.isEmpty && $0 != "." && $0 != ".."
+        }
+    }
 }
 
 struct InstallRecord: Codable, Identifiable {
@@ -261,6 +1180,43 @@ struct InstallRecord: Codable, Identifiable {
     let name: String
     let pack: String
     let wasNew: Bool
+}
+
+/// The Community installer and standalone cleanup mutate overlapping SD paths. UI
+/// disabling is not synchronization, so both entry points acquire this main-actor gate
+/// synchronously before their first suspension point.
+@MainActor
+final class PluginTransactionGate {
+    private(set) var isActive = false
+
+    func begin() -> Bool {
+        guard !isActive else { return false }
+        isActive = true
+        return true
+    }
+
+    func end() {
+        isActive = false
+    }
+}
+
+/// Linearizes protection changes with only the short irreversible part of a Community
+/// mutation. Long downloads, hashes, and recoverable staging remain interruptible;
+/// requests made inside the live delete/swap window are not acknowledged and can be
+/// retried immediately afterwards.
+@MainActor
+final class PluginProtectionMutationGate {
+    private(set) var isActive = false
+
+    func begin() -> Bool {
+        guard !isActive else { return false }
+        isActive = true
+        return true
+    }
+
+    func end() {
+        isActive = false
+    }
 }
 
 /// One dated build in the all-the-plugins release history — xMasterX sometimes ships
@@ -318,10 +1274,10 @@ final class PluginUpdater: ObservableObject {
     @Published var changedFromScan = 0
     /// App name-stems (lowercased, no .fap) the updater must NEVER touch — your
     /// locally-modified builds. They're skipped entirely: not shown, not written.
-    @Published var excluded: Set<String> = PluginUpdater.loadExcluded()
+    @Published private(set) var excluded: Set<String> = []
     /// Built-in protections the user has explicitly lifted. A name here is no longer
     /// protected even though it's in `builtInExcluded`, so all-the-plugins may overwrite it.
-    @Published var unprotectedBuiltIns: Set<String> = PluginUpdater.loadUnprotected()
+    @Published private(set) var unprotectedBuiltIns: Set<String> = []
     /// Protected apps present in the upstream pack, compared against the device.
     @Published var protectedReviews: [ProtectedPluginReview] = []
     /// Automation-owned decision for the exact release tag + base/extra archive bytes.
@@ -329,6 +1285,9 @@ final class PluginUpdater: ObservableObject {
     /// remain UNVERIFIED until an authoritative comparison is available.
     @Published private(set) var protectedAuditResolution: ProtectedPluginAuditResolution?
     private let protectedAuditService: ProtectedPluginAuditService
+    private let cleanupJournalStore: PluginRouteCleanupJournalStore
+    private let persistenceDefaults: UserDefaults
+    private let protectionMutationGate: PluginProtectionMutationGate
     /// Exact archive identity retained for the loaded catalog. The audit can be
     /// published after the Community Pack was downloaded, so every later device
     /// verification must be able to re-resolve this same immutable identity without
@@ -368,8 +1327,11 @@ final class PluginUpdater: ObservableObject {
     @Published var installDetail: InstallDetail?
     /// Result of the last install verification or on-device verify (nil until one runs).
     @Published var verifyResult: VerifyResult?
-    /// Result of the post-install legacy-duplicate sweep (nil until an install runs).
+    /// Result of the last explicit legacy-route cleanup transaction.
     @Published var lastCleanup: CleanupResult?
+    /// Immutable-history route moves that can be checked in a standalone cleanup.
+    /// No device path is touched until the user starts the separate transaction.
+    @Published private(set) var pendingRouteCleanup: [PluginRouteCleanupCandidate] = []
     /// nil = always use GitHub's "latest" release; set = pin to this exact tag (e.g. to
     /// pick up a same-day "p2" follow-up that "latest" hasn't reflected yet, or to roll
     /// back to a known-good build). Persisted so the pin survives relaunches.
@@ -377,8 +1339,20 @@ final class PluginUpdater: ObservableObject {
     @Published var availableReleases: [PluginReleaseInfo] = []
     @Published var loadingReleases = false
 
-    init(protectedAuditService: ProtectedPluginAuditService = .live()) {
+    init(
+        protectedAuditService: ProtectedPluginAuditService = .live(),
+        cleanupJournalStore: PluginRouteCleanupJournalStore = .init(),
+        persistenceDefaults: UserDefaults = .standard,
+        protectionMutationGate: PluginProtectionMutationGate? = nil
+    ) {
         self.protectedAuditService = protectedAuditService
+        self.cleanupJournalStore = cleanupJournalStore
+        self.persistenceDefaults = persistenceDefaults
+        self.protectionMutationGate = protectionMutationGate
+            ?? PluginProtectionMutationGate()
+        excluded = Self.loadExcluded(defaults: persistenceDefaults)
+        unprotectedBuiltIns = Self.loadUnprotected(defaults: persistenceDefaults)
+        pendingRouteCleanup = eligibleJournalCleanupCandidates()
     }
 
     func protectedReviewStatus(_ review: ProtectedPluginReview) -> ProtectedPluginReviewAuditStatus {
@@ -487,15 +1461,27 @@ final class PluginUpdater: ObservableObject {
     }
 
     // Per-fap md5 of the pack state we last reconciled with the device.
-    private struct Cache: Codable { var tag: String; var map: [String: String] }
     private let cacheKey = "pluginPackCache.v2"
 
     // Working files for the current check (kept for install pass).
     private var packURLs: [(pack: String, url: URL)] = []
     private var allManifest: [String: PluginUpdate] = [:]   // remotePath -> entry (no data)
     private var protectedManifest: [PluginUpdate] = []
+    private let transactionGate = PluginTransactionGate()
+
+#if DEBUG
+    // Test-only seams for exercising the real check/install transaction without a
+    // physical Flipper or a live GitHub release. They stay nil in every normal app
+    // run, so production keeps using the active transfer channel and RPC identity.
+    private var testingStorage: (any DeviceFileStore)?
+    private var testingChannel: TransferChannel?
+    private var testingDeviceIdentity: (api: Int?, target: Int?)?
+    private var testingRelease: (tag: String, assets: [String: URL])?
+    private var testingDownloads: [URL: URL] = [:]
+#endif
 
     var selectedCount: Int { installableSelectedCount }
+    var pendingCleanupCount: Int { pendingRouteCleanup.count }
 
     // MARK: - FAP/FAL compatibility (issue #19)
 
@@ -553,6 +1539,9 @@ final class PluginUpdater: ObservableObject {
     /// stale cached identity is NEVER used as the install-time identity — this always
     /// reads device_info over a BLE-ready link.
     private func deviceApiTarget() async throws -> (api: Int?, target: Int?) {
+#if DEBUG
+        if let testingDeviceIdentity { return testingDeviceIdentity }
+#endif
         guard FlipperBLE.shared.state == .ready else {
             throw FlipperRPCError.notReady
         }
@@ -587,7 +1576,10 @@ final class PluginUpdater: ObservableObject {
         // card heights mid-animation (visible z-fight) and contending with the
         // transfer over RPC (issue #21). install() runs its own inline gate, so
         // skipping here loses nothing; the post-install .ready settle revalidates.
-        if case .installing = phase { return }
+        switch phase {
+        case .installing, .cleaning: return
+        default: break
+        }
         validating = true
         defer { validating = false }
         let api: Int?
@@ -651,22 +1643,31 @@ final class PluginUpdater: ObservableObject {
             await refreshProtectedAuditResolution()
             await refreshProtectedReviews()
 
-            if let cacheMap = loadCache()?.map, !cacheMap.isEmpty {
+            var cache = loadCache()
+            if var reconciled = cache {
+                reconciled.reconcileRoutes(
+                    current: manifest.mapValues(\.newMD5)
+                )
+                saveCache(reconciled)
+                cache = reconciled
+            }
+            pendingRouteCleanup = cleanupCandidates(cache: cache)
+            if let cache {
                 // Fast path: diff the new pack against what we last reconciled.
                 var result: [PluginUpdate] = []
                 for (path, f) in manifest {
-                    if cacheMap[path] != f.newMD5 {
+                    if cache.map[path] != f.newMD5 {
                         var update = PluginUpdate(
                             remotePath: path,
                             name: f.name,
                             category: f.category,
                             pack: f.pack,
                             newMD5: f.newMD5,
-                            oldMD5: cacheMap[path],
+                            oldMD5: cache.map[path],
                             size: f.size)
                         // New all-the-plugins entries should be reviewed manually; otherwise
                         // a broad pack update can quietly fill the SD with duplicates.
-                        update.selected = cacheMap[path] != nil
+                        update.selected = cache.map[path] != nil
                         result.append(update)
                     }
                 }
@@ -693,6 +1694,75 @@ final class PluginUpdater: ObservableObject {
 
     private func sortProtected(_ r: [ProtectedPluginReview]) -> [ProtectedPluginReview] {
         r.sorted { ($0.pack, $0.category, $0.name) < ($1.pack, $1.category, $1.name) }
+    }
+
+    private func standaloneCleanupCandidates(
+        _ cache: PluginCatalogCache
+    ) -> [PluginRouteCleanupCandidate] {
+        PluginRouteReconciliation.candidates(
+            current: Array(allManifest.values),
+            retiredRoutes: cache.retiredRoutes,
+            excluded: excluded,
+            unprotectedBuiltIns: unprotectedBuiltIns,
+            includeInstallRoutes: false
+        ).values.flatMap { $0 }.sorted {
+            PluginRouteReconciliation.pathIdentity($0.legacyPath)
+                < PluginRouteReconciliation.pathIdentity($1.legacyPath)
+        }
+    }
+
+    private func isCleanupAllowed(_ candidate: PluginRouteCleanupCandidate) -> Bool {
+        let name = (((candidate.catalogPath as NSString).lastPathComponent as NSString)
+            .deletingPathExtension)
+        return !PluginProtectionPolicy.isProtected(
+            name: name,
+            remotePath: candidate.canonicalPath,
+            excluded: excluded,
+            unprotectedBuiltIns: unprotectedBuiltIns
+        )
+    }
+
+    private func shouldPreserveDuringCleanup(
+        _ candidate: PluginRouteCleanupCandidate
+    ) -> Bool {
+        return !isCleanupAllowed(candidate)
+    }
+
+    private func isProtectedAtInstallTarget(_ update: PluginUpdate) -> Bool {
+        PluginProtectionPolicy.isProtected(
+            name: update.name,
+            remotePath: update.targetPath,
+            excluded: excluded,
+            unprotectedBuiltIns: unprotectedBuiltIns
+        )
+    }
+
+    private func eligibleJournalCleanupCandidates() -> [PluginRouteCleanupCandidate] {
+        let activePaths = cleanupJournalStore.recoveryPathIdentities()
+        return cleanupJournalStore.load().filter {
+            isCleanupAllowed($0)
+                || activePaths.contains(
+                    PluginRouteReconciliation.pathIdentity($0.legacyPath)
+                )
+        }
+    }
+
+    private func cleanupCandidates(
+        cache: PluginCatalogCache?
+    ) -> [PluginRouteCleanupCandidate] {
+        let journal = eligibleJournalCleanupCandidates()
+        let journalPaths = Set(journal.map {
+            PluginRouteReconciliation.pathIdentity($0.legacyPath)
+        })
+        let historical = cache.map(standaloneCleanupCandidates) ?? []
+        let newHistorical = historical.filter {
+            !journalPaths.contains(PluginRouteReconciliation.pathIdentity($0.legacyPath))
+        }
+        return PluginRouteReconciliation.normalizedCandidates(journal + newHistorical)
+    }
+
+    private func refreshPendingRouteCleanup() {
+        pendingRouteCleanup = cleanupCandidates(cache: loadCache())
     }
 
     private func setProtectedAuditProvenance(_ provenance: ProtectedPluginPackProvenance?) {
@@ -829,16 +1899,30 @@ final class PluginUpdater: ObservableObject {
     /// First-run option B: assume the Flipper already has this build (e.g. just
     /// flashed via SD). Seeds the baseline instantly with no scan.
     func seedBaseline() {
-        var map: [String: String] = [:]
-        for (path, f) in allManifest { map[path] = f.newMD5 }
-        saveCache(Cache(tag: tag, map: map))
+        let map = allManifest.mapValues(\.newMD5)
+        var cache = loadCache() ?? PluginCatalogCache(tag: tag, map: [:])
+        cache.reconcileRoutes(current: map)
+        cache.tag = tag
+        cache.map = map
+        saveCache(cache)
+        pendingRouteCleanup = cleanupCandidates(cache: cache)
         updates = []
         phase = .done("Baseline set · \(tag)")
     }
 
     private func ble() -> FlipperBLE { .shared }
-    private var activeStorage: any DeviceFileStore { TransferChannelStore.shared.activeStore }
-    var activeChannel: TransferChannel { TransferChannelStore.shared.activeChannel }
+    private var activeStorage: any DeviceFileStore {
+#if DEBUG
+        if let testingStorage { return testingStorage }
+#endif
+        return TransferChannelStore.shared.activeStore
+    }
+    var activeChannel: TransferChannel {
+#if DEBUG
+        if let testingChannel { return testingChannel }
+#endif
+        return TransferChannelStore.shared.activeChannel
+    }
 
     private func fileChannelReady(_ channel: TransferChannel, timeout: Double? = nil) async -> Bool {
         switch channel {
@@ -863,6 +1947,22 @@ final class PluginUpdater: ObservableObject {
     func install() async {
         let requested = updates.filter(\.selected)
         guard !requested.isEmpty else { return }
+
+        // `updates` is mutable UI state: protection can remove a row while this
+        // async transaction is suspended, and unprotecting it does not fabricate a
+        // new pending row without an ordinary Check. The only non-installed paths
+        // allowed to retain/receive the current catalog MD5 are therefore paths whose
+        // cache already matched the exact current catalog at transaction start.
+        // Everything else needs either a verified live install below or another Check.
+        var cache = loadCache() ?? PluginCatalogCache(tag: tag, map: [:])
+        cache.reconcileRoutes(current: allManifest.mapValues(\.newMD5))
+        let cacheVerifiedCurrentAtStart = Set(allManifest.compactMap { entry -> String? in
+            let (path, update) = entry
+            return cache.map[path] == update.newMD5 ? path : nil
+        })
+
+        guard transactionGate.begin() else { return }
+        defer { transactionGate.end() }
         stopRequested = false
         // Mark busy immediately so the Install button disables before any
         // await point — `phase` stayed `.idle` (not busy) through the
@@ -913,12 +2013,9 @@ final class PluginUpdater: ObservableObject {
             return
         }
 
-        var cache = loadCache() ?? Cache(tag: tag, map: [:])
-
         var installed = Set<String>()      // verified on device
+        var protectedSkipped = Set<String>()
         var failures: [String] = []
-        var cleanedDuplicates: [String] = []   // legacy copies removed (exact pack match)
-        var keptDuplicates: [String] = []      // legacy copies left for review (md5 differs)
         verifyResult = nil
         lastCleanup = nil
 
@@ -939,6 +2036,10 @@ final class PluginUpdater: ObservableObject {
         for (i, u) in selected.enumerated() {
             // Stop before starting a new file: apps not yet started keep their version.
             if stopRequested { break }
+            if isProtectedAtInstallTarget(u) {
+                protectedSkipped.insert(u.remotePath)
+                continue
+            }
             live.update(current: i, total: selected.count, detail: u.name)
             guard let data = extractData(remotePath: u.remotePath) else {
                 failures.append("\(u.name): not found in pack"); continue
@@ -992,8 +2093,15 @@ final class PluginUpdater: ObservableObject {
                     let staged = await verifyWrite(
                         path: tempPath, expectedMD5: u.newMD5, expectedSize: data.count, storage: storage)
                     guard staged.ok else { lastReason = staged.reason; try? await storage.delete(tempPath); continue }
-                    if await storage.exists(u.targetPath) { try? await storage.delete(u.targetPath) }
-                    try await storage.move(tempPath, to: u.targetPath)
+                    guard try await commitStagedInstall(
+                        u,
+                        tempPath: tempPath,
+                        storage: storage
+                    ) else {
+                        protectedSkipped.insert(u.remotePath)
+                        try? await storage.delete(tempPath)
+                        break
+                    }
                     let landed = await verifyWrite(
                         path: u.targetPath, expectedMD5: u.newMD5, expectedSize: data.count, storage: storage)
                     if landed.ok { ok = true; break }
@@ -1011,28 +2119,7 @@ final class PluginUpdater: ObservableObject {
                 cache.map[u.remotePath] = u.newMD5
                 history.insert(InstallRecord(date: Date(), tag: tag, name: u.name,
                                              pack: u.pack, wasNew: u.isNew), at: 0)
-
-                // Legacy-duplicate sweep: the new copy is verified at the canonical
-                // destination. Remove an old-route copy ONLY when it byte-matches what
-                // was just installed; a different custom/older build is retained.
-                for legacyPath in PluginInstallRouting.legacyPaths(for: u.remotePath)
-                where legacyPath != u.targetPath {
-                    guard let legacyMD5 = await storage.md5(legacyPath) else { continue }
-                    if legacyMD5 == u.newMD5 {
-                        do {
-                            try await storage.delete(legacyPath, recursive: false)
-                            cleanedDuplicates.append(legacyPath)
-                            ulog.notice("removed legacy duplicate \(legacyPath, privacy: .public)")
-                        } catch {
-                            keptDuplicates.append(legacyPath)   // couldn't delete → leave it
-                            ulog.error("failed to remove legacy duplicate \(legacyPath, privacy: .public): \(error.localizedDescription, privacy: .public)")
-                        }
-                    } else {
-                        keptDuplicates.append(legacyPath)
-                        ulog.notice("kept legacy file for review (md5 differs) \(legacyPath, privacy: .public)")
-                    }
-                }
-            } else if !stoppedMidFile {
+            } else if !stoppedMidFile && !protectedSkipped.contains(u.remotePath) {
                 failures.append("\(u.name): \(lastReason)")
             }
             live.update(current: i + 1, total: selected.count, detail: u.name)
@@ -1044,32 +2131,36 @@ final class PluginUpdater: ObservableObject {
         if history.count > 1000 { history.removeLast(history.count - 1000) }
         saveHistory()
 
-        // Reconcile cache: unchanged apps + verified installs = new md5. Failed /
-        // skipped stay at their old value so they surface again next check.
-        let inUpdates = Set(updates.map(\.remotePath))
-        for (path, f) in allManifest where !inUpdates.contains(path) || installed.contains(path) {
+        // Reconcile cache only for paths that already matched this exact catalog at
+        // transaction start, plus files that this transaction md5-verified after a
+        // successful live replacement. Failed, skipped, protected, and previously
+        // hidden rows keep their old hash so an ordinary subsequent Check surfaces
+        // them. Do not derive this from mutable `updates` or current protection:
+        // either can change while this transaction is suspended.
+        for (path, f) in allManifest where installed.contains(path)
+            || cacheVerifiedCurrentAtStart.contains(path) {
             cache.map[path] = f.newMD5
         }
         cache.tag = tag
         saveCache(cache)
+        pendingRouteCleanup = cleanupCandidates(cache: cache)
 
         // Keep failed/skipped in the list; drop only the verified ones.
-        updates.removeAll { installed.contains($0.remotePath) }
+        updates.removeAll {
+            installed.contains($0.remotePath) || isProtectedAtInstallTarget($0)
+        }
 
         // Post-install signature summary: each install above is md5-verified on the
         // device, so this records exactly what landed intact vs what didn't.
         verifyResult = VerifyResult(kind: .postInstall, tag: tag,
                                     verified: installed.count, failed: failures)
-        lastCleanup = (cleanedDuplicates.isEmpty && keptDuplicates.isEmpty)
-            ? nil : CleanupResult(removed: cleanedDuplicates, kept: keptDuplicates)
 
-        let cleanNote = cleanedDuplicates.isEmpty ? "" : " · cleaned \(cleanedDuplicates.count) duplicate\(cleanedDuplicates.count == 1 ? "" : "s")"
         if stopRequested {
             // Files that were stopped (mid-temp-write or not yet started) kept their
             // previous working version — neither installed nor failed. Any genuine
             // failure (e.g. a verify mismatch) is still surfaced separately.
             let kept = max(0, selected.count - installed.count - failures.count)
-            var msg = "Stopped — installed \(installed.count) of \(selected.count)\(cleanNote)."
+            var msg = "Stopped — installed \(installed.count) of \(selected.count)."
             if kept > 0 { msg += " \(kept) kept their current version." }
             if failures.isEmpty {
                 phase = .done(msg)
@@ -1084,7 +2175,11 @@ final class PluginUpdater: ObservableObject {
                 detail: failures.isEmpty ? "Install stopped" : "Stopped with failures"
             )
         } else if failures.isEmpty {
-            phase = .done("Installed \(installed.count) app\(installed.count == 1 ? "" : "s")\(cleanNote) · \(tag)")
+            var message = "Installed \(installed.count) app\(installed.count == 1 ? "" : "s") · \(tag)"
+            if !protectedSkipped.isEmpty {
+                message += " · kept \(protectedSkipped.count) newly protected"
+            }
+            phase = .done(message)
             live.succeed(
                 completed: installed.count,
                 total: selected.count,
@@ -1092,7 +2187,7 @@ final class PluginUpdater: ObservableObject {
             )
         } else {
             let head = installed.isEmpty ? "Install failed" : "Installed \(installed.count), \(failures.count) failed"
-            phase = .failed("\(head)\(cleanNote): " + failures.prefix(4).joined(separator: "; ")
+            phase = .failed("\(head): " + failures.prefix(4).joined(separator: "; ")
                             + (failures.count > 4 ? " …" : ""))
             if installed.isEmpty {
                 live.fail(
@@ -1107,6 +2202,112 @@ final class PluginUpdater: ObservableObject {
                     detail: "\(failures.count) failed"
                 )
             }
+        }
+    }
+
+    /// Separate, user-triggered reconciliation for routes retired by an immutable
+    /// Community Pack catalog. It never downloads or reinstalls an app. Each path is
+    /// independently content-verified and moved through a durable recovery marker.
+    func cleanUpPendingRoutes() async {
+        guard !pendingRouteCleanup.isEmpty else {
+            phase = .done("No obsolete Community Pack routes remain.")
+            return
+        }
+        guard transactionGate.begin() else { return }
+        defer { transactionGate.end() }
+
+        phase = .cleaning(0, pendingRouteCleanup.count)
+        verifyResult = nil
+        lastCleanup = nil
+        let channel = activeChannel
+        let storage = activeStorage
+        guard await fileChannelReady(channel) else {
+            phase = .failed(
+                "Flipper isn't ready — connect it or select its SD card, then retry cleanup."
+            )
+            return
+        }
+        guard channel != .ble || ble().serialOwner != .claudeBuddy else {
+            phase = .failed(FlipperRPCError.serialOwnedByClaudeBuddy.localizedDescription)
+            return
+        }
+
+        var cache = loadCache()
+        cache?.reconcileRoutes(current: allManifest.mapValues(\.newMD5))
+        let candidates = cleanupCandidates(cache: cache)
+        pendingRouteCleanup = candidates
+        guard !candidates.isEmpty else {
+            if let cache { saveCache(cache) }
+            phase = .done("No obsolete Community Pack routes remain.")
+            return
+        }
+
+        // Persist exact recovery context before the first device mutation. This
+        // journal intentionally survives Reset baseline and app/device restarts.
+        guard cleanupJournalStore.record(candidates) else {
+            phase = .failed("Cleanup recovery journal could not be persisted; nothing was removed.")
+            return
+        }
+        let stagedRecoveryPaths = cleanupJournalStore.recoveryPathIdentities()
+        phase = .cleaning(0, candidates.count)
+        let cleanup = await PluginRouteCleanupExecutor.execute(
+            candidates,
+            storage: storage,
+            stagedRecoveryPaths: stagedRecoveryPaths,
+            shouldPreserve: { [weak self] candidate in
+                self?.shouldPreserveDuringCleanup(candidate) ?? true
+            },
+            beginIrreversibleMutation: { [weak self] in
+                self?.protectionMutationGate.begin() ?? false
+            },
+            endIrreversibleMutation: { [weak self] in
+                self?.protectionMutationGate.end()
+            },
+            didObserveNoStage: { [cleanupJournalStore] candidate in
+                cleanupJournalStore.markPending(candidate)
+            },
+            willStage: { [cleanupJournalStore] candidate in
+                guard cleanupJournalStore.markStaging(candidate) else {
+                    throw PluginRouteCleanupFailure(
+                        message: "active cleanup marker could not be persisted"
+                    )
+                }
+            },
+            progress: { [weak self] done, total, _ in
+                self?.phase = .cleaning(done, total)
+            }
+        )
+        for path in cleanup.removed + cleanup.missing {
+            cache?.forgetRetiredRoute(path)
+        }
+        if let cache { saveCache(cache) }
+        let journalUpdated = cleanupJournalStore.remove(
+            legacyPaths: cleanup.removed + cleanup.missing + cleanup.rolledBack
+        )
+        pendingRouteCleanup = cleanupCandidates(cache: cache)
+        lastCleanup = (cleanup.removed.isEmpty && cleanup.kept.isEmpty)
+            ? nil
+            : CleanupResult(removed: cleanup.removed, kept: cleanup.kept)
+
+        if !journalUpdated {
+            phase = .failed(
+                "Device files are safe, but cleanup recovery state could not be updated. Retry cleanup."
+            )
+        } else if let failure = cleanup.failures.first {
+            phase = .failed(
+                "Cleanup stopped safely; unverified files were kept. \(failure)"
+            )
+        } else if !cleanup.removed.isEmpty {
+            phase = .done(
+                "Removed \(cleanup.removed.count) obsolete Community Pack route"
+                + (cleanup.removed.count == 1 ? "." : "s.")
+            )
+        } else if !cleanup.rolledBack.isEmpty {
+            phase = .done("Restored protected Community app route safely.")
+        } else if !cleanup.kept.isEmpty {
+            phase = .done("Nothing removed — custom or unverified files were kept.")
+        } else {
+            phase = .done("No obsolete Community Pack routes remain.")
         }
     }
 
@@ -1192,11 +2393,36 @@ final class PluginUpdater: ObservableObject {
         return (false, "md5 mismatch (device \(sizeStr)B vs source \(expectedSize)B)")
     }
 
+    /// Commit a fully verified `.ucnew` only while the protection policy is fenced.
+    /// A user may protect an app during the long temp-file upload, but once this
+    /// method begins that request is rejected rather than falsely acknowledged while
+    /// the live target is being replaced. Returning `false` leaves the live FAP
+    /// untouched and lets the caller discard the temp safely.
+    private func commitStagedInstall(
+        _ update: PluginUpdate,
+        tempPath: String,
+        storage: any DeviceFileStore
+    ) async throws -> Bool {
+        guard protectionMutationGate.begin() else { return false }
+        defer { protectionMutationGate.end() }
+        guard !isProtectedAtInstallTarget(update) else {
+            return false
+        }
+        if await storage.exists(update.targetPath) {
+            try await storage.delete(update.targetPath)
+        }
+        try await storage.move(tempPath, to: update.targetPath)
+        return true
+    }
+
     // MARK: - GitHub
 
     /// Picks the release to use: the manual pin if one is set, otherwise GitHub's own
     /// "latest" (most recently published non-draft, non-prerelease release).
     private func latestRelease() async throws -> (String, [String: URL]) {
+#if DEBUG
+        if let testingRelease { return testingRelease }
+#endif
         let path = manualReleaseTag.map { "releases/tags/\($0)" } ?? "releases/latest"
         let url = URL(string: "https://api.github.com/repos/\(repo)/\(path)")!
         let result = try await GitHubAPIClient.shared.data(from: url)
@@ -1253,6 +2479,9 @@ final class PluginUpdater: ObservableObject {
     }
 
     private func download(_ url: URL, to name: String) async throws -> URL {
+#if DEBUG
+        if let local = testingDownloads[url] { return local }
+#endif
         let (tmp, _) = try await URLSession.shared.download(from: url)
         let dest = FileManager.default.temporaryDirectory.appendingPathComponent(name)
         try? FileManager.default.removeItem(at: dest)
@@ -1321,59 +2550,107 @@ final class PluginUpdater: ObservableObject {
 
     // MARK: - Cache
 
-    private func loadCache() -> Cache? {
-        guard let d = UserDefaults.standard.data(forKey: cacheKey) else { return nil }
-        return try? JSONDecoder().decode(Cache.self, from: d)
+    private func loadCache() -> PluginCatalogCache? {
+        guard let d = persistenceDefaults.data(forKey: cacheKey) else { return nil }
+        return try? JSONDecoder().decode(PluginCatalogCache.self, from: d)
     }
-    private func saveCache(_ c: Cache) {
-        if let d = try? JSONEncoder().encode(c) { UserDefaults.standard.set(d, forKey: cacheKey) }
+    private func saveCache(_ c: PluginCatalogCache) {
+        if let d = try? JSONEncoder().encode(c) {
+            persistenceDefaults.set(d, forKey: cacheKey)
+        }
     }
-    func resetBaseline() { UserDefaults.standard.removeObject(forKey: cacheKey) }
+    func resetBaseline() {
+        persistenceDefaults.removeObject(forKey: cacheKey)
+        pendingRouteCleanup = cleanupCandidates(cache: nil)
+    }
 
     // MARK: - Exclusions (protect locally-modified apps)
 
-    private static func loadExcluded() -> Set<String> {
-        if let arr = UserDefaults.standard.array(forKey: excludedKey) as? [String] {
+    private static func loadExcluded(defaults: UserDefaults) -> Set<String> {
+        if let arr = defaults.array(forKey: excludedKey) as? [String] {
             let original = Set(arr.map { $0.lowercased() })
             let saved = original.subtracting(retiredBuiltInExcluded)
             let merged = saved.union(builtInExcluded)
             if merged != original {
-                UserDefaults.standard.set(Array(merged).sorted(), forKey: excludedKey)
+                defaults.set(Array(merged).sorted(), forKey: excludedKey)
             }
             return merged
         }
         return builtInExcluded
     }
-    private func saveExcluded() {
-        UserDefaults.standard.set(Array(excluded), forKey: Self.excludedKey)
+
+    @discardableResult
+    private func saveExcluded() -> Bool {
+        persistenceDefaults.set(Array(excluded).sorted(), forKey: Self.excludedKey)
+        return persistenceDefaults.synchronize()
+            && Self.loadExcluded(defaults: persistenceDefaults) == excluded
     }
+
     private static let unprotectedKey = "pluginUnprotectedBuiltIns"
-    private static func loadUnprotected() -> Set<String> {
-        guard let arr = UserDefaults.standard.array(forKey: unprotectedKey) as? [String] else { return [] }
+    private static func loadUnprotected(defaults: UserDefaults) -> Set<String> {
+        guard let arr = defaults.array(forKey: unprotectedKey) as? [String] else { return [] }
         return Set(arr.map { $0.lowercased() }).intersection(builtInExcluded)   // only honor real built-ins
     }
-    private func saveUnprotected() {
-        UserDefaults.standard.set(Array(unprotectedBuiltIns).sorted(), forKey: Self.unprotectedKey)
+
+    @discardableResult
+    private func saveUnprotected() -> Bool {
+        persistenceDefaults.set(
+            Array(unprotectedBuiltIns).sorted(),
+            forKey: Self.unprotectedKey
+        )
+        return persistenceDefaults.synchronize()
+            && Self.loadUnprotected(defaults: persistenceDefaults) == unprotectedBuiltIns
     }
-    func addExclusion(_ name: String) {
-        let n = name.lowercased().trimmingCharacters(in: .whitespaces)
-            .replacingOccurrences(of: ".fap", with: "")
-        guard !n.isEmpty else { return }
-        excluded.insert(n)
-        unprotectedBuiltIns.remove(n)   // re-protecting a built-in clears its override
-        saveExcluded(); saveUnprotected()
-        updates.removeAll { $0.name.lowercased() == n }   // drop it from the current list
-    }
-    func removeExclusion(_ name: String) {
-        let n = name.lowercased().trimmingCharacters(in: .whitespaces)
-            .replacingOccurrences(of: ".fap", with: "")
-        if Self.builtInExcluded.contains(n) {
-            // Built-ins are re-merged into `excluded` on load, so we lift protection with
-            // an explicit override instead of removing them. Re-protect via addExclusion.
-            unprotectedBuiltIns.insert(n); saveUnprotected()
-        } else {
-            excluded.remove(n); saveExcluded()
+
+    @discardableResult
+    private func changeProtection(_ protect: Bool, name: String) -> Bool {
+        // Do not acknowledge a policy change while a live target is in its tiny
+        // delete/rename window. The caller can retry immediately; accepting and
+        // queueing it here would make "Protected" appear true after the FAP was
+        // already removed or swapped. Outside that fence, each operation changes
+        // exactly one synchronously verified UserDefaults key.
+        guard !protectionMutationGate.isActive else { return false }
+        guard let normalized = PluginProtectionPolicy.normalizedName(name) else {
+            return false
         }
+
+        let oldExcluded = excluded
+        let oldUnprotected = unprotectedBuiltIns
+        let saved: Bool
+        if Self.builtInExcluded.contains(normalized) {
+            if protect {
+                unprotectedBuiltIns.remove(normalized)
+            } else {
+                unprotectedBuiltIns.insert(normalized)
+            }
+            saved = saveUnprotected()
+        } else {
+            if protect {
+                excluded.insert(normalized)
+            } else {
+                excluded.remove(normalized)
+            }
+            saved = saveExcluded()
+        }
+        guard saved else {
+            excluded = oldExcluded
+            unprotectedBuiltIns = oldUnprotected
+            return false
+        }
+
+        if protect { updates.removeAll { isProtectedAtInstallTarget($0) } }
+        refreshPendingRouteCleanup()
+        return true
+    }
+
+    @discardableResult
+    func addExclusion(_ name: String) -> Bool {
+        changeProtection(true, name: name)
+    }
+
+    @discardableResult
+    func removeExclusion(_ name: String) -> Bool {
+        changeProtection(false, name: name)
     }
 
     // MARK: - History
@@ -1393,6 +2670,41 @@ final class PluginUpdater: ObservableObject {
 
 #if DEBUG
 extension PluginUpdater {
+    /// Configures a deterministic local Community Pack source and device transport
+    /// for transaction regressions. Production catalog discovery remains remote-only.
+    func configureCatalogSourceForTesting(
+        tag: String,
+        assets: [String: URL],
+        downloads: [URL: URL],
+        storage: any DeviceFileStore,
+        deviceAPI: Int? = 88,
+        deviceTarget: Int? = 7
+    ) {
+        testingRelease = (tag, assets)
+        testingDownloads = downloads
+        testingStorage = storage
+        testingChannel = storage.channel
+        testingDeviceIdentity = (deviceAPI, deviceTarget)
+    }
+
+    func seedCacheForTesting(_ cache: PluginCatalogCache) {
+        saveCache(cache)
+    }
+
+    func cacheForTesting() -> PluginCatalogCache? {
+        loadCache()
+    }
+
+    /// Test-only access to the final replacement boundary. Production callers can
+    /// reach it only through `install()` after staging and MD5 verification.
+    func commitStagedInstallForTesting(
+        _ update: PluginUpdate,
+        tempPath: String,
+        storage: any DeviceFileStore
+    ) async throws -> Bool {
+        try await commitStagedInstall(update, tempPath: tempPath, storage: storage)
+    }
+
     /// Focused test hook for the late-ledger lifecycle. Production provenance is set
     /// only from the SHA-256 values computed while downloading both pack archives.
     func configureProtectedAuditProvenanceForTesting(
@@ -1493,6 +2805,30 @@ extension PluginUpdater {
         updater.protectedAuditResolution = .rejected(
             "The authoritative protected-app audit document is malformed.",
             kind: .invalid)
+        return updater
+    }
+
+    static func communityRouteCleanupQAFixture() -> PluginUpdater {
+        let updater = PluginUpdater()
+        updater.tag = "16aug2026"
+        updater.phase = .done("Installed 2 apps · cleaned 1 duplicate · 16aug2026")
+        updater.verifyResult = VerifyResult(
+            kind: .postInstall,
+            tag: "16aug2026",
+            verified: 2,
+            failed: []
+        )
+        updater.lastCleanup = CleanupResult(
+            removed: ["/ext/apps/Games/4inrow.fap"],
+            kept: ["/ext/apps/GPIO/custom_sensor.fap"]
+        )
+        updater.pendingRouteCleanup = [PluginRouteCleanupCandidate(
+            catalogPath: "/ext/apps/Games/Board/chess.fap",
+            canonicalPath: "/ext/apps/Games/Board/chess.fap",
+            legacyPath: "/ext/apps/Games/chess.fap",
+            canonicalMD5: "22222222222222222222222222222222",
+            acceptedLegacyMD5s: ["11111111111111111111111111111111"]
+        )]
         return updater
     }
 }
