@@ -775,6 +775,223 @@ final class PluginProtectionPolicyTests: XCTestCase {
         XCTAssertFalse(events.contains { $0.hasPrefix("move:") || $0.hasPrefix("delete:") })
     }
 
+    @MainActor
+    func testCleanupPreservesProtectedFALFamilyBeforeAnyLegacyMutation() async {
+        let oldMD5 = "11111111111111111111111111111111"
+        let newMD5 = "22222222222222222222222222222222"
+        let canonical = "/ext/apps_data/arf_subghz_full/modules/proto_pirate.fal"
+        let legacy = "/ext/apps/Module One/Sub-GHz/proto_pirate.fal"
+        let candidate = PluginRouteCleanupCandidate(
+            catalogPath: canonical,
+            canonicalPath: canonical,
+            legacyPath: legacy,
+            canonicalMD5: newMD5,
+            acceptedLegacyMD5s: [oldMD5]
+        )
+        let storage = PluginRouteMemoryStore(hashes: [
+            canonical: newMD5,
+            legacy: oldMD5,
+        ])
+
+        let result = await PluginRouteCleanupExecutor.execute(
+            [candidate],
+            storage: storage,
+            shouldPreserve: { candidate in
+                let name = ((candidate.catalogPath as NSString).lastPathComponent as NSString)
+                    .deletingPathExtension
+                return PluginProtectionPolicy.isProtected(
+                    name: name,
+                    remotePath: candidate.canonicalPath,
+                    excluded: ["arf_subghz_full"],
+                    unprotectedBuiltIns: []
+                )
+            }
+        )
+
+        XCTAssertEqual(result.rolledBack, [legacy])
+        XCTAssertTrue(result.removed.isEmpty)
+        let legacyAfter = await storage.hash(at: legacy)
+        XCTAssertEqual(legacyAfter, oldMD5)
+        let events = await storage.recordedEvents()
+        XCTAssertFalse(events.contains { $0.hasPrefix("move:") || $0.hasPrefix("delete:\(legacy)") })
+    }
+
+    @MainActor
+    func testProtectionAfterDurableStageIntentRollsBackWithoutMovingLegacy() async {
+        let oldMD5 = "11111111111111111111111111111111"
+        let newMD5 = "22222222222222222222222222222222"
+        let canonical = "/ext/apps/Games/Board/chess.fap"
+        let legacy = "/ext/apps/Games/chess.fap"
+        let candidate = PluginRouteCleanupCandidate(
+            catalogPath: canonical,
+            canonicalPath: canonical,
+            legacyPath: legacy,
+            canonicalMD5: newMD5,
+            acceptedLegacyMD5s: [oldMD5]
+        )
+        let storage = PluginRouteMemoryStore(hashes: [
+            canonical: newMD5,
+            legacy: oldMD5,
+        ])
+        var durableStageIntentWritten = false
+        var recoveryIntentCleared = false
+
+        let result = await PluginRouteCleanupExecutor.execute(
+            [candidate],
+            storage: storage,
+            shouldPreserve: { _ in durableStageIntentWritten },
+            didObserveNoStage: { _ in recoveryIntentCleared = true },
+            willStage: { _ in durableStageIntentWritten = true }
+        )
+
+        XCTAssertTrue(durableStageIntentWritten)
+        XCTAssertTrue(recoveryIntentCleared)
+        XCTAssertEqual(result.rolledBack, [legacy])
+        let legacyAfter = await storage.hash(at: legacy)
+        let stagedAfter = await storage.hash(
+            at: PluginRouteCleanupExecutor.cleanupStagePath(for: candidate)
+        )
+        XCTAssertEqual(legacyAfter, oldMD5)
+        XCTAssertNil(stagedAfter)
+        let events = await storage.recordedEvents()
+        XCTAssertFalse(events.contains { $0.hasPrefix("move:") })
+    }
+
+    @MainActor
+    func testProtectionAfterMarkerStagingRestoresLegacyThroughDynamicPolicy() async {
+        let oldMD5 = "11111111111111111111111111111111"
+        let newMD5 = "22222222222222222222222222222222"
+        let canonical = "/ext/apps/Games/Board/chess.fap"
+        let legacy = "/ext/apps/Games/chess.fap"
+        let candidate = PluginRouteCleanupCandidate(
+            catalogPath: canonical,
+            canonicalPath: canonical,
+            legacyPath: legacy,
+            canonicalMD5: newMD5,
+            acceptedLegacyMD5s: [oldMD5]
+        )
+        let staged = PluginRouteCleanupExecutor.cleanupStagePath(for: candidate)
+        let storage = PluginRouteMemoryStore(hashes: [
+            canonical: newMD5,
+            staged: oldMD5,
+        ])
+        var clearedRecoveryIntent = false
+
+        // This is the exact post-crash state after the legacy FAP has already been
+        // staged. A protection added before recovery must be read dynamically,
+        // restore the owned marker, and never continue cleanup from a stale snapshot.
+        let result = await PluginRouteCleanupExecutor.execute(
+            [candidate],
+            storage: storage,
+            stagedRecoveryPaths: recoveryPaths(for: candidate),
+            shouldPreserve: { _ in true },
+            didObserveNoStage: { _ in clearedRecoveryIntent = true }
+        )
+
+        XCTAssertTrue(clearedRecoveryIntent)
+        XCTAssertEqual(result.rolledBack, [legacy])
+        XCTAssertTrue(result.removed.isEmpty)
+        let legacyAfter = await storage.hash(at: legacy)
+        let stagedAfter = await storage.hash(at: staged)
+        XCTAssertEqual(legacyAfter, oldMD5)
+        XCTAssertNil(stagedAfter)
+        let events = await storage.recordedEvents()
+        XCTAssertFalse(events.contains("delete:\(legacy)"))
+    }
+
+    @MainActor
+    func testInstallCommitKeepsLiveTargetWhenProtectionArrivesAfterStaging() async throws {
+        let suite = "PluginInstallProtectionTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let updater = PluginUpdater(persistenceDefaults: defaults)
+        let target = "/ext/apps/Games/Board/chess.fap"
+        let temp = target + ".ucnew"
+        let oldMD5 = "11111111111111111111111111111111"
+        let newMD5 = "22222222222222222222222222222222"
+        let update = routeUpdate("chess", remotePath: target, md5: newMD5)
+        let storage = PluginRouteMemoryStore(hashes: [
+            target: oldMD5,
+            temp: newMD5,
+        ])
+
+        XCTAssertTrue(updater.addExclusion("chess"))
+        let committed = try await updater.commitStagedInstallForTesting(
+            update,
+            tempPath: temp,
+            storage: storage
+        )
+        XCTAssertFalse(committed)
+
+        let targetAfter = await storage.hash(at: target)
+        let tempAfter = await storage.hash(at: temp)
+        let events = await storage.recordedEvents()
+        XCTAssertEqual(targetAfter, oldMD5)
+        XCTAssertEqual(tempAfter, newMD5)
+        XCTAssertFalse(events.contains { $0.hasPrefix("delete:\(target)") })
+        XCTAssertFalse(events.contains { $0.hasPrefix("move:\(temp)->\(target)") })
+    }
+
+    @MainActor
+    func testProtectionRequestInsideIrreversibleFenceIsNotAcknowledged() async {
+        let suite = "PluginProtectionFenceTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let gate = PluginProtectionMutationGate()
+        let updater = PluginUpdater(
+            persistenceDefaults: defaults,
+            protectionMutationGate: gate
+        )
+        let oldMD5 = "11111111111111111111111111111111"
+        let newMD5 = "22222222222222222222222222222222"
+        let canonical = "/ext/apps/Games/Board/chess.fap"
+        let legacy = "/ext/apps/Games/chess.fap"
+        let candidate = PluginRouteCleanupCandidate(
+            catalogPath: canonical,
+            canonicalPath: canonical,
+            legacyPath: legacy,
+            canonicalMD5: newMD5,
+            acceptedLegacyMD5s: [oldMD5]
+        )
+        let storage = PluginRouteMemoryStore(hashes: [
+            canonical: newMD5,
+            legacy: oldMD5,
+        ])
+        var requestWasAccepted: Bool?
+
+        let result = await PluginRouteCleanupExecutor.execute(
+            [candidate],
+            storage: storage,
+            shouldPreserve: { _ in updater.isProtected("chess") },
+            beginIrreversibleMutation: {
+                guard gate.begin() else { return false }
+                requestWasAccepted = updater.addExclusion("chess")
+                return true
+            },
+            endIrreversibleMutation: { gate.end() }
+        )
+
+        XCTAssertEqual(requestWasAccepted, false)
+        XCTAssertFalse(updater.isProtected("chess"))
+        XCTAssertNil(defaults.array(forKey: "pluginExcluded"))
+        XCTAssertEqual(result.removed, [legacy])
+    }
+
+    @MainActor
+    func testProtectionChangePersistsBeforeItIsAcknowledged() {
+        let suite = "PluginProtectionPersistenceTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let updater = PluginUpdater(persistenceDefaults: defaults)
+
+        XCTAssertTrue(updater.addExclusion("chess"))
+        let relaunched = PluginUpdater(persistenceDefaults: defaults)
+
+        XCTAssertTrue(relaunched.isProtected("chess"))
+        XCTAssertTrue((defaults.array(forKey: "pluginExcluded") as? [String] ?? [])
+            .contains("chess"))
+    }
+
     func testModifiedLegacyFileIsNeverMovedOrDeleted() async {
         let acceptedOldMD5 = "11111111111111111111111111111111"
         let customMD5 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"

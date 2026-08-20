@@ -524,8 +524,9 @@ struct ProtectedAppsView: View {
     private func addCurrent() {
         let name = newExclusion.trimmingCharacters(in: .whitespaces)
         guard !name.isEmpty else { return }
-        updater.addExclusion(name)
-        newExclusion = ""
+        if updater.addExclusion(name) {
+            newExclusion = ""
+        }
     }
 }
 
