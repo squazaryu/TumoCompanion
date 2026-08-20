@@ -944,6 +944,51 @@ final class ProtectedPluginAuditTests: XCTestCase {
             .sourceMatches)
     }
 
+    func testMovedTotpSourceMatchesItsAuditedTumoflipTarget() {
+        let remotePath = "/ext/apps/Tools/Crypto/totp.fap"
+        let sourceMD5 = "3fa820efb076d8fefa96394d1f55e0fc"
+        let targetMD5 = "90fae273534c401ff7bce1da94dada6c"
+        let targetPath = PluginInstallRouting.targetPath(for: remotePath)
+        let review = ProtectedPluginReview(
+            remotePath: remotePath,
+            targetPath: targetPath,
+            name: "totp",
+            category: "Crypto",
+            pack: "base",
+            newMD5: sourceMD5,
+            deviceMD5: targetMD5,
+            deviceKnown: true,
+            size: 1)
+        let entry = ProtectedPluginAuditEntry(
+            remotePath: remotePath,
+            targetPath: "/ext/apps/Tools/totp.fap",
+            sourceMD5: sourceMD5,
+            targetMD5s: [targetMD5],
+            targetProvenance: [ProtectedPluginTargetProvenance(
+                targetMD5: targetMD5,
+                channel: .stable,
+                releaseTag: "v1.0.6",
+                manifestSHA256: "d887e3aabfff457dc9b4a3e8b53c2ad51a97d7da251892325dfbac1d0c914258")],
+            disposition: .auditedDifference,
+            note: nil)
+        let audit = ProtectedPluginAudit(
+            sourceTag: "18aug2026p2",
+            sourceCommit: "85e56f4f2d15abda3b1ad327eb7e68e2bc2601a8",
+            auditIssue: "https://github.com/squazaryu/tumoflip-fw-packages/issues/20",
+            archives: [],
+            entries: [entry])
+        let compatible = FapCompatibilityState.compatible(
+            FapMetadata(apiMajor: 88, apiMinor: 4, hardwareTarget: 7))
+
+        XCTAssertEqual(audit.entry(matching: review), entry)
+        XCTAssertEqual(
+            ProtectedPluginReviewPolicy.status(
+                review,
+                compatibility: compatible,
+                audit: audit),
+            .verified)
+    }
+
     private func makeProvenance() -> ProtectedPluginPackProvenance? {
         ProtectedPluginPackProvenance(
             sourceTag: "9aug2026",
