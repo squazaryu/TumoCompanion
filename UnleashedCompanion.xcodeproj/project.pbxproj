@@ -85,6 +85,7 @@
 		624755C1707F30D1CF685556 /* ESP32Updater.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43BFF8A135671585F6B17A7C /* ESP32Updater.swift */; };
 		63C2AC8BC494254D9F0A745C /* AppBridgeRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 296A7D30A6C58A754FF6B5E5 /* AppBridgeRequest.swift */; };
 		6406AAE804CB9DDBDA59DC36 /* TumoSpectrumViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E38D7DF4DD5D32376A5F7CC /* TumoSpectrumViewModel.swift */; };
+		6533954C72F9FBB4D7C9458D /* fw-packages-stable-003-contract.json in Resources */ = {isa = PBXBuildFile; fileRef = D1BE57BD502CE825C04EACF7 /* fw-packages-stable-003-contract.json */; };
 		660358B5ED53BD9B93390DC2 /* DolphinProfileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3352B17F82ACA14AD4B854B7 /* DolphinProfileTests.swift */; };
 		6639DBE5A0696A7A75531255 /* PluginUpdatesDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4930E5335E77EBB9BFA70EF /* PluginUpdatesDetailView.swift */; };
 		67BAED6714BF802153F252C9 /* SberIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 987F2B3510E58C6070C7D81E /* SberIntents.swift */; };
@@ -377,6 +378,7 @@
 		CBA5FCA0F80809900471F32E /* PluginUpdateMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginUpdateMonitor.swift; sourceTree = "<group>"; };
 		CC55E01E623BEF12E94B15DA /* DolphinPreviews */ = {isa = PBXFileReference; lastKnownFileType = folder; name = DolphinPreviews; path = Resources/DolphinPreviews; sourceTree = SOURCE_ROOT; };
 		CFD10DB620EC18749FE46591 /* FirmwareLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirmwareLibraryView.swift; sourceTree = "<group>"; };
+		D1BE57BD502CE825C04EACF7 /* fw-packages-stable-003-contract.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "fw-packages-stable-003-contract.json"; sourceTree = "<group>"; };
 		D40FDF9AC257DE97849E36E9 /* DolphinProfileService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DolphinProfileService.swift; sourceTree = "<group>"; };
 		D74C1AC4E19C6F9FC21C9D8D /* PluginUpdateMonitorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginUpdateMonitorTests.swift; sourceTree = "<group>"; };
 		DB003747D5AF7D07C4094F9F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -429,6 +431,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		052CAA6650F629B25777C679 /* Fixtures */ = {
+			isa = PBXGroup;
+			children = (
+				D1BE57BD502CE825C04EACF7 /* fw-packages-stable-003-contract.json */,
+			);
+			path = Fixtures;
+			sourceTree = "<group>";
+		};
 		0F778768A4BC1709D425DA32 /* System */ = {
 			isa = PBXGroup;
 			children = (
@@ -709,6 +719,7 @@
 				FCE7269E5AB13331C01704F7 /* USBStorageTests.swift */,
 				3443A5546515DB6C6D192059 /* WiFiMapperGeoJSONTests.swift */,
 				4178D107C8E9CCE11C051E5A /* WiFiNetworkMapPresentationTests.swift */,
+				052CAA6650F629B25777C679 /* Fixtures */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -939,6 +950,7 @@
 			buildConfigurationList = 9B5CF4B0985D4717964EC01C /* Build configuration list for PBXNativeTarget "UnleashedTests" */;
 			buildPhases = (
 				3A841E53D2EC01D99C3FF3A5 /* Sources */,
+				2251667A86BD09C9D348F01D /* Resources */,
 			);
 			buildRules = (
 			);
@@ -1067,6 +1079,14 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		2251667A86BD09C9D348F01D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6533954C72F9FBB4D7C9458D /* fw-packages-stable-003-contract.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		ABDEC7F6DE796953E9F20185 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
