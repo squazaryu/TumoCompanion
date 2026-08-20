@@ -303,6 +303,23 @@ final class PluginProtectionPolicyTests: XCTestCase {
             unprotectedBuiltIns: []))
     }
 
+    func testMovedCommunityTotpUsesAuditedTumoflipRoute() {
+        let remotePath = "/ext/apps/Tools/Crypto/totp.fap"
+
+        XCTAssertEqual(
+            PluginInstallRouting.targetPath(for: remotePath),
+            "/ext/apps/Tools/totp.fap")
+        XCTAssertEqual(
+            PluginInstallRouting.legacyPaths(for: remotePath),
+            [remotePath],
+            "The Community Pack category is never the protected Tumoflip target.")
+        XCTAssertTrue(PluginProtectionPolicy.isProtected(
+            name: "totp",
+            remotePath: remotePath,
+            excluded: PluginUpdater.builtInExcluded,
+            unprotectedBuiltIns: []))
+    }
+
     func testLegacyCommunityAppsAreProtectedReplacements() {
         let replacements: [(name: String, remote: String, target: String)] = [
             (

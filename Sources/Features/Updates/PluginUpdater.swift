@@ -44,6 +44,9 @@ enum PluginInstallRouting {
         // that path is retained only as a guarded cleanup candidate below.
         "subghz_wardriving": "/ext/apps/Sub-GHz/subghz_wardriving.fap",
         "timed_remote": "/ext/apps/Module One/IR Blaster/timed_remote.fap",
+        // Community Pack moved its source FAP to Tools/Crypto, but Tumoflip's
+        // audited TOTP build remains at this route with its CLI-plugin family.
+        "totp": "/ext/apps/Tools/totp.fap",
         "tpms": "/ext/apps/Module One/Sub-GHz/tpms.fap",
         "ublox": "/ext/apps/Module One/GPS/ublox.fap",
         "unitemp": "/ext/apps/Module One/Sensors BME280/unitemp.fap",
