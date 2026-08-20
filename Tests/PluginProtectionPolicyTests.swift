@@ -1,4 +1,6 @@
+import CryptoKit
 import XCTest
+import ZIPFoundation
 @testable import UnleashedCompanion
 
 final class PluginProtectionPolicyTests: XCTestCase {
@@ -22,6 +24,164 @@ final class PluginProtectionPolicyTests: XCTestCase {
         for candidate: PluginRouteCleanupCandidate
     ) -> Set<String> {
         [PluginRouteReconciliation.pathIdentity(candidate.legacyPath)]
+    }
+
+    private func md5(_ data: Data) -> String {
+        Insecure.MD5.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    }
+
+    private func le16(_ value: Int) -> [UInt8] {
+        [UInt8(value & 0xFF), UInt8((value >> 8) & 0xFF)]
+    }
+
+    private func le32(_ value: Int) -> [UInt8] {
+        [
+            UInt8(value & 0xFF),
+            UInt8((value >> 8) & 0xFF),
+            UInt8((value >> 16) & 0xFF),
+            UInt8((value >> 24) & 0xFF),
+        ]
+    }
+
+    private func put(_ bytes: inout [UInt8], at offset: Int, _ value: [UInt8]) {
+        for (index, byte) in value.enumerated() {
+            bytes[offset + index] = byte
+        }
+    }
+
+    /// Small, valid ELF32/FAP fixture. The real install gate parses this payload,
+    /// rather than a test bypass, so the regression covers the production path.
+    private func makeFAP(seed: UInt8) -> Data {
+        var bytes = [UInt8](repeating: 0, count: 52)
+        put(&bytes, at: 0, [0x7F, 0x45, 0x4C, 0x46]) // ELF
+        bytes[4] = 1 // ELFCLASS32
+        bytes[5] = 1 // ELFDATA2LSB
+        bytes[6] = 1 // EV_CURRENT
+        put(&bytes, at: 16, le16(1))
+        put(&bytes, at: 18, le16(0x28))
+        put(&bytes, at: 20, le32(1))
+        put(&bytes, at: 40, le16(52))
+        put(&bytes, at: 46, le16(40))
+        put(&bytes, at: 48, le16(3))
+        put(&bytes, at: 50, le16(2))
+
+        let metaOffset = bytes.count
+        bytes += le32(FapMetadata.manifestMagic)
+        bytes += le32(1)
+        bytes += le16(4)
+        bytes += le16(88)
+        bytes += le16(7)
+
+        let namesOffset = bytes.count
+        let names = Array("\0.fapmeta\0.shstrtab\0".utf8)
+        bytes += names
+        let sectionOffset = (bytes.count + 3) & ~3
+        put(&bytes, at: 32, le32(sectionOffset))
+        bytes += repeatElement(0, count: sectionOffset - bytes.count)
+
+        func sectionHeader(name: Int, type: Int, offset: Int, size: Int) -> [UInt8] {
+            var header = [UInt8](repeating: 0, count: 40)
+            put(&header, at: 0, le32(name))
+            put(&header, at: 4, le32(type))
+            put(&header, at: 16, le32(offset))
+            put(&header, at: 20, le32(size))
+            return header
+        }
+
+        bytes += sectionHeader(name: 0, type: 0, offset: 0, size: 0)
+        bytes += sectionHeader(name: 1, type: 1, offset: metaOffset, size: 14)
+        bytes += sectionHeader(name: 10, type: 3, offset: namesOffset, size: names.count)
+        bytes += [seed]
+        return Data(bytes)
+    }
+
+    private func makePluginArchive(entries: [String: Data]) throws -> URL {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("PluginUpdaterTests-\(UUID().uuidString)")
+            .appendingPathExtension("zip")
+        let archive = try Archive(url: url, accessMode: .create)
+        for (path, data) in entries {
+            try archive.addEntry(
+                with: path,
+                type: .file,
+                uncompressedSize: Int64(data.count),
+                compressionMethod: .deflate
+            ) { position, size in
+                data.subdata(in: Int(position)..<Int(position) + size)
+            }
+        }
+        return url
+    }
+
+    @MainActor
+    private func makeCacheReconciliationFixture(
+        storage: PluginInstallMemoryStore,
+        defaults: UserDefaults
+    ) async throws -> (
+        updater: PluginUpdater,
+        chessPath: String,
+        checkersPath: String,
+        oldChessMD5: String,
+        oldCheckersMD5: String,
+        newChessMD5: String,
+        newCheckersMD5: String,
+        archives: [URL],
+        auditDirectory: URL
+    ) {
+        let chessPath = "/ext/apps/Games/Board/chess.fap"
+        let checkersPath = "/ext/apps/Games/Board/checkers.fap"
+        let chess = makeFAP(seed: 0xC1)
+        let checkers = makeFAP(seed: 0xC2)
+        let base = try makePluginArchive(entries: [
+            "base_pack_build/artifacts-base/Games/Board/chess.fap": chess,
+            "base_pack_build/artifacts-base/Games/Board/checkers.fap": checkers,
+        ])
+        let extra = try makePluginArchive(entries: [:])
+        let baseAsset = URL(string: "https://example.invalid/base.zip")!
+        let extraAsset = URL(string: "https://example.invalid/extra.zip")!
+        let auditDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("PluginAuditTests-\(UUID().uuidString)", isDirectory: true)
+        let auditService = ProtectedPluginAuditService(
+            url: URL(string: "https://example.invalid/audit.json")!,
+            cache: ProtectedPluginAuditCache(directory: auditDirectory),
+            fetch: { _ in throw URLError(.notConnectedToInternet) },
+            bundledData: { nil }
+        )
+        let updater = PluginUpdater(
+            protectedAuditService: auditService,
+            persistenceDefaults: defaults
+        )
+        let oldChessMD5 = String(repeating: "1", count: 32)
+        let oldCheckersMD5 = String(repeating: "2", count: 32)
+        updater.seedCacheForTesting(PluginCatalogCache(
+            tag: "previous",
+            map: [
+                chessPath: oldChessMD5,
+                checkersPath: oldCheckersMD5,
+            ]
+        ))
+        updater.configureCatalogSourceForTesting(
+            tag: "fixture-pack",
+            assets: [
+                "all-the-apps-base.zip": baseAsset,
+                "all-the-apps-extra.zip": extraAsset,
+            ],
+            downloads: [baseAsset: base, extraAsset: extra],
+            storage: storage
+        )
+        await updater.check()
+
+        return (
+            updater,
+            chessPath,
+            checkersPath,
+            oldChessMD5,
+            oldCheckersMD5,
+            md5(chess),
+            md5(checkers),
+            [base, extra],
+            auditDirectory
+        )
     }
 
     func testArchiveRoutingIncludesAppsAndAppsDataBinaries() {
@@ -925,6 +1085,139 @@ final class PluginProtectionPolicyTests: XCTestCase {
     }
 
     @MainActor
+    func testPreProtectedCatalogEntryStaysPendingWhileAnotherAppInstalls() async throws {
+        let suite = "PluginInstallCachePreProtectedTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let fixture = try await makeCacheReconciliationFixture(
+            storage: PluginInstallMemoryStore(),
+            defaults: defaults
+        )
+        defer {
+            fixture.archives.forEach { try? FileManager.default.removeItem(at: $0) }
+            try? FileManager.default.removeItem(at: fixture.auditDirectory)
+        }
+
+        XCTAssertEqual(
+            Set(fixture.updater.updates.map(\.remotePath)),
+            [fixture.chessPath, fixture.checkersPath]
+        )
+        XCTAssertTrue(fixture.updater.addExclusion("chess"))
+        XCTAssertEqual(
+            fixture.updater.updates.map(\.remotePath),
+            [fixture.checkersPath],
+            "Protection removes chess from the mutable UI list before the transaction starts."
+        )
+
+        await fixture.updater.install()
+
+        let cache = try XCTUnwrap(fixture.updater.cacheForTesting())
+        XCTAssertEqual(
+            cache.map[fixture.chessPath], fixture.oldChessMD5,
+            "A path protected before the transaction must not be advanced just because it is absent from updates."
+        )
+        XCTAssertEqual(cache.map[fixture.checkersPath], fixture.newCheckersMD5)
+        XCTAssertTrue(fixture.updater.removeExclusion("chess"))
+
+        await fixture.updater.check()
+        XCTAssertEqual(
+            fixture.updater.updates.map(\.remotePath), [fixture.chessPath],
+            "An ordinary Check must surface the still-pending pre-protected app."
+        )
+    }
+
+    @MainActor
+    func testUnprotectedButPreviouslyHiddenEntryStaysPendingUntilOrdinaryCheck() async throws {
+        let suite = "PluginInstallCacheUnprotectedHiddenTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let fixture = try await makeCacheReconciliationFixture(
+            storage: PluginInstallMemoryStore(),
+            defaults: defaults
+        )
+        defer {
+            fixture.archives.forEach { try? FileManager.default.removeItem(at: $0) }
+            try? FileManager.default.removeItem(at: fixture.auditDirectory)
+        }
+
+        XCTAssertTrue(fixture.updater.addExclusion("chess"))
+        XCTAssertTrue(
+            fixture.updater.removeExclusion("chess"),
+            "Removing protection must not claim an unverified binary is current."
+        )
+        XCTAssertEqual(
+            fixture.updater.updates.map(\.remotePath), [fixture.checkersPath],
+            "Unprotecting does not recreate a row; only a subsequent Check may do that."
+        )
+
+        await fixture.updater.install()
+
+        let cache = try XCTUnwrap(fixture.updater.cacheForTesting())
+        XCTAssertEqual(cache.map[fixture.chessPath], fixture.oldChessMD5)
+        XCTAssertEqual(cache.map[fixture.checkersPath], fixture.newCheckersMD5)
+
+        await fixture.updater.check()
+        XCTAssertEqual(
+            fixture.updater.updates.map(\.remotePath), [fixture.chessPath],
+            "An old cache entry hidden by a protection toggle must reappear after ordinary Check."
+        )
+    }
+
+    @MainActor
+    func testProtectionDuringStagingKeepsSelectedAndUnselectedUpdatesPending() async throws {
+        let suite = "PluginInstallCacheStagingTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let staging = PluginInstallTestLatch()
+        let fixture = try await makeCacheReconciliationFixture(
+            storage: PluginInstallMemoryStore(stagingLatch: staging),
+            defaults: defaults
+        )
+        defer {
+            fixture.archives.forEach { try? FileManager.default.removeItem(at: $0) }
+            try? FileManager.default.removeItem(at: fixture.auditDirectory)
+        }
+
+        let checkersID = try XCTUnwrap(
+            fixture.updater.updates.first { $0.remotePath == fixture.checkersPath }?.id
+        )
+        fixture.updater.setSelected(false, id: checkersID)
+        XCTAssertEqual(
+            fixture.updater.updates.filter(\.selected).map(\.remotePath), [fixture.chessPath]
+        )
+
+        let installation = Task { @MainActor in
+            await fixture.updater.install()
+        }
+        await staging.waitForStaging()
+
+        XCTAssertTrue(fixture.updater.addExclusion("chess"))
+        XCTAssertTrue(fixture.updater.addExclusion("checkers"))
+        XCTAssertTrue(
+            fixture.updater.updates.isEmpty,
+            "Both rows disappear from mutable UI state once protection is accepted."
+        )
+        await staging.release()
+        await installation.value
+
+        let cache = try XCTUnwrap(fixture.updater.cacheForTesting())
+        XCTAssertEqual(cache.map[fixture.chessPath], fixture.oldChessMD5)
+        XCTAssertEqual(
+            cache.map[fixture.checkersPath], fixture.oldCheckersMD5,
+            "The unselected pending row must not gain a new MD5 when it is protected during another app's staging."
+        )
+        XCTAssertTrue(fixture.updater.removeExclusion("chess"))
+        XCTAssertTrue(fixture.updater.removeExclusion("checkers"))
+
+        await fixture.updater.check()
+        XCTAssertEqual(
+            Set(fixture.updater.updates.map(\.remotePath)),
+            [fixture.chessPath, fixture.checkersPath],
+            "After protection is lifted, an ordinary Check must surface both untouched updates."
+        )
+    }
+
+    @MainActor
     func testInstallCommitKeepsLiveTargetWhenProtectionArrivesAfterStaging() async throws {
         let suite = "PluginInstallProtectionTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
@@ -1241,5 +1534,120 @@ private actor PluginRouteTestLatch {
         isOpen = true
         continuation?.resume()
         continuation = nil
+    }
+}
+
+private enum PluginInstallTestStoreError: Error {
+    case missing
+    case unsupported
+}
+
+/// A deterministic USB-like store for the real PluginUpdater.install() path. It can
+/// pause only after the temporary FAP is whole, which gives the test a precise point
+/// to submit protection changes before the irreversible live-target commit.
+private actor PluginInstallMemoryStore: DeviceFileStore {
+    nonisolated let channel: TransferChannel = .usb
+    private var files: [String: Data] = [:]
+    private let stagingLatch: PluginInstallTestLatch?
+
+    init(stagingLatch: PluginInstallTestLatch? = nil) {
+        self.stagingLatch = stagingLatch
+    }
+
+    private func identity(_ path: String) -> String {
+        PluginRouteReconciliation.pathIdentity(path)
+    }
+
+    private func md5(_ data: Data) -> String {
+        Insecure.MD5.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    }
+
+    func list(_ path: String) async throws -> [FlipperFile] {
+        []
+    }
+
+    func read(_ path: String) async throws -> Data {
+        guard let data = files[identity(path)] else {
+            throw PluginInstallTestStoreError.missing
+        }
+        return data
+    }
+
+    func write(
+        _ path: String,
+        data: Data,
+        progress: (@Sendable (Int) -> Void)?
+    ) async throws {
+        files[identity(path)] = data
+        progress?(data.count)
+        if path.hasSuffix(".ucnew") {
+            await stagingLatch?.stageAndWaitForRelease()
+        }
+    }
+
+    func makeDirectory(_ path: String) async throws {}
+
+    func delete(_ path: String, recursive: Bool) async throws {
+        files.removeValue(forKey: identity(path))
+    }
+
+    func move(_ from: String, to newPath: String) async throws {
+        guard let data = files.removeValue(forKey: identity(from)) else {
+            throw PluginInstallTestStoreError.missing
+        }
+        files[identity(newPath)] = data
+    }
+
+    func md5(_ path: String) async -> String? {
+        files[identity(path)].map(md5)
+    }
+
+    func checkedMD5(_ path: String) async throws -> String? {
+        files[identity(path)].map(md5)
+    }
+
+    func exists(_ path: String) async -> Bool {
+        files[identity(path)] != nil
+    }
+
+    func uploadFolder(
+        localURL: URL,
+        to destination: String,
+        progress: @escaping (UploadProgress) -> Void
+    ) async throws {
+        throw PluginInstallTestStoreError.unsupported
+    }
+}
+
+private actor PluginInstallTestLatch {
+    private var staged = false
+    private var released = false
+    private var stagingContinuation: CheckedContinuation<Void, Never>?
+    private var releaseContinuation: CheckedContinuation<Void, Never>?
+
+    func stageAndWaitForRelease() async {
+        staged = true
+        stagingContinuation?.resume()
+        stagingContinuation = nil
+        await withCheckedContinuation { continuation in
+            if released {
+                continuation.resume()
+            } else {
+                releaseContinuation = continuation
+            }
+        }
+    }
+
+    func waitForStaging() async {
+        guard !staged else { return }
+        await withCheckedContinuation { continuation in
+            stagingContinuation = continuation
+        }
+    }
+
+    func release() {
+        released = true
+        releaseContinuation?.resume()
+        releaseContinuation = nil
     }
 }

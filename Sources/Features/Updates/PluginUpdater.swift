@@ -1469,6 +1469,17 @@ final class PluginUpdater: ObservableObject {
     private var protectedManifest: [PluginUpdate] = []
     private let transactionGate = PluginTransactionGate()
 
+#if DEBUG
+    // Test-only seams for exercising the real check/install transaction without a
+    // physical Flipper or a live GitHub release. They stay nil in every normal app
+    // run, so production keeps using the active transfer channel and RPC identity.
+    private var testingStorage: (any DeviceFileStore)?
+    private var testingChannel: TransferChannel?
+    private var testingDeviceIdentity: (api: Int?, target: Int?)?
+    private var testingRelease: (tag: String, assets: [String: URL])?
+    private var testingDownloads: [URL: URL] = [:]
+#endif
+
     var selectedCount: Int { installableSelectedCount }
     var pendingCleanupCount: Int { pendingRouteCleanup.count }
 
@@ -1528,6 +1539,9 @@ final class PluginUpdater: ObservableObject {
     /// stale cached identity is NEVER used as the install-time identity — this always
     /// reads device_info over a BLE-ready link.
     private func deviceApiTarget() async throws -> (api: Int?, target: Int?) {
+#if DEBUG
+        if let testingDeviceIdentity { return testingDeviceIdentity }
+#endif
         guard FlipperBLE.shared.state == .ready else {
             throw FlipperRPCError.notReady
         }
@@ -1897,8 +1911,18 @@ final class PluginUpdater: ObservableObject {
     }
 
     private func ble() -> FlipperBLE { .shared }
-    private var activeStorage: any DeviceFileStore { TransferChannelStore.shared.activeStore }
-    var activeChannel: TransferChannel { TransferChannelStore.shared.activeChannel }
+    private var activeStorage: any DeviceFileStore {
+#if DEBUG
+        if let testingStorage { return testingStorage }
+#endif
+        return TransferChannelStore.shared.activeStore
+    }
+    var activeChannel: TransferChannel {
+#if DEBUG
+        if let testingChannel { return testingChannel }
+#endif
+        return TransferChannelStore.shared.activeChannel
+    }
 
     private func fileChannelReady(_ channel: TransferChannel, timeout: Double? = nil) async -> Bool {
         switch channel {
@@ -1923,6 +1947,20 @@ final class PluginUpdater: ObservableObject {
     func install() async {
         let requested = updates.filter(\.selected)
         guard !requested.isEmpty else { return }
+
+        // `updates` is mutable UI state: protection can remove a row while this
+        // async transaction is suspended, and unprotecting it does not fabricate a
+        // new pending row without an ordinary Check. The only non-installed paths
+        // allowed to retain/receive the current catalog MD5 are therefore paths whose
+        // cache already matched the exact current catalog at transaction start.
+        // Everything else needs either a verified live install below or another Check.
+        var cache = loadCache() ?? PluginCatalogCache(tag: tag, map: [:])
+        cache.reconcileRoutes(current: allManifest.mapValues(\.newMD5))
+        let cacheVerifiedCurrentAtStart = Set(allManifest.compactMap { entry -> String? in
+            let (path, update) = entry
+            return cache.map[path] == update.newMD5 ? path : nil
+        })
+
         guard transactionGate.begin() else { return }
         defer { transactionGate.end() }
         stopRequested = false
@@ -1974,9 +2012,6 @@ final class PluginUpdater: ObservableObject {
             phase = .failed("No compatible apps selected.")
             return
         }
-
-        var cache = loadCache() ?? PluginCatalogCache(tag: tag, map: [:])
-        cache.reconcileRoutes(current: allManifest.mapValues(\.newMD5))
 
         var installed = Set<String>()      // verified on device
         var protectedSkipped = Set<String>()
@@ -2096,10 +2131,14 @@ final class PluginUpdater: ObservableObject {
         if history.count > 1000 { history.removeLast(history.count - 1000) }
         saveHistory()
 
-        // Reconcile cache: unchanged apps + verified installs = new md5. Failed /
-        // skipped stay at their old value so they surface again next check.
-        let inUpdates = Set(updates.map(\.remotePath))
-        for (path, f) in allManifest where !inUpdates.contains(path) || installed.contains(path) {
+        // Reconcile cache only for paths that already matched this exact catalog at
+        // transaction start, plus files that this transaction md5-verified after a
+        // successful live replacement. Failed, skipped, protected, and previously
+        // hidden rows keep their old hash so an ordinary subsequent Check surfaces
+        // them. Do not derive this from mutable `updates` or current protection:
+        // either can change while this transaction is suspended.
+        for (path, f) in allManifest where installed.contains(path)
+            || cacheVerifiedCurrentAtStart.contains(path) {
             cache.map[path] = f.newMD5
         }
         cache.tag = tag
@@ -2381,6 +2420,9 @@ final class PluginUpdater: ObservableObject {
     /// Picks the release to use: the manual pin if one is set, otherwise GitHub's own
     /// "latest" (most recently published non-draft, non-prerelease release).
     private func latestRelease() async throws -> (String, [String: URL]) {
+#if DEBUG
+        if let testingRelease { return testingRelease }
+#endif
         let path = manualReleaseTag.map { "releases/tags/\($0)" } ?? "releases/latest"
         let url = URL(string: "https://api.github.com/repos/\(repo)/\(path)")!
         let result = try await GitHubAPIClient.shared.data(from: url)
@@ -2437,6 +2479,9 @@ final class PluginUpdater: ObservableObject {
     }
 
     private func download(_ url: URL, to name: String) async throws -> URL {
+#if DEBUG
+        if let local = testingDownloads[url] { return local }
+#endif
         let (tmp, _) = try await URLSession.shared.download(from: url)
         let dest = FileManager.default.temporaryDirectory.appendingPathComponent(name)
         try? FileManager.default.removeItem(at: dest)
@@ -2625,6 +2670,31 @@ final class PluginUpdater: ObservableObject {
 
 #if DEBUG
 extension PluginUpdater {
+    /// Configures a deterministic local Community Pack source and device transport
+    /// for transaction regressions. Production catalog discovery remains remote-only.
+    func configureCatalogSourceForTesting(
+        tag: String,
+        assets: [String: URL],
+        downloads: [URL: URL],
+        storage: any DeviceFileStore,
+        deviceAPI: Int? = 88,
+        deviceTarget: Int? = 7
+    ) {
+        testingRelease = (tag, assets)
+        testingDownloads = downloads
+        testingStorage = storage
+        testingChannel = storage.channel
+        testingDeviceIdentity = (deviceAPI, deviceTarget)
+    }
+
+    func seedCacheForTesting(_ cache: PluginCatalogCache) {
+        saveCache(cache)
+    }
+
+    func cacheForTesting() -> PluginCatalogCache? {
+        loadCache()
+    }
+
     /// Test-only access to the final replacement boundary. Production callers can
     /// reach it only through `install()` after staging and MD5 verification.
     func commitStagedInstallForTesting(
