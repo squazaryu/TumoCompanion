@@ -52,6 +52,31 @@ final class PluginProtectionPolicyTests: XCTestCase {
             unprotectedBuiltIns: []))
     }
 
+    @MainActor
+    func testMixedCaseSubGhzProtocolFALCannotBeAdmittedWhenOwnerIsProtected() {
+        let suite = "PluginProtectionMixedCaseFALTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let updater = PluginUpdater(persistenceDefaults: defaults)
+        let fal = routeUpdate(
+            "protocol_vag",
+            remotePath: "/ext/apps_data/subghz/PLUGINS/protocol_vag.fal",
+            md5: "11111111111111111111111111111111"
+        )
+
+        XCTAssertEqual(
+            PluginProtectionPolicy.protectionKeys(
+                name: fal.name,
+                remotePath: fal.remotePath
+            ),
+            ["protocol_vag", "subghz_protocols"]
+        )
+        XCTAssertTrue(
+            updater.isProtected(fal),
+            "A FAT case alias must be filtered into the protected review, not admitted for install."
+        )
+    }
+
     func testUnprotectingOwnerLiftsDependentFalProtection() {
         XCTAssertFalse(PluginProtectionPolicy.isProtected(
             name: "totp_cli_add_plugin",

@@ -99,11 +99,16 @@ enum PluginProtectionPolicy {
     ]
 
     static func protectionKeys(name: String, remotePath: String) -> Set<String> {
+        // Flipper storage is FAT-backed. A catalog/archive spelling such as
+        // `PLUGINS` must retain the same protection-family owner as `plugins`,
+        // otherwise the generic apps_data fallback can silently classify a
+        // protected protocol FAL as the unrelated `subghz` family.
+        let path = PluginRouteReconciliation.pathIdentity(remotePath)
         var keys = [name.lowercased()]
-        if let family = dataFamilyOwners.first(where: { remotePath.hasPrefix($0.prefix) }) {
+        if let family = dataFamilyOwners.first(where: { path.hasPrefix($0.prefix) }) {
             keys.append(family.owner)
-        } else if remotePath.hasPrefix("/ext/apps_data/") {
-            let suffix = remotePath.dropFirst("/ext/apps_data/".count)
+        } else if path.hasPrefix("/ext/apps_data/") {
+            let suffix = path.dropFirst("/ext/apps_data/".count)
             if let root = suffix.split(separator: "/").first {
                 keys.append(String(root).lowercased())
             }
