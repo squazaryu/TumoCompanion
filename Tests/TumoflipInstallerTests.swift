@@ -188,6 +188,79 @@ final class TumoflipInstallerTests: XCTestCase {
         XCTAssertEqual((decoded?["files"] as? [[String: Any]])?.count, 1)
     }
 
+    func testCatalogSnapshotSeparatesCurrentCatalogFromInstallHistory() throws {
+        let firmwareOwned = Data("firmware-owned".utf8)
+        let overlay = Data("catalog-overlay".utf8)
+        let manifest = TumoflipManifest(
+            schema: 2,
+            releaseId: String(repeating: "a", count: 64),
+            firmware: .init(
+                api: "88.0", name: "tumoflip", version: "t-dev-004-015",
+                target: 7, radioAddress: nil),
+            artifacts: [:],
+            packages: [
+                "base": [.init(
+                    bytes: firmwareOwned.count, sha256: TumoflipHash.sha256(firmwareOwned),
+                    source: "apps/base.fap", target: "/ext/apps/Tools/base.fap")],
+                "arf": [],
+                "module_one": [.init(
+                    bytes: overlay.count, sha256: TumoflipHash.sha256(overlay),
+                    source: "apps/esp_flasher.fap",
+                    target: "/ext/apps/Module One/ESP32 Wi-Fi/esp_flasher.fap")],
+                "protocol_packs": [],
+            ],
+            cleanup: [],
+            safety: nil,
+            packageRelease: .init(
+                id: "catalog-dev-008",
+                type: "package-only",
+                sourceCommit: String(repeating: "b", count: 40),
+                sourceDirty: false,
+                sourceFirmwareVersion: "t-dev-004-015",
+                targetReleaseTag: "t-dev-004-015",
+                firmwareFlashUnchanged: true,
+                catalogChannel: "dev",
+                catalogRevision: 8,
+                catalogReleaseTag: "fw-packages-dev-008",
+                catalogInstallScope: .delta,
+                catalogModifiedTargets: ["apps/esp_flasher.fap"],
+                overlayTargets: ["apps/esp_flasher.fap"]
+            )
+        )
+        let selection = TumoflipPackageCatalogSelection(
+            release: .init(
+                githubID: 8,
+                repository: .primary,
+                tag: "fw-packages-dev-008",
+                assets: []),
+            manifest: manifest,
+            manifestUpdatedAt: nil
+        )
+        let device = TumoflipDeviceIdentity(
+            firmwareVersion: "t-dev-007-001",
+            originFork: "tumoflip",
+            firmwareCommit: String(repeating: "c", count: 40),
+            firmwareCommitDirty: false,
+            firmwareAPI: "88.0",
+            hardwareTarget: 7
+        )
+
+        let data = TumoflipCatalogSnapshot.data(
+            sourceManifest: manifest,
+            selection: selection,
+            device: device
+        )
+        let text = try XCTUnwrap(String(data: data, encoding: .utf8))
+
+        XCTAssertTrue(text.contains("CatalogRelease: fw-packages-dev-008"))
+        XCTAssertTrue(text.contains("CatalogScope: delta"))
+        XCTAssertTrue(text.contains("CatalogSourceFW: t-dev-004-015"))
+        XCTAssertTrue(text.contains("DeviceFW: t-dev-007-001"))
+        XCTAssertTrue(text.contains("ManagedFiles: 1"))
+        XCTAssertTrue(text.contains("FirmwareBaselineFiles: 1"))
+        XCTAssertTrue(text.contains("Compatibility: verified"))
+    }
+
     private let rid = String(repeating: "c", count: 64)
 
     private func file(_ source: String, _ target: String, _ bytes: Data) -> TumoflipManifest.PackageFile {

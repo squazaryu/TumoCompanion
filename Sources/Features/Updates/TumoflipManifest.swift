@@ -359,6 +359,10 @@ struct TumoflipManifest: Codable, Equatable {
         let managed: TumoflipManifest
         let firmwareOwned: [String: [PackageFile]]
 
+        var managedFileCount: Int {
+            managed.packages.values.reduce(0) { $0 + $1.count }
+        }
+
         var firmwareOwnedFileCount: Int {
             firmwareOwned.values.reduce(0) { $0 + $1.count }
         }

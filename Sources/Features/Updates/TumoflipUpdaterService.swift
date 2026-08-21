@@ -151,6 +151,51 @@ final class TumoflipTransactionGate {
     }
 }
 
+/// Read-only projection of the *currently selected* independent FW Packages catalog.
+///
+/// This deliberately does not replace `package-state.txt`: that file is an immutable
+/// record of the last file transaction and must retain its original firmware
+/// provenance. The on-device Tumoflip Packages FAP instead reads this small snapshot
+/// to explain which catalog TumoCompanion has just revalidated for the connected
+/// firmware. It is refreshed even when every selected overlay is already installed.
+struct TumoflipCatalogSnapshot {
+    static let directory = "/ext/.tumoflip"
+    static let path = "\(directory)/catalog-state.txt"
+
+    static func data(
+        sourceManifest: TumoflipManifest,
+        selection: TumoflipPackageCatalogSelection,
+        device: TumoflipDeviceIdentity
+    ) -> Data {
+        let surface = sourceManifest.packageSurface()
+        let packageRelease = sourceManifest.packageRelease
+        let scope = packageRelease?.resolvedCatalogInstallScope(
+            manifestFirmwareVersion: sourceManifest.firmware.version
+        ).rawValue ?? "firmware-bound"
+        let lines = [
+            "Filetype: Tumoflip Package Catalog State",
+            "Version: 1",
+            "Schema: 1",
+            "CatalogRepository: \(selection.identity.repository)",
+            "CatalogRelease: \(selection.identity.releaseTag)",
+            "CatalogChannel: \(selection.identity.catalogChannel ?? "legacy")",
+            "CatalogRevision: \(selection.identity.catalogRevision.map(String.init) ?? "0")",
+            "CatalogScope: \(scope)",
+            "ManifestReleaseId: \(selection.identity.manifestReleaseID)",
+            "PackageReleaseId: \(selection.identity.packageReleaseID)",
+            "CatalogSourceFW: \(sourceManifest.firmware.version)",
+            "DeviceFW: \(device.firmwareVersion ?? "unknown")",
+            "DeviceApi: \(device.firmwareAPI ?? "unknown")",
+            "DeviceTarget: \(device.hardwareTarget.map(String.init) ?? "unknown")",
+            "ManagedFiles: \(surface.managedFileCount)",
+            "FirmwareBaselineFiles: \(surface.firmwareOwnedFileCount)",
+            "Compatibility: verified",
+            "",
+        ]
+        return Data(lines.joined(separator: "\n").utf8)
+    }
+}
+
 @MainActor
 final class TumoflipUpdater: ObservableObject {
     enum Phase: Equatable {
@@ -604,6 +649,11 @@ final class TumoflipUpdater: ObservableObject {
                 statuses: fileStatus
             )
             guard !pendingTargets.isEmpty else {
+                try await refreshCatalogSnapshot(
+                    sourceManifest: sourceManifest,
+                    selection: liveSelection,
+                    fs: fs
+                )
                 phase = .done("Already installed — nothing to do.")
                 return
             }
@@ -622,6 +672,11 @@ final class TumoflipUpdater: ObservableObject {
                 statuses: refreshedStatuses
             )
             guard !requestedTargets.isEmpty else {
+                try await refreshCatalogSnapshot(
+                    sourceManifest: sourceManifest,
+                    selection: liveSelection,
+                    fs: fs
+                )
                 phase = .done("Already installed — nothing to do.")
                 return
             }
@@ -712,6 +767,11 @@ final class TumoflipUpdater: ObservableObject {
                     }
                 }
                 try await installer.refreshCompatibilityState(manifest: manifest, plan: plan)
+                try await self.refreshCatalogSnapshot(
+                    sourceManifest: sourceManifest,
+                    selection: liveSelection,
+                    fs: fs
+                )
                 return result
             }
             guard let outcome else { return }
@@ -908,6 +968,30 @@ final class TumoflipUpdater: ObservableObject {
             return USBTumoflipDeviceFS(storage: usb)
         }
         return FlipperDeviceFS()
+    }
+
+    /// Persist the catalog only after the live release and the connected firmware
+    /// have passed the same install gate. This is display metadata for the on-device
+    /// diagnostic FAP, never an install authority or substitute for the durable
+    /// package transaction ledger.
+    private func refreshCatalogSnapshot(
+        sourceManifest: TumoflipManifest,
+        selection: TumoflipPackageCatalogSelection,
+        fs: any TumoflipDeviceFS
+    ) async throws {
+        guard let deviceIdentity else {
+            throw TumoflipInstallError.statePersistenceFailed(TumoflipCatalogSnapshot.path)
+        }
+        let data = TumoflipCatalogSnapshot.data(
+            sourceManifest: sourceManifest,
+            selection: selection,
+            device: deviceIdentity
+        )
+        try await fs.makeDirectory(TumoflipCatalogSnapshot.directory)
+        try await fs.write(data, to: TumoflipCatalogSnapshot.path)
+        guard await fs.deviceMD5(TumoflipCatalogSnapshot.path) == TumoflipHash.md5(data) else {
+            throw TumoflipInstallError.statePersistenceFailed(TumoflipCatalogSnapshot.path)
+        }
     }
 
     private struct FreshDeviceIdentity {
