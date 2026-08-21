@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.10.33",
-      "versionDate": "2026-08-21",
-      "versionDescription": "Clarifies FW Packages: firmware-owned baseline FAPs are shown separately from installable overlays, and protected apps awaiting a device check are no longer presented as DIFFs.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.33/TumoCompanion-unsigned.ipa",
-      "size": 29978764,
+      "version": "1.10.34",
+      "versionDate": "2026-08-22",
+      "versionDescription": "FW Packages now records a verified catalog snapshot on the Flipper after a successful install or already-current check. The next Tumoflip Dev firmware will display this current catalog separately from historic package provenance.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.34/TumoCompanion-unsigned.ipa",
+      "size": 29985913,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.10.34",
+          "date": "2026-08-22",
+          "localizedDescription": "FW Packages now records a verified catalog snapshot on the Flipper after a successful install or already-current check. The next Tumoflip Dev firmware will display this current catalog separately from historic package provenance.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.34/TumoCompanion-unsigned.ipa",
+          "size": 29985913,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.10.33",
           "date": "2026-08-21",
