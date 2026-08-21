@@ -206,8 +206,12 @@ final class TumoflipUpdater: ObservableObject {
     /// Resolve the catalog's declared install surface. Deltas expose only their
     /// automation-owned allowlist; an exact firmware snapshot exposes its bundled
     /// package files only after source-firmware identity checks pass.
+    private var packageSurface: TumoflipManifest.PackageSurface? {
+        manifest?.packageSurface()
+    }
+
     private var managedManifest: TumoflipManifest? {
-        manifest?.packageManagedManifest()
+        packageSurface?.managed
     }
 
     init(packageCatalogClient: TumoflipPackageCatalogClient = .live()) {
@@ -254,12 +258,7 @@ final class TumoflipUpdater: ObservableObject {
         if let release = manifest.packageRelease,
            let channel = release.catalogChannel,
            let revision = release.catalogRevision {
-            return String(
-                format: "%@ %03d · %@",
-                channel.capitalized,
-                revision,
-                String(release.sourceCommit.prefix(10))
-            )
+            return String(format: "%@ %03d", channel.capitalized, revision)
         }
         let identity = manifest.packageRelease?.sourceCommit ?? manifest.releaseId
         return String(identity.prefix(10))
@@ -376,6 +375,20 @@ final class TumoflipUpdater: ObservableObject {
     }
     func files(_ group: String) -> [TumoflipManifest.PackageFile] {
         managedManifest?.packages[group] ?? []
+    }
+
+    /// Firmware-owned FAPs are shown separately from standalone package overlays.
+    /// They are intentionally not selectable, staged, or reconciled by this service.
+    func firmwareOwnedCount(_ group: String) -> Int {
+        packageSurface?.firmwareOwnedFiles(in: group).count ?? 0
+    }
+
+    var firmwareOwnedFileCount: Int {
+        packageSurface?.firmwareOwnedFileCount ?? 0
+    }
+
+    var hasFirmwareOwnedBaseline: Bool {
+        firmwareOwnedFileCount > 0
     }
 
     // MARK: - Per-file selection

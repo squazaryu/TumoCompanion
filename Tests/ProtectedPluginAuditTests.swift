@@ -504,6 +504,36 @@ final class ProtectedPluginAuditTests: XCTestCase {
         })
     }
 
+    @MainActor
+    func testDeviceCheckRowsAreSeparatedFromActualProtectedDiffs() {
+        let updater = PluginUpdater.protectedAuditQAFixture()
+        updater.protectedReviews = [
+            ProtectedPluginReview(
+                remotePath: "/ext/apps/GPIO/unreviewed.fap",
+                targetPath: "/ext/apps/GPIO/unreviewed.fap",
+                name: "unreviewed",
+                category: "GPIO",
+                pack: "base",
+                newMD5: String(repeating: "f", count: 32),
+                deviceMD5: nil,
+                deviceKnown: false,
+                size: 1),
+            ProtectedPluginReview(
+                remotePath: "/ext/apps/GPIO/unreviewed-on-device.fap",
+                targetPath: "/ext/apps/GPIO/unreviewed-on-device.fap",
+                name: "unreviewed-on-device",
+                category: "GPIO",
+                pack: "base",
+                newMD5: String(repeating: "e", count: 32),
+                deviceMD5: String(repeating: "d", count: 32),
+                deviceKnown: true,
+                size: 1),
+        ]
+
+        XCTAssertEqual(updater.protectedDeviceCheckReviews.map(\.name), ["unreviewed"])
+        XCTAssertEqual(updater.protectedDeviceDiffReviews.map(\.name), ["unreviewed-on-device"])
+    }
+
     func testReachableValidLedgerWithoutExactPackRevokesCachedAcceptance() async throws {
         let directory = temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }

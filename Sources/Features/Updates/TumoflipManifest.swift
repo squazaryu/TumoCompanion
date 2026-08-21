@@ -328,19 +328,9 @@ struct TumoflipManifest: Codable, Equatable {
     /// firmware snapshot intentionally exposes its complete package surface; catalog
     /// selection and install compatibility gate that surface to the source firmware.
     func packageManagedManifest() -> TumoflipManifest {
-        guard let release = packageRelease,
-              release.isIndependentCatalog else {
+        guard let allowed = independentDeltaSources else {
             return self
         }
-
-        if release.resolvedCatalogInstallScope(
-            manifestFirmwareVersion: firmware.version
-        ) == .firmwareSnapshot {
-            return self
-        }
-
-        let modifiedSources = release.catalogModifiedTargets ?? release.overlayTargets ?? []
-        let allowed = Set(modifiedSources)
         let filteredPackages = packages.mapValues { files in
             files.filter { allowed.contains($0.source) }
         }
@@ -355,6 +345,54 @@ struct TumoflipManifest: Codable, Equatable {
             safety: safety,
             packageRelease: packageRelease
         )
+    }
+
+    /// The two distinct surfaces carried by an independent catalog delta.
+    ///
+    /// A catalog asset contains a complete source manifest so its immutable
+    /// provenance can be verified. Only the producer-declared allowlist is an
+    /// install offer. The complement is a firmware-owned reference surface: useful
+    /// for explaining the package layout, but never eligible for an SD write from
+    /// FW Packages. Keeping the distinction in the model prevents the UI from
+    /// presenting a safe empty install surface as misleading `0/0` groups.
+    struct PackageSurface: Equatable {
+        let managed: TumoflipManifest
+        let firmwareOwned: [String: [PackageFile]]
+
+        var firmwareOwnedFileCount: Int {
+            firmwareOwned.values.reduce(0) { $0 + $1.count }
+        }
+
+        func firmwareOwnedFiles(in group: String) -> [PackageFile] {
+            firmwareOwned[group] ?? []
+        }
+    }
+
+    /// Returns the separately-presented firmware-owned baseline for a delta. Exact
+    /// firmware snapshots and old firmware-bound manifests intentionally have no
+    /// split surface: their complete manifest is the install surface.
+    func packageSurface() -> PackageSurface {
+        let managed = packageManagedManifest()
+        guard let allowed = independentDeltaSources else {
+            return PackageSurface(managed: managed, firmwareOwned: [:])
+        }
+        return PackageSurface(
+            managed: managed,
+            firmwareOwned: packages.mapValues { files in
+                files.filter { !allowed.contains($0.source) }
+            }
+        )
+    }
+
+    private var independentDeltaSources: Set<String>? {
+        guard let release = packageRelease,
+              release.isIndependentCatalog,
+              release.resolvedCatalogInstallScope(
+                  manifestFirmwareVersion: firmware.version
+              ) == .delta else {
+            return nil
+        }
+        return Set(release.catalogModifiedTargets ?? release.overlayTargets ?? [])
     }
 
     var isFirmwareSnapshotCatalog: Bool {

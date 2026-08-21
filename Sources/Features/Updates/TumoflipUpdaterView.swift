@@ -128,6 +128,16 @@ struct TumoflipUpdaterView: View {
                     groupRow(g)
                 }
             }
+            if updater.hasFirmwareOwnedBaseline {
+                Label(
+                    "\(updater.firmwareOwnedFileCount) FAPs belong to the firmware baseline. FW Packages manages only independent overlays and never reinstalls these files.",
+                    systemImage: "shippingbox.fill"
+                )
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("fw-packages-firmware-baseline")
+            }
             if updater.compatibilityChecked && updater.hasUnvalidatedBinaries {
                 Label(FapCompatibility.unknownDeviceReason, systemImage: "antenna.radiowaves.left.and.right.slash")
                     .font(.caption2)
@@ -273,26 +283,43 @@ struct TumoflipUpdaterView: View {
         let n = updater.count(g.key)
         let sel = updater.selectedCount(g.key)
         let selectable = updater.selectableCount(g.key)
+        let firmwareOwned = updater.firmwareOwnedCount(g.key)
         let cleanupEntries = updater.cleanupEntries(g.key)
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                // Tri-state category checkbox: selects/deselects every file in the group.
-                Button { updater.setGroup(g.key, selected: sel < selectable) } label: {
-                    Image(systemName: sel == 0 ? "square" : (sel == selectable ? "checkmark.square.fill" : "minus.square.fill"))
+                if n > 0 {
+                    // Tri-state selection is limited to standalone overlays. The
+                    // firmware-owned baseline is visible, but cannot be overwritten
+                    // from this screen.
+                    Button { updater.setGroup(g.key, selected: sel < selectable) } label: {
+                        Image(systemName: sel == 0 ? "square" : (sel == selectable ? "checkmark.square.fill" : "minus.square.fill"))
+                            .font(.title3)
+                            .foregroundStyle(sel == 0 ? Color.secondary : Theme.accent)
+                            .frame(width: 28, height: 30)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(selectable == 0 || updater.busy || updater.validating)
+                    .accessibilityIdentifier("fw-packages-select-\(g.key)")
+                } else {
+                    Image(systemName: firmwareOwned > 0 ? "shippingbox" : "square")
                         .font(.title3)
-                        .foregroundStyle(sel == 0 ? Color.secondary : Theme.accent)
+                        .foregroundStyle(.secondary)
                         .frame(width: 28, height: 30)
-                        .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
-                .disabled(selectable == 0 || updater.busy || updater.validating)
-                .accessibilityIdentifier("fw-packages-select-\(g.key)")
 
                 Image(systemName: g.icon).foregroundStyle(.orange).frame(width: 22)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(g.title).font(.subheadline)
-                    Text("\(sel)/\(selectable) compatible · \(byteStr(updater.bytes(g.key)))")
-                        .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                    if n > 0 {
+                        Text("\(sel)/\(selectable) standalone · \(byteStr(updater.bytes(g.key)))")
+                            .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                    if firmwareOwned > 0 {
+                        Text("\(firmwareOwned) firmware-owned · not managed here")
+                            .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                            .accessibilityIdentifier("fw-packages-baseline-\(g.key)")
+                    }
                     if let info = groupSummaryInfo(g.key) {
                         Label(info.text, systemImage: info.icon)
                             .font(.caption2)

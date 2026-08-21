@@ -240,8 +240,15 @@ struct UpdatesView: View {
                             AttentionRow(systemImage: "magnifyingglass", text: "Community apps — first sync needed", tint: .blue)
                         }
                     }
-                    if updater.pendingProtectedReview.count > 0 {
-                        let n = updater.pendingProtectedReview.count
+                    if !updater.protectedDeviceCheckReviews.isEmpty {
+                        let n = updater.protectedDeviceCheckReviews.count
+                        NavigationLink { ProtectedAppsView(updater: updater) } label: {
+                            AttentionRow(systemImage: "checkmark.shield",
+                                         text: "Check \(n) protected app\(n == 1 ? "" : "s") on device", tint: .secondary)
+                        }
+                    }
+                    if !updater.protectedDeviceDiffReviews.isEmpty {
+                        let n = updater.protectedDeviceDiffReviews.count
                         NavigationLink { ProtectedAppsView(updater: updater) } label: {
                             AttentionRow(systemImage: "lock.trianglebadge.exclamationmark",
                                          text: "\(n) protected app\(n == 1 ? "" : "s") to review", tint: .orange)
@@ -312,7 +319,17 @@ struct UpdatesView: View {
         if let failure = updater.protectedAuditFailure {
             return failure.failureKind?.label ?? "AUDIT UNAVAILABLE"
         }
-        return "\(updater.builtInProtectedNames.count) built-in · \(updater.customProtectedNames.count) custom · \(updater.pendingProtectedReview.count) to review"
+        var parts = [
+            "\(updater.builtInProtectedNames.count) built-in",
+            "\(updater.customProtectedNames.count) custom",
+        ]
+        if !updater.protectedDeviceCheckReviews.isEmpty {
+            parts.append("\(updater.protectedDeviceCheckReviews.count) to check")
+        }
+        if !updater.protectedDeviceDiffReviews.isEmpty {
+            parts.append("\(updater.protectedDeviceDiffReviews.count) to review")
+        }
+        return parts.joined(separator: " · ")
     }
 
     /// Row label for a card NavigationLink — cards don't draw the List disclosure
@@ -417,9 +434,25 @@ struct ProtectedAppsView: View {
                 }
             }
 
-            if !updater.pendingProtectedReview.isEmpty {
+            if !updater.protectedDeviceCheckReviews.isEmpty {
                 Section {
-                    ForEach(updater.pendingProtectedReview) { item in
+                    ForEach(updater.protectedDeviceCheckReviews) { item in
+                        ProtectedReviewRow(
+                            item: item,
+                            compatibility: updater.classification(item.remotePath),
+                            auditStatus: .needsReview)
+                    }
+                } header: {
+                    Text("Check on device")
+                } footer: {
+                    Text("These protected apps have not been compared with this Flipper yet. Connect it and use Verify on device; this is not a DIFF.")
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            if !updater.protectedDeviceDiffReviews.isEmpty {
+                Section {
+                    ForEach(updater.protectedDeviceDiffReviews) { item in
                         ProtectedReviewRow(
                             item: item,
                             compatibility: updater.classification(item.remotePath),
