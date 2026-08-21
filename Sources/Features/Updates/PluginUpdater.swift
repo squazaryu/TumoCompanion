@@ -1308,6 +1308,15 @@ final class PluginUpdater: ObservableObject {
             protectedReviewStatus($0) == .needsReview
         }
     }
+    /// These rows have no device MD5 yet. They need a device check, not a human
+    /// provenance decision, so the UI must never present them as a DIFF.
+    var protectedDeviceCheckReviews: [ProtectedPluginReview] {
+        pendingProtectedReview.filter { !$0.deviceKnown }
+    }
+    /// These rows were actually compared with the device and still need a review.
+    var protectedDeviceDiffReviews: [ProtectedPluginReview] {
+        pendingProtectedReview.filter(\.deviceKnown)
+    }
     /// Rows whose bytes cannot be classified because the centralized ledger itself
     /// is unavailable or invalid. These are deliberately not DIFFs: no authoritative
     /// comparison was possible.

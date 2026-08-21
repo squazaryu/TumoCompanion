@@ -63,6 +63,29 @@ final class TumoflipManifestPackageReleaseTests: XCTestCase {
         XCTAssertEqual(managed.cleanup.map(\.canonical), ["/ext/apps/esp.fap"])
     }
 
+    func testIndependentDeltaSeparatesFirmwareOwnedBaselineFromInstallSurface() throws {
+        let independent = packageRelease.replacingOccurrences(
+            of: "\"firmware_flash_unchanged\": true",
+            with: """
+            "firmware_flash_unchanged": true,
+              "catalog_channel": "dev",
+              "catalog_revision": 8,
+              "catalog_release_tag": "fw-packages-dev-008",
+              "catalog_install_scope": "delta",
+              "catalog_modified_targets": ["apps/esp.fap"],
+              "overlay_targets": ["apps/esp.fap"]
+            """
+        )
+        let manifest = try TumoflipManifest.decode(fixture(packageRelease: independent))
+        try manifest.validate()
+
+        let surface = manifest.packageSurface()
+        XCTAssertEqual(surface.managed.packages["base"]?.map(\.source), ["apps/esp.fap"])
+        XCTAssertEqual(surface.firmwareOwnedFiles(in: "base").map(\.source), ["apps/base.fap"])
+        XCTAssertEqual(surface.firmwareOwnedFileCount, 1)
+        XCTAssertTrue(surface.firmwareOwnedFiles(in: "arf").isEmpty)
+    }
+
     func testOlderCatalogUsesOverlayAllowlistAndNeverExposesBaseline() throws {
         let independent = packageRelease.replacingOccurrences(
             of: "\"firmware_flash_unchanged\": true",
