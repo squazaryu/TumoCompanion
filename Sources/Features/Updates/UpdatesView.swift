@@ -115,7 +115,7 @@ struct UpdatesView: View {
 
     private var firmwareChecking: Bool {
         switch packages.phase {
-        case .checking, .downloading: return true
+        case .checking, .syncingCatalog, .downloading: return true
         default: return false
         }
     }

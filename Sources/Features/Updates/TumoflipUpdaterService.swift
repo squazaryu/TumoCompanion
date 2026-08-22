@@ -194,12 +194,34 @@ struct TumoflipCatalogSnapshot {
         ]
         return Data(lines.joined(separator: "\n").utf8)
     }
+
+    /// Replace the non-authoritative catalog state only after its exact bytes are
+    /// verified on the Flipper. This never touches the package ledger or any FAP/FAL;
+    /// an interrupted write can therefore only leave diagnostic metadata unavailable,
+    /// never alter an installed application.
+    static func write(
+        sourceManifest: TumoflipManifest,
+        selection: TumoflipPackageCatalogSelection,
+        device: TumoflipDeviceIdentity,
+        fs: any TumoflipDeviceFS
+    ) async throws {
+        let snapshot = data(
+            sourceManifest: sourceManifest,
+            selection: selection,
+            device: device
+        )
+        try await fs.makeDirectory(directory)
+        try await fs.write(snapshot, to: path)
+        guard await fs.deviceMD5(path) == TumoflipHash.md5(snapshot) else {
+            throw TumoflipInstallError.statePersistenceFailed(path)
+        }
+    }
 }
 
 @MainActor
 final class TumoflipUpdater: ObservableObject {
     enum Phase: Equatable {
-        case idle, checking, ready, downloading
+        case idle, checking, syncingCatalog, ready, downloading
         case installing(done: Int, total: Int, file: String)
         case cleaning(done: Int, total: Int, file: String)
         case done(String), failed(String)
@@ -291,7 +313,7 @@ final class TumoflipUpdater: ObservableObject {
         if transactionGate.isActive { return true }
         if validating { return true }
         switch phase {
-        case .checking, .downloading, .installing, .cleaning:
+        case .checking, .syncingCatalog, .downloading, .installing, .cleaning:
             return true
         default:
             return false
@@ -542,23 +564,7 @@ final class TumoflipUpdater: ObservableObject {
                 installedCommit: deviceIdentity?.firmwareCommit,
                 installedCommitDirty: deviceIdentity?.firmwareCommitDirty
             )
-            let m = selection.manifest
-            try m.validate()
-            if let packageRelease = m.packageRelease {
-                let declaredReleaseTag = packageRelease.isIndependentCatalog
-                    ? packageRelease.catalogReleaseTag
-                    : packageRelease.targetReleaseTag
-                guard declaredReleaseTag == selection.release.tag else {
-                    throw TumoflipManifestError.invalidPackageRelease(packageRelease.id)
-                }
-            }
-            releaseTag = selection.release.tag
-            selectedCatalogIdentity = selection.identity
-            selectedCatalogRepository = selection.release.repository
-            packageRevisionDate = selection.manifestUpdatedAt
-            manifest = m
-            packageZipURL = selection.release.asset("tumoflip-packages.zip")?.url
-            hasPackageZip = packageZipURL != nil
+            try adoptCatalogSelection(selection)
             await refreshStatus()
             phase = .ready
             // FAP/FAL API validation needs the package zip; it's triggered from the FW
@@ -571,6 +577,103 @@ final class TumoflipUpdater: ObservableObject {
             }
             phase = .failed(friendly(error))
         }
+    }
+
+    /// Revalidate the live catalog and replace only the small catalog snapshot read by
+    /// the on-device Tumoflip Packages FAP. Unlike `install()`, this does not download
+    /// a package archive, stop Loader, mutate FAP/FAL files, or alter install history.
+    func syncCatalog() async {
+        guard manifest != nil else { return }
+        guard transactionGate.begin() else { return }
+        defer { transactionGate.end() }
+
+        phase = .syncingCatalog
+        transferChannel = activeChannel
+        do {
+            // A mounted USB SD card is only the file path. Firmware identity still has
+            // to come from the connected Flipper immediately before this write.
+            guard await FlipperBLE.shared.waitUntilReady(timeout: 8) else {
+                phase = .failed("Connect this Flipper over BLE to revalidate its firmware before syncing the catalog.")
+                return
+            }
+            if FlipperBLE.shared.buddyMode {
+                phase = .failed("Claude Buddy passthrough is holding the serial link. Turn Claude Buddy off, then retry catalog sync.")
+                return
+            }
+
+            let initialIdentity = try await freshDeviceIdentity()
+            adopt(initialIdentity)
+            guard let selectedCatalogRepository else {
+                phase = .failed("Refresh Firmware packages before syncing; catalog identity is unavailable.")
+                return
+            }
+
+            let selection = try await packageCatalogClient.latest(
+                for: firmwareRoute.channel,
+                installedVersion: packageIdentityVersion,
+                installedAPI: deviceIdentity?.firmwareAPI,
+                installedTarget: deviceIdentity?.hardwareTarget,
+                installedCommit: deviceIdentity?.firmwareCommit,
+                installedCommitDirty: deviceIdentity?.firmwareCommitDirty,
+                forceRemote: true,
+                requiredRepository: selectedCatalogRepository
+            )
+            let sourceManifest = try validatedCatalogManifest(selection)
+            let fs = activeFS()
+
+            try await TumoflipPrewriteIdentityGate.authorize(
+                manifest: sourceManifest,
+                readIdentity: {
+                    let fresh = try await self.freshDeviceIdentity()
+                    return fresh.identity
+                }
+            ) { authorized in
+                self.adopt(FreshDeviceIdentity(
+                    identity: authorized.identity,
+                    compatibility: authorized.compatibility
+                ))
+                try await self.refreshCatalogSnapshot(
+                    sourceManifest: sourceManifest,
+                    selection: selection,
+                    fs: fs
+                )
+            }
+
+            try adoptCatalogSelection(selection)
+            await refreshStatus()
+            phase = .done("Catalog synchronized — no FAP files changed.")
+        } catch let error as TumoflipInstallError {
+            phase = .failed(installErrorText(error))
+        } catch {
+            phase = .failed(friendly(error))
+        }
+    }
+
+    private func validatedCatalogManifest(
+        _ selection: TumoflipPackageCatalogSelection
+    ) throws -> TumoflipManifest {
+        let sourceManifest = selection.manifest
+        try sourceManifest.validate()
+        if let packageRelease = sourceManifest.packageRelease {
+            let declaredReleaseTag = packageRelease.isIndependentCatalog
+                ? packageRelease.catalogReleaseTag
+                : packageRelease.targetReleaseTag
+            guard declaredReleaseTag == selection.release.tag else {
+                throw TumoflipManifestError.invalidPackageRelease(packageRelease.id)
+            }
+        }
+        return sourceManifest
+    }
+
+    private func adoptCatalogSelection(_ selection: TumoflipPackageCatalogSelection) throws {
+        let sourceManifest = try validatedCatalogManifest(selection)
+        releaseTag = selection.release.tag
+        selectedCatalogIdentity = selection.identity
+        selectedCatalogRepository = selection.release.repository
+        packageRevisionDate = selection.manifestUpdatedAt
+        manifest = sourceManifest
+        packageZipURL = selection.release.asset("tumoflip-packages.zip")?.url
+        hasPackageZip = packageZipURL != nil
     }
 
     /// Download the package zip, check device compatibility, stage + verify + atomically
@@ -982,16 +1085,12 @@ final class TumoflipUpdater: ObservableObject {
         guard let deviceIdentity else {
             throw TumoflipInstallError.statePersistenceFailed(TumoflipCatalogSnapshot.path)
         }
-        let data = TumoflipCatalogSnapshot.data(
+        try await TumoflipCatalogSnapshot.write(
             sourceManifest: sourceManifest,
             selection: selection,
-            device: deviceIdentity
+            device: deviceIdentity,
+            fs: fs
         )
-        try await fs.makeDirectory(TumoflipCatalogSnapshot.directory)
-        try await fs.write(data, to: TumoflipCatalogSnapshot.path)
-        guard await fs.deviceMD5(TumoflipCatalogSnapshot.path) == TumoflipHash.md5(data) else {
-            throw TumoflipInstallError.statePersistenceFailed(TumoflipCatalogSnapshot.path)
-        }
     }
 
     private struct FreshDeviceIdentity {
@@ -1159,7 +1258,7 @@ final class TumoflipUpdater: ObservableObject {
     func validateCompatibility() async {
         if validating { return }
         switch phase {
-        case .checking, .downloading, .installing, .cleaning:
+        case .checking, .syncingCatalog, .downloading, .installing, .cleaning:
             return
         default:
             break

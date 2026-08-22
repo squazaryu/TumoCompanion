@@ -34,6 +34,7 @@ struct TumoflipUpdaterView: View {
                             color: transfer.activeChannel == .usb ? .blue : .secondary,
                             systemImage: transfer.activeChannel.systemImage))) {
                 statusRow
+                syncCatalogRow
                 verifyRow
             }
 
@@ -471,6 +472,7 @@ struct TumoflipUpdaterView: View {
                 }
             }
         case .checking:    progress("Checking the latest release…")
+        case .syncingCatalog: progress("Syncing the verified catalog to Flipper…")
         case .downloading:
             VStack(alignment: .leading, spacing: 4) {
                 progress("Downloading package archive…")
@@ -527,6 +529,34 @@ struct TumoflipUpdaterView: View {
               systemImage: transfer.activeChannel == .usb ? "cable.connector" : "lock.open.iphone")
             .font(.caption2).foregroundStyle(.orange)
             .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// This is intentionally separate from verification. It updates the FAP's
+    /// display-only catalog snapshot even when every package is already current.
+    @ViewBuilder private var syncCatalogRow: some View {
+        if updater.manifest != nil {
+            Button {
+                Task { await updater.syncCatalog() }
+            } label: {
+                HStack {
+                    if case .syncingCatalog = updater.phase {
+                        ProgressView().scaleEffect(0.85)
+                        Text("Syncing catalog…").foregroundStyle(.secondary)
+                    } else {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                        Text("Sync catalog to Flipper")
+                    }
+                    Spacer()
+                    Text("no FAP changes")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .disabled(updater.busy || !hasFileChannel)
+            .accessibilityIdentifier("fw-packages-sync-catalog")
+            .accessibilityLabel("Sync package catalog to Flipper")
+            .accessibilityHint("Writes only the verified catalog snapshot and does not install or replace FAP files.")
+        }
     }
 
     /// On-demand deep check: hash the actual files on the Flipper to confirm presence/integrity.
@@ -643,6 +673,8 @@ struct FWPackagesActionBar: View {
     @ViewBuilder
     var body: some View {
         switch phase {
+        case .checking, .syncingCatalog:
+            EmptyView()
         case .downloading:
             transactionBar(
                 title: "Downloading package archive",
