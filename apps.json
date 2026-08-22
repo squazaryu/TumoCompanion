@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.10.34",
+      "version": "1.10.35",
       "versionDate": "2026-08-22",
-      "versionDescription": "FW Packages now records a verified catalog snapshot on the Flipper after a successful install or already-current check. The next Tumoflip Dev firmware will display this current catalog separately from historic package provenance.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.34/TumoCompanion-unsigned.ipa",
-      "size": 29985913,
+      "versionDescription": "Adds a separate Sync catalog to Flipper action for FW Packages. It refreshes the verified catalog snapshot even when every package is current, without downloading or reinstalling FAPs and without changing install history.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.35/TumoCompanion-unsigned.ipa",
+      "size": 29994763,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.10.35",
+          "date": "2026-08-22",
+          "localizedDescription": "Adds a separate Sync catalog to Flipper action for FW Packages. It refreshes the verified catalog snapshot even when every package is current, without downloading or reinstalling FAPs and without changing install history.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.35/TumoCompanion-unsigned.ipa",
+          "size": 29994763,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.10.34",
           "date": "2026-08-22",
