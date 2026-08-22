@@ -261,6 +261,113 @@ final class TumoflipInstallerTests: XCTestCase {
         XCTAssertTrue(text.contains("Compatibility: verified"))
     }
 
+    func testCatalogSnapshotSyncReplacesOnlyCatalogState() async throws {
+        let fs = FakeFS()
+        let first = catalogSnapshotFixture(deviceVersion: "t-dev-007-002")
+        let second = catalogSnapshotFixture(deviceVersion: "t-dev-007-003")
+
+        try await TumoflipCatalogSnapshot.write(
+            sourceManifest: first.manifest,
+            selection: first.selection,
+            device: first.device,
+            fs: fs
+        )
+        let firstSnapshot = try XCTUnwrap(fs.files[TumoflipCatalogSnapshot.path])
+
+        try await TumoflipCatalogSnapshot.write(
+            sourceManifest: second.manifest,
+            selection: second.selection,
+            device: second.device,
+            fs: fs
+        )
+
+        let current = try XCTUnwrap(fs.files[TumoflipCatalogSnapshot.path])
+        let currentText = try XCTUnwrap(String(data: current, encoding: .utf8))
+        XCTAssertNotEqual(current, firstSnapshot)
+        XCTAssertTrue(currentText.contains("DeviceFW: t-dev-007-003"))
+        XCTAssertEqual(Set(fs.files.keys), Set([TumoflipCatalogSnapshot.path]))
+    }
+
+    func testCatalogSnapshotSyncFailsClosedWhenDeviceDigestCannotBeRead() async throws {
+        let fs = FakeFS()
+        let fixture = catalogSnapshotFixture(deviceVersion: "t-dev-007-003")
+        fs.uncheckedMD5FailuresByPath[TumoflipCatalogSnapshot.path] = 1
+
+        do {
+            try await TumoflipCatalogSnapshot.write(
+                sourceManifest: fixture.manifest,
+                selection: fixture.selection,
+                device: fixture.device,
+                fs: fs
+            )
+            XCTFail("A snapshot without a verified device digest must not be accepted")
+        } catch let error as TumoflipInstallError {
+            XCTAssertEqual(error, .statePersistenceFailed(TumoflipCatalogSnapshot.path))
+        }
+    }
+
+    private func catalogSnapshotFixture(
+        deviceVersion: String
+    ) -> (
+        manifest: TumoflipManifest,
+        selection: TumoflipPackageCatalogSelection,
+        device: TumoflipDeviceIdentity
+    ) {
+        let overlay = Data("catalog-overlay".utf8)
+        let manifest = TumoflipManifest(
+            schema: 2,
+            releaseId: String(repeating: "a", count: 64),
+            firmware: .init(
+                api: "88.0", name: "tumoflip", version: "t-dev-004-015",
+                target: 7, radioAddress: nil
+            ),
+            artifacts: [:],
+            packages: [
+                "base": [], "arf": [],
+                "module_one": [.init(
+                    bytes: overlay.count, sha256: TumoflipHash.sha256(overlay),
+                    source: "apps/esp_flasher.fap",
+                    target: "/ext/apps/Module One/ESP32 Wi-Fi/esp_flasher.fap")],
+                "protocol_packs": [],
+            ],
+            cleanup: [],
+            safety: nil,
+            packageRelease: .init(
+                id: "catalog-dev-008",
+                type: "package-only",
+                sourceCommit: String(repeating: "b", count: 40),
+                sourceDirty: false,
+                sourceFirmwareVersion: "t-dev-004-015",
+                targetReleaseTag: "t-dev-004-015",
+                firmwareFlashUnchanged: true,
+                catalogChannel: "dev",
+                catalogRevision: 8,
+                catalogReleaseTag: "fw-packages-dev-008",
+                catalogInstallScope: .delta,
+                catalogModifiedTargets: ["apps/esp_flasher.fap"],
+                overlayTargets: ["apps/esp_flasher.fap"]
+            )
+        )
+        let selection = TumoflipPackageCatalogSelection(
+            release: .init(
+                githubID: 8,
+                repository: .primary,
+                tag: "fw-packages-dev-008",
+                assets: []),
+            manifest: manifest,
+            manifestUpdatedAt: nil
+        )
+        let device = TumoflipDeviceIdentity(
+            firmwareVersion: deviceVersion,
+            originFork: "tumoflip",
+            firmwareCommit: String(repeating: "c", count: 40),
+            firmwareCommitDirty: false,
+            firmwareAPI: "88.0",
+            hardwareTarget: 7
+        )
+        return (manifest, selection, device)
+    }
+
     private let rid = String(repeating: "c", count: 64)
 
     private func file(_ source: String, _ target: String, _ bytes: Data) -> TumoflipManifest.PackageFile {
