@@ -54,8 +54,22 @@ struct TumoflipPackageCatalogSelection: Equatable {
     let manifestUpdatedAt: Date?
     /// Digest evidence comes from the immutable FW Packages catalog index. Legacy
     /// releases may omit it during migration; primary releases must carry it.
-    let expectedManifestSHA256: String? = nil
-    let expectedArchiveSHA256: String? = nil
+    let expectedManifestSHA256: String?
+    let expectedArchiveSHA256: String?
+
+    init(
+        release: TumoflipPackageCatalogRelease,
+        manifest: TumoflipManifest,
+        manifestUpdatedAt: Date?,
+        expectedManifestSHA256: String? = nil,
+        expectedArchiveSHA256: String? = nil
+    ) {
+        self.release = release
+        self.manifest = manifest
+        self.manifestUpdatedAt = manifestUpdatedAt
+        self.expectedManifestSHA256 = expectedManifestSHA256
+        self.expectedArchiveSHA256 = expectedArchiveSHA256
+    }
 
     var identity: Identity {
         Identity(
