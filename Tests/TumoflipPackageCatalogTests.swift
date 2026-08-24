@@ -25,6 +25,36 @@ final class TumoflipPackageCatalogTests: XCTestCase {
         XCTAssertEqual(selected.identity.catalogRevision, 9)
     }
 
+    func testCatalogIndexDigestMismatchFailsClosedBeforeSelection() async throws {
+        let tag = "fw-packages-dev-009"
+        let manifestData = manifest(tag: tag, revision: 9)
+        let client = makeClient(
+            primaryPages: [releasesData([release(id: 9, tag: tag)])],
+            manifests: [manifestURL(tag): manifestData],
+            catalogIndex: catalogIndex(
+                channel: "dev",
+                tag: tag,
+                revision: 9,
+                manifestReleaseID: String(repeating: "d", count: 64),
+                manifestSHA256: String(repeating: "a", count: 64)
+            )
+        )
+
+        do {
+            _ = try await client.latest(
+                for: .dev,
+                installedVersion: "t-dev-004-015",
+                installedAPI: "88.0",
+                installedTarget: 7
+            )
+            XCTFail("An index digest mismatch must stop catalog selection")
+        } catch let error as TumoflipPackageCatalogError {
+            guard case .malformedPrimary = error else {
+                return XCTFail("Unexpected error: \(error)")
+            }
+        }
+    }
+
     func testAvailableReturnsImmutableHistoryNewestFirst() async throws {
         let newer = release(id: 9, tag: "fw-packages-dev-009")
         let older = release(id: 8, tag: "fw-packages-dev-008")
@@ -512,7 +542,8 @@ final class TumoflipPackageCatalogTests: XCTestCase {
         primaryPages: [Data] = [Data("[]".utf8)],
         legacyPages: [Data] = [Data("[]".utf8)],
         primaryError: Error? = nil,
-        manifests: [URL: Data]
+        manifests: [URL: Data],
+        catalogIndex: Data? = nil
     ) -> TumoflipPackageCatalogClient {
         TumoflipPackageCatalogClient(
             apiFetch: { repository, page, _ in
@@ -523,8 +554,81 @@ final class TumoflipPackageCatalogTests: XCTestCase {
             assetFetch: { url, _ in
                 guard let data = manifests[url] else { throw URLError(.fileDoesNotExist) }
                 return data
-            }
+            },
+            indexFetch: catalogIndex.map { data in { _ in data } }
         )
+    }
+
+    private func catalogIndex(
+        channel: String,
+        tag: String,
+        revision: Int,
+        manifestReleaseID: String,
+        manifestSHA256: String
+    ) -> Data {
+        func release(
+            channel: String,
+            tag: String,
+            revision: Int,
+            releaseID: String,
+            manifestSHA256: String
+        ) -> [String: Any] {
+            [
+                "revision": revision,
+                "tag": tag,
+                "repository": "squazaryu/tumoflip-fw-packages",
+                "release_id": releaseID,
+                "manifest_sha256": manifestSHA256,
+                "archive_sha256": String(repeating: "b", count: 64),
+                "state": "active",
+                "compatibility": ["targets": [7], "api_majors": [88]],
+            ]
+        }
+        let stable = channel == "stable"
+            ? release(
+                channel: "stable",
+                tag: tag,
+                revision: revision,
+                releaseID: manifestReleaseID,
+                manifestSHA256: manifestSHA256
+            )
+            : release(
+                channel: "stable",
+                tag: "fw-packages-stable-001",
+                revision: 1,
+                releaseID: String(repeating: "c", count: 64),
+                manifestSHA256: String(repeating: "d", count: 64)
+            )
+        let dev = channel == "dev"
+            ? release(
+                channel: "dev",
+                tag: tag,
+                revision: revision,
+                releaseID: manifestReleaseID,
+                manifestSHA256: manifestSHA256
+            )
+            : release(
+                channel: "dev",
+                tag: "fw-packages-dev-001",
+                revision: 1,
+                releaseID: String(repeating: "e", count: 64),
+                manifestSHA256: String(repeating: "f", count: 64)
+            )
+        let object: [String: Any] = [
+            "schema": 1,
+            "repository": "squazaryu/tumoflip-fw-packages",
+            "generated_at": "2026-08-24T20:00:00Z",
+            "selection_policy": [
+                "auto": "highest compatible active revision",
+                "manual": "any compatible active or legacy revision",
+                "withdrawal": "immutable release retained; index state becomes withdrawn",
+            ],
+            "channels": [
+                "stable": ["current_revision": stable["revision"]!, "releases": [stable]],
+                "dev": ["current_revision": dev["revision"]!, "releases": [dev]],
+            ],
+        ]
+        return try! JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
     }
 
     private func release(

@@ -43,6 +43,8 @@ struct TumoflipPackageCatalogSelection: Equatable {
         let releaseTag: String
         let manifestReleaseID: String
         let packageReleaseID: String
+        let manifestSHA256: String?
+        let archiveSHA256: String?
         let catalogChannel: String?
         let catalogRevision: Int?
     }
@@ -50,6 +52,10 @@ struct TumoflipPackageCatalogSelection: Equatable {
     let release: TumoflipPackageCatalogRelease
     let manifest: TumoflipManifest
     let manifestUpdatedAt: Date?
+    /// Digest evidence comes from the immutable FW Packages catalog index. Legacy
+    /// releases may omit it during migration; primary releases must carry it.
+    let expectedManifestSHA256: String? = nil
+    let expectedArchiveSHA256: String? = nil
 
     var identity: Identity {
         Identity(
@@ -58,6 +64,8 @@ struct TumoflipPackageCatalogSelection: Equatable {
             releaseTag: release.tag,
             manifestReleaseID: manifest.releaseId,
             packageReleaseID: manifest.packageRelease?.id ?? manifest.releaseId,
+            manifestSHA256: expectedManifestSHA256,
+            archiveSHA256: expectedArchiveSHA256,
             catalogChannel: manifest.packageRelease?.catalogChannel,
             catalogRevision: manifest.packageRelease?.catalogRevision
         )
@@ -240,13 +248,14 @@ struct TumoflipPackageCatalogClient {
 
         do {
             let releases = try await releases(in: primary, forceRemote: forceRemote)
-            let channelReleases = try await indexedAuthoritativeReleases(
+            let indexed = try await indexedAuthoritativeReleases(
                 authoritativeReleases(releases, channel: channel),
                 channel: channel,
                 installedAPI: installedAPI,
                 installedTarget: installedTarget,
                 forceRemote: forceRemote
             )
+            let channelReleases = indexed.releases
             if !channelReleases.isEmpty {
                 let current = try await selectAllAuthoritative(
                     channelReleases,
@@ -257,7 +266,8 @@ struct TumoflipPackageCatalogClient {
                     installedTarget: installedTarget,
                     installedCommit: installedCommit,
                     installedCommitDirty: installedCommitDirty,
-                    forceRemote: forceRemote
+                    forceRemote: forceRemote,
+                    indexEvidence: indexed.evidence
                 )
                 let history = await legacyHistorySelections(
                     for: channel,
@@ -419,7 +429,8 @@ struct TumoflipPackageCatalogClient {
             guard let manifestAsset = release.asset("tumoflip-packages.json"),
                   let rawManifest = try? await loadManifest(
                       from: manifestAsset.url,
-                      forceRemote: forceRemote
+                      forceRemote: forceRemote,
+                      expectedSHA256: nil
                   ),
                   rawManifest.packageRelease?.isIndependentCatalog != true,
                   TumoflipPackageReleaseMatcher.matches(
@@ -513,13 +524,25 @@ struct TumoflipPackageCatalogClient {
         }
         var output: [TumoflipPackageCatalogSelection] = []
         for release in releases where historicalTags.contains(release.tag) {
+            let evidence = index.channels[channel.rawValue]?.releases
+                .first(where: { $0.tag == release.tag })
             guard let asset = release.asset("tumoflip-packages.json"),
-                  let raw = try? await loadManifest(from: asset.url, forceRemote: forceRemote),
+                  let raw = try? await loadManifest(
+                      from: asset.url,
+                      forceRemote: forceRemote,
+                      expectedSHA256: evidence?.manifestSHA256
+                  ),
                   let revision = revision(from: release.tag, channel: channel) else { continue }
             let manifest = normalizedLegacyManifest(raw, channel: channel, revision: revision, tag: release.tag)
             guard installedTarget.map({ $0 == manifest.firmware.target }) ?? true,
                   installedAPI.map({ FirmwareAPICompatibility.hasSameMajor($0, manifest.firmware.api) }) ?? true else { continue }
-            output.append(.init(release: release, manifest: manifest, manifestUpdatedAt: asset.updatedAt))
+            output.append(.init(
+                release: release,
+                manifest: manifest,
+                manifestUpdatedAt: asset.updatedAt,
+                expectedManifestSHA256: evidence?.manifestSHA256,
+                expectedArchiveSHA256: evidence?.archiveSHA256
+            ))
         }
         return output
     }
@@ -546,8 +569,14 @@ struct TumoflipPackageCatalogClient {
             throw TumoflipPackageCatalogError.noMatchingRelease(channel, nil)
         }
         let raw: TumoflipManifest
+        let evidence = await loadCatalogIndex(forceRemote: forceRemote)?.channels[channel.rawValue]?.releases
+            .first(where: { $0.revision == revision })
         do {
-            raw = try await loadManifest(from: asset.url, forceRemote: forceRemote)
+            raw = try await loadManifest(
+                from: asset.url,
+                forceRemote: forceRemote,
+                expectedSHA256: evidence?.manifestSHA256
+            )
         } catch {
             throw TumoflipPackageCatalogError.malformedLegacy("\(tag) manifest failed validation")
         }
@@ -556,7 +585,13 @@ struct TumoflipPackageCatalogClient {
               installedTarget.map({ $0 == manifest.firmware.target }) ?? true else {
             throw TumoflipPackageCatalogError.noMatchingRelease(channel, nil)
         }
-        return [.init(release: release, manifest: manifest, manifestUpdatedAt: asset.updatedAt)]
+        return [.init(
+            release: release,
+            manifest: manifest,
+            manifestUpdatedAt: asset.updatedAt,
+            expectedManifestSHA256: evidence?.manifestSHA256,
+            expectedArchiveSHA256: evidence?.archiveSHA256
+        )]
     }
 
     private func selectAuthoritative(
@@ -595,7 +630,8 @@ struct TumoflipPackageCatalogClient {
         installedTarget: Int?,
         installedCommit: String?,
         installedCommitDirty: Bool?,
-        forceRemote: Bool
+        forceRemote: Bool,
+        indexEvidence: [String: TumoflipCatalogIndex.Release] = [:]
     ) async throws -> [TumoflipPackageCatalogSelection] {
         let ranked = releases.compactMap { release -> (Int, TumoflipPackageCatalogRelease)? in
             revision(from: release.tag, channel: channel).map { ($0, release) }
@@ -612,9 +648,14 @@ struct TumoflipPackageCatalogClient {
                   release.asset("tumoflip-packages.zip") != nil else {
                 throw malformed(repository, "\(release.tag) is missing manifest or package archive")
             }
+            let evidence = indexEvidence[release.tag]
             let manifest: TumoflipManifest
             do {
-                manifest = try await loadManifest(from: manifestAsset.url, forceRemote: forceRemote)
+                manifest = try await loadManifest(
+                    from: manifestAsset.url,
+                    forceRemote: forceRemote,
+                    expectedSHA256: evidence?.manifestSHA256
+                )
             } catch {
                 throw malformed(repository, "\(release.tag) manifest failed validation")
             }
@@ -622,7 +663,8 @@ struct TumoflipPackageCatalogClient {
                   packageRelease.isIndependentCatalog,
                   packageRelease.catalogChannel == channel.rawValue,
                   packageRelease.catalogRevision == revision,
-                  packageRelease.catalogReleaseTag == release.tag else {
+                  packageRelease.catalogReleaseTag == release.tag,
+                  evidence.map({ $0.releaseId == manifest.releaseId }) ?? true else {
                 throw malformed(repository, "\(release.tag) provenance does not match its manifest")
             }
             let versionMatches = TumoflipPackageReleaseMatcher.matches(
@@ -645,7 +687,9 @@ struct TumoflipPackageCatalogClient {
                 selections.append(TumoflipPackageCatalogSelection(
                     release: release,
                     manifest: manifest,
-                    manifestUpdatedAt: manifestAsset.updatedAt
+                    manifestUpdatedAt: manifestAsset.updatedAt,
+                    expectedManifestSHA256: evidence?.manifestSHA256,
+                    expectedArchiveSHA256: evidence?.archiveSHA256
                 ))
                 continue
             }
@@ -661,7 +705,9 @@ struct TumoflipPackageCatalogClient {
             selections.append(TumoflipPackageCatalogSelection(
                 release: release,
                 manifest: manifest,
-                manifestUpdatedAt: manifestAsset.updatedAt
+                manifestUpdatedAt: manifestAsset.updatedAt,
+                expectedManifestSHA256: evidence?.manifestSHA256,
+                expectedArchiveSHA256: evidence?.archiveSHA256
             ))
         }
         guard !selections.isEmpty else {
@@ -670,8 +716,16 @@ struct TumoflipPackageCatalogClient {
         return selections
     }
 
-    private func loadManifest(from url: URL, forceRemote: Bool) async throws -> TumoflipManifest {
-        let manifest = try TumoflipManifest.decode(await assetFetch(url, forceRemote))
+    private func loadManifest(
+        from url: URL,
+        forceRemote: Bool,
+        expectedSHA256: String?
+    ) async throws -> TumoflipManifest {
+        let data = try await assetFetch(url, forceRemote)
+        if let expectedSHA256, TumoflipHash.sha256(data) != expectedSHA256 {
+            throw TumoflipPackageCatalogError.malformedPrimary("manifest digest mismatch")
+        }
+        let manifest = try TumoflipManifest.decode(data)
         try manifest.validate()
         return manifest
     }

@@ -268,6 +268,7 @@ final class TumoflipUpdater: ObservableObject {
     private let transactionGate = TumoflipTransactionGate()
 
     private var packageZipURL: URL?
+    private var expectedArchiveSHA256: String?
     private var selectedCatalogIdentity: TumoflipPackageCatalogSelection.Identity?
     private var selectedCatalogRepository: TumoflipPackageCatalogRepository?
     private var catalogSelections: [TumoflipPackageCatalogSelection] = []
@@ -725,6 +726,7 @@ final class TumoflipUpdater: ObservableObject {
         packageRevisionDate = selection.manifestUpdatedAt
         manifest = sourceManifest
         packageZipURL = selection.release.asset("tumoflip-packages.zip")?.url
+        expectedArchiveSHA256 = selection.expectedArchiveSHA256
         hasPackageZip = packageZipURL != nil
     }
 
@@ -1285,6 +1287,12 @@ final class TumoflipUpdater: ObservableObject {
         )
         request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
         let (tmp, _) = try await URLSession.shared.download(for: request)
+        if let expectedArchiveSHA256 {
+            let archiveData = try Data(contentsOf: tmp)
+            guard TumoflipHash.sha256(archiveData) == expectedArchiveSHA256 else {
+                throw TumoflipInstallError.hashMismatch("tumoflip-packages.zip")
+            }
+        }
         let source = try ZipPackageSource.load(zipAt: tmp)
         cachedSource = (manifest.releaseId, source)
         return source
