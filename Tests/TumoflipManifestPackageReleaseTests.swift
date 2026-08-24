@@ -86,6 +86,28 @@ final class TumoflipManifestPackageReleaseTests: XCTestCase {
         XCTAssertTrue(surface.firmwareOwnedFiles(in: "arf").isEmpty)
     }
 
+    func testIndependentBaselineManagesNoFilesAndExposesReferenceSurface() throws {
+        let independent = packageRelease.replacingOccurrences(
+            of: "\"firmware_flash_unchanged\": true",
+            with: """
+            "firmware_flash_unchanged": true,
+              "catalog_channel": "stable",
+              "catalog_revision": 4,
+              "catalog_release_tag": "fw-packages-stable-004",
+              "catalog_install_scope": "baseline",
+              "catalog_modified_targets": [],
+              "overlay_targets": [],
+              "compatible_releases": []
+            """
+        )
+        let manifest = try TumoflipManifest.decode(fixture(packageRelease: independent))
+        try manifest.validate()
+
+        XCTAssertTrue(manifest.isIndependentBaselineCatalog)
+        XCTAssertTrue(manifest.packageManagedManifest().packages.values.allSatisfy(\.isEmpty))
+        XCTAssertEqual(manifest.packageSurface().firmwareOwnedFileCount, 2)
+    }
+
     func testOlderCatalogUsesOverlayAllowlistAndNeverExposesBaseline() throws {
         let independent = packageRelease.replacingOccurrences(
             of: "\"firmware_flash_unchanged\": true",
