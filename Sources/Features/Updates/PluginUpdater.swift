@@ -58,16 +58,19 @@ enum PluginInstallRouting {
     ]
 
     static func targetPath(for remotePath: String) -> String {
-        let appName = ((remotePath as NSString).lastPathComponent as NSString)
-            .deletingPathExtension
+        targetPaths[appID(for: remotePath)] ?? remotePath
+    }
+
+    /// Stable identity of a catalog binary. Community Pack categories and install
+    /// routes are allowed to move, but the FAP basename is the app identity used by
+    /// the Flipper launcher and by the package audit.
+    static func appID(for path: String) -> String {
+        (((path as NSString).lastPathComponent as NSString).deletingPathExtension)
             .lowercased()
-        return targetPaths[appName] ?? remotePath
     }
 
     static func legacyPaths(for remotePath: String) -> [String] {
-        let appName = ((remotePath as NSString).lastPathComponent as NSString)
-            .deletingPathExtension
-            .lowercased()
+        let appName = appID(for: remotePath)
         var paths: [String] = []
         let target = targetPath(for: remotePath)
         if target != remotePath { paths.append(remotePath) }
@@ -75,6 +78,20 @@ enum PluginInstallRouting {
             paths.append("/ext/apps/Module One/Sub-GHz/subghz_wardriving.fap")
         }
         return Array(Set(paths)).sorted()
+    }
+
+    /// Device paths that can represent one catalog binary, ordered from the local
+    /// Tumoflip route to the current Community Pack path and then explicit historical
+    /// aliases. Hash equality decides which one is authoritative; path spelling alone
+    /// must never create a false missing/diff result.
+    static func candidatePaths(for remotePath: String) -> [String] {
+        let target = targetPath(for: remotePath)
+        var result = [target]
+        result.append(contentsOf: legacyPaths(for: remotePath))
+        var seen = Set<String>()
+        return result.filter {
+            seen.insert(PluginRouteReconciliation.pathIdentity($0)).inserted
+        }
     }
 
     static func remotePath(for archivePath: String) -> String? {
@@ -287,20 +304,26 @@ struct CleanupResult: Equatable {
 struct PluginCatalogCache: Codable, Equatable {
     var tag: String
     var map: [String: String]
+    /// Content identities keyed by stable app ID + pack. Unlike `map`, these keys
+    /// survive a Community Pack category/path move and are used only to migrate an
+    /// existing baseline; route cleanup continues to use the path map and history.
+    var appHashes: [String: String]
     private(set) var retiredRoutes: [String: [String]]
 
     init(
         tag: String,
         map: [String: String],
+        appHashes: [String: String] = [:],
         retiredRoutes: [String: [String]] = [:]
     ) {
         self.tag = tag
         self.map = map
+        self.appHashes = appHashes
         self.retiredRoutes = retiredRoutes.mapValues(Self.normalizedMD5s)
     }
 
     private enum CodingKeys: String, CodingKey {
-        case tag, map
+        case tag, map, appHashes = "app_hashes"
         case retiredRoutes = "retired_routes"
     }
 
@@ -308,10 +331,72 @@ struct PluginCatalogCache: Codable, Equatable {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         tag = try values.decode(String.self, forKey: .tag)
         map = try values.decode([String: String].self, forKey: .map)
+        appHashes = try values.decodeIfPresent(
+            [String: String].self,
+            forKey: .appHashes
+        ) ?? [:]
         retiredRoutes = try values.decodeIfPresent(
             [String: [String]].self,
             forKey: .retiredRoutes
         )?.mapValues(Self.normalizedMD5s) ?? [:]
+    }
+
+    /// Returns the last known content identity for an app, first using the new
+    /// identity index and then falling back to v2 path entries. The fallback is
+    /// accepted only when one unambiguous hash exists for that app ID; two different
+    /// binaries with the same basename fail closed and remain visible for review.
+    func md5(for update: PluginUpdate) -> String? {
+        let identityKey = PluginRouteReconciliation.cacheIdentityKey(for: update)
+        if let value = appHashes[identityKey] { return value }
+        if let value = map[update.remotePath] { return value }
+        let routeIdentity = PluginRouteReconciliation.pathIdentity(update.remotePath)
+        if let value = map.first(where: {
+            PluginRouteReconciliation.pathIdentity($0.key) == routeIdentity
+        })?.value {
+            return value
+        }
+
+        let appID = PluginInstallRouting.appID(for: update.remotePath)
+        let artifactExtension = (update.remotePath as NSString).pathExtension.lowercased()
+        let belongsToArtifact: (String) -> Bool = { path in
+            !path.hasPrefix("appid:") &&
+            PluginInstallRouting.appID(for: path) == appID &&
+            (path as NSString).pathExtension.lowercased() == artifactExtension
+        }
+        let matches = map.compactMap { path, value -> String? in
+            guard belongsToArtifact(path) else { return nil }
+            return value
+        }
+        let unique = Set(matches)
+        if unique.count == 1 { return unique.first }
+
+        // `reconcileRoutes` retires a moved path before the fast diff runs. Keep
+        // that history useful for the first post-move check; otherwise the old
+        // v2 cache would be interpreted as a brand-new app on every path move.
+        let retired = retiredRoutes.compactMap { path, values -> [String]? in
+            belongsToArtifact(path) ? values : nil
+        }.flatMap { $0 }
+        let retiredUnique = Set(retired)
+        if retiredUnique.contains(update.newMD5) { return update.newMD5 }
+        if retiredUnique.count == 1 { return retiredUnique.first }
+        return retiredUnique.sorted().last
+    }
+
+    mutating func record(_ update: PluginUpdate) {
+        map[update.remotePath] = update.newMD5
+        appHashes[PluginRouteReconciliation.cacheIdentityKey(for: update)] = update.newMD5
+    }
+
+    /// Historical paths retained when an immutable catalog moved an artifact. They
+    /// are read-only aliases for verification; deletion still requires the separate
+    /// content-addressed cleanup gate.
+    func retiredAliases(for update: PluginUpdate) -> [String] {
+        let appID = PluginInstallRouting.appID(for: update.remotePath)
+        let artifactExtension = (update.remotePath as NSString).pathExtension.lowercased()
+        return retiredRoutes.keys.filter { path in
+            PluginInstallRouting.appID(for: path) == appID &&
+            (path as NSString).pathExtension.lowercased() == artifactExtension
+        }.sorted()
     }
 
     /// Moves paths removed by the current immutable catalog out of the active
@@ -974,6 +1059,13 @@ enum PluginRouteCleanupExecutor {
 /// release-specific deletion list is trusted: a move needs a unique same-name app in
 /// the current catalog, a retired old route, and exact content identities on device.
 enum PluginRouteReconciliation {
+    /// Stable cache key for a catalog binary. The pack and extension components
+    /// prevent same-basename FAP/FAL artifacts from sharing a baseline.
+    static func cacheIdentityKey(for update: PluginUpdate) -> String {
+        let ext = (update.remotePath as NSString).pathExtension.lowercased()
+        return "appid:\(pathIdentity(update.pack)):\(PluginInstallRouting.appID(for: update.remotePath)).\(ext)"
+    }
+
     static func candidates(
         current: [PluginUpdate],
         retiredRoutes: [String: [String]],
@@ -1663,30 +1755,40 @@ final class PluginUpdater: ObservableObject {
                 saveCache(reconciled)
                 cache = reconciled
             }
-            pendingRouteCleanup = cleanupCandidates(cache: cache)
-            if let cache {
+            if var cache {
                 // Fast path: diff the new pack against what we last reconciled.
                 var result: [PluginUpdate] = []
                 for (path, f) in manifest {
-                    if cache.map[path] != f.newMD5 {
+                    let knownMD5 = cache.md5(for: f)
+                    if knownMD5 != f.newMD5 {
                         var update = PluginUpdate(
                             remotePath: path,
                             name: f.name,
                             category: f.category,
                             pack: f.pack,
                             newMD5: f.newMD5,
-                            oldMD5: cache.map[path],
+                            oldMD5: knownMD5,
                             size: f.size)
                         // New all-the-plugins entries should be reviewed manually; otherwise
                         // a broad pack update can quietly fill the SD with duplicates.
-                        update.selected = cache.map[path] != nil
+                        update.selected = knownMD5 != nil
                         result.append(update)
+                    } else if cache.map[path] != f.newMD5 ||
+                                cache.appHashes[PluginRouteReconciliation.cacheIdentityKey(for: f)] != f.newMD5 {
+                        // The bytes are already accepted, but the catalog moved the
+                        // app or this cache predates the identity index. Persist the
+                        // current path/key so the next release does not rediscover a
+                        // false DIFF.
+                        cache.record(f)
                     }
                 }
+                saveCache(cache)
+                pendingRouteCleanup = cleanupCandidates(cache: cache)
                 updates = sortUpdates(result)
                 phase = updates.isEmpty ? .done("Everything up to date · \(nextTag)") : .idle
             } else {
                 // No baseline yet — let the user choose how to seed it.
+                pendingRouteCleanup = cleanupCandidates(cache: nil)
                 phase = .needsBaseline
             }
             await validateCompatibility()
@@ -1773,6 +1875,37 @@ final class PluginUpdater: ObservableObject {
         return PluginRouteReconciliation.normalizedCandidates(journal + newHistorical)
     }
 
+    /// Reads every known route for one app. The deliberate Tumoflip target remains
+    /// authoritative when it exists; an alias is accepted only when that target is
+    /// missing and its bytes match. Community Pack is free to move a FAP between
+    /// categories, so checking only `targetPath` turns a valid alias installation
+    /// into a false MISSING/DIFF without hiding a genuinely modified target.
+    private func deviceObservation(
+        for update: PluginUpdate,
+        storage: any DeviceFileStore,
+        cache: PluginCatalogCache? = nil
+    ) async throws -> (path: String, md5: String?) {
+        var firstFound: (path: String, md5: String)?
+        var matchingAlias: (path: String, md5: String)?
+        let targetIdentity = PluginRouteReconciliation.pathIdentity(update.targetPath)
+        var candidates = PluginInstallRouting.candidatePaths(for: update.remotePath)
+        candidates.append(contentsOf: cache?.retiredAliases(for: update) ?? [])
+        var seen = Set<String>()
+        for path in candidates where seen.insert(
+            PluginRouteReconciliation.pathIdentity(path)
+        ).inserted {
+            guard let md5 = try await storage.checkedMD5(path) else { continue }
+            if firstFound == nil { firstFound = (path, md5) }
+            if PluginRouteReconciliation.pathIdentity(path) == targetIdentity {
+                return (path, md5)
+            }
+            if md5.lowercased() == update.newMD5.lowercased(), matchingAlias == nil {
+                matchingAlias = (path, md5)
+            }
+        }
+        return matchingAlias ?? firstFound ?? (update.targetPath, nil)
+    }
+
     private func refreshPendingRouteCleanup() {
         pendingRouteCleanup = cleanupCandidates(cache: loadCache())
     }
@@ -1836,11 +1969,13 @@ final class PluginUpdater: ObservableObject {
         }
 
         let storage = activeStorage
+        let cache = loadCache()
         var result: [ProtectedPluginReview] = []
         for f in items {
-            let deviceMD5: String?
+            let observation: (path: String, md5: String?)
             do {
-                deviceMD5 = try await storage.checkedMD5(f.targetPath)
+                observation = try await deviceObservation(
+                    for: f, storage: storage, cache: cache)
             } catch {
                 protectedReviews = sortProtected(items.map {
                     ProtectedPluginReview(
@@ -1863,8 +1998,8 @@ final class PluginUpdater: ObservableObject {
                 category: f.category,
                 pack: f.pack,
                 newMD5: f.newMD5,
-                deviceMD5: deviceMD5,
-                deviceKnown: true,
+                deviceMD5: observation.md5,
+                deviceKnown: observation.md5 != nil,
                 size: f.size))
         }
         protectedReviews = sortProtected(result)
@@ -1874,6 +2009,7 @@ final class PluginUpdater: ObservableObject {
     func scanBaseline() async {
         let channel = activeChannel
         let storage = activeStorage
+        let cache = loadCache()
         guard await fileChannelReady(channel) else {
             phase = .failed("Connect to the Flipper first, or select the SD card over USB.")
             return
@@ -1886,16 +2022,17 @@ final class PluginUpdater: ObservableObject {
                 return
             }
             phase = .scanning(i + 1, items.count)
-            let dev: String?
+            let observation: (path: String, md5: String?)
             do {
-                dev = try await storage.checkedMD5(f.targetPath)
+                observation = try await deviceObservation(
+                    for: f, storage: storage, cache: cache)
             } catch {
                 phase = .failed(error.localizedDescription)
                 return
             }
-            if dev != f.newMD5 {
+            if observation.md5?.lowercased() != f.newMD5.lowercased() {
                 var u = PluginUpdate(remotePath: f.remotePath, name: f.name, category: f.category,
-                                     pack: f.pack, newMD5: f.newMD5, oldMD5: dev, size: f.size)
+                                     pack: f.pack, newMD5: f.newMD5, oldMD5: observation.md5, size: f.size)
                 // Differs-from-pack apps may be YOUR mods, and new pack entries can be
                 // low-value duplicates. Leave both for explicit review.
                 u.selected = false
@@ -1916,6 +2053,9 @@ final class PluginUpdater: ObservableObject {
         cache.reconcileRoutes(current: map)
         cache.tag = tag
         cache.map = map
+        cache.appHashes = allManifest.values.reduce(into: [:]) { hashes, update in
+            hashes[PluginRouteReconciliation.cacheIdentityKey(for: update)] = update.newMD5
+        }
         saveCache(cache)
         pendingRouteCleanup = cleanupCandidates(cache: cache)
         updates = []
@@ -1970,7 +2110,7 @@ final class PluginUpdater: ObservableObject {
         cache.reconcileRoutes(current: allManifest.mapValues(\.newMD5))
         let cacheVerifiedCurrentAtStart = Set(allManifest.compactMap { entry -> String? in
             let (path, update) = entry
-            return cache.map[path] == update.newMD5 ? path : nil
+            return cache.md5(for: update) == update.newMD5 ? path : nil
         })
 
         guard transactionGate.begin() else { return }
@@ -2128,7 +2268,7 @@ final class PluginUpdater: ObservableObject {
 
             if ok {
                 installed.insert(u.remotePath)
-                cache.map[u.remotePath] = u.newMD5
+                cache.record(u)
                 history.insert(InstallRecord(date: Date(), tag: tag, name: u.name,
                                              pack: u.pack, wasNew: u.isNew), at: 0)
             } else if !stoppedMidFile && !protectedSkipped.contains(u.remotePath) {
@@ -2151,7 +2291,7 @@ final class PluginUpdater: ObservableObject {
         // either can change while this transaction is suspended.
         for (path, f) in allManifest where installed.contains(path)
             || cacheVerifiedCurrentAtStart.contains(path) {
-            cache.map[path] = f.newMD5
+            cache.record(f)
         }
         cache.tag = tag
         saveCache(cache)
@@ -2346,6 +2486,7 @@ final class PluginUpdater: ObservableObject {
             return
         }
         let storage = activeStorage
+        let cache = loadCache()
         verifyResult = nil
         let items = allManifest.values.sorted { $0.remotePath < $1.remotePath }
         var bad: [PluginUpdate] = []
@@ -2355,14 +2496,15 @@ final class PluginUpdater: ObservableObject {
             if Task.isCancelled { phase = .idle; return }
             phase = .verifying(i + 1, items.count)
             guard await fileChannelReady(channel) else { phase = .failed("Disconnected during verify"); return }
-            let dev: String?
+            let observation: (path: String, md5: String?)
             do {
-                dev = try await storage.checkedMD5(f.targetPath)
+                observation = try await deviceObservation(
+                    for: f, storage: storage, cache: cache)
             } catch {
                 phase = .failed(error.localizedDescription)
                 return
             }
-            if dev == f.newMD5 {
+            if observation.md5?.lowercased() == f.newMD5.lowercased() {
                 verified += 1
             } else {
                 var update = PluginUpdate(
@@ -2371,11 +2513,11 @@ final class PluginUpdater: ObservableObject {
                     category: f.category,
                     pack: f.pack,
                     newMD5: f.newMD5,
-                    oldMD5: dev,
+                    oldMD5: observation.md5,
                     size: f.size)
-                update.selected = dev != nil
+                update.selected = observation.md5 != nil
                 bad.append(update)
-                failures.append("\(f.name): \(dev == nil ? "missing" : "md5 mismatch")")
+                failures.append("\(f.name): \(observation.md5 == nil ? "missing" : "md5 mismatch")")
             }
         }
         verifyResult = VerifyResult(kind: .onDevice, tag: tag, verified: verified, failed: failures)

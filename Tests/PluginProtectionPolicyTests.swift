@@ -320,6 +320,76 @@ final class PluginProtectionPolicyTests: XCTestCase {
             unprotectedBuiltIns: []))
     }
 
+    func testCandidatePathsPreferTumoflipRouteThenCommunityAlias() {
+        let remotePath = "/ext/apps/GPIO/weather_station.fap"
+        XCTAssertEqual(
+            PluginInstallRouting.candidatePaths(for: remotePath),
+            [
+                "/ext/apps/Module One/Sub-GHz/weather_station.fap",
+                remotePath,
+            ]
+        )
+    }
+
+    func testCacheMatchesMovedCatalogEntryByAppIDAndMigratesIdentityIndex() {
+        let oldPath = "/ext/apps/Old Category/weather_station.fap"
+        let newPath = "/ext/apps/New Category/weather_station.fap"
+        let md5 = "67067213b636a3a5f3bba182390c0bde"
+        let update = routeUpdate("weather_station", remotePath: newPath, md5: md5)
+        var cache = PluginCatalogCache(tag: "previous", map: [oldPath: md5])
+        cache.reconcileRoutes(current: [newPath: md5])
+
+        XCTAssertEqual(
+            cache.md5(for: update),
+            md5,
+            "A category move must not become a false new/changed app.")
+        cache.record(update)
+        XCTAssertEqual(cache.map[newPath], md5)
+        XCTAssertEqual(
+            cache.appHashes[PluginRouteReconciliation.cacheIdentityKey(for: update)],
+            md5
+        )
+    }
+
+    @MainActor
+    func testBaselineScanAcceptsByteIdenticalCommunityAlias() async throws {
+        let suite = "PluginAliasScanTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let data = makeFAP(seed: 0xC7)
+        let remotePath = "/ext/apps/GPIO/weather_station.fap"
+        let archive = try makePluginArchive(entries: [
+            "base_pack_build/artifacts-base/GPIO/weather_station.fap": data,
+        ])
+        let extra = try makePluginArchive(entries: [:])
+        let baseAsset = URL(string: "https://example.invalid/alias-base.zip")!
+        let extraAsset = URL(string: "https://example.invalid/alias-extra.zip")!
+        let md5 = self.md5(data)
+        let storage = PluginRouteMemoryStore(hashes: [remotePath: md5])
+        let updater = PluginUpdater(persistenceDefaults: defaults)
+        updater.configureCatalogSourceForTesting(
+            tag: "alias-pack",
+            assets: [
+                "all-the-apps-base.zip": baseAsset,
+                "all-the-apps-extra.zip": extraAsset,
+            ],
+            downloads: [baseAsset: archive, extraAsset: extra],
+            storage: storage
+        )
+
+        await updater.check()
+        XCTAssertEqual(updater.phase, .needsBaseline)
+        await updater.scanBaseline()
+
+        XCTAssertTrue(
+            updater.updates.isEmpty,
+            "A matching alias hash must be accepted even when the local target path is absent.")
+
+        try? FileManager.default.removeItem(at: archive)
+        try? FileManager.default.removeItem(at: extra)
+    }
+
     func testLegacyCommunityAppsAreProtectedReplacements() {
         let replacements: [(name: String, remote: String, target: String)] = [
             (
