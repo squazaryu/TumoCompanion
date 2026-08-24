@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.10.36",
+      "version": "1.10.37",
       "versionDate": "2026-08-24",
-      "versionDescription": "Community Pack reconciliation and protected-app routing\n\n- matches Community Pack apps by stable identity instead of category or path\n- recognizes historical aliases after Community Pack moves\n- keeps protected review and cleanup hash-verified\n- prevents false missing/DIFF states without reinstalling FAPs\n\nNo firmware changes are included in this app release.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.36/TumoCompanion-unsigned.ipa",
-      "size": 30011409,
+      "versionDescription": "TumoCompanion 1.10.37 adds an independent FW Packages baseline catalog. Stable catalogs are now selected by channel, API major, and hardware target instead of being pinned to one firmware release; firmware-owned FAPs remain reference-only and are never reinstalled as package overlays.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.37/TumoCompanion-unsigned.ipa",
+      "size": 30011613,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.10.37",
+          "date": "2026-08-24",
+          "localizedDescription": "TumoCompanion 1.10.37 adds an independent FW Packages baseline catalog. Stable catalogs are now selected by channel, API major, and hardware target instead of being pinned to one firmware release; firmware-owned FAPs remain reference-only and are never reinstalled as package overlays.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.37/TumoCompanion-unsigned.ipa",
+          "size": 30011613,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.10.36",
           "date": "2026-08-24",
