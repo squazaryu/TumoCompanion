@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.10.35",
-      "versionDate": "2026-08-22",
-      "versionDescription": "Adds a separate Sync catalog to Flipper action for FW Packages. It refreshes the verified catalog snapshot even when every package is current, without downloading or reinstalling FAPs and without changing install history.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.35/TumoCompanion-unsigned.ipa",
-      "size": 29994763,
+      "version": "1.10.36",
+      "versionDate": "2026-08-24",
+      "versionDescription": "Community Pack reconciliation and protected-app routing\n\n- matches Community Pack apps by stable identity instead of category or path\n- recognizes historical aliases after Community Pack moves\n- keeps protected review and cleanup hash-verified\n- prevents false missing/DIFF states without reinstalling FAPs\n\nNo firmware changes are included in this app release.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.36/TumoCompanion-unsigned.ipa",
+      "size": 30011409,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.10.36",
+          "date": "2026-08-24",
+          "localizedDescription": "Community Pack reconciliation and protected-app routing\n\n- matches Community Pack apps by stable identity instead of category or path\n- recognizes historical aliases after Community Pack moves\n- keeps protected review and cleanup hash-verified\n- prevents false missing/DIFF states without reinstalling FAPs\n\nNo firmware changes are included in this app release.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.36/TumoCompanion-unsigned.ipa",
+          "size": 30011409,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.10.35",
           "date": "2026-08-22",
