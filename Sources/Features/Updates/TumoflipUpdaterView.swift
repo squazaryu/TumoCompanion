@@ -315,9 +315,9 @@ struct TumoflipUpdaterView: View {
         let revision = option.revision.map { String(format: "%03d", $0) } ?? "legacy"
         let suffix = option.repository.role == .legacy ? " · legacy" : ""
         if let date = option.updatedAt {
-            return "Rev (revision)(suffix) · (date.formatted(date: .abbreviated, time: .omitted))"
+            return "Rev \(revision)\(suffix) · \(date.formatted(date: .abbreviated, time: .omitted))"
         }
-        return "Rev (revision)(suffix)"
+        return "Rev \(revision)\(suffix)"
     }
 
     private func firmwareCompatibilityDisplay(_ manifest: TumoflipManifest) -> String {
