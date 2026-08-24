@@ -181,6 +181,7 @@ struct TumoflipCatalogSnapshot {
             "CatalogChannel: \(selection.identity.catalogChannel ?? "legacy")",
             "CatalogRevision: \(selection.identity.catalogRevision.map(String.init) ?? "0")",
             "CatalogScope: \(scope)",
+            "CatalogSelection: immutable-history",
             "ManifestReleaseId: \(selection.identity.manifestReleaseID)",
             "PackageReleaseId: \(selection.identity.packageReleaseID)",
             "CatalogSourceFW: \(sourceManifest.firmware.version)",
@@ -236,6 +237,7 @@ final class TumoflipUpdater: ObservableObject {
     @Published private(set) var manifest: TumoflipManifest?
     @Published private(set) var releaseTag = ""
     @Published private(set) var packageRevisionDate: Date?
+    @Published private(set) var availableCatalogOptions: [TumoflipPackageCatalogOption] = []
     @Published private(set) var hasPackageZip = false
     @Published private(set) var groupStatus: [String: TumoflipInstaller.GroupStatus] = [:]
     @Published private(set) var fileStatus: [String: TumoflipInstaller.FileStatus] = [:]
@@ -266,8 +268,11 @@ final class TumoflipUpdater: ObservableObject {
     private let transactionGate = TumoflipTransactionGate()
 
     private var packageZipURL: URL?
+    private var expectedArchiveSHA256: String?
     private var selectedCatalogIdentity: TumoflipPackageCatalogSelection.Identity?
     private var selectedCatalogRepository: TumoflipPackageCatalogRepository?
+    private var catalogSelections: [TumoflipPackageCatalogSelection] = []
+    private var requestedCatalogRevision: Int?
     private let packageCatalogClient: TumoflipPackageCatalogClient
 
     /// Resolve the catalog's declared install surface. Deltas expose only their
@@ -331,6 +336,14 @@ final class TumoflipUpdater: ObservableObject {
         return String(identity.prefix(10))
     }
 
+    var selectedCatalogRevision: Int? { selectedCatalogIdentity?.catalogRevision }
+
+    var canRollbackCatalog: Bool {
+        availableCatalogOptions.contains { option in
+            option.revision != nil && option.revision != selectedCatalogRevision
+        }
+    }
+
     var firmwareFlashUnchanged: Bool {
         manifest?.packageRelease?.firmwareFlashUnchanged == true
     }
@@ -363,13 +376,34 @@ final class TumoflipUpdater: ObservableObject {
     }
 
     func setManualChannelOverride(_ channel: TumoflipFirmwareChannel) {
+        requestedCatalogRevision = nil
         manualChannelOverride = channel
         firmwareRoute = TumoflipFirmwareRouter.route(identity: deviceIdentity, manualOverride: manualChannelOverride)
     }
 
     func clearManualChannelOverride() {
+        requestedCatalogRevision = nil
         manualChannelOverride = nil
         firmwareRoute = TumoflipFirmwareRouter.route(identity: deviceIdentity, manualOverride: nil)
+    }
+
+    /// Select an immutable catalog revision from the history list. No files are
+    /// changed until the normal Install action is confirmed; the subsequent live
+    /// recheck pins the same revision, so selecting an older package is a real
+    /// rollback rather than an accidental refresh back to latest.
+    func selectCatalogRevision(_ revision: Int?) async {
+        requestedCatalogRevision = revision
+        guard let selection = catalogSelections.first(where: { $0.revision == revision }) else {
+            await check()
+            return
+        }
+        do {
+            try adoptCatalogSelection(selection)
+            await refreshStatus()
+            phase = .ready
+        } catch {
+            phase = .failed(friendly(error))
+        }
     }
 
     /// Overall badge: any installed group out of date → Update; else any up to date → Up
@@ -556,7 +590,7 @@ final class TumoflipUpdater: ObservableObject {
         phase = .checking
         do {
             await refreshRoutingIdentity()
-            let selection = try await packageCatalogClient.latest(
+            let selections = try await packageCatalogClient.available(
                 for: firmwareRoute.channel,
                 installedVersion: packageIdentityVersion,
                 installedAPI: deviceIdentity?.firmwareAPI,
@@ -564,6 +598,24 @@ final class TumoflipUpdater: ObservableObject {
                 installedCommit: deviceIdentity?.firmwareCommit,
                 installedCommitDirty: deviceIdentity?.firmwareCommitDirty
             )
+            catalogSelections = selections
+            availableCatalogOptions = selections.map { selection in
+                TumoflipPackageCatalogOption(
+                    id: selection.identity.releaseTag + ":" + selection.identity.manifestReleaseID,
+                    repository: selection.release.repository,
+                    tag: selection.release.tag,
+                    revision: selection.revision,
+                    updatedAt: selection.manifestUpdatedAt,
+                    isSelected: selection.revision == requestedCatalogRevision
+                )
+            }
+            let selection = selections.first(where: { $0.revision == requestedCatalogRevision }) ?? selections.first
+            guard let selection else {
+                throw TumoflipPackageCatalogError.noMatchingRelease(
+                    firmwareRoute.channel,
+                    packageIdentityVersion
+                )
+            }
             try adoptCatalogSelection(selection)
             await refreshStatus()
             phase = .ready
@@ -616,7 +668,8 @@ final class TumoflipUpdater: ObservableObject {
                 installedCommit: deviceIdentity?.firmwareCommit,
                 installedCommitDirty: deviceIdentity?.firmwareCommitDirty,
                 forceRemote: true,
-                requiredRepository: selectedCatalogRepository
+                requiredRepository: selectedCatalogRepository,
+                requestedRevision: requestedCatalogRevision
             )
             let sourceManifest = try validatedCatalogManifest(selection)
             let fs = activeFS()
@@ -673,6 +726,7 @@ final class TumoflipUpdater: ObservableObject {
         packageRevisionDate = selection.manifestUpdatedAt
         manifest = sourceManifest
         packageZipURL = selection.release.asset("tumoflip-packages.zip")?.url
+        expectedArchiveSHA256 = selection.expectedArchiveSHA256
         hasPackageZip = packageZipURL != nil
     }
 
@@ -735,7 +789,8 @@ final class TumoflipUpdater: ObservableObject {
                 installedCommit: deviceIdentity?.firmwareCommit,
                 installedCommitDirty: deviceIdentity?.firmwareCommitDirty,
                 forceRemote: true,
-                requiredRepository: selectedCatalogRepository
+                requiredRepository: selectedCatalogRepository,
+                requestedRevision: requestedCatalogRevision
             )
             guard liveSelection.identity == selectedCatalogIdentity,
                   liveSelection.manifest == sourceManifest else {
@@ -1232,6 +1287,12 @@ final class TumoflipUpdater: ObservableObject {
         )
         request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
         let (tmp, _) = try await URLSession.shared.download(for: request)
+        if let expectedArchiveSHA256 {
+            let archiveData = try Data(contentsOf: tmp)
+            guard TumoflipHash.sha256(archiveData) == expectedArchiveSHA256 else {
+                throw TumoflipInstallError.hashMismatch("tumoflip-packages.zip")
+            }
+        }
         let source = try ZipPackageSource.load(zipAt: tmp)
         cachedSource = (manifest.releaseId, source)
         return source
