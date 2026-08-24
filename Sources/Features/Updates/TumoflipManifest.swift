@@ -128,6 +128,9 @@ struct TumoflipManifest: Codable, Equatable {
 
     struct PackageRelease: Codable, Equatable {
         enum CatalogInstallScope: String, Codable, Equatable {
+            /// A complete firmware-owned catalog with no package-managed overlays.
+            /// Baselines are compatible by channel/API/target, not one exact firmware.
+            case baseline
             case delta
             case firmwareSnapshot
         }
@@ -145,9 +148,9 @@ struct TumoflipManifest: Codable, Equatable {
         let catalogChannel: String?
         let catalogRevision: Int?
         let catalogReleaseTag: String?
-        /// Producer-declared package surface. Delta releases manage only their
-        /// cumulative source allowlist. Firmware snapshots manage every package in
-        /// the manifest, but only on the exact firmware build they were copied from.
+        /// Producer-declared package surface. Baselines manage no files, delta
+        /// releases manage only their cumulative source allowlist, and firmware
+        /// snapshots manage every package only on the exact firmware build copied.
         let catalogInstallScope: CatalogInstallScope?
         let compatibleReleases: [CompatibleRelease]?
         /// Exact package archive sources changed by this independent catalog revision.
@@ -328,7 +331,7 @@ struct TumoflipManifest: Codable, Equatable {
     /// firmware snapshot intentionally exposes its complete package surface; catalog
     /// selection and install compatibility gate that surface to the source firmware.
     func packageManagedManifest() -> TumoflipManifest {
-        guard let allowed = independentDeltaSources else {
+        guard let allowed = independentManagedSources else {
             return self
         }
         let filteredPackages = packages.mapValues { files in
@@ -372,12 +375,13 @@ struct TumoflipManifest: Codable, Equatable {
         }
     }
 
-    /// Returns the separately-presented firmware-owned baseline for a delta. Exact
-    /// firmware snapshots and old firmware-bound manifests intentionally have no
-    /// split surface: their complete manifest is the install surface.
+    /// Returns the separately-presented firmware-owned baseline for an independent
+    /// catalog. Baselines expose the complete reference surface while managing no
+    /// files; deltas expose the complement of their cumulative allowlist. Exact
+    /// firmware snapshots and old firmware-bound manifests have no split surface.
     func packageSurface() -> PackageSurface {
         let managed = packageManagedManifest()
-        guard let allowed = independentDeltaSources else {
+        guard let allowed = independentManagedSources else {
             return PackageSurface(managed: managed, firmwareOwned: [:])
         }
         return PackageSurface(
@@ -388,15 +392,20 @@ struct TumoflipManifest: Codable, Equatable {
         )
     }
 
-    private var independentDeltaSources: Set<String>? {
-        guard let release = packageRelease,
-              release.isIndependentCatalog,
-              release.resolvedCatalogInstallScope(
-                  manifestFirmwareVersion: firmware.version
-              ) == .delta else {
+    private var independentManagedSources: Set<String>? {
+        guard let release = packageRelease, release.isIndependentCatalog else {
             return nil
         }
-        return Set(release.catalogModifiedTargets ?? release.overlayTargets ?? [])
+        switch release.resolvedCatalogInstallScope(
+            manifestFirmwareVersion: firmware.version
+        ) {
+        case .baseline:
+            return []
+        case .delta:
+            return Set(release.catalogModifiedTargets ?? release.overlayTargets ?? [])
+        case .firmwareSnapshot:
+            return nil
+        }
     }
 
     var isFirmwareSnapshotCatalog: Bool {
@@ -406,6 +415,15 @@ struct TumoflipManifest: Codable, Equatable {
         return release.resolvedCatalogInstallScope(
             manifestFirmwareVersion: firmware.version
         ) == .firmwareSnapshot
+    }
+
+    var isIndependentBaselineCatalog: Bool {
+        guard let release = packageRelease, release.isIndependentCatalog else {
+            return false
+        }
+        return release.resolvedCatalogInstallScope(
+            manifestFirmwareVersion: firmware.version
+        ) == .baseline
     }
 }
 
@@ -538,6 +556,13 @@ extension TumoflipManifest {
                     guard packageRelease.hasFirmwareSnapshotIdentity(
                         manifestFirmwareVersion: firmware.version
                     ) else {
+                        throw TumoflipManifestError.invalidPackageRelease(packageRelease.id)
+                    }
+                } else if resolvedScope == .baseline {
+                    let baselineSources = packageRelease.catalogModifiedTargets ??
+                        packageRelease.overlayTargets ?? []
+                    guard baselineSources.isEmpty,
+                          packageRelease.compatibleReleases?.isEmpty != false else {
                         throw TumoflipManifestError.invalidPackageRelease(packageRelease.id)
                     }
                 } else if packageRelease.catalogInstallScope == .delta {

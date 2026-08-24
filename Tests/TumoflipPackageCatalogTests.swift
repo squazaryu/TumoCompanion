@@ -166,6 +166,33 @@ final class TumoflipPackageCatalogTests: XCTestCase {
         }
     }
 
+    func testIndependentBaselineSelectsAcrossStableFirmwareVersions() async throws {
+        let tag = "fw-packages-stable-004"
+        let client = makeClient(
+            primaryPages: [releasesData([release(id: 4, tag: tag)])],
+            manifests: [
+                manifestURL(tag): manifest(
+                    tag: tag,
+                    revision: 4,
+                    api: "88.4",
+                    firmwareVersion: "t-flppr-fw-007",
+                    catalogInstallScope: "baseline"
+                ),
+            ]
+        )
+
+        let selected = try await client.latest(
+            for: .stable,
+            installedVersion: "t-flppr-fw-008",
+            installedAPI: "88.4",
+            installedTarget: 7
+        )
+
+        XCTAssertEqual(selected.release.tag, tag)
+        XCTAssertTrue(selected.manifest.isIndependentBaselineCatalog)
+        XCTAssertTrue(selected.manifest.packageManagedManifest().packages.values.allSatisfy(\.isEmpty))
+    }
+
     func testFirmwareSnapshotRejectsWrongOrDirtyBuild() async throws {
         let tag = "fw-packages-stable-003"
         let commit = "8ab2ccdf7a34bbf3e07f2d4cbd459de1c6de8758"
@@ -550,7 +577,8 @@ final class TumoflipPackageCatalogTests: XCTestCase {
         api: String = "88.0",
         firmwareVersion explicitFirmwareVersion: String? = nil,
         snapshotCommit: String? = nil,
-        snapshotExplicitScope: Bool = true
+        snapshotExplicitScope: Bool = true,
+        catalogInstallScope: String? = nil
     ) -> Data {
         let channel = tag.contains("-stable-") ? "stable" : "dev"
         let firmwareVersion = explicitFirmwareVersion ??
@@ -576,6 +604,14 @@ final class TumoflipPackageCatalogTests: XCTestCase {
             packageRelease["target_firmware_commit"] = snapshotCommit
             packageRelease["target_source_commit"] = snapshotCommit
             packageRelease["target_release_id"] = String(repeating: "e", count: 64)
+        }
+        if let catalogInstallScope {
+            packageRelease["catalog_install_scope"] = catalogInstallScope
+            if catalogInstallScope == "baseline" {
+                packageRelease["catalog_modified_targets"] = []
+                packageRelease["overlay_targets"] = []
+                packageRelease["compatible_releases"] = []
+            }
         }
         let object: [String: Any] = [
             "schema": 2,

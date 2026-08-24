@@ -215,7 +215,9 @@ struct TumoflipUpdaterView: View {
                         Label(
                             manifest.isFirmwareSnapshotCatalog
                                 ? "Exact firmware package snapshot. Missing or changed bundled files can be reinstalled; firmware flashing is unchanged."
-                                : "Apps-only package update. Firmware flashing is unchanged.",
+                                : manifest.isIndependentBaselineCatalog
+                                    ? "Independent baseline catalog. Firmware-owned files are reference-only; no FAP files are managed here."
+                                    : "Apps-only package update. Firmware flashing is unchanged.",
                             systemImage: "checkmark.shield.fill"
                         )
                         .font(.caption2)
