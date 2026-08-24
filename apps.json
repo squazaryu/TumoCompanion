@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.10.37",
+      "version": "1.10.38",
       "versionDate": "2026-08-24",
-      "versionDescription": "TumoCompanion 1.10.37 adds an independent FW Packages baseline catalog. Stable catalogs are now selected by channel, API major, and hardware target instead of being pinned to one firmware release; firmware-owned FAPs remain reference-only and are never reinstalled as package overlays.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.37/TumoCompanion-unsigned.ipa",
-      "size": 30011613,
+      "versionDescription": "Independent FW Packages catalog lifecycle\n\n- Package catalogs are now independent from firmware release labels.\n- Choose the newest compatible revision or explicitly roll back to a retained stable/dev revision.\n- Validate catalog, manifest, and archive SHA-256 digests before installation.\n- Fail closed on malformed or stale catalog metadata.\n- Firmware-owned FAPs remain reference-only and are never reinstalled as overlays.\n\nNo firmware or existing FAP release assets were changed.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.38/TumoCompanion-unsigned.ipa",
+      "size": 30085561,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.10.38",
+          "date": "2026-08-24",
+          "localizedDescription": "Independent FW Packages catalog lifecycle\n\n- Package catalogs are now independent from firmware release labels.\n- Choose the newest compatible revision or explicitly roll back to a retained stable/dev revision.\n- Validate catalog, manifest, and archive SHA-256 digests before installation.\n- Fail closed on malformed or stale catalog metadata.\n- Firmware-owned FAPs remain reference-only and are never reinstalled as overlays.\n\nNo firmware or existing FAP release assets were changed.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.38/TumoCompanion-unsigned.ipa",
+          "size": 30085561,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.10.37",
           "date": "2026-08-24",
