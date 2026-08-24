@@ -514,7 +514,7 @@ struct TumoflipPackageCatalogClient {
         installedTarget: Int?,
         forceRemote: Bool
     ) async -> [TumoflipPackageCatalogSelection] {
-        guard let index = await loadCatalogIndex(forceRemote: forceRemote) else { return [] }
+        guard let index = try? await loadCatalogIndex(forceRemote: forceRemote) else { return [] }
         let historicalTags = Set(index.releases(for: channel, api: installedAPI, target: installedTarget)
             .filter { $0.state == .legacy }
             .map(\.tag))
@@ -547,12 +547,23 @@ struct TumoflipPackageCatalogClient {
         return output
     }
 
-    private func loadCatalogIndex(forceRemote: Bool) async -> TumoflipCatalogIndex? {
-        guard let indexFetch,
-              let data = try? await indexFetch(forceRemote),
-              let index = try? JSONDecoder().decode(TumoflipCatalogIndex.self, from: data),
-              (try? index.validate()) != nil else { return nil }
-        return index
+    private func loadCatalogIndex(forceRemote: Bool) async throws -> TumoflipCatalogIndex? {
+        guard let indexFetch else { return nil }
+        let data: Data
+        do {
+            data = try await indexFetch(forceRemote)
+        } catch {
+            // A transport failure is a migration/network condition. Keep the
+            // established release API fallback; malformed index data is terminal.
+            return nil
+        }
+        do {
+            let index = try JSONDecoder().decode(TumoflipCatalogIndex.self, from: data)
+            try index.validate()
+            return index
+        } catch {
+            throw TumoflipPackageCatalogError.malformedPrimary("catalog index is invalid")
+        }
     }
 
     private func selectLegacyRevision(
@@ -569,7 +580,7 @@ struct TumoflipPackageCatalogClient {
             throw TumoflipPackageCatalogError.noMatchingRelease(channel, nil)
         }
         let raw: TumoflipManifest
-        let evidence = await loadCatalogIndex(forceRemote: forceRemote)?.channels[channel.rawValue]?.releases
+        let evidence = try await loadCatalogIndex(forceRemote: forceRemote)?.channels[channel.rawValue]?.releases
             .first(where: { $0.revision == revision })
         do {
             raw = try await loadManifest(
@@ -747,19 +758,20 @@ struct TumoflipPackageCatalogClient {
         installedAPI: String?,
         installedTarget: Int?,
         forceRemote: Bool
-    ) async throws -> [TumoflipPackageCatalogRelease] {
-        guard let indexFetch else { return releases }
-        guard let data = try? await indexFetch(forceRemote),
-              let index = try? JSONDecoder().decode(TumoflipCatalogIndex.self, from: data),
-              (try? index.validate()) != nil else {
-            return releases
+    ) async throws -> (releases: [TumoflipPackageCatalogRelease], evidence: [String: TumoflipCatalogIndex.Release]) {
+        guard let index = try await loadCatalogIndex(forceRemote: forceRemote) else {
+            return (releases, [:])
         }
-        let allowed = Set(index.releases(
+        let indexed = index.releases(
             for: channel,
             api: installedAPI,
             target: installedTarget
-        ).map(\.tag))
-        return releases.filter { allowed.contains($0.tag) }
+        )
+        let allowed = Set(indexed.map(\.tag))
+        return (
+            releases.filter { allowed.contains($0.tag) },
+            Dictionary(uniqueKeysWithValues: indexed.map { ($0.tag, $0) })
+        )
     }
 
     private func revision(from tag: String, channel: TumoflipFirmwareChannel) -> Int? {

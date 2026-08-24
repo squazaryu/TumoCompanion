@@ -55,6 +55,35 @@ final class TumoflipPackageCatalogTests: XCTestCase {
         }
     }
 
+    func testMalformedCatalogIndexDoesNotFallBackToReleaseAPI() async throws {
+        let tag = "fw-packages-dev-009"
+        let client = makeClient(
+            primaryPages: [releasesData([release(id: 9, tag: tag)])],
+            legacyPages: [releasesData([release(id: 8, tag: "fw-packages-dev-008")])],
+            manifests: [
+                manifestURL(tag): manifest(tag: tag, revision: 9),
+                manifestURL("fw-packages-dev-008"): manifest(
+                    tag: "fw-packages-dev-008", revision: 8
+                ),
+            ],
+            catalogIndex: Data("{\"schema\":99}".utf8)
+        )
+
+        do {
+            _ = try await client.latest(
+                for: .dev,
+                installedVersion: "t-dev-004-015",
+                installedAPI: "88.0",
+                installedTarget: 7
+            )
+            XCTFail("Malformed index must not be bypassed through the release API")
+        } catch let error as TumoflipPackageCatalogError {
+            guard case .malformedPrimary = error else {
+                return XCTFail("Unexpected error: \(error)")
+            }
+        }
+    }
+
     func testAvailableReturnsImmutableHistoryNewestFirst() async throws {
         let newer = release(id: 9, tag: "fw-packages-dev-009")
         let older = release(id: 8, tag: "fw-packages-dev-008")
