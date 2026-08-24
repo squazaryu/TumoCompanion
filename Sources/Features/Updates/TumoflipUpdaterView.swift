@@ -194,11 +194,39 @@ struct TumoflipUpdaterView: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
+                if !updater.availableCatalogOptions.isEmpty {
+                    Menu {
+                        Button {
+                            Task { await updater.selectCatalogRevision(nil) }
+                        } label: {
+                            Label("Automatic (latest compatible)", systemImage: "wand.and.stars")
+                        }
+                        ForEach(updater.availableCatalogOptions) { option in
+                            Button {
+                                Task { await updater.selectCatalogRevision(option.revision) }
+                            } label: {
+                                Label(catalogOptionLabel(option), systemImage: option.revision == updater.selectedCatalogRevision ? "checkmark.circle.fill" : "clock.arrow.circlepath")
+                            }
+                        }
+                    } label: {
+                        Label("Choose package revision", systemImage: "clock.arrow.circlepath")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .accessibilityIdentifier("fw-packages-revision-picker")
+                }
                 Divider().opacity(0.4)
                 metadataRow("Installed", updater.deviceIdentity?.firmwareVersion ?? "Unknown")
                 metadataRow("Origin", updater.deviceIdentity?.originFork ?? "Unknown")
                 metadataRow("Detected", updater.firmwareRoute.detectedChannel?.packageLabel ?? "Unknown")
                 metadataRow("Selected", updater.firmwareRoute.channel.packageLabel)
+                Label(
+                    "Catalog history is independent of the firmware release. Compatibility is checked by channel, API major and hardware target.",
+                    systemImage: "link.badge.plus"
+                )
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
                 if let manifest = updater.manifest {
                     metadataRow(
                         "Compatible FW",
@@ -210,6 +238,18 @@ struct TumoflipUpdaterView: View {
                         packageRevisionDisplay,
                         identifier: "fw-packages-revision"
                     )
+                    if let selected = updater.selectedCatalogRevision,
+                       let current = updater.availableCatalogOptions.compactMap(\.revision).max(),
+                       selected < current {
+                        Label(
+                            "Rollback revision selected. Install will restore this immutable package snapshot; firmware is unchanged.",
+                            systemImage: "arrow.uturn.backward.circle.fill"
+                        )
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("fw-packages-rollback-selected")
+                    }
                     metadataRow("Package API", manifest.firmware.api)
                     if updater.firmwareFlashUnchanged {
                         Label(
@@ -269,6 +309,15 @@ struct TumoflipUpdaterView: View {
             return updater.packageRevision
         }
         return "\(updater.packageRevision) · \(date.formatted(date: .abbreviated, time: .omitted))"
+    }
+
+    private func catalogOptionLabel(_ option: TumoflipPackageCatalogOption) -> String {
+        let revision = option.revision.map { String(format: "%03d", $0) } ?? "legacy"
+        let suffix = option.repository.role == .legacy ? " · legacy" : ""
+        if let date = option.updatedAt {
+            return "Rev (revision)(suffix) · (date.formatted(date: .abbreviated, time: .omitted))"
+        }
+        return "Rev (revision)(suffix)"
     }
 
     private func firmwareCompatibilityDisplay(_ manifest: TumoflipManifest) -> String {

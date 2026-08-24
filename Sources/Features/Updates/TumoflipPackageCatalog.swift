@@ -62,6 +62,22 @@ struct TumoflipPackageCatalogSelection: Equatable {
             catalogRevision: manifest.packageRelease?.catalogRevision
         )
     }
+
+    var revision: Int? {
+        if let catalogRevision = identity.catalogRevision { return catalogRevision }
+        let parts = release.tag.split(separator: "-")
+        guard let suffix = parts.last, suffix.count == 3 else { return nil }
+        return Int(suffix)
+    }
+}
+
+struct TumoflipPackageCatalogOption: Identifiable, Equatable {
+    let id: String
+    let repository: TumoflipPackageCatalogRepository
+    let tag: String
+    let revision: Int?
+    let updatedAt: Date?
+    let isSelected: Bool
 }
 
 enum TumoflipPackageCatalogError: LocalizedError, Equatable {
@@ -98,6 +114,7 @@ struct TumoflipPackageCatalogClient {
         _ forceRemote: Bool
     ) async throws -> Data
     typealias AssetFetch = @Sendable (_ url: URL, _ forceRemote: Bool) async throws -> Data
+    typealias IndexFetch = @Sendable (_ forceRemote: Bool) async throws -> Data
 
     private static let perPage = 100
     private static let maximumPages = 20
@@ -106,17 +123,20 @@ struct TumoflipPackageCatalogClient {
     let legacy: TumoflipPackageCatalogRepository
     let apiFetch: APIFetch
     let assetFetch: AssetFetch
+    let indexFetch: IndexFetch?
 
     init(
         primary: TumoflipPackageCatalogRepository = .primary,
         legacy: TumoflipPackageCatalogRepository = .legacy,
         apiFetch: @escaping APIFetch,
-        assetFetch: @escaping AssetFetch
+        assetFetch: @escaping AssetFetch,
+        indexFetch: IndexFetch? = nil
     ) {
         self.primary = primary
         self.legacy = legacy
         self.apiFetch = apiFetch
         self.assetFetch = assetFetch
+        self.indexFetch = indexFetch
     }
 
     static func live() -> Self {
@@ -153,11 +173,34 @@ struct TumoflipPackageCatalogClient {
                     throw URLError(.badServerResponse)
                 }
                 return data
+            },
+            indexFetch: { forceRemote in
+                let url = URL(string: "https://raw.githubusercontent.com/squazaryu/tumoflip-fw-packages/main/catalog-index.json")!
+                var request = URLRequest(
+                    url: url,
+                    cachePolicy: forceRemote
+                        ? .reloadIgnoringLocalAndRemoteCacheData
+                        : .reloadIgnoringLocalCacheData,
+                    timeoutInterval: 30
+                )
+                if forceRemote {
+                    request.setValue("no-cache, no-store, max-age=0", forHTTPHeaderField: "Cache-Control")
+                    request.setValue("no-cache", forHTTPHeaderField: "Pragma")
+                }
+                let (data, response) = try await URLSession.shared.data(for: request)
+                guard let http = response as? HTTPURLResponse,
+                      (200..<300).contains(http.statusCode) else {
+                    throw URLError(.badServerResponse)
+                }
+                return data
             }
         )
     }
 
-    func latest(
+    /// Returns every compatible immutable catalog revision, newest first. Auto
+    /// mode uses the first result; the UI can select any other result for a
+    /// deterministic rollback without pretending that it is a firmware update.
+    func available(
         for channel: TumoflipFirmwareChannel,
         installedVersion: String?,
         installedAPI: String? = nil,
@@ -165,14 +208,23 @@ struct TumoflipPackageCatalogClient {
         installedCommit: String? = nil,
         installedCommitDirty: Bool? = nil,
         forceRemote: Bool = false,
-        requiredRepository: TumoflipPackageCatalogRepository? = nil
-    ) async throws -> TumoflipPackageCatalogSelection {
+        requiredRepository: TumoflipPackageCatalogRepository? = nil,
+        requestedRevision: Int? = nil
+    ) async throws -> [TumoflipPackageCatalogSelection] {
         if let requiredRepository {
-            let releases = try await releases(
-                in: requiredRepository,
-                forceRemote: forceRemote
-            )
-            return try await select(
+            let releases = try await releases(in: requiredRepository, forceRemote: forceRemote)
+            if requiredRepository.role == .legacy,
+               let requestedRevision {
+                return try await selectLegacyRevision(
+                    releases,
+                    channel: channel,
+                    revision: requestedRevision,
+                    installedAPI: installedAPI,
+                    installedTarget: installedTarget,
+                    forceRemote: forceRemote
+                )
+            }
+            return try await selectAll(
                 releases,
                 in: requiredRepository,
                 channel: channel,
@@ -188,9 +240,15 @@ struct TumoflipPackageCatalogClient {
 
         do {
             let releases = try await releases(in: primary, forceRemote: forceRemote)
-            let channelReleases = authoritativeReleases(releases, channel: channel)
+            let channelReleases = try await indexedAuthoritativeReleases(
+                authoritativeReleases(releases, channel: channel),
+                channel: channel,
+                installedAPI: installedAPI,
+                installedTarget: installedTarget,
+                forceRemote: forceRemote
+            )
             if !channelReleases.isEmpty {
-                return try await selectAuthoritative(
+                let current = try await selectAllAuthoritative(
                     channelReleases,
                     in: primary,
                     channel: channel,
@@ -201,15 +259,22 @@ struct TumoflipPackageCatalogClient {
                     installedCommitDirty: installedCommitDirty,
                     forceRemote: forceRemote
                 )
+                let history = await legacyHistorySelections(
+                    for: channel,
+                    installedAPI: installedAPI,
+                    installedTarget: installedTarget,
+                    forceRemote: forceRemote
+                )
+                return (current + history).sorted {
+                    ($0.revision ?? 0) > ($1.revision ?? 0)
+                }
             }
-            // Transitional state: the new repository exists but has not published this
-            // channel yet. The immutable legacy repository remains the only source.
         } catch {
             guard Self.primaryUnavailable(error) else { throw error }
         }
 
         let legacyReleases = try await releases(in: legacy, forceRemote: forceRemote)
-        return try await select(
+        return try await selectAll(
             legacyReleases,
             in: legacy,
             channel: channel,
@@ -221,6 +286,36 @@ struct TumoflipPackageCatalogClient {
             forceRemote: forceRemote,
             allowLegacyFirmwareReleases: true
         )
+    }
+
+    func latest(
+        for channel: TumoflipFirmwareChannel,
+        installedVersion: String?,
+        installedAPI: String? = nil,
+        installedTarget: Int? = nil,
+        installedCommit: String? = nil,
+        installedCommitDirty: Bool? = nil,
+        forceRemote: Bool = false,
+        requiredRepository: TumoflipPackageCatalogRepository? = nil,
+        requestedRevision: Int? = nil
+    ) async throws -> TumoflipPackageCatalogSelection {
+        let candidates = try await available(
+            for: channel,
+            installedVersion: installedVersion,
+            installedAPI: installedAPI,
+            installedTarget: installedTarget,
+            installedCommit: installedCommit,
+            installedCommitDirty: installedCommitDirty,
+            forceRemote: forceRemote,
+            requiredRepository: requiredRepository,
+            requestedRevision: requestedRevision
+        )
+        guard let selection = requestedRevision.map({ revision in
+            candidates.first(where: { $0.revision == revision })
+        }) ?? candidates.first else {
+            throw TumoflipPackageCatalogError.noMatchingRelease(channel, installedVersion)
+        }
+        return selection
     }
 
     private func releases(
@@ -272,9 +367,38 @@ struct TumoflipPackageCatalogClient {
         forceRemote: Bool,
         allowLegacyFirmwareReleases: Bool
     ) async throws -> TumoflipPackageCatalogSelection {
+        guard let first = try await selectAll(
+            releases,
+            in: repository,
+            channel: channel,
+            installedVersion: installedVersion,
+            installedAPI: installedAPI,
+            installedTarget: installedTarget,
+            installedCommit: installedCommit,
+            installedCommitDirty: installedCommitDirty,
+            forceRemote: forceRemote,
+            allowLegacyFirmwareReleases: allowLegacyFirmwareReleases
+        ).first else {
+            throw TumoflipPackageCatalogError.noMatchingRelease(channel, installedVersion)
+        }
+        return first
+    }
+
+    private func selectAll(
+        _ releases: [TumoflipPackageCatalogRelease],
+        in repository: TumoflipPackageCatalogRepository,
+        channel: TumoflipFirmwareChannel,
+        installedVersion: String?,
+        installedAPI: String?,
+        installedTarget: Int?,
+        installedCommit: String?,
+        installedCommitDirty: Bool?,
+        forceRemote: Bool,
+        allowLegacyFirmwareReleases: Bool
+    ) async throws -> [TumoflipPackageCatalogSelection] {
         let authoritative = authoritativeReleases(releases, channel: channel)
         if !authoritative.isEmpty {
-            return try await selectAuthoritative(
+            return try await selectAllAuthoritative(
                 authoritative,
                 in: repository,
                 channel: channel,
@@ -290,33 +414,149 @@ struct TumoflipPackageCatalogClient {
         guard allowLegacyFirmwareReleases else {
             throw TumoflipPackageCatalogError.noMatchingRelease(channel, installedVersion)
         }
-        var selected: TumoflipPackageCatalogSelection?
+        var selected: [TumoflipPackageCatalogSelection] = []
         for release in releases {
             guard let manifestAsset = release.asset("tumoflip-packages.json"),
-                  let manifest = try? await loadManifest(
-                    from: manifestAsset.url,
-                    forceRemote: forceRemote
+                  let rawManifest = try? await loadManifest(
+                      from: manifestAsset.url,
+                      forceRemote: forceRemote
                   ),
-                  manifest.packageRelease?.isIndependentCatalog != true,
+                  rawManifest.packageRelease?.isIndependentCatalog != true,
                   TumoflipPackageReleaseMatcher.matches(
-                    manifestVersion: manifest.firmware.version,
-                    packageRelease: manifest.packageRelease,
+                    manifestVersion: rawManifest.firmware.version,
+                    packageRelease: rawManifest.packageRelease,
                     channel: channel,
                     installedVersion: installedVersion
                   ),
-                  installedAPI.map({ $0 == manifest.firmware.api }) ?? true,
-                  installedTarget.map({ $0 == manifest.firmware.target }) ?? true else { continue }
+                  installedAPI.map({ $0 == rawManifest.firmware.api }) ?? true,
+                  installedTarget.map({ $0 == rawManifest.firmware.target }) ?? true else { continue }
+            let manifest = normalizedLegacyManifest(
+                rawManifest,
+                channel: channel,
+                revision: revision(from: release.tag, channel: channel) ?? 0,
+                tag: release.tag
+            )
             let candidate = TumoflipPackageCatalogSelection(
                 release: release,
                 manifest: manifest,
                 manifestUpdatedAt: manifestAsset.updatedAt
             )
-            if selected == nil { selected = candidate }
+            selected.append(candidate)
         }
-        guard let selected else {
+        guard !selected.isEmpty else {
             throw TumoflipPackageCatalogError.noMatchingRelease(channel, installedVersion)
         }
         return selected
+    }
+
+    /// Transitional releases from the old firmware repository did not carry
+    /// independent-catalog metadata. The index supplies their channel/revision;
+    /// normalize that metadata in memory so they remain valid rollback snapshots
+    /// without rewriting the immutable legacy assets.
+    private func normalizedLegacyManifest(
+        _ manifest: TumoflipManifest,
+        channel: TumoflipFirmwareChannel,
+        revision: Int,
+        tag: String
+    ) -> TumoflipManifest {
+        guard revision > 0, manifest.packageRelease?.isIndependentCatalog != true else {
+            return manifest
+        }
+        let previous = manifest.packageRelease
+        let sourceCommit = previous?.sourceCommit.count == 40
+            ? previous!.sourceCommit
+            : String(manifest.releaseId.prefix(40))
+        let packageRelease = TumoflipManifest.PackageRelease(
+            id: previous?.id ?? "legacy-\(manifest.releaseId.prefix(16))",
+            type: "package-only",
+            sourceCommit: sourceCommit,
+            sourceDirty: false,
+            sourceFirmwareVersion: previous?.sourceFirmwareVersion ?? manifest.firmware.version,
+            targetReleaseTag: previous?.targetReleaseTag ?? manifest.firmware.version,
+            firmwareFlashUnchanged: true,
+            catalogChannel: channel.rawValue,
+            catalogRevision: revision,
+            catalogReleaseTag: tag,
+            catalogInstallScope: .delta,
+            compatibleReleases: nil,
+            catalogModifiedTargets: manifest.packages.values.flatMap { $0.map(\.source) },
+            overlayTargets: nil,
+            targetFirmwareCommit: nil,
+            targetSourceCommit: nil,
+            targetReleaseId: nil
+        )
+        return TumoflipManifest(
+            schema: manifest.schema,
+            releaseId: manifest.releaseId,
+            firmware: manifest.firmware,
+            artifacts: manifest.artifacts,
+            packages: manifest.packages,
+            cleanup: manifest.cleanup,
+            safety: manifest.safety,
+            packageRelease: packageRelease
+        )
+    }
+
+    private func legacyHistorySelections(
+        for channel: TumoflipFirmwareChannel,
+        installedAPI: String?,
+        installedTarget: Int?,
+        forceRemote: Bool
+    ) async -> [TumoflipPackageCatalogSelection] {
+        guard let index = await loadCatalogIndex(forceRemote: forceRemote) else { return [] }
+        let historicalTags = Set(index.releases(for: channel, api: installedAPI, target: installedTarget)
+            .filter { $0.state == .legacy }
+            .map(\.tag))
+        guard !historicalTags.isEmpty,
+              let releases = try? await releases(in: legacy, forceRemote: forceRemote) else {
+            return []
+        }
+        var output: [TumoflipPackageCatalogSelection] = []
+        for release in releases where historicalTags.contains(release.tag) {
+            guard let asset = release.asset("tumoflip-packages.json"),
+                  let raw = try? await loadManifest(from: asset.url, forceRemote: forceRemote),
+                  let revision = revision(from: release.tag, channel: channel) else { continue }
+            let manifest = normalizedLegacyManifest(raw, channel: channel, revision: revision, tag: release.tag)
+            guard installedTarget.map({ $0 == manifest.firmware.target }) ?? true,
+                  installedAPI.map({ FirmwareAPICompatibility.hasSameMajor($0, manifest.firmware.api) }) ?? true else { continue }
+            output.append(.init(release: release, manifest: manifest, manifestUpdatedAt: asset.updatedAt))
+        }
+        return output
+    }
+
+    private func loadCatalogIndex(forceRemote: Bool) async -> TumoflipCatalogIndex? {
+        guard let indexFetch,
+              let data = try? await indexFetch(forceRemote),
+              let index = try? JSONDecoder().decode(TumoflipCatalogIndex.self, from: data),
+              (try? index.validate()) != nil else { return nil }
+        return index
+    }
+
+    private func selectLegacyRevision(
+        _ releases: [TumoflipPackageCatalogRelease],
+        channel: TumoflipFirmwareChannel,
+        revision: Int,
+        installedAPI: String?,
+        installedTarget: Int?,
+        forceRemote: Bool
+    ) async throws -> [TumoflipPackageCatalogSelection] {
+        let tag = String(format: "fw-packages-%@-%03d", channel.rawValue, revision)
+        guard let release = releases.first(where: { $0.tag == tag }),
+              let asset = release.asset("tumoflip-packages.json") else {
+            throw TumoflipPackageCatalogError.noMatchingRelease(channel, nil)
+        }
+        let raw: TumoflipManifest
+        do {
+            raw = try await loadManifest(from: asset.url, forceRemote: forceRemote)
+        } catch {
+            throw TumoflipPackageCatalogError.malformedLegacy("\(tag) manifest failed validation")
+        }
+        let manifest = normalizedLegacyManifest(raw, channel: channel, revision: revision, tag: tag)
+        guard installedAPI.map({ FirmwareAPICompatibility.hasSameMajor($0, manifest.firmware.api) }) ?? true,
+              installedTarget.map({ $0 == manifest.firmware.target }) ?? true else {
+            throw TumoflipPackageCatalogError.noMatchingRelease(channel, nil)
+        }
+        return [.init(release: release, manifest: manifest, manifestUpdatedAt: asset.updatedAt)]
     }
 
     private func selectAuthoritative(
@@ -330,6 +570,33 @@ struct TumoflipPackageCatalogClient {
         installedCommitDirty: Bool?,
         forceRemote: Bool
     ) async throws -> TumoflipPackageCatalogSelection {
+        guard let first = try await selectAllAuthoritative(
+            releases,
+            in: repository,
+            channel: channel,
+            installedVersion: installedVersion,
+            installedAPI: installedAPI,
+            installedTarget: installedTarget,
+            installedCommit: installedCommit,
+            installedCommitDirty: installedCommitDirty,
+            forceRemote: forceRemote
+        ).first else {
+            throw TumoflipPackageCatalogError.noMatchingRelease(channel, installedVersion)
+        }
+        return first
+    }
+
+    private func selectAllAuthoritative(
+        _ releases: [TumoflipPackageCatalogRelease],
+        in repository: TumoflipPackageCatalogRepository,
+        channel: TumoflipFirmwareChannel,
+        installedVersion: String?,
+        installedAPI: String?,
+        installedTarget: Int?,
+        installedCommit: String?,
+        installedCommitDirty: Bool?,
+        forceRemote: Bool
+    ) async throws -> [TumoflipPackageCatalogSelection] {
         let ranked = releases.compactMap { release -> (Int, TumoflipPackageCatalogRelease)? in
             revision(from: release.tag, channel: channel).map { ($0, release) }
         }.sorted {
@@ -339,6 +606,7 @@ struct TumoflipPackageCatalogClient {
         guard !ranked.isEmpty else {
             throw TumoflipPackageCatalogError.noMatchingRelease(channel, installedVersion)
         }
+        var selections: [TumoflipPackageCatalogSelection] = []
         for (revision, release) in ranked {
             guard let manifestAsset = release.asset("tumoflip-packages.json"),
                   release.asset("tumoflip-packages.zip") != nil else {
@@ -374,11 +642,12 @@ struct TumoflipPackageCatalogClient {
                       ) else {
                     continue
                 }
-                return TumoflipPackageCatalogSelection(
+                selections.append(TumoflipPackageCatalogSelection(
                     release: release,
                     manifest: manifest,
                     manifestUpdatedAt: manifestAsset.updatedAt
-                )
+                ))
+                continue
             }
             let apiMatches = installedAPI.map {
                 FirmwareAPICompatibility.hasSameMajor($0, manifest.firmware.api)
@@ -389,13 +658,16 @@ struct TumoflipPackageCatalogClient {
                 // not malformed provenance; continue to an older compatible revision.
                 continue
             }
-            return TumoflipPackageCatalogSelection(
+            selections.append(TumoflipPackageCatalogSelection(
                 release: release,
                 manifest: manifest,
                 manifestUpdatedAt: manifestAsset.updatedAt
-            )
+            ))
         }
-        throw TumoflipPackageCatalogError.noMatchingRelease(channel, installedVersion)
+        guard !selections.isEmpty else {
+            throw TumoflipPackageCatalogError.noMatchingRelease(channel, installedVersion)
+        }
+        return selections
     }
 
     private func loadManifest(from url: URL, forceRemote: Bool) async throws -> TumoflipManifest {
@@ -409,6 +681,31 @@ struct TumoflipPackageCatalogClient {
         channel: TumoflipFirmwareChannel
     ) -> [TumoflipPackageCatalogRelease] {
         releases.filter { revision(from: $0.tag, channel: channel) != nil }
+    }
+
+    /// The release API remains the asset transport, while the immutable index is
+    /// the source of truth for withdrawn/history entries. During migration an
+    /// unavailable index is tolerated so older clients can still consume v2
+    /// releases; malformed manifests remain terminal failures.
+    private func indexedAuthoritativeReleases(
+        _ releases: [TumoflipPackageCatalogRelease],
+        channel: TumoflipFirmwareChannel,
+        installedAPI: String?,
+        installedTarget: Int?,
+        forceRemote: Bool
+    ) async throws -> [TumoflipPackageCatalogRelease] {
+        guard let indexFetch else { return releases }
+        guard let data = try? await indexFetch(forceRemote),
+              let index = try? JSONDecoder().decode(TumoflipCatalogIndex.self, from: data),
+              (try? index.validate()) != nil else {
+            return releases
+        }
+        let allowed = Set(index.releases(
+            for: channel,
+            api: installedAPI,
+            target: installedTarget
+        ).map(\.tag))
+        return releases.filter { allowed.contains($0.tag) }
     }
 
     private func revision(from tag: String, channel: TumoflipFirmwareChannel) -> Int? {

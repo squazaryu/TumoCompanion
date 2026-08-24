@@ -25,6 +25,49 @@ final class TumoflipPackageCatalogTests: XCTestCase {
         XCTAssertEqual(selected.identity.catalogRevision, 9)
     }
 
+    func testAvailableReturnsImmutableHistoryNewestFirst() async throws {
+        let newer = release(id: 9, tag: "fw-packages-dev-009")
+        let older = release(id: 8, tag: "fw-packages-dev-008")
+        let client = makeClient(
+            primaryPages: [releasesData([older, newer])],
+            manifests: [
+                manifestURL("fw-packages-dev-009"): manifest(tag: "fw-packages-dev-009", revision: 9),
+                manifestURL("fw-packages-dev-008"): manifest(tag: "fw-packages-dev-008", revision: 8),
+            ]
+        )
+
+        let selections = try await client.available(
+            for: .dev,
+            installedVersion: "t-dev-004-015",
+            installedAPI: "88.0",
+            installedTarget: 7
+        )
+
+        XCTAssertEqual(selections.map(\.revision), [9, 8])
+    }
+
+    func testLatestCanPinAnOlderRevisionForRollback() async throws {
+        let newer = release(id: 9, tag: "fw-packages-dev-009")
+        let older = release(id: 8, tag: "fw-packages-dev-008")
+        let client = makeClient(
+            primaryPages: [releasesData([newer, older])],
+            manifests: [
+                manifestURL("fw-packages-dev-009"): manifest(tag: "fw-packages-dev-009", revision: 9),
+                manifestURL("fw-packages-dev-008"): manifest(tag: "fw-packages-dev-008", revision: 8),
+            ]
+        )
+
+        let selected = try await client.latest(
+            for: .dev,
+            installedVersion: "t-dev-004-015",
+            installedAPI: "88.0",
+            installedTarget: 7,
+            requestedRevision: 8
+        )
+
+        XCTAssertEqual(selected.revision, 8)
+    }
+
     func testUnavailablePrimaryFallsBackToImmutableLegacyCatalog() async throws {
         let legacy = release(id: 8, tag: "fw-packages-dev-008")
         let client = makeClient(
