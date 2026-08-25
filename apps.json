@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.10.40",
+      "version": "1.10.41",
       "versionDate": "2026-08-25",
-      "versionDescription": "FW Packages baseline status fix\n\n- Shows independent catalogs with no overlay FAPs as \u201cCatalog ready\u201d instead of \u201cNot installed\u201d.\n- Keeps firmware-owned baseline FAPs reference-only and does not reinstall or modify them.\n- Preserves the existing Verify and catalog synchronization behavior.\n\nNo firmware or FAP assets changed.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.40/TumoCompanion-unsigned.ipa",
-      "size": 30085469,
+      "versionDescription": "Fix protected-app audit reconciliation. After Verify on device, intentionally replaced upstream apps (freq_analyzer_ext, wifi_map, claude_remote_ble) are now reported as REPLACED when absent instead of remaining in CHECK. Unexpected duplicates still surface as DIFF. No firmware or FAP payload changes.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.41/TumoCompanion-unsigned.ipa",
+      "size": 30085558,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.10.41",
+          "date": "2026-08-25",
+          "localizedDescription": "Fix protected-app audit reconciliation. After Verify on device, intentionally replaced upstream apps (freq_analyzer_ext, wifi_map, claude_remote_ble) are now reported as REPLACED when absent instead of remaining in CHECK. Unexpected duplicates still surface as DIFF. No firmware or FAP payload changes.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.41/TumoCompanion-unsigned.ipa",
+          "size": 30085558,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.10.40",
           "date": "2026-08-25",
