@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.10.38",
-      "versionDate": "2026-08-24",
-      "versionDescription": "Independent FW Packages catalog lifecycle\n\n- Package catalogs are now independent from firmware release labels.\n- Choose the newest compatible revision or explicitly roll back to a retained stable/dev revision.\n- Validate catalog, manifest, and archive SHA-256 digests before installation.\n- Fail closed on malformed or stale catalog metadata.\n- Firmware-owned FAPs remain reference-only and are never reinstalled as overlays.\n\nNo firmware or existing FAP release assets were changed.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.38/TumoCompanion-unsigned.ipa",
-      "size": 30085561,
+      "version": "1.10.39",
+      "versionDate": "2026-08-25",
+      "versionDescription": "Fix FW Packages catalog parsing\n\n- Accepts the published snake_case catalog fields release_id, manifest_sha256 and archive_sha256.\n- Restores Stable/Dev package catalog discovery and rollback selection instead of showing catalog index invalid.\n- No firmware or FAP release assets changed.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.39/TumoCompanion-unsigned.ipa",
+      "size": 30084160,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.10.39",
+          "date": "2026-08-25",
+          "localizedDescription": "Fix FW Packages catalog parsing\n\n- Accepts the published snake_case catalog fields release_id, manifest_sha256 and archive_sha256.\n- Restores Stable/Dev package catalog discovery and rollback selection instead of showing catalog index invalid.\n- No firmware or FAP release assets changed.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.39/TumoCompanion-unsigned.ipa",
+          "size": 30084160,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.10.38",
           "date": "2026-08-24",
