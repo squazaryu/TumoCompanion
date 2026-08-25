@@ -534,6 +534,24 @@ final class ProtectedPluginAuditTests: XCTestCase {
         XCTAssertEqual(updater.protectedDeviceDiffReviews.map(\.name), ["unreviewed-on-device"])
     }
 
+    @MainActor
+    func testMissingIntentionallyReplacedAppIsNotShownAsDeviceCheck() {
+        let updater = PluginUpdater.protectedAuditQAFixture()
+        let replacement = updater.protectedReviews.first {
+            $0.name == "claude_remote_ble"
+        }
+
+        XCTAssertNotNil(replacement)
+        XCTAssertEqual(
+            replacement.map(updater.protectedReviewStatus),
+            .intentionallyReplaced)
+        XCTAssertFalse(
+            updater.protectedDeviceCheckReviews.contains { $0.name == "claude_remote_ble" },
+            "A completed probe with no upstream file is not an unknown device state")
+        XCTAssertTrue(
+            updater.auditedProtectedReviews.contains { $0.name == "claude_remote_ble" })
+    }
+
     func testReachableValidLedgerWithoutExactPackRevokesCachedAcceptance() async throws {
         let directory = temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }

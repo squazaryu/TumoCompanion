@@ -1335,6 +1335,9 @@ struct ProtectedPluginReview: Identifiable, Equatable {
     let pack: String
     let newMD5: String
     let deviceMD5: String?
+    /// Whether the device probe completed successfully. A successful probe with
+    /// `deviceMD5 == nil` means the protected upstream path is absent, not that
+    /// the device is still unknown.
     let deviceKnown: Bool
     let size: Int
 
@@ -1400,8 +1403,9 @@ final class PluginUpdater: ObservableObject {
             protectedReviewStatus($0) == .needsReview
         }
     }
-    /// These rows have no device MD5 yet. They need a device check, not a human
-    /// provenance decision, so the UI must never present them as a DIFF.
+    /// These rows have not received a completed device probe yet. They need a
+    /// device check, not a human provenance decision, so the UI must never
+    /// present them as a DIFF.
     var protectedDeviceCheckReviews: [ProtectedPluginReview] {
         pendingProtectedReview.filter { !$0.deviceKnown }
     }
@@ -1999,7 +2003,11 @@ final class PluginUpdater: ObservableObject {
                 pack: f.pack,
                 newMD5: f.newMD5,
                 deviceMD5: observation.md5,
-                deviceKnown: observation.md5 != nil,
+                // `deviceObservation` returns nil when every candidate path is
+                // absent. The successful RPC probe is still authoritative: for
+                // an intentionally replaced upstream app this is the evidence
+                // required to render REPLACED rather than CHECK.
+                deviceKnown: true,
                 size: f.size))
         }
         protectedReviews = sortProtected(result)
