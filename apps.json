@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.10.42",
+      "version": "1.10.43",
       "versionDate": "2026-08-25",
-      "versionDescription": "### What\u2019s new\n\n- Redesigned Protected Apps review with clear Verified, Needs review, and Missing groups.\n- Added a single detail sheet with route, compatibility, expected MD5, device MD5, and install target.\n- Unified loading, progress, and actionable Retry states across Firmware, FW Packages, and Community Apps.\n- Improved Dynamic Type handling for settings, metadata, long paths, and review details.\n- Replaced the Clear-mode icon assets with new transparent Flipper-inspired light and dark variants.\n\n### Verification\n\n- 557 unit tests passed.\n- 15 UI tests passed.\n- Release IPA build and icon alpha/size validation passed.\n\nThis release is unsigned and is intended for installation through Feather or another personal sideloading workflow.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.42/TumoCompanion-unsigned.ipa",
-      "size": 25350923,
+      "versionDescription": "Fix independent FW Packages provenance display. Compatibility now uses catalog channel, API major and hardware target; historical producer firmware version remains provenance only. Added regression coverage. Full iOS test suite passed: 558 unit tests and 15 UI tests. No firmware update is required.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.43/TumoCompanion-unsigned.ipa",
+      "size": 25351165,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.10.43",
+          "date": "2026-08-25",
+          "localizedDescription": "Fix independent FW Packages provenance display. Compatibility now uses catalog channel, API major and hardware target; historical producer firmware version remains provenance only. Added regression coverage. Full iOS test suite passed: 558 unit tests and 15 UI tests. No firmware update is required.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.43/TumoCompanion-unsigned.ipa",
+          "size": 25351165,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.10.42",
           "date": "2026-08-25",
