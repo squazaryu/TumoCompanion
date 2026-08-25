@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.10.39",
+      "version": "1.10.40",
       "versionDate": "2026-08-25",
-      "versionDescription": "Fix FW Packages catalog parsing\n\n- Accepts the published snake_case catalog fields release_id, manifest_sha256 and archive_sha256.\n- Restores Stable/Dev package catalog discovery and rollback selection instead of showing catalog index invalid.\n- No firmware or FAP release assets changed.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.39/TumoCompanion-unsigned.ipa",
-      "size": 30084160,
+      "versionDescription": "FW Packages baseline status fix\n\n- Shows independent catalogs with no overlay FAPs as \u201cCatalog ready\u201d instead of \u201cNot installed\u201d.\n- Keeps firmware-owned baseline FAPs reference-only and does not reinstall or modify them.\n- Preserves the existing Verify and catalog synchronization behavior.\n\nNo firmware or FAP assets changed.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.40/TumoCompanion-unsigned.ipa",
+      "size": 30085469,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.10.40",
+          "date": "2026-08-25",
+          "localizedDescription": "FW Packages baseline status fix\n\n- Shows independent catalogs with no overlay FAPs as \u201cCatalog ready\u201d instead of \u201cNot installed\u201d.\n- Keeps firmware-owned baseline FAPs reference-only and does not reinstall or modify them.\n- Preserves the existing Verify and catalog synchronization behavior.\n\nNo firmware or FAP assets changed.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.40/TumoCompanion-unsigned.ipa",
+          "size": 30085469,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.10.39",
           "date": "2026-08-25",
