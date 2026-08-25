@@ -433,6 +433,24 @@ struct TumoflipManifest: Codable, Equatable {
         guard packageRelease?.isIndependentCatalog == true else { return false }
         return packageSurface().managedFileCount == 0
     }
+
+    /// Human-readable compatibility identity for an independent catalog.
+    ///
+    /// `source_firmware_version` is immutable producer provenance. It describes
+    /// the build used to produce the catalog and must never be presented as the
+    /// firmware version required to install an independent baseline or overlay.
+    /// The install contract is channel/API-major/target (or exact firmware only
+    /// for an explicitly identified legacy snapshot).
+    var independentCompatibilityDisplay: String? {
+        guard let release = packageRelease, release.isIndependentCatalog else {
+            return nil
+        }
+        if isFirmwareSnapshotCatalog {
+            return "Exact \(firmware.version) · API \(firmware.api) · f\(firmware.target)"
+        }
+        guard let channel = release.catalogChannel else { return nil }
+        return "Tumoflip \(channel.capitalized) · API \(firmware.api) · f\(firmware.target)"
+    }
 }
 
 enum TumoflipManifestError: Error, Equatable {

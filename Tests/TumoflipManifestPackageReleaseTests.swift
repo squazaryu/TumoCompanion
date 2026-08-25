@@ -63,6 +63,36 @@ final class TumoflipManifestPackageReleaseTests: XCTestCase {
         XCTAssertEqual(managed.cleanup.map(\.canonical), ["/ext/apps/esp.fap"])
     }
 
+    func testIndependentCompatibilityDisplayIgnoresHistoricalSourceFirmwareVersion() throws {
+        let independent = packageRelease
+            .replacingOccurrences(
+                of: "\"source_firmware_version\": \"t-dev-004-014\"",
+                with: "\"source_firmware_version\": \"t-dev-004-015\""
+            )
+            .replacingOccurrences(
+                of: "\"firmware_flash_unchanged\": true",
+                with: """
+                "firmware_flash_unchanged": true,
+                  "catalog_channel": "dev",
+                  "catalog_revision": 8,
+                  "catalog_release_tag": "fw-packages-dev-008",
+                  "catalog_install_scope": "delta",
+                  "catalog_modified_targets": ["apps/esp.fap"],
+                  "overlay_targets": ["apps/esp.fap"]
+                """
+            )
+        let manifest = try TumoflipManifest.decode(fixture(packageRelease: independent))
+        try manifest.validate()
+
+        XCTAssertEqual(
+            manifest.independentCompatibilityDisplay,
+            "Tumoflip Dev · API 88.0 · f7"
+        )
+        XCTAssertFalse(
+            manifest.independentCompatibilityDisplay?.contains("t-dev-004-015") == true
+        )
+    }
+
     func testIndependentDeltaSeparatesFirmwareOwnedBaselineFromInstallSurface() throws {
         let independent = packageRelease.replacingOccurrences(
             of: "\"firmware_flash_unchanged\": true",
