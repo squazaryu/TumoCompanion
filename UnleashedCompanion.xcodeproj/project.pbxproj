@@ -58,6 +58,7 @@
 		3E3E586D830439E2A9A3C8F9 /* CompanionBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 299EFF336F47935AE03E9500 /* CompanionBridge.swift */; };
 		3F042FA8BCF01CBAD8377161 /* DolphinGalleryModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2223CB55367C869D06A5001D /* DolphinGalleryModel.swift */; };
 		3FFE12E9A014C7F05D300AAB /* MarauderResultViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52741A242FCEED74C342D4D6 /* MarauderResultViews.swift */; };
+		41E926FF08644F751DB96360 /* DeviceInfoViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2530743A4F45B32311FB1951 /* DeviceInfoViewTests.swift */; };
 		4657F289AE20F68598CF1F23 /* GitHubOAuthClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA766CD63AD11289FB5F0DC8 /* GitHubOAuthClientTests.swift */; };
 		46936C2B1C79FA9536851B40 /* GitHubAuthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EBD710F983D218FB913E435 /* GitHubAuthStore.swift */; };
 		46EF26B33502AED58F1E687A /* MarauderPcap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95DB35AEEDE67D42752C5953 /* MarauderPcap.swift */; };
@@ -265,6 +266,7 @@
 		2485BA585EAEAF510AE43475 /* system.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = system.pb.swift; sourceTree = "<group>"; };
 		24AE55444A9A10FFD0C9F3C5 /* DeviceServicesUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceServicesUITests.swift; sourceTree = "<group>"; };
 		24DE2B5AF5B3FA4C77EEF6AB /* SberLoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SberLoginView.swift; sourceTree = "<group>"; };
+		2530743A4F45B32311FB1951 /* DeviceInfoViewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceInfoViewTests.swift; sourceTree = "<group>"; };
 		263FF028D83D9F5E4C56E6CF /* UpdatesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdatesView.swift; sourceTree = "<group>"; };
 		296A7D30A6C58A754FF6B5E5 /* AppBridgeRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBridgeRequest.swift; sourceTree = "<group>"; };
 		299EFF336F47935AE03E9500 /* CompanionBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionBridge.swift; sourceTree = "<group>"; };
@@ -702,6 +704,7 @@
 				9C90997591A015CAB64F92E9 /* AppBridgeConsoleTests.swift */,
 				B04D2FFBE41EED4A3482CEFA /* AppBridgeRequestTests.swift */,
 				54BC731EF974B7077777585D /* CatalogClientTests.swift */,
+				2530743A4F45B32311FB1951 /* DeviceInfoViewTests.swift */,
 				6441776EDA9115C9BEB5946E /* DeviceServiceTests.swift */,
 				3352B17F82ACA14AD4B854B7 /* DolphinProfileTests.swift */,
 				E80D165190935774781982C8 /* ESP32FlashPackageManifestTests.swift */,
@@ -1147,6 +1150,7 @@
 				72AA0AFD7A1A377DA0CFBFFE /* AppBridgeConsoleTests.swift in Sources */,
 				BCA5C227A003B22953FA49D7 /* AppBridgeRequestTests.swift in Sources */,
 				31DE3241E429DCE7FAA6C3B2 /* CatalogClientTests.swift in Sources */,
+				41E926FF08644F751DB96360 /* DeviceInfoViewTests.swift in Sources */,
 				94270EE7D91E72A67DCCF72F /* DeviceServiceTests.swift in Sources */,
 				660358B5ED53BD9B93390DC2 /* DolphinProfileTests.swift in Sources */,
 				BA3F2055C70D4F3CBECCA623 /* ESP32FlashPackageManifestTests.swift in Sources */,
@@ -1386,7 +1390,7 @@
 				CODE_SIGNING_REQUIRED = NO;
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 249;
+				CURRENT_PROJECT_VERSION = 251;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -1407,7 +1411,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GITHUB_OAUTH_CLIENT_ID = Ov23liKmKXYcliMvoCgL;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 1.10.42;
+				MARKETING_VERSION = 1.10.44;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -1612,7 +1616,7 @@
 				CODE_SIGNING_REQUIRED = NO;
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 249;
+				CURRENT_PROJECT_VERSION = 251;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = "";
 				ENABLE_NS_ASSERTIONS = NO;
@@ -1627,7 +1631,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GITHUB_OAUTH_CLIENT_ID = Ov23liKmKXYcliMvoCgL;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 1.10.42;
+				MARKETING_VERSION = 1.10.44;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";

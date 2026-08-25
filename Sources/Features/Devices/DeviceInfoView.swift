@@ -65,6 +65,22 @@ final class DeviceInfoViewModel: ObservableObject {
         return head.isEmpty ? nil : head
     }
 
+    /// The compact FAB2 runtime/status contract intentionally limits `fw` to
+    /// eight characters. Prefer the complete identity from the system
+    /// `device_info` response when it is the same firmware prefix, so the
+    /// diagnostics card does not show misleading values such as `t-flppr-`.
+    func runtimeFirmwareDisplay(_ runtimeVersion: String?) -> String? {
+        guard let runtimeVersion, !runtimeVersion.isEmpty else {
+            return value("firmware_version")
+        }
+        guard let fullVersion = value("firmware_version"),
+              !fullVersion.isEmpty,
+              fullVersion.hasPrefix(runtimeVersion) else {
+            return runtimeVersion
+        }
+        return fullVersion
+    }
+
     var region: String? { value("hardware_region_provisioned") ?? value("hardware_region") }
 
     var radio: String? {
@@ -192,7 +208,9 @@ struct DeviceInfoView: View {
                     .font(.caption2).foregroundStyle(.orange)
             }
             if let status = vm.runtimeStatus {
-                if let fw = status.firmwareVersion { infoRow("Firmware", fw) }
+                if let fw = vm.runtimeFirmwareDisplay(status.firmwareVersion) {
+                    infoRow("Firmware", fw)
+                }
                 if let commit = status.commit {
                     infoRow("Commit", status.dirty == true ? "\(commit) (dirty)" : commit)
                 }
