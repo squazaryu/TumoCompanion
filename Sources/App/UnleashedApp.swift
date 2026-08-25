@@ -121,19 +121,19 @@ struct RootView: View {
     }
 
     private var tabs: some View {
-        // Four top-level tabs. Files / Relay / WiFi and the tool screens still live as
-        // tiles on Home (grouped + customizable); deep links push them onto Home's stack.
+        // Three top-level tabs. Files / Relay / WiFi and the tool screens live as tiles
+        // on Home (grouped + customizable); deep links push them onto Home's stack.
+        // Remote is also a Home destination so the live Flipper preview and its controls
+        // stay next to the connection status instead of splitting the device workflow.
         // Apps Market is its own persistent tab since it's a whole browse/search/install
         // flow, not a one-shot tool.
         TabView(selection: $tab) {
             DevicesView(path: $homePath)
                 .tabItem { Label("Home", systemImage: "house.fill") }.tag(0)
-            ScreenView()
-                .tabItem { Label("Screen", systemImage: "rectangle.on.rectangle") }.tag(1)
             NavigationStack { CatalogListView() }
-                .tabItem { Label("Apps Market", systemImage: "bag.fill") }.tag(2)
+                .tabItem { Label("Apps Market", systemImage: "bag.fill") }.tag(1)
             NavigationStack { SettingsView() }
-                .tabItem { Label("Settings", systemImage: "gearshape.fill") }.tag(3)
+                .tabItem { Label("Settings", systemImage: "gearshape.fill") }.tag(2)
         }
     }
 
@@ -143,9 +143,9 @@ struct RootView: View {
         guard url.scheme == "unleashed" else { return }
         switch url.host {
         case "home":     tab = 0; homePath = []
-        case "screen":   tab = 1
-        case "appstore": tab = 2
-        case "settings": tab = 3
+        case "screen":   tab = 0; homePath = [.screen]
+        case "appstore": tab = 1
+        case "settings": tab = 2
         case "files":    tab = 0; homePath = [.files]
         case "wifi":     tab = 0; homePath = [.wifi]
         case "media":    tab = 0; homePath = [.media]

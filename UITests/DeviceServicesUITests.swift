@@ -61,6 +61,10 @@ final class DeviceServicesUITests: XCTestCase {
         XCTAssertTrue(settings.waitForExistence(timeout: 5))
         settings.tap()
 
+        let connectivity = app.buttons["settings-connectivity"]
+        XCTAssertTrue(connectivity.waitForExistence(timeout: 5))
+        connectivity.tap()
+
         let location = app.switches["device-services-location"]
         for _ in 0..<5 where !location.isHittable { app.swipeUp() }
         XCTAssertTrue(location.waitForExistence(timeout: 3))

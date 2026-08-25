@@ -15,6 +15,10 @@ final class DolphinGalleryUITests: XCTestCase {
         XCTAssertTrue(settings.waitForExistence(timeout: 5))
         settings.tap()
 
+        let personalization = app.buttons["settings-personalization"]
+        XCTAssertTrue(personalization.waitForExistence(timeout: 5))
+        personalization.tap()
+
         let gallery = app.buttons["Dolphin Gallery"]
         XCTAssertTrue(gallery.waitForExistence(timeout: 5))
         gallery.tap()
@@ -33,7 +37,7 @@ final class DolphinGalleryUITests: XCTestCase {
         app.buttons["dolphin-duration-save"].tap()
         XCTAssertEqual(duration.label, "Duration, 00:02:00")
 
-        app.navigationBars["Dolphin Gallery"].buttons["Settings"].tap()
+        app.navigationBars["Dolphin Gallery"].buttons["Personalization"].tap()
         app.buttons["Dolphin Gallery"].tap()
         let persistedDuration = app.buttons["dolphin-duration-link"]
         XCTAssertTrue(persistedDuration.waitForExistence(timeout: 5))
@@ -297,6 +301,10 @@ final class QualityPassUITests: XCTestCase {
         app.launch()
         app.tabBars.buttons["Settings"].tap()
 
+        let developer = app.buttons["settings-developer"]
+        XCTAssertTrue(developer.waitForExistence(timeout: 5))
+        developer.tap()
+
         let signIn = app.buttons["github-auth-sign-in"]
         for _ in 0..<4 where !signIn.isHittable { app.swipeUp() }
         XCTAssertTrue(signIn.waitForExistence(timeout: 3))
@@ -340,6 +348,10 @@ final class QualityPassUITests: XCTestCase {
         app.launchArguments = ["-onboardingDone", "YES"]
         app.launch()
         app.tabBars.buttons["Settings"].tap()
+
+        let developer = app.buttons["settings-developer"]
+        XCTAssertTrue(developer.waitForExistence(timeout: 5))
+        developer.tap()
 
         let diagnostics = app.buttons.matching(
             NSPredicate(format: "label CONTAINS[c] %@", "DIAGNOSTICS")

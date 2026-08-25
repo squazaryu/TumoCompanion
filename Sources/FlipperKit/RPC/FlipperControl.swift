@@ -6,6 +6,7 @@ import Combine
 final class FlipperControl: ObservableObject {
     let rpc: FlipperRPC
     private var streamCancellable: AnyCancellable?
+    private var streamActive = false
 
     /// Latest decoded screen frame as a 128x64 1-bpp bitmap, expanded to bytes.
     @Published var screenPixels: [Bool] = Array(repeating: false, count: 128 * 64)
@@ -53,6 +54,8 @@ final class FlipperControl: ObservableObject {
     // MARK: - Remote input (screen mirroring control)
 
     func startScreenStream() {
+        guard !streamActive else { return }
+        streamActive = true
         rpc.send { main in
             main.content = .guiStartScreenStreamRequest(PBGui_StartScreenStreamRequest())
         }
@@ -60,6 +63,8 @@ final class FlipperControl: ObservableObject {
     }
 
     func stopScreenStream() {
+        guard streamActive else { return }
+        streamActive = false
         rpc.send { main in
             main.content = .guiStopScreenStreamRequest(PBGui_StopScreenStreamRequest())
         }

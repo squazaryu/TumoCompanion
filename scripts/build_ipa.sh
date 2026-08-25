@@ -11,6 +11,9 @@ XCODE_JOBS="${XCODE_JOBS:-2}"
 
 VERSION=$(awk -F'"' '/MARKETING_VERSION:/{print $2; exit}' project.yml)
 STAMP="${BUILD_STAMP:-$(date +%Y%m%d-%H%M)}"
+echo "==> Validating Clear icon alpha assets"
+scripts/validate_icon_assets.sh
+
 echo "==> Stamping BuildInfo: v$VERSION · $STAMP"
 cat > Sources/App/BuildInfo.swift <<EOF
 import Foundation

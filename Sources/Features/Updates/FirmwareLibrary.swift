@@ -220,6 +220,18 @@ final class FirmwareLibrary: ObservableObject {
         }
     }
 
+    /// Awaitable counterpart used by pull-to-refresh. The existing `refresh()` API is
+    /// intentionally fire-and-forget for toolbar buttons and background loading; this
+    /// variant keeps the refresh indicator visible until the catalog has settled.
+    func refreshAndWait() async {
+        if let loadTask {
+            await loadTask.value
+            return
+        }
+        refresh()
+        if let loadTask { await loadTask.value }
+    }
+
     func requestStop() { stopRequested = true }
 
     func stage(_ release: FirmwareRelease) async {

@@ -35,7 +35,7 @@ struct CustomizeHomeView: View {
             } header: {
                 Label("Hidden", systemImage: "eye.slash")
             } footer: {
-                Text("Drag the grip to reorder within a section. Use a tile's menu to move it to another section or hide it. Tabs Home / Screen / Settings stay fixed.")
+                Text("Drag the grip to reorder within a section. Use a tile's menu to move it to another section or hide it. Home, Apps Market and Settings stay fixed.")
             }
         }
         .navigationTitle("Customize Home")

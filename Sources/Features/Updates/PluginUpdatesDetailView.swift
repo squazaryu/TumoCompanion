@@ -15,7 +15,7 @@ struct PluginUpdatesDetailView: View {
     @State private var showCleanupConfirmation = false
 
     var body: some View {
-        CardScroll {
+        CardScroll(refreshAction: refreshCommunityApps) {
             SectionCard(title: "Community apps", systemImage: "shippingbox",
                         accessory: AnyView(StatusPill(
                             text: transfer.activeChannel.label,
@@ -187,6 +187,12 @@ struct PluginUpdatesDetailView: View {
 
     private var hasFileChannel: Bool {
         transfer.activeChannel == .usb || ble.state == .ready || ble.state == .connected
+    }
+
+    private func refreshCommunityApps() async {
+        guard !busy else { return }
+        await updater.check()
+        if hasFileChannel { await updater.validateCompatibility() }
     }
 
     private var busy: Bool {

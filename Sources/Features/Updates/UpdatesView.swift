@@ -66,7 +66,7 @@ struct UpdatesView: View {
     private var firmware: FirmwareLibrary { updates.firmware }
 
     var body: some View {
-        CardScroll {
+        CardScroll(refreshAction: refreshSources) {
             headerView
             sourcesCard
             attentionCard
@@ -93,6 +93,18 @@ struct UpdatesView: View {
 
     private var hasFileChannel: Bool {
         transfer.activeChannel == .usb || ble.state == .ready || ble.state == .connected
+    }
+
+    /// Pull-to-refresh is deliberately a read-only operation. It refreshes all three
+    /// catalogs and re-runs compatibility checks, but never stages, installs, cleans,
+    /// or changes a file on the Flipper.
+    private func refreshSources() async {
+        guard !pluginBusy, !packages.busy, !firmware.busy else { return }
+        await updater.check()
+        await packages.reload(recover: hasFileChannel)
+        await firmware.refreshAndWait()
+        await updater.validateCompatibility()
+        await packages.validateCompatibility()
     }
 
     // MARK: - Header (single combined verdict, no card chrome)

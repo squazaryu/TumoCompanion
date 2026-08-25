@@ -2,7 +2,7 @@ import SwiftUI
 
 /// A destination that can live as a tile on the Home screen (and double as a deep-link route).
 enum HomeTileID: String, Codable, CaseIterable, Identifiable, Hashable {
-    case info, apps, files, airadar, wifi, fieldServices, spectrum, relay, tumonet, esp32, updates, backup, remotes, media
+    case info, apps, files, airadar, wifi, fieldServices, spectrum, relay, tumonet, esp32, updates, backup, remotes, media, screen
     var id: String { rawValue }
 
     var title: String {
@@ -21,6 +21,7 @@ enum HomeTileID: String, Codable, CaseIterable, Identifiable, Hashable {
         case .backup:  return "Backup"
         case .remotes: return "Remotes"
         case .media:   return "Media"
+        case .screen:  return "Remote"
         }
     }
 
@@ -40,6 +41,7 @@ enum HomeTileID: String, Codable, CaseIterable, Identifiable, Hashable {
         case .backup:  return "externaldrive.badge.timemachine"
         case .remotes: return "dot.radiowaves.right"
         case .media:   return "music.note"
+        case .screen:  return "rectangle.on.rectangle"
         }
     }
 
@@ -59,6 +61,7 @@ enum HomeTileID: String, Codable, CaseIterable, Identifiable, Hashable {
         case .backup:  return .purple
         case .remotes: return .orange
         case .media:   return .pink
+        case .screen:  return .teal
         }
     }
 
@@ -97,7 +100,7 @@ private struct HomeLayoutData: Codable {
     static var `default`: HomeLayoutData {
         .init(info: ["info", "apps", "files"],
               tools: ["airadar", "wifi", "fieldServices", "spectrum", "relay", "tumonet", "esp32"],
-              revision: ["updates", "backup", "remotes"],
+        revision: ["updates", "backup", "remotes", "screen"],
               hidden: [],
               collapsed: [])
     }
@@ -180,7 +183,9 @@ final class HomeLayoutStore: ObservableObject {
         for g in HomeGroupID.allCases { o[g] = (o[g] ?? []).filter { seen.insert($0).inserted } }
         hid = hid.filter { seen.insert($0).inserted }
         for t in HomeTileID.allCases where !seen.contains(t) {
-            o[.tools, default: []].append(t); seen.insert(t)
+            // Remote belongs with revision/device state rather than the long tools list.
+            let group: HomeGroupID = t == .screen ? .revision : .tools
+            o[group, default: []].append(t); seen.insert(t)
         }
         order = o
         hidden = hid

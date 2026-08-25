@@ -2,10 +2,13 @@ import SwiftUI
 
 struct DevicesView: View {
     @EnvironmentObject var ble: FlipperBLE
+    @EnvironmentObject var control: FlipperControl
     @EnvironmentObject var transfer: TransferChannelStore
     @ObservedObject private var layout = HomeLayoutStore.shared
     @Binding var path: [HomeTileID]
     @State private var showCustomize = false
+    @State private var connectionPulse = false
+    @State private var previewPulse = false
 
     private let cols = [GridItem(.flexible(), spacing: 10),
                         GridItem(.flexible(), spacing: 10),
@@ -13,8 +16,9 @@ struct DevicesView: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            CardScroll {
+            CardScroll(refreshAction: refreshConnection) {
                 connectionCard
+                if ble.state == .ready { remotePreviewCard }
                 if ble.state != .ready && !ble.discovered.isEmpty { nearbyCard }
                 ForEach(HomeGroupID.allCases) { groupCard($0) }
                 versionFooter
@@ -40,17 +44,83 @@ struct DevicesView: View {
             .sheet(isPresented: $showCustomize) {
                 NavigationStack { CustomizeHomeView() }
             }
-            .onAppear { if ble.state == .disconnected { ble.autoConnect() } }
+            .onAppear {
+                if ble.state == .disconnected { ble.autoConnect() }
+                if ble.state == .ready { control.startScreenStream() }
+                restartConnectionPulseIfNeeded()
+                restartPreviewPulseIfNeeded()
+            }
+            .onDisappear {
+                control.stopScreenStream()
+                connectionPulse = false
+                previewPulse = false
+            }
+            .onChange(of: ble.state) { _, state in
+                if state == .ready {
+                    control.startScreenStream()
+                    restartConnectionPulseIfNeeded()
+                    restartPreviewPulseIfNeeded()
+                } else {
+                    control.stopScreenStream()
+                    connectionPulse = false
+                    previewPulse = false
+                }
+            }
+            .onChange(of: control.streaming) { _, active in
+                if active { restartPreviewPulseIfNeeded() } else { previewPulse = false }
+            }
         }
     }
 
     // MARK: - Connection hero
+
+    private func refreshConnection() async {
+        ble.autoConnect()
+        if ble.state == .ready { control.startScreenStream() }
+        // Let CoreBluetooth deliver a retained-link state change before the refresh
+        // control disappears. This is intentionally short and never starts a second
+        // scan while a connection attempt is already in progress.
+        try? await Task.sleep(nanoseconds: 250_000_000)
+    }
+
+    private func restartConnectionPulseIfNeeded() {
+        guard ble.state == .scanning || ble.state == .connecting || ble.state == .connected else {
+            connectionPulse = false
+            return
+        }
+        connectionPulse = false
+        DispatchQueue.main.async {
+            guard self.ble.state == .scanning || self.ble.state == .connecting || self.ble.state == .connected else { return }
+            self.connectionPulse = true
+        }
+    }
+
+    private func restartPreviewPulseIfNeeded() {
+        guard ble.state == .ready, control.streaming else {
+            previewPulse = false
+            return
+        }
+        previewPulse = false
+        DispatchQueue.main.async {
+            guard self.ble.state == .ready, self.control.streaming else { return }
+            self.previewPulse = true
+        }
+    }
 
     private var connectionCard: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 12) {
                 ZStack {
                     Circle().fill(color.opacity(0.18)).frame(width: 52, height: 52)
+                    if ble.state == .scanning || ble.state == .connecting || ble.state == .connected {
+                        Circle()
+                            .stroke(color.opacity(0.6), lineWidth: 2)
+                            .frame(width: 52, height: 52)
+                            .scaleEffect(connectionPulse ? 1.55 : 1)
+                            .opacity(connectionPulse ? 0 : 0.75)
+                            .animation(.easeOut(duration: 1.25).repeatForever(autoreverses: false),
+                                       value: connectionPulse)
+                    }
                     Image(systemName: ble.state == .ready ? "checkmark" :
                             (ble.state == .scanning ? "dot.radiowaves.left.and.right" : "bolt.horizontal"))
                         .font(.title3).foregroundStyle(color)
@@ -97,6 +167,53 @@ struct DevicesView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .card(tint: color)
+    }
+
+    private var remotePreviewCard: some View {
+        NavigationLink(value: HomeTileID.screen) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    Label("Remote", systemImage: HomeTileID.screen.systemImage)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+
+                FlipperScreenCanvas(pixels: control.screenPixels)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 132)
+
+                HStack(spacing: 7) {
+                    ZStack {
+                        Circle()
+                            .fill(control.streaming ? Color.green : Color.orange)
+                            .frame(width: 7, height: 7)
+                        if control.streaming {
+                            Circle()
+                                .stroke(Color.green.opacity(0.55), lineWidth: 1.5)
+                                .frame(width: 7, height: 7)
+                                .scaleEffect(previewPulse ? 2.8 : 1)
+                                .opacity(previewPulse ? 0 : 0.8)
+                                .animation(.easeOut(duration: 1.35).repeatForever(autoreverses: false),
+                                           value: previewPulse)
+                        }
+                    }
+                    Text(control.streaming ? "Live screen" : "Waiting for screen")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text("Tap to control")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.teal)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .buttonStyle(.plain)
+        .card(tint: .teal, padding: 14)
     }
 
     private var nearbyCard: some View {
@@ -171,6 +288,7 @@ struct DevicesView: View {
         case .backup:  BackupView()
         case .remotes: RemotesView()
         case .media:   MediaRemoteView()
+        case .screen:  ScreenView()
         }
     }
 

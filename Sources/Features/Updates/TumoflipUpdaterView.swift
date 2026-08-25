@@ -27,7 +27,7 @@ struct TumoflipUpdaterView: View {
     }
 
     var body: some View {
-        CardScroll {
+        CardScroll(refreshAction: refreshPackages) {
             SectionCard(title: "Firmware packages", systemImage: "cpu.fill",
                         accessory: AnyView(StatusPill(
                             text: transfer.activeChannel.label,
@@ -120,6 +120,12 @@ struct TumoflipUpdaterView: View {
         }
         #endif
         return transfer.activeChannel == .usb || ble.state == .ready || ble.state == .connected
+    }
+
+    private func refreshPackages() async {
+        guard !updater.busy else { return }
+        await updater.reload(recover: hasFileChannel)
+        await updater.validateCompatibility()
     }
 
     private var groupsCard: some View {

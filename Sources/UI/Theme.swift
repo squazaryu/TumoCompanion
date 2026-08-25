@@ -7,6 +7,8 @@ enum Theme {
     static let accent = Color.orange
     static let cardRadius: CGFloat = 18
     static let cardSpacing: CGFloat = 14
+    static let pagePadding: CGFloat = 16
+    static let sectionSpacing: CGFloat = 10
 }
 
 /// A premium card surface: material fill, hairline stroke, soft shadow.
@@ -17,12 +19,12 @@ struct CardBackground: ViewModifier {
     func body(content: Content) -> some View {
         content
             .padding(padding)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
                     .strokeBorder((tint ?? Color.primary).opacity(0.08), lineWidth: 1)
             )
-            .shadow(color: .black.opacity(0.06), radius: 10, y: 4)
+            .shadow(color: .black.opacity(0.055), radius: 12, y: 5)
     }
 }
 
@@ -102,12 +104,32 @@ struct PillButton: View {
 
 /// Scrollable container with consistent card spacing and grouped background.
 struct CardScroll<Content: View>: View {
+    private let refreshAction: (() async -> Void)?
     @ViewBuilder var content: Content
+
+    init(refreshAction: (() async -> Void)? = nil, @ViewBuilder content: () -> Content) {
+        self.refreshAction = refreshAction
+        self.content = content()
+    }
+
     var body: some View {
+        Group {
+            if let refreshAction {
+                scrollContent
+                    .refreshable { await refreshAction() }
+            } else {
+                scrollContent
+            }
+        }
+    }
+
+    private var scrollContent: some View {
         ScrollView {
             VStack(spacing: Theme.cardSpacing) { content }
-                .padding(16)
+                .padding(.horizontal, Theme.pagePadding)
+                .padding(.vertical, Theme.pagePadding)
         }
+        .scrollIndicators(.hidden)
         .background(Color(.systemGroupedBackground))
     }
 }

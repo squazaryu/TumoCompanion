@@ -9,7 +9,7 @@ struct FirmwareLibraryView: View {
     @State private var detailsRelease: FirmwareRelease?
 
     var body: some View {
-        CardScroll {
+        CardScroll(refreshAction: refreshLibrary) {
             connectionCard
             channelPicker
             if library.visibleGroups.isEmpty {
@@ -77,6 +77,11 @@ struct FirmwareLibraryView: View {
                 phasePill
             }
         }
+    }
+
+    private func refreshLibrary() async {
+        guard !library.busy else { return }
+        await library.refreshAndWait()
     }
 
     private var channelPicker: some View {
