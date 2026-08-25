@@ -25,6 +25,13 @@ struct TumoflipCatalogIndex: Codable, Equatable {
         let state: State
         let compatibility: Compatibility
 
+        enum CodingKeys: String, CodingKey {
+            case revision, tag, repository, state, compatibility
+            case releaseId = "release_id"
+            case manifestSHA256 = "manifest_sha256"
+            case archiveSHA256 = "archive_sha256"
+        }
+
         var id: String { "\(repository):\(tag):\(releaseId)" }
         var isInstallable: Bool { state == .active || state == .legacy }
     }
