@@ -104,8 +104,34 @@ final class TumoflipManifestPackageReleaseTests: XCTestCase {
         try manifest.validate()
 
         XCTAssertTrue(manifest.isIndependentBaselineCatalog)
+        XCTAssertTrue(manifest.isReferenceOnlyCatalog)
         XCTAssertTrue(manifest.packageManagedManifest().packages.values.allSatisfy(\.isEmpty))
         XCTAssertEqual(manifest.packageSurface().firmwareOwnedFileCount, 2)
+    }
+
+    func testIndependentDeltaWithOverlayIsNotReferenceOnly() throws {
+        let independent = packageRelease.replacingOccurrences(
+            of: "\"firmware_flash_unchanged\": true",
+            with: """
+            "firmware_flash_unchanged": true,
+              "catalog_channel": "dev",
+              "catalog_revision": 8,
+              "catalog_release_tag": "fw-packages-dev-008",
+              "catalog_install_scope": "delta",
+              "catalog_modified_targets": ["apps/esp.fap"],
+              "overlay_targets": ["apps/esp.fap"]
+            """
+        )
+        let manifest = try TumoflipManifest.decode(fixture(packageRelease: independent))
+        try manifest.validate()
+
+        XCTAssertFalse(manifest.isReferenceOnlyCatalog)
+    }
+
+    func testLegacyManifestIsNotReferenceOnly() throws {
+        let manifest = try TumoflipManifest.decode(fixture(packageRelease: nil))
+
+        XCTAssertFalse(manifest.isReferenceOnlyCatalog)
     }
 
     func testOlderCatalogUsesOverlayAllowlistAndNeverExposesBaseline() throws {

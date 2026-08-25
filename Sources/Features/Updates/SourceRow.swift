@@ -5,12 +5,13 @@ import SwiftUI
 /// which backend (tumoflip firmware packages vs all-the-plugins community apps)
 /// produced the state. Deliberately has NO "needs attention" case — exceptional states
 /// (first sync, protected review, failed verify) live in the screen's separate
-/// "Needs attention" card instead, so a row's badge always reads as one of these five
+/// "Needs attention" card instead, so a row's badge always reads as one of these six
 /// plain, comparable states and the two rows stay visually symmetric.
 enum SourceBadge: Equatable {
     case notChecked
     case checking
     case upToDate
+    case catalogReady
     case updatesAvailable(Int, of: Int? = nil)   // of: total units, e.g. "2 of 4" for groups
     case notInstalled
 
@@ -19,6 +20,7 @@ enum SourceBadge: Equatable {
         case .notChecked: return "Tap to check"
         case .checking: return "Checking…"
         case .upToDate: return "Up to date"
+        case .catalogReady: return "Catalog ready"
         case .updatesAvailable(let n, let of):
             if let of { return "\(n) of \(of) need updates" }
             return "\(n) update\(n == 1 ? "" : "s")"
@@ -30,7 +32,7 @@ enum SourceBadge: Equatable {
         switch self {
         case .notChecked, .notInstalled: return .secondary
         case .checking: return .secondary
-        case .upToDate: return .green
+        case .upToDate, .catalogReady: return .green
         case .updatesAvailable: return .orange
         }
     }
@@ -40,6 +42,7 @@ enum SourceBadge: Equatable {
         case .notChecked: return "questionmark.circle"
         case .checking: return "ellipsis.circle"
         case .upToDate: return "checkmark.circle.fill"
+        case .catalogReady: return "checkmark.seal.fill"
         case .updatesAvailable: return "arrow.down.circle.fill"
         case .notInstalled: return "circle.dashed"
         }

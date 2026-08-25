@@ -517,7 +517,9 @@ struct TumoflipUpdaterView: View {
                     Label("Rev \(updater.packageRevision)", systemImage: "shippingbox")
                         .foregroundStyle(.secondary)
                     Spacer()
-                    if let info = statusInfo(updater.overallStatus) {
+                    if updater.manifest?.isReferenceOnlyCatalog == true {
+                        StatusPill(text: "Catalog ready", color: .green, systemImage: "checkmark.seal.fill")
+                    } else if let info = statusInfo(updater.overallStatus) {
                         StatusPill(text: info.text, color: info.color, systemImage: info.icon)
                     }
                 }

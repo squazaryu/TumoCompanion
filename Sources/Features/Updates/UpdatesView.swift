@@ -138,6 +138,9 @@ struct UpdatesView: View {
     /// the header says "Everything is up to date").
     private var firmwareNeedsAction: Bool {
         guard packages.manifest != nil else { return false }
+        // An independent baseline is a valid catalog with no package-owned FAPs.
+        // It is reference metadata for firmware-owned files, not an install job.
+        if packages.manifest?.isReferenceOnlyCatalog == true { return false }
         switch packages.overallStatus {
         case .updateAvailable, .notInstalled: return true
         case .upToDate, .empty: return false
@@ -185,6 +188,7 @@ struct UpdatesView: View {
 
     private var packagesBadge: SourceBadge {
         guard packages.manifest != nil else { return .notChecked }
+        if packages.manifest?.isReferenceOnlyCatalog == true { return .catalogReady }
         switch packages.overallStatus {
         case .upToDate: return .upToDate
         case .notInstalled: return .notInstalled

@@ -425,6 +425,14 @@ struct TumoflipManifest: Codable, Equatable {
             manifestFirmwareVersion: firmware.version
         ) == .baseline
     }
+
+    /// An independent catalog can be valid without offering any files for an SD
+    /// install.  The baseline is a reference surface for firmware-owned FAPs; it
+    /// must not be presented as a missing package installation.
+    var isReferenceOnlyCatalog: Bool {
+        guard packageRelease?.isIndependentCatalog == true else { return false }
+        return packageSurface().managedFileCount == 0
+    }
 }
 
 enum TumoflipManifestError: Error, Equatable {
