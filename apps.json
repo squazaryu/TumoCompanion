@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.10.44",
+      "version": "1.10.45",
       "versionDate": "2026-08-25",
-      "versionDescription": "Fix Runtime diagnostics firmware display. FAB2 runtime/status intentionally carries an eight-character firmware prefix; the app now expands it from the complete device_info identity when available. Added fallback and regression coverage. Full validation passed: 561 unit tests and 15 UI tests. No firmware or FW Packages payload changes.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.44/TumoCompanion-unsigned.ipa",
-      "size": 25351442,
+      "versionDescription": "TumoCompanion 1.10.45 introduces the Tumo Live Deck home experience.\n\nHighlights:\n- Replaced the launcher grid with a vertical dashboard of independent live surfaces.\n- Added live device and BLE state, battery and bridge status, nearby Flippers, remote-screen preview, current activity, source health, quick launch actions, and an expandable Tools surface.\n- Added state-aware loading and activity animations with Reduce Motion support.\n- Preserved existing navigation routes, pull-to-refresh, package workflows, and device-service behavior.\n- Added a dedicated UI smoke test for the Live Deck and verified the complete simulator test suite.\n\nValidation:\n- iOS Simulator unit and UI tests: 16 passed, 0 failed.\n- No firmware or FW Packages behavior changes.\n- This is a UI-focused patch release with no migration required.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.45/TumoCompanion-unsigned.ipa",
+      "size": 25368144,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.10.45",
+          "date": "2026-08-25",
+          "localizedDescription": "TumoCompanion 1.10.45 introduces the Tumo Live Deck home experience.\n\nHighlights:\n- Replaced the launcher grid with a vertical dashboard of independent live surfaces.\n- Added live device and BLE state, battery and bridge status, nearby Flippers, remote-screen preview, current activity, source health, quick launch actions, and an expandable Tools surface.\n- Added state-aware loading and activity animations with Reduce Motion support.\n- Preserved existing navigation routes, pull-to-refresh, package workflows, and device-service behavior.\n- Added a dedicated UI smoke test for the Live Deck and verified the complete simulator test suite.\n\nValidation:\n- iOS Simulator unit and UI tests: 16 passed, 0 failed.\n- No firmware or FW Packages behavior changes.\n- This is a UI-focused patch release with no migration required.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.45/TumoCompanion-unsigned.ipa",
+          "size": 25368144,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.10.44",
           "date": "2026-08-25",
