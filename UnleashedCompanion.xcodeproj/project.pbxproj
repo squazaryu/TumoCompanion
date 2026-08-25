@@ -84,6 +84,7 @@
 		5B3AA404F2C6230D9FAC8795 /* TumoflipManifestPackageReleaseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78482E05DB7B6420088FF379 /* TumoflipManifestPackageReleaseTests.swift */; };
 		5CF5B93624E1418CAC1E13A9 /* TumoNetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85A71B8014DF7BCBEAE77C5A /* TumoNetView.swift */; };
 		5EAC241A8A24322589A7FB52 /* TumoflipUpdaterService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8697965C8EA5F8D768000FC9 /* TumoflipUpdaterService.swift */; };
+		5FFADBEF4597B3F7A0AD9FAA /* LiveDeckHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83F35A633E1B5B22888D35A0 /* LiveDeckHomeView.swift */; };
 		61371A51934A206CF6FF6545 /* FileEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB89F00DE286E56D6DA34162 /* FileEditorView.swift */; };
 		621D52882D83E8928D9FA094 /* TumoSpectrumView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7084FC33B12DC1EB57FB72EB /* TumoSpectrumView.swift */; };
 		624755C1707F30D1CF685556 /* ESP32Updater.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43BFF8A135671585F6B17A7C /* ESP32Updater.swift */; };
@@ -153,6 +154,7 @@
 		CF45484B76A4045DEB111C85 /* SourceRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 381F674E5A1903409E33517D /* SourceRow.swift */; };
 		CFDE4BE98F4A5BB2FC3232B4 /* FlipperCatalogClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9759CEE5F028AF5A01580A8 /* FlipperCatalogClient.swift */; };
 		D1F9B1FCB9746D60A07E5702 /* CustomizeHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B45DE40E2BC405AC4C85567B /* CustomizeHomeView.swift */; };
+		D4F22DB15550D7B88E3D4FE3 /* LiveDeckHomeUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02FBA7705F3270054F81BF98 /* LiveDeckHomeUITests.swift */; };
 		D5D267A9E0553575932192E6 /* AppBridgeConsole.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C77746A516D982B72D1FB47 /* AppBridgeConsole.swift */; };
 		D6ACA63F88F6163391E1E1FD /* ESP32FlashPackageManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9043704DE321E7D7FCC7972F /* ESP32FlashPackageManifest.swift */; };
 		D73CC8F61AEDB3DF57991AFA /* GitHubAccessCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19E12C880E5E2F99397122BC /* GitHubAccessCard.swift */; };
@@ -249,6 +251,7 @@
 /* Begin PBXFileReference section */
 		022BE984F8DAB89F987AEC28 /* DolphinAnimations */ = {isa = PBXFileReference; lastKnownFileType = folder; name = DolphinAnimations; path = Resources/DolphinAnimations; sourceTree = SOURCE_ROOT; };
 		02EF4133669223E43E09D659 /* UnleashedWidgets.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = UnleashedWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		02FBA7705F3270054F81BF98 /* LiveDeckHomeUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveDeckHomeUITests.swift; sourceTree = "<group>"; };
 		0544D0FD5C4C15A8EE3509DE /* FieldServicesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FieldServicesView.swift; sourceTree = "<group>"; };
 		0711A5F791B6D248100D3EBD /* ProtocolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtocolTests.swift; sourceTree = "<group>"; };
 		090EE11AA22E9A2D32CB5FBC /* FilesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilesView.swift; sourceTree = "<group>"; };
@@ -329,6 +332,7 @@
 		7DD006180A3983508A725752 /* ProtectedPluginAudit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtectedPluginAudit.swift; sourceTree = "<group>"; };
 		7ECF810E2BD149C8F1726216 /* UnleashedCompanion.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = UnleashedCompanion.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		824EE059E5BDBC0F8B7419E8 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		83F35A633E1B5B22888D35A0 /* LiveDeckHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveDeckHomeView.swift; sourceTree = "<group>"; };
 		856D8627B88920587D56B850 /* FirmwareLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirmwareLibrary.swift; sourceTree = "<group>"; };
 		85A71B8014DF7BCBEAE77C5A /* TumoNetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoNetView.swift; sourceTree = "<group>"; };
 		8697965C8EA5F8D768000FC9 /* TumoflipUpdaterService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoflipUpdaterService.swift; sourceTree = "<group>"; };
@@ -486,6 +490,7 @@
 			children = (
 				24AE55444A9A10FFD0C9F3C5 /* DeviceServicesUITests.swift */,
 				FCB5C504F3756F796BB35073 /* DolphinGalleryUITests.swift */,
+				02FBA7705F3270054F81BF98 /* LiveDeckHomeUITests.swift */,
 			);
 			path = UITests;
 			sourceTree = "<group>";
@@ -897,6 +902,7 @@
 			children = (
 				B503520198AB916BA4F47F10 /* DeviceInfoView.swift */,
 				DCE61D0B4EB2C9925E58FA87 /* DevicesView.swift */,
+				83F35A633E1B5B22888D35A0 /* LiveDeckHomeView.swift */,
 			);
 			path = Devices;
 			sourceTree = "<group>";
@@ -1197,6 +1203,7 @@
 			files = (
 				255DDC35E88194CCE38D71CB /* DeviceServicesUITests.swift in Sources */,
 				B384864F1C44B833958723B0 /* DolphinGalleryUITests.swift in Sources */,
+				D4F22DB15550D7B88E3D4FE3 /* LiveDeckHomeUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1255,6 +1262,7 @@
 				9D4526D85608E2635C63D0D8 /* HomeLayout.swift in Sources */,
 				3B8F9FDDE4E195CFAB92B2A1 /* InstallActivityController.swift in Sources */,
 				32DECC0F5D2C157C5F95F156 /* InstalledAppsView.swift in Sources */,
+				5FFADBEF4597B3F7A0AD9FAA /* LiveDeckHomeView.swift in Sources */,
 				3A33EB625F256D95748132BB /* LocationProvider.swift in Sources */,
 				20E37F40F64BD3080356A54F /* MacBridgeDiscovery.swift in Sources */,
 				A67E7F06A079691F84FE3B2A /* MarauderLiveView.swift in Sources */,
