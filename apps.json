@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.10.43",
+      "version": "1.10.44",
       "versionDate": "2026-08-25",
-      "versionDescription": "Fix independent FW Packages provenance display. Compatibility now uses catalog channel, API major and hardware target; historical producer firmware version remains provenance only. Added regression coverage. Full iOS test suite passed: 558 unit tests and 15 UI tests. No firmware update is required.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.43/TumoCompanion-unsigned.ipa",
-      "size": 25351165,
+      "versionDescription": "Fix Runtime diagnostics firmware display. FAB2 runtime/status intentionally carries an eight-character firmware prefix; the app now expands it from the complete device_info identity when available. Added fallback and regression coverage. Full validation passed: 561 unit tests and 15 UI tests. No firmware or FW Packages payload changes.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.44/TumoCompanion-unsigned.ipa",
+      "size": 25351442,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.10.44",
+          "date": "2026-08-25",
+          "localizedDescription": "Fix Runtime diagnostics firmware display. FAB2 runtime/status intentionally carries an eight-character firmware prefix; the app now expands it from the complete device_info identity when available. Added fallback and regression coverage. Full validation passed: 561 unit tests and 15 UI tests. No firmware or FW Packages payload changes.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.44/TumoCompanion-unsigned.ipa",
+          "size": 25351442,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.10.43",
           "date": "2026-08-25",
