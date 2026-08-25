@@ -33,6 +33,7 @@ struct PersonalizationSettingsView: View {
                                         Text("Keeps alpha for iOS Clear mode")
                                             .font(.caption2)
                                             .foregroundStyle(.secondary)
+                                            .fixedSize(horizontal: false, vertical: true)
                                     }
                                 }
                                 Spacer()

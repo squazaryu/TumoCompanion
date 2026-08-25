@@ -409,96 +409,44 @@ struct UpdatesView: View {
     }
 }
 
-/// Dedicated screen for managing protected (never-updated) apps. Kept off the
-/// main Updates list so the "unprotect" control can't be tapped by accident —
-/// removal is a deliberate left-swipe, not a one-tap minus.
+/// Dedicated screen for managing protected (never-updated) apps. Audit results are
+/// intentionally grouped into three user-facing states; tapping a row opens the full
+/// provenance and compatibility detail in a bottom sheet rather than expanding every
+/// row inline.
 struct ProtectedAppsView: View {
     @ObservedObject var updater: PluginUpdater
     @State private var newExclusion = ""
+    @State private var selectedDetail: ProtectedReviewDetail?
 
     var body: some View {
         List {
             if let failure = updater.protectedAuditFailure {
                 Section {
-                    Label(
-                        failure.failureKind?.label ?? "AUDIT UNAVAILABLE",
-                        systemImage: failure.failureKind == .invalid
-                            ? "xmark.shield.fill"
-                            : "questionmark.shield.fill"
+                    ActionableErrorView(
+                        title: failure.failureKind?.label ?? "AUDIT UNAVAILABLE",
+                        message: failure.failure ?? "Protected-app audit could not be loaded.",
+                        actionTitle: "Retry audit",
+                        accessibilityIdentifier: "protected-app-audit-global-status",
+                        action: retryAudit
                     )
-                    .foregroundStyle(failure.failureKind == .invalid ? .red : .orange)
-                    .accessibilityIdentifier("protected-app-audit-global-status")
-                } footer: {
-                    Text(failure.failure ?? "Protected-app audit could not be loaded.")
-                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
-            if !updater.unverifiedProtectedReviews.isEmpty {
-                Section {
-                    ForEach(updater.unverifiedProtectedReviews) { item in
-                        ProtectedReviewRow(
-                            item: item,
-                            compatibility: updater.classification(item.remotePath),
-                            auditStatus: .unverified)
-                    }
-                } header: {
-                    Text("Unverified")
-                } footer: {
-                    Text("The centralized audit was not available, so no per-file MD5 verdict was produced. Verify again when the ledger is available.")
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-
-            if !updater.protectedDeviceCheckReviews.isEmpty {
-                Section {
-                    ForEach(updater.protectedDeviceCheckReviews) { item in
-                        ProtectedReviewRow(
-                            item: item,
-                            compatibility: updater.classification(item.remotePath),
-                            auditStatus: .needsReview)
-                    }
-                } header: {
-                    Text("Check on device")
-                } footer: {
-                    Text("These protected apps have not been compared with this Flipper yet. Connect it and use Verify on device; this is not a DIFF.")
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-
-            if !updater.protectedDeviceDiffReviews.isEmpty {
-                Section {
-                    ForEach(updater.protectedDeviceDiffReviews) { item in
-                        ProtectedReviewRow(
-                            item: item,
-                            compatibility: updater.classification(item.remotePath),
-                            auditStatus: .needsReview)
-                    }
-                } header: {
-                    Text("Needs review")
-                } footer: {
-                    Text("Protected apps whose source, route, or installed target bytes differ from the successfully loaded centralized audit.")
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-
-            if !updater.auditedProtectedReviews.isEmpty {
-                Section {
-                    ForEach(updater.auditedProtectedReviews) { item in
-                        ProtectedReviewRow(
-                            item: item,
-                            compatibility: updater.classification(item.remotePath),
-                            auditStatus: updater.protectedReviewStatus(item))
-                    }
-                } header: {
-                    Text("Verified by Tumoflip audit")
-                } footer: {
-                    let source = updater.protectedAuditResolution?.origin?.rawValue ?? "ledger"
-                    let tag = updater.protectedAuditResolution?.audit?.sourceTag ?? updater.tag
-                    Text("Exact pack, source, route, and installed target bytes are covered by the centralized \(tag) audit (\(source)). Any change or incompatible metadata returns to Needs review automatically.")
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
+            statusSection(
+                title: "Verified",
+                items: verifiedDetails,
+                footer: verifiedFooter
+            )
+            statusSection(
+                title: "Needs review",
+                items: needsReviewDetails,
+                footer: needsReviewFooter
+            )
+            statusSection(
+                title: "Missing",
+                items: missingDetails,
+                footer: "The protected Community Pack path is absent on this Flipper. Open a row for the expected path and choose Verify on device or install the matching protected package."
+            )
 
             Section {
                 ForEach(updater.builtInProtectedNames, id: \.self) { name in
@@ -508,7 +456,8 @@ struct ProtectedAppsView: View {
                             .foregroundStyle(lifted ? .orange : .indigo).font(.caption)
                         Text(name).font(.system(.footnote, design: .monospaced))
                             .foregroundStyle(lifted ? .secondary : .primary)
-                        Spacer()
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 8)
                         Text(lifted ? "unprotected" : "tumoflip")
                             .font(.caption2)
                             .foregroundStyle(lifted ? .orange : .secondary)
@@ -541,6 +490,7 @@ struct ProtectedAppsView: View {
                     HStack {
                         Image(systemName: "lock.fill").foregroundStyle(.indigo).font(.caption)
                         Text(name).font(.system(.footnote, design: .monospaced))
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     .swipeActions(edge: .trailing) {
                         Button(role: .destructive) { updater.removeExclusion(name) } label: {
@@ -556,18 +506,99 @@ struct ProtectedAppsView: View {
             }
 
             Section("Add protection") {
-                HStack {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
                     TextField("app name (e.g. quac)", text: $newExclusion)
                         .autocorrectionDisabled().textInputAutocapitalization(.never)
                         .onSubmit { addCurrent() }
                     Button { addCurrent() } label: {
                         Image(systemName: "plus.circle.fill")
-                    }.disabled(newExclusion.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
+                    .disabled(newExclusion.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }
         }
         .navigationTitle("Protected apps")
         .navigationBarTitleDisplayMode(.inline)
+        .refreshable { await updater.check() }
+        .sheet(item: $selectedDetail) { detail in
+            NavigationStack {
+                ProtectedAppDetailSheet(detail: detail)
+            }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
+    }
+
+    private var verifiedDetails: [ProtectedReviewDetail] {
+        details { $0.status.isAudited }
+    }
+
+    private var missingDetails: [ProtectedReviewDetail] {
+        details {
+            $0.status == .needsReview && $0.item.deviceKnown && $0.item.deviceMD5 == nil
+        }
+    }
+
+    private var needsReviewDetails: [ProtectedReviewDetail] {
+        details {
+            !$0.status.isAudited && !($0.status == .needsReview && $0.item.deviceKnown && $0.item.deviceMD5 == nil)
+        }
+    }
+
+    private func details(where predicate: (ProtectedReviewDetail) -> Bool) -> [ProtectedReviewDetail] {
+        updater.protectedReviews
+            .map(detail(for:))
+            .filter(predicate)
+    }
+
+    private func detail(for item: ProtectedPluginReview) -> ProtectedReviewDetail {
+        ProtectedReviewDetail(
+            item: item,
+            compatibility: updater.classification(item.remotePath),
+            status: updater.protectedReviewStatus(item)
+        )
+    }
+
+    private var verifiedFooter: String {
+        let source = updater.protectedAuditResolution?.origin?.rawValue ?? "ledger"
+        let tag = updater.protectedAuditResolution?.audit?.sourceTag ?? updater.tag
+        return "Exact pack, source, route, and installed target bytes are covered by the centralized \(tag) audit (\(source)). Any change or incompatible metadata returns to Needs review automatically."
+    }
+
+    private var needsReviewFooter: String {
+        if updater.protectedAuditFailure != nil {
+            return "The authoritative audit is unavailable, so these files are unverified rather than DIFF. Retry the audit before making a provenance decision."
+        }
+        return "These protected apps need a device check or a provenance review. Open a row for the exact path, API, target and MD5 values."
+    }
+
+    @ViewBuilder
+    private func statusSection(
+        title: String,
+        items: [ProtectedReviewDetail],
+        footer: String
+    ) -> some View {
+        if !items.isEmpty {
+            Section {
+                ForEach(items) { detail in
+                    ProtectedReviewRow(
+                        item: detail.item,
+                        compatibility: detail.compatibility,
+                        auditStatus: detail.status,
+                        onTap: { selectedDetail = detail }
+                    )
+                }
+            } header: {
+                Text(title)
+            } footer: {
+                Text(footer)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private func retryAudit() {
+        Task { await updater.check() }
     }
 
     private func addCurrent() {
@@ -575,6 +606,129 @@ struct ProtectedAppsView: View {
         guard !name.isEmpty else { return }
         if updater.addExclusion(name) {
             newExclusion = ""
+        }
+    }
+}
+
+struct ProtectedReviewDetail: Identifiable {
+    let item: ProtectedPluginReview
+    let compatibility: FapCompatibilityState
+    let status: ProtectedPluginReviewAuditStatus
+
+    var id: String { item.id }
+}
+
+struct ProtectedAppDetailSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let detail: ProtectedReviewDetail
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: Theme.cardSpacing) {
+                SectionCard(title: "Verdict", systemImage: "checkmark.shield") {
+                    HStack(spacing: 10) {
+                        Image(systemName: statusIcon)
+                            .font(.title3)
+                            .foregroundStyle(statusColor)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(statusText)
+                                .font(.headline)
+                                .foregroundStyle(statusColor)
+                            Text(statusExplanation)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+
+                SectionCard(title: "Application", systemImage: "app.badge") {
+                    detailRow("Name", detail.item.name)
+                    detailRow("Pack", detail.item.pack)
+                    detailRow("Source", detail.item.remotePath)
+                    detailRow("Install target", detail.item.targetPath)
+                    detailRow("Size", ByteCountFormatter.string(fromByteCount: Int64(detail.item.size), countStyle: .file))
+                }
+
+                SectionCard(title: "Integrity", systemImage: "number.circle") {
+                    detailRow("Expected MD5", detail.item.newMD5)
+                    detailRow("Device MD5", detail.item.deviceMD5 ?? "Not present")
+                    if let metadata = detail.compatibility.metadata {
+                        detailRow("Compatibility", "API \(metadata.apiVersionString) · target \(metadata.hardwareTarget)")
+                    } else if let reason = detail.compatibility.reason {
+                        detailRow("Compatibility", reason)
+                    }
+                }
+            }
+            .padding(.horizontal, Theme.pagePadding)
+            .padding(.vertical, Theme.pagePadding)
+        }
+        .background(Color(.systemGroupedBackground))
+        .navigationTitle(detail.item.name)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Done") { dismiss() }
+            }
+        }
+    }
+
+    private func detailRow(_ title: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.caption)
+                .foregroundStyle(.primary)
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var statusText: String {
+        switch detail.status {
+        case .verified: return "Verified"
+        case .sourceMatches: return "Source matches"
+        case .intentionallyReplaced: return "Intentionally replaced"
+        case .unverified: return "Needs review"
+        case .needsReview:
+            return detail.item.deviceKnown && detail.item.deviceMD5 == nil ? "Missing" : "Needs review"
+        }
+    }
+
+    private var statusExplanation: String {
+        switch detail.status {
+        case .verified, .sourceMatches:
+            return "The exact pack, route and device bytes are covered by the Tumoflip audit."
+        case .intentionallyReplaced:
+            return "The upstream app is intentionally replaced by the Tumoflip route."
+        case .unverified:
+            return "The authoritative audit is unavailable, so no byte-level verdict was produced."
+        case .needsReview:
+            return detail.item.deviceKnown && detail.item.deviceMD5 == nil
+                ? "The expected protected path is not present on the device."
+                : "The device, route or audit metadata needs a closer look."
+        }
+    }
+
+    private var statusIcon: String {
+        switch detail.status {
+        case .verified, .sourceMatches, .intentionallyReplaced: return "checkmark.seal.fill"
+        case .unverified: return "questionmark.shield.fill"
+        case .needsReview:
+            return detail.item.deviceKnown && detail.item.deviceMD5 == nil
+                ? "minus.circle.fill" : "exclamationmark.shield.fill"
+        }
+    }
+
+    private var statusColor: Color {
+        switch detail.status {
+        case .verified, .sourceMatches, .intentionallyReplaced: return .green
+        case .unverified: return .secondary
+        case .needsReview:
+            return detail.item.deviceKnown && detail.item.deviceMD5 == nil ? .orange : .red
         }
     }
 }
@@ -631,6 +785,7 @@ struct ProtectedReviewRow: View {
     let item: ProtectedPluginReview
     let compatibility: FapCompatibilityState
     let auditStatus: ProtectedPluginReviewAuditStatus
+    let onTap: () -> Void
 
     private var isAudited: Bool { auditStatus.isAudited }
     private var isUnverified: Bool { auditStatus == .unverified }
@@ -647,36 +802,52 @@ struct ProtectedReviewRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: isAudited
-                  ? "checkmark.seal.fill"
-                  : (isUnverified || !item.deviceKnown ? "questionmark.circle.fill" : "lock.fill"))
-                .foregroundStyle(isAudited ? .green : (isUnverified || !item.deviceKnown ? .secondary : .orange))
-                .frame(width: 20)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(item.name).font(.subheadline)
-                Text(item.isRouted ? "\(item.category) -> \(item.targetCategory) (tumoflip route)" : "\(item.category) · \(item.pack)")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                if let reason = compatibility.reason {
-                    Text(reason)
-                        .font(.caption2)
-                        .foregroundStyle(.red)
+        Button(action: onTap) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: isAudited
+                      ? "checkmark.seal.fill"
+                      : (isUnverified || !item.deviceKnown ? "questionmark.circle.fill" : "lock.fill"))
+                    .foregroundStyle(isAudited ? .green : (isUnverified || !item.deviceKnown ? .secondary : .orange))
+                    .frame(width: 20)
+                    .padding(.top, 2)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(item.name)
+                        .font(.subheadline)
+                        .foregroundStyle(.primary)
                         .fixedSize(horizontal: false, vertical: true)
-                } else if let metadata = compatibility.metadata {
-                    Text("API \(metadata.apiVersionString) · target \(metadata.hardwareTarget)")
+                    Text(item.isRouted ? "\(item.category) -> \(item.targetCategory) (tumoflip route)" : "\(item.category) · \(item.pack)")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let reason = compatibility.reason {
+                        Text(reason)
+                            .font(.caption2)
+                            .foregroundStyle(.red)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else if let metadata = compatibility.metadata {
+                        Text("API \(metadata.apiVersionString) · target \(metadata.hardwareTarget)")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Text(statusText)
+                        .font(.caption2)
+                        .bold()
+                        .foregroundStyle(isAudited ? .green : (isUnverified || !item.deviceKnown ? .secondary : .orange))
+                        .accessibilityIdentifier("protected-app-review-status-\(item.name)")
                 }
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+                    .padding(.top, 3)
             }
-            Spacer()
-            Text(statusText)
-                .font(.caption2)
-                .bold()
-                .foregroundStyle(isAudited ? .green : (isUnverified || !item.deviceKnown ? .secondary : .orange))
-                .accessibilityIdentifier("protected-app-review-status-\(item.name)")
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 3)
+            .contentShape(Rectangle())
         }
-        .padding(.vertical, 3)
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("protected-app-row-\(item.name)")
     }
 }
 

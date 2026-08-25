@@ -165,6 +165,7 @@
 		E79C6619468C7F98B5CC5723 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6DB8FBDDFA1BA4791D40EADD /* Assets.xcassets */; };
 		E930003EB761E5C7508356C3 /* PersonalizationSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EA4626A8FC90297BDBAF45B /* PersonalizationSettingsView.swift */; };
 		EAC0D7A0739C0B6EF7565475 /* ProtocolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0711A5F791B6D248100D3EBD /* ProtocolTests.swift */; };
+		EAC745F4B6A84F12F9A78CBF /* AsyncStateComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAC4D255962F3DE6272FFC3B /* AsyncStateComponents.swift */; };
 		EAEEC9F6B54EE144CBB3E418 /* TumoflipUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A2841D785BA1CA7A7A15B8B /* TumoflipUpdater.swift */; };
 		EF29087E95CB46A7D220142A /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 824EE059E5BDBC0F8B7419E8 /* SettingsView.swift */; };
 		EF56AFBD98636A14B23FEACB /* TumoflipInstallerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3CBD3609865B0C18EB48702 /* TumoflipInstallerTests.swift */; };
@@ -386,6 +387,7 @@
 		C45488972BD725C3ECE8BDA8 /* MacBridgeDiscovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacBridgeDiscovery.swift; sourceTree = "<group>"; };
 		C6F24142729978361986A6C2 /* AIRadarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIRadarView.swift; sourceTree = "<group>"; };
 		C823E47E64B2DF1022C4964B /* MarauderLiveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarauderLiveView.swift; sourceTree = "<group>"; };
+		CAC4D255962F3DE6272FFC3B /* AsyncStateComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AsyncStateComponents.swift; sourceTree = "<group>"; };
 		CBA5FCA0F80809900471F32E /* PluginUpdateMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginUpdateMonitor.swift; sourceTree = "<group>"; };
 		CC55E01E623BEF12E94B15DA /* DolphinPreviews */ = {isa = PBXFileReference; lastKnownFileType = folder; name = DolphinPreviews; path = Resources/DolphinPreviews; sourceTree = SOURCE_ROOT; };
 		CFD10DB620EC18749FE46591 /* FirmwareLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirmwareLibraryView.swift; sourceTree = "<group>"; };
@@ -599,6 +601,7 @@
 		540C5BDB1E72466592DE3583 /* UI */ = {
 			isa = PBXGroup;
 			children = (
+				CAC4D255962F3DE6272FFC3B /* AsyncStateComponents.swift */,
 				F9183EF8E1FF8617A2B48EA8 /* Theme.swift */,
 			);
 			path = UI;
@@ -1204,6 +1207,7 @@
 				08FC1F6E6EA1377927AA4124 /* AppBridge.swift in Sources */,
 				D5D267A9E0553575932192E6 /* AppBridgeConsole.swift in Sources */,
 				63C2AC8BC494254D9F0A745C /* AppBridgeRequest.swift in Sources */,
+				EAC745F4B6A84F12F9A78CBF /* AsyncStateComponents.swift in Sources */,
 				A910F14D11CCC2B19261AB3F /* BackupView.swift in Sources */,
 				58ADEF0B8E8D011FDB32D17F /* BridgeView.swift in Sources */,
 				FD2037726A6354E2F8C9A7C1 /* BuddyRelay.swift in Sources */,

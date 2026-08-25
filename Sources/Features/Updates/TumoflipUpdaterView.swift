@@ -287,26 +287,28 @@ struct TumoflipUpdaterView: View {
         _ value: String,
         identifier: String? = nil
     ) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
+        VStack(alignment: .leading, spacing: 3) {
             Text(title)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
-                .frame(width: 100, alignment: .leading)
-            if let identifier {
-                Text(value)
-                    .font(.caption2)
-                    .foregroundStyle(.primary)
-                    .lineLimit(2)
-                    .truncationMode(.middle)
-                    .accessibilityIdentifier(identifier)
-            } else {
-                Text(value)
-                    .font(.caption2)
-                    .foregroundStyle(.primary)
-                    .lineLimit(2)
-                    .truncationMode(.middle)
-            }
-            Spacer(minLength: 0)
+            metadataValue(value, identifier: identifier)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func metadataValue(_ value: String, identifier: String?) -> some View {
+        if let identifier {
+            Text(value)
+                .font(.caption2)
+                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier(identifier)
+        } else {
+            Text(value)
+                .font(.caption2)
+                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -539,45 +541,42 @@ struct TumoflipUpdaterView: View {
             }
         case .installing(let done, let total, let file):
             VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text("\(file) · \(updater.transferChannel.label)")
-                        .font(.callout).lineLimit(1).truncationMode(.middle)
-                    Spacer()
-                    Text("\(Int(Double(done) / Double(max(total, 1)) * 100))%")
-                        .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
-                }
-                ProgressView(value: Double(min(done, total)), total: Double(max(total, 1)))
-                    .tint(Theme.accent)
+                UnifiedProgressView(
+                    title: file,
+                    detail: "\(Int(Double(done) / Double(max(total, 1)) * 100))% · \(updater.transferChannel.label)",
+                    fraction: Double(min(done, total)) / Double(max(total, 1)),
+                    tint: Theme.accent
+                )
                 keepAwakeNote
             }
         case .cleaning(let done, let total, let file):
             VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text("\(file) · \(updater.transferChannel.label)")
-                        .font(.callout)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    Spacer()
-                    Text("\(done)/\(total)")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                }
-                ProgressView(value: Double(min(done, total)), total: Double(max(total, 1)))
-                    .tint(.orange)
+                UnifiedProgressView(
+                    title: file,
+                    detail: "\(done)/\(total) · \(updater.transferChannel.label)",
+                    fraction: Double(min(done, total)) / Double(max(total, 1)),
+                    tint: .orange
+                )
                 keepAwakeNote
             }
         case .done(let m):
             Label(m, systemImage: "checkmark.circle.fill").foregroundStyle(.green)
                 .fixedSize(horizontal: false, vertical: true)
         case .failed(let m):
-            Label(m, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red)
-                .fixedSize(horizontal: false, vertical: true)
+            ActionableErrorView(
+                title: "FW Packages action failed",
+                message: m,
+                actionTitle: "Retry",
+                action: { Task {
+                    await updater.reload(recover: hasFileChannel)
+                    await updater.validateCompatibility()
+                } }
+            )
         }
     }
 
     private func progress(_ text: String) -> some View {
-        HStack { ProgressView(); Text(text).foregroundStyle(.secondary) }
+        LoadingStateView(title: text, compact: true)
     }
 
     /// Shown during a live transaction: locking the phone mid-install tears down BLE.
@@ -819,26 +818,12 @@ struct FWPackagesActionBar: View {
         stopTitle: String
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(stopRequested ? "Stopping safely…" : title)
-                    .font(.callout.weight(.semibold))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Spacer(minLength: 8)
-                Text(detail)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
-                    .lineLimit(1)
-            }
-            Group {
-                if let progress {
-                    ProgressView(value: progress)
-                } else {
-                    ProgressView()
-                }
-            }
-            .tint(tint)
+            UnifiedProgressView(
+                title: stopRequested ? "Stopping safely…" : title,
+                detail: detail,
+                fraction: progress,
+                tint: tint
+            )
             .accessibilityIdentifier("fw-packages-progress")
 
             Button(role: .destructive, action: stop) {

@@ -496,7 +496,7 @@ final class ProtectedPluginAuditTests: XCTestCase {
     func testGlobalAuditFailureDoesNotCreatePerFileReviewDiffs() {
         let updater = PluginUpdater.protectedAuditUnavailableQAFixture()
 
-        XCTAssertEqual(updater.unverifiedProtectedReviews.count, 3)
+        XCTAssertEqual(updater.unverifiedProtectedReviews.count, 4)
         XCTAssertTrue(updater.pendingProtectedReview.isEmpty)
         XCTAssertEqual(updater.protectedAuditFailure?.failureKind, .unavailable)
         XCTAssertTrue(updater.unverifiedProtectedReviews.allSatisfy {

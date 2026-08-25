@@ -98,10 +98,13 @@ struct FirmwareLibraryView: View {
 
     private var emptyCard: some View {
         SectionCard(title: "No releases", systemImage: "tray") {
-            HStack(spacing: 10) {
-                if library.busy { ProgressView() }
+            if library.busy {
+                LoadingStateView(title: "Loading firmware releases…", compact: true)
+            } else {
                 Text(emptyMessage)
-                    .font(.subheadline).foregroundStyle(.secondary)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -247,7 +250,13 @@ struct FirmwareLibraryView: View {
         case .done(let message):
             resultBar(message, color: .green, icon: "checkmark.circle.fill")
         case .failed(let message):
-            resultBar(message, color: .red, icon: "exclamationmark.triangle.fill")
+            resultBar(
+                message,
+                color: .red,
+                icon: "exclamationmark.triangle.fill",
+                actionTitle: "Retry",
+                action: { library.refresh() }
+            )
         default:
             EmptyView()
         }
@@ -255,12 +264,11 @@ struct FirmwareLibraryView: View {
 
     private func transferProgress(title: String, fraction: Double?, canStop: Bool = false) -> some View {
         VStack(spacing: 8) {
-            HStack {
-                Text(title).font(.caption).lineLimit(1).truncationMode(.middle)
-                Spacer()
-                if let fraction { Text(fraction, format: .percent.precision(.fractionLength(0))).font(.caption.monospacedDigit()) }
-            }
-            if let fraction { ProgressView(value: fraction) } else { ProgressView() }
+            UnifiedProgressView(
+                title: title,
+                detail: fraction.map { $0.formatted(.percent.precision(.fractionLength(0))) },
+                fraction: fraction
+            )
             if canStop {
                 Button(role: .destructive) { library.requestStop() } label: {
                     Label(library.stopRequested ? "Stopping after this file" : "Stop",
@@ -275,12 +283,32 @@ struct FirmwareLibraryView: View {
         .background(.bar)
     }
 
-    private func resultBar(_ message: String, color: Color, icon: String) -> some View {
-        Label(message, systemImage: icon)
-            .font(.caption).foregroundStyle(color)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding()
+    @ViewBuilder
+    private func resultBar(
+        _ message: String,
+        color: Color,
+        icon: String,
+        actionTitle: String? = nil,
+        action: (() -> Void)? = nil
+    ) -> some View {
+        if let actionTitle, let action {
+            ActionableErrorView(
+                title: "Firmware transfer failed",
+                message: message,
+                actionTitle: actionTitle,
+                action: action
+            )
+            .padding(.horizontal, Theme.pagePadding)
+            .padding(.vertical, 10)
             .background(.bar)
+        } else {
+            Label(message, systemImage: icon)
+                .font(.caption)
+                .foregroundStyle(color)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding()
+                .background(.bar)
+        }
     }
 }
 

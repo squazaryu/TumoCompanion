@@ -73,10 +73,11 @@ struct SettingsCategoryCard<Destination: View>: View {
                     Text(title)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.primary)
+                        .fixedSize(horizontal: false, vertical: true)
                     Text(subtitle)
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 8)
                 Image(systemName: "chevron.right")
@@ -106,9 +107,11 @@ struct SettingsHeroCard: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("TumoCompanion")
                         .font(.title3.weight(.semibold))
+                        .fixedSize(horizontal: false, vertical: true)
                     Text("Personalize the app and its device bridge")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             HStack(spacing: 8) {

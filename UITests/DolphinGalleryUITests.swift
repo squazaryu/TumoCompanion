@@ -236,7 +236,7 @@ final class ProtectedAppsAuditUITests: XCTestCase {
         ]
         app.launch()
 
-        XCTAssertTrue(app.staticTexts["Verified by Tumoflip audit"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["Verified"].waitForExistence(timeout: 3))
         XCTAssertEqual(
             app.staticTexts["protected-app-review-status-esp_flasher"].label,
             "VERIFIED")
@@ -244,6 +244,7 @@ final class ProtectedAppsAuditUITests: XCTestCase {
             app.staticTexts["protected-app-review-status-claude_remote_ble"].label,
             "REPLACED")
         XCTAssertTrue(app.staticTexts["Needs review"].exists)
+        XCTAssertTrue(app.staticTexts["Missing"].exists)
         XCTAssertEqual(
             app.staticTexts["protected-app-review-status-subghz_raw_edit"].label,
             "DIFF")
@@ -252,6 +253,24 @@ final class ProtectedAppsAuditUITests: XCTestCase {
         screenshot.name = "Protected apps centralized audit statuses"
         screenshot.lifetime = .keepAlways
         add(screenshot)
+    }
+
+    func testProtectedRowOpensSingleDetailSheet() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-onboardingDone", "YES",
+            "-protected-apps-audit-qa",
+        ]
+        app.launch()
+
+        let row = app.buttons["protected-app-row-esp_flasher"]
+        XCTAssertTrue(row.waitForExistence(timeout: 3))
+        row.tap()
+        XCTAssertTrue(app.navigationBars["esp_flasher"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["Expected MD5"].exists)
+        XCTAssertTrue(app.staticTexts["Install target"].exists)
+        app.buttons["Done"].tap()
+        XCTAssertTrue(row.waitForExistence(timeout: 3))
     }
 
     func testUnavailableAuditIsOneGlobalFailureAndRowsAreUnverified() {
@@ -265,7 +284,7 @@ final class ProtectedAppsAuditUITests: XCTestCase {
         let global = app.staticTexts["protected-app-audit-global-status"]
         XCTAssertTrue(global.waitForExistence(timeout: 3))
         XCTAssertEqual(global.label, "AUDIT UNAVAILABLE")
-        XCTAssertTrue(app.staticTexts["Unverified"].exists)
+        XCTAssertTrue(app.staticTexts["Needs review"].exists)
         XCTAssertEqual(
             app.staticTexts["protected-app-review-status-esp_flasher"].label,
             "UNVERIFIED")
@@ -273,7 +292,7 @@ final class ProtectedAppsAuditUITests: XCTestCase {
             app.staticTexts["protected-app-review-status-subghz_raw_edit"].label,
             "UNVERIFIED")
         XCTAssertFalse(app.staticTexts["DIFF"].exists)
-        XCTAssertFalse(app.staticTexts["Needs review"].exists)
+        XCTAssertFalse(app.staticTexts["Verified"].exists)
     }
 
     func testMalformedAuditIsGlobalInvalidInsteadOfPerFileDiff() {

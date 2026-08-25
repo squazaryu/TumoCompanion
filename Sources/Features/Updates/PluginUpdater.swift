@@ -2952,6 +2952,13 @@ extension PluginUpdater {
                 newMD5: String(repeating: "3", count: 32),
                 deviceMD5: String(repeating: "b", count: 32),
                 deviceKnown: true, size: 32_000),
+            ProtectedPluginReview(
+                remotePath: "/ext/apps/Tools/missing_protected_app.fap",
+                targetPath: "/ext/apps/Tools/missing_protected_app.fap",
+                name: "missing_protected_app", category: "Tools", pack: "base",
+                newMD5: String(repeating: "4", count: 32),
+                deviceMD5: nil,
+                deviceKnown: true, size: 24_000),
         ]
         let metadata = FapMetadata(apiMajor: 88, apiMinor: 2, hardwareTarget: 7)
         updater.classifications = Dictionary(

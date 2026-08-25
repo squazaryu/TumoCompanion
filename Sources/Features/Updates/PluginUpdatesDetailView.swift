@@ -454,37 +454,37 @@ struct PluginUpdatesDetailView: View {
             Label(m, systemImage: "checkmark.circle.fill").foregroundStyle(.green)
                 .fixedSize(horizontal: false, vertical: true)
         case .failed(let m):
-            Label(m, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red)
-                .fixedSize(horizontal: false, vertical: true)
+            ActionableErrorView(
+                title: "Community apps check failed",
+                message: m,
+                actionTitle: "Retry",
+                action: { Task { await updater.check() } }
+            )
         }
     }
 
     private func progress(_ text: String) -> some View {
-        HStack { ProgressView(); Text(text).foregroundStyle(.secondary) }
+        LoadingStateView(title: text, compact: true)
     }
 
     /// Live install row: app counter + the current file's name and a real byte
     /// progress bar, so it's obvious it's moving (not hung).
     @ViewBuilder private func installingRow(_ i: Int, _ n: Int) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                ProgressView().scaleEffect(0.85)
-                Text("Installing via \(updater.installDetail?.channel.label ?? transfer.activeChannel.label) \(i)/\(n)")
-                    .foregroundStyle(.secondary)
-            }
+            LoadingStateView(
+                title: "Installing via \(updater.installDetail?.channel.label ?? transfer.activeChannel.label)",
+                detail: "App \(i)/\(n)",
+                compact: true
+            )
             if let d = updater.installDetail {
-                HStack {
-                    Text(d.name).font(.caption).lineLimit(1)
-                    if d.attempt > 1 {
-                        Spacer()
-                        Text("retry \(d.attempt)").font(.caption2).foregroundStyle(.orange)
-                    }
-                }
-                ProgressView(value: Double(d.sent), total: Double(max(d.total, 1)))
-                    .tint(.orange)
-                Text("\(byteStr(d.sent)) / \(byteStr(d.total))")
-                    .font(.caption2).foregroundStyle(.secondary)
-                    .monospacedDigit()
+                UnifiedProgressView(
+                    title: d.name,
+                    detail: d.attempt > 1
+                        ? "retry \(d.attempt) · \(byteStr(d.sent)) / \(byteStr(d.total))"
+                        : "\(byteStr(d.sent)) / \(byteStr(d.total))",
+                    fraction: Double(d.sent) / Double(max(d.total, 1)),
+                    tint: .orange
+                )
             }
         }
     }
