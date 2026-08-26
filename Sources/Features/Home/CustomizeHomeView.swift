@@ -25,6 +25,94 @@ struct CustomizeHomeView: View {
             }
 
             Section {
+                if layout.quickAccessTiles.isEmpty {
+                    Text("Nothing selected — add up to four destinations below.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(layout.quickAccessTiles) { tile in
+                        HStack(spacing: 12) {
+                            icon(tile.systemImage, tile.tint)
+                            Text(tile.title)
+                            Spacer()
+                            Button {
+                                withAnimation { layout.toggleQuickAccess(tile) }
+                            } label: {
+                                Image(systemName: "minus.circle.fill")
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.borderless)
+                            .accessibilityLabel("Remove \(tile.title) from Quick Access")
+                        }
+                    }
+                    .onMove { layout.reorderQuickAccess(from: $0, to: $1) }
+                }
+
+                ForEach(layout.quickAccessCandidates.filter { !layout.isQuickAccess($0) }) { tile in
+                    Button {
+                        withAnimation { layout.toggleQuickAccess(tile) }
+                    } label: {
+                        HStack(spacing: 12) {
+                            icon(tile.systemImage, tile.tint)
+                            Text("Add \(tile.title)")
+                            Spacer()
+                            Image(systemName: "plus.circle.fill")
+                                .foregroundStyle(layout.canAddQuickAccess(tile) ? Theme.accent : Color.secondary.opacity(0.45))
+                        }
+                    }
+                    .disabled(!layout.canAddQuickAccess(tile))
+                }
+            } header: {
+                Label("Quick Access", systemImage: "square.grid.2x2")
+            } footer: {
+                Text("Choose up to four items from Tools and the core actions shown inside the Flipper Console. Drag to reorder.")
+            }
+
+            Section {
+                if layout.toolsQuickAccessTiles.isEmpty {
+                    Text("Nothing selected — add up to six tools below.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(layout.toolsQuickAccessTiles) { tool in
+                        HStack(spacing: 12) {
+                            icon(tool.systemImage, tool.tint)
+                            Text(tool.title)
+                            Spacer()
+                            Button {
+                                withAnimation { layout.toggleToolQuickAccess(tool.id) }
+                            } label: {
+                                Image(systemName: "minus.circle.fill")
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.borderless)
+                            .accessibilityLabel("Remove \(tool.title) from Tools Quick Access")
+                        }
+                    }
+                    .onMove { layout.reorderToolQuickAccess(from: $0, to: $1) }
+                }
+
+                ForEach(layout.toolCandidates.filter { !layout.isToolQuickAccess($0.id) }) { tool in
+                    Button {
+                        withAnimation { layout.toggleToolQuickAccess(tool.id) }
+                    } label: {
+                        HStack(spacing: 12) {
+                            icon(tool.systemImage, tool.tint)
+                            Text("Add \(tool.title)")
+                            Spacer()
+                            Image(systemName: "plus.circle.fill")
+                                .foregroundStyle(layout.canAddToolQuickAccess(tool.id) ? Theme.accent : Color.secondary.opacity(0.45))
+                        }
+                    }
+                    .disabled(!layout.canAddToolQuickAccess(tool.id))
+                }
+            } header: {
+                Label("Tools Quick Access", systemImage: "square.grid.3x2")
+            } footer: {
+                Text("Choose up to six tools for the 3×2 dashboard. Selected tools are hidden from the Tools drawer. Drag to reorder.")
+            }
+
+            Section {
                 if layout.hidden.isEmpty {
                     Text("Nothing hidden — every tile is on your Home screen.")
                         .font(.footnote).foregroundStyle(.secondary)
@@ -44,9 +132,15 @@ struct CustomizeHomeView: View {
             ToolbarItem(placement: .topBarLeading) { EditButton() }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
-                    Button(role: .destructive) { layout.reset() } label: {
-                        Label("Reset to default", systemImage: "arrow.counterclockwise")
-                    }
+                Button(role: .destructive) { layout.reset() } label: {
+                    Label("Reset to default", systemImage: "arrow.counterclockwise")
+                }
+                Button { layout.resetQuickAccess() } label: {
+                    Label("Reset Quick Access", systemImage: "square.grid.2x2")
+                }
+                Button { layout.resetToolsQuickAccess() } label: {
+                    Label("Reset Tools Quick Access", systemImage: "square.grid.3x2")
+                }
                 } label: { Image(systemName: "ellipsis.circle") }
             }
         }

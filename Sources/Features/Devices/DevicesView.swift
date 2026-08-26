@@ -10,17 +10,18 @@ struct DevicesView: View {
             Group {
                 LiveDeckHomeView(path: $path, refreshAction: refreshConnection)
                     .navigationTitle("Home")
+                    .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .topBarTrailing) {
                             if ble.state == .connected || ble.state == .ready {
                                 Button("Disconnect") { ble.disconnect() }
-                            } else {
+                            } else if ble.state == .scanning {
                                 Button {
-                                    ble.state == .scanning ? ble.stopScan() : ble.startScan()
+                                    ble.stopScan()
                                 } label: {
-                                    Image(systemName: ble.state == .scanning ? "stop.circle" : "arrow.clockwise")
+                                    Image(systemName: "stop.circle")
                                 }
-                                .accessibilityLabel(ble.state == .scanning ? "Stop scan" : "Scan for Flippers")
+                                .accessibilityLabel("Stop scan")
                             }
                         }
                     }

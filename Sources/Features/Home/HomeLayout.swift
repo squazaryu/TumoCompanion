@@ -68,6 +68,29 @@ enum HomeTileID: String, Codable, CaseIterable, Identifiable, Hashable {
     var spec: DashTileSpec { DashTileSpec(title: title, systemImage: systemImage, tint: tint) }
 }
 
+struct HomeToolSpec: Identifiable {
+    let id: HomeTileID
+    let title: String
+    let systemImage: String
+    let tint: Color
+}
+
+enum HomeToolCatalog {
+    static let all: [HomeToolSpec] = [
+        .init(id: .fieldServices, title: "Field Services", systemImage: "iphone.and.arrow.forward", tint: .blue),
+        .init(id: .wifi, title: "WiFi Survey", systemImage: "wifi", tint: .teal),
+        .init(id: .airadar, title: "AI Radar", systemImage: "dot.radiowaves.left.and.right", tint: .purple),
+        .init(id: .spectrum, title: "Spectrum", systemImage: "waveform.path.ecg", tint: .orange),
+        .init(id: .relay, title: "Relay", systemImage: "switch.2", tint: .green),
+        .init(id: .tumonet, title: "TumoNet", systemImage: "network", tint: .indigo),
+        .init(id: .esp32, title: "ESP32", systemImage: "cpu", tint: .pink),
+        .init(id: .remotes, title: "Remotes", systemImage: "switch.2", tint: .cyan),
+        .init(id: .media, title: "Media Remote", systemImage: "play.rectangle", tint: .mint)
+    ]
+
+    static let ids = all.map(\.id)
+}
+
 /// The three collapsible sections on Home.
 enum HomeGroupID: String, Codable, CaseIterable, Identifiable {
     case info, tools, revision
@@ -112,17 +135,47 @@ private struct HomeLayoutData: Codable {
 final class HomeLayoutStore: ObservableObject {
     static let shared = HomeLayoutStore()
     private let key = "home.layout.v1"
+    private let quickAccessKey = "home.quickAccess.v1"
+    private let toolsQuickAccessKey = "home.toolsQuickAccess.v1"
+    let quickAccessLimit = 4
+    let toolsQuickAccessLimit = 6
 
     @Published private(set) var order: [HomeGroupID: [HomeTileID]] = [:]
     @Published private(set) var hidden: [HomeTileID] = []
     @Published private(set) var collapsed: Set<HomeGroupID> = []
+    @Published private(set) var quickAccess: [HomeTileID] = []
+    @Published private(set) var toolsQuickAccess: [HomeTileID] = []
 
-    private init() { load() }
+    private init() {
+        load()
+        loadQuickAccess()
+        loadToolsQuickAccess()
+    }
 
     // MARK: - Reads
 
     func tiles(_ group: HomeGroupID) -> [HomeTileID] { order[group] ?? [] }
     func isExpanded(_ group: HomeGroupID) -> Bool { !collapsed.contains(group) }
+    var quickAccessTiles: [HomeTileID] { quickAccess }
+    var toolsQuickAccessTiles: [HomeToolSpec] {
+        toolsQuickAccess.compactMap { tile in HomeToolCatalog.all.first { $0.id == tile } }
+    }
+    var toolsQuickAccessIDs: [HomeTileID] { toolsQuickAccess }
+    var toolCandidates: [HomeToolSpec] { HomeToolCatalog.all }
+
+    var quickAccessCandidates: [HomeTileID] {
+        var candidates = tiles(.tools) + [.files, .apps, .backup] + quickAccess
+        var seen = Set<HomeTileID>()
+        candidates.removeAll { tile in
+            tile == .info || tile == .screen || tile == .remotes || !seen.insert(tile).inserted
+        }
+        return candidates
+    }
+
+    func isQuickAccess(_ tile: HomeTileID) -> Bool { quickAccess.contains(tile) }
+    func canAddQuickAccess(_ tile: HomeTileID) -> Bool {
+        !isQuickAccess(tile) && quickAccess.count < quickAccessLimit
+    }
 
     // MARK: - Mutations (each persists)
 
@@ -158,6 +211,54 @@ final class HomeLayoutStore: ObservableObject {
 
     func reset() { apply(.default); save() }
 
+    func toggleQuickAccess(_ tile: HomeTileID) {
+        if isQuickAccess(tile) {
+            quickAccess.removeAll { $0 == tile }
+        } else if quickAccess.count < quickAccessLimit {
+            quickAccess.append(tile)
+        }
+        saveQuickAccess()
+    }
+
+    func reorderQuickAccess(from source: IndexSet, to destination: Int) {
+        quickAccess.move(fromOffsets: source, toOffset: destination)
+        saveQuickAccess()
+    }
+
+    func resetQuickAccess() {
+        quickAccess = Self.defaultQuickAccess
+        saveQuickAccess()
+    }
+
+    func isToolQuickAccess(_ tile: HomeTileID) -> Bool {
+        toolsQuickAccess.contains(tile)
+    }
+
+    func canAddToolQuickAccess(_ tile: HomeTileID) -> Bool {
+        HomeToolCatalog.ids.contains(tile)
+            && !isToolQuickAccess(tile)
+            && toolsQuickAccess.count < toolsQuickAccessLimit
+    }
+
+    func toggleToolQuickAccess(_ tile: HomeTileID) {
+        if isToolQuickAccess(tile) {
+            toolsQuickAccess.removeAll { $0 == tile }
+        } else if canAddToolQuickAccess(tile) {
+            toolsQuickAccess.append(tile)
+        }
+        saveToolsQuickAccess()
+    }
+
+    func reorderToolQuickAccess(from source: IndexSet, to destination: Int) {
+        toolsQuickAccess.move(fromOffsets: source, toOffset: destination)
+        saveToolsQuickAccess()
+    }
+
+    func resetToolsQuickAccess() {
+        toolsQuickAccess = Array(HomeToolCatalog.ids.prefix(toolsQuickAccessLimit))
+        saveToolsQuickAccess()
+    }
+
     private func removeEverywhere(_ tile: HomeTileID) {
         for g in HomeGroupID.allCases { order[g]?.removeAll { $0 == tile } }
         hidden.removeAll { $0 == tile }
@@ -190,6 +291,61 @@ final class HomeLayoutStore: ObservableObject {
         order = o
         hidden = hid
         collapsed = Set(data.collapsed.compactMap { HomeGroupID(rawValue: $0) })
+    }
+
+    private static let defaultQuickAccess: [HomeTileID] = [.files, .apps, .backup]
+
+    private func loadQuickAccess() {
+        guard let raw = UserDefaults.standard.data(forKey: quickAccessKey),
+              let decoded = try? JSONDecoder().decode([String].self, from: raw) else {
+            quickAccess = Self.defaultQuickAccess
+            return
+        }
+        quickAccess = normalizeQuickAccess(decoded.compactMap { HomeTileID(rawValue: $0) })
+    }
+
+    private func normalizeQuickAccess(_ tiles: [HomeTileID]) -> [HomeTileID] {
+        var seen = Set<HomeTileID>()
+        return tiles.filter { tile in
+            guard tile != .info,
+                  tile != .screen,
+                  tile != .remotes,
+                  seen.insert(tile).inserted else { return false }
+            return true
+        }.prefix(quickAccessLimit).map { $0 }
+    }
+
+    private func saveQuickAccess() {
+        let raw = quickAccess.map(\.rawValue)
+        if let data = try? JSONEncoder().encode(raw) {
+            UserDefaults.standard.set(data, forKey: quickAccessKey)
+        }
+    }
+
+    private func loadToolsQuickAccess() {
+        guard let raw = UserDefaults.standard.data(forKey: toolsQuickAccessKey),
+              let decoded = try? JSONDecoder().decode([String].self, from: raw) else {
+            toolsQuickAccess = Array(HomeToolCatalog.ids.prefix(toolsQuickAccessLimit))
+            return
+        }
+        toolsQuickAccess = normalizeToolsQuickAccess(decoded.compactMap { HomeTileID(rawValue: $0) })
+    }
+
+    private func normalizeToolsQuickAccess(_ tiles: [HomeTileID]) -> [HomeTileID] {
+        var seen = Set<HomeTileID>()
+        return tiles.filter { tile in
+            guard HomeToolCatalog.ids.contains(tile),
+                  tile != .backup,
+                  seen.insert(tile).inserted else { return false }
+            return true
+        }.prefix(toolsQuickAccessLimit).map { $0 }
+    }
+
+    private func saveToolsQuickAccess() {
+        let raw = toolsQuickAccess.map(\.rawValue)
+        if let data = try? JSONEncoder().encode(raw) {
+            UserDefaults.standard.set(data, forKey: toolsQuickAccessKey)
+        }
     }
 
     private func save() {

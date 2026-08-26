@@ -48,6 +48,15 @@ struct SettingsView: View {
             }
 
             SettingsCategoryCard(
+                title: "Home dashboard",
+                subtitle: "Customize Console and Tools Quick Access",
+                systemImage: "square.grid.2x2",
+                tint: .purple
+            ) {
+                CustomizeHomeView()
+            }
+
+            SettingsCategoryCard(
                 title: "Connectivity",
                 subtitle: "BLE keep-alive, iPhone services and Claude Buddy passthrough",
                 systemImage: "antenna.radiowaves.left.and.right",

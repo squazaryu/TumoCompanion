@@ -88,7 +88,7 @@ final class DeviceServicesUITests: XCTestCase {
         ]
         app.launch()
 
-        let tile = app.buttons["Field Services"]
+        let tile = app.buttons["Open Field Services"]
         for _ in 0..<6 where !tile.isHittable { app.swipeUp() }
         if !tile.exists {
             let tools = app.buttons.matching(

@@ -1,8 +1,10 @@
 import SwiftUI
 
-/// The Home dashboard is intentionally a live deck rather than a launcher grid.
-/// Each surface owns one piece of state (device, screen, activity, sources, actions)
-/// so a change in one subsystem does not make the whole screen jump.
+/// Compact Home dashboard for the connected Flipper.
+///
+/// The console is the single source of truth for device and screen state. The
+/// remaining surfaces are compact, two-column widgets so the useful state is
+/// visible without a long launcher page or duplicated activity indicators.
 struct LiveDeckHomeView: View {
     @EnvironmentObject private var ble: FlipperBLE
     @EnvironmentObject private var control: FlipperControl
@@ -18,83 +20,45 @@ struct LiveDeckHomeView: View {
     }
 
     var body: some View {
-        CardScroll(refreshAction: refreshAction) {
-            LiveDeckDeviceCard(onNavigate: { navigate(.info) })
-            LiveDeckNearbyCard()
-            LiveDeckScreenCard(onNavigate: { navigate(.screen) })
-            LiveDeckActivityCard(onNavigate: navigate)
-            LiveDeckSourcesCard(onNavigate: { navigate(.updates) })
-            LiveDeckQuickActions(onNavigate: navigate)
-            LiveDeckToolsCard(onNavigate: navigate)
-            LiveDeckFooter()
-        }
-        .animation(reduceMotion ? nil : .snappy(duration: 0.35), value: ble.state)
-        .animation(reduceMotion ? nil : .snappy(duration: 0.35), value: control.streaming)
-    }
-}
+        ZStack(alignment: .bottom) {
+            CardScroll(refreshAction: refreshAction) {
+                LiveDeckConsoleCard(
+                    onScreen: { navigate(.screen) },
+                    onDeviceInfo: { navigate(.info) },
+                    onNavigate: navigate
+                )
 
-private struct LiveDeckNearbyCard: View {
-    @EnvironmentObject private var ble: FlipperBLE
+                LiveDeckNearbyCard()
 
-    var body: some View {
-        if ble.state != .ready && !ble.discovered.isEmpty {
-            VStack(alignment: .leading, spacing: 12) {
-                Label("NEARBY FLIPPERS", systemImage: "wave.3.right")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(Theme.accent)
-                    .tracking(0.7)
-                ForEach(ble.discovered) { flipper in
-                    Button { ble.connect(flipper.id) } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: "dot.radiowaves.left.and.right")
-                                .foregroundStyle(Theme.accent)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(flipper.name)
-                                    .font(.subheadline.weight(.semibold))
-                                Text(flipper.id.uuidString.prefix(8))
-                                    .font(.caption2.monospaced())
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            LiveDeckSignal(rssi: flipper.rssi)
-                            Image(systemName: "chevron.right")
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(.tertiary)
-                        }
-                    }
-                    .buttonStyle(.plain)
+                VStack(spacing: 10) {
+                    // Keep these surfaces full width. A mixed LazyVGrid made
+                    // gridCellColumns(2) unreliable on older iOS 17 layouts.
+                    LiveDeckSourcesCard(onNavigate: { navigate(.updates) })
+                    LiveDeckToolsQuickAccessCard(onNavigate: navigate)
                 }
+
+                LiveDeckFooter()
+                // Leave room for the fixed folder tab without making the tab
+                // part of the scrolling content.
+                Color.clear.frame(height: 34)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .card(tint: Theme.accent, padding: 16)
+
+            LiveDeckToolsDrawer(onNavigate: navigate)
         }
+        .animation(reduceMotion ? nil : .snappy(duration: 0.3), value: ble.state)
+        .animation(reduceMotion ? nil : .snappy(duration: 0.3), value: control.streaming)
     }
 }
 
-private struct LiveDeckSignal: View {
-    let rssi: Int
-
-    var body: some View {
-        let bars = rssi > -55 ? 3 : rssi > -70 ? 2 : 1
-        return HStack(alignment: .bottom, spacing: 2) {
-            ForEach(0..<3) { index in
-                RoundedRectangle(cornerRadius: 1)
-                    .fill(index < bars ? Theme.accent : Color.gray.opacity(0.28))
-                    .frame(width: 4, height: CGFloat(6 + index * 4))
-            }
-        }
-        .accessibilityLabel("Signal \(rssi) dBm")
-    }
-}
-
-// MARK: - Device
-
-private struct LiveDeckDeviceCard: View {
+private struct LiveDeckConsoleCard: View {
     @EnvironmentObject private var ble: FlipperBLE
+    @EnvironmentObject private var control: FlipperControl
     @EnvironmentObject private var transfer: TransferChannelStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var pulse = false
-    let onNavigate: () -> Void
+
+    let onScreen: () -> Void
+    let onDeviceInfo: () -> Void
+    let onNavigate: (HomeTileID) -> Void
 
     private var tint: Color {
         switch ble.state {
@@ -117,344 +81,240 @@ private struct LiveDeckDeviceCard: View {
     }
 
     var body: some View {
-        Button(action: onNavigate) {
-            VStack(alignment: .leading, spacing: 18) {
-                HStack(alignment: .top, spacing: 14) {
-                    ZStack {
-                        Circle()
-                            .fill(tint.opacity(0.16))
-                            .frame(width: 58, height: 58)
-                        if status.isAnimated && !reduceMotion {
-                            Circle()
-                                .stroke(tint.opacity(0.6), lineWidth: 2)
-                                .frame(width: 58, height: 58)
-                                .scaleEffect(pulse ? 1.6 : 1)
-                                .opacity(pulse ? 0 : 0.8)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Label("FLIPPER CONSOLE", systemImage: "rectangle.on.rectangle")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(tint)
+                    .tracking(0.8)
+                Spacer()
+                LiveDeckLiveIndicator(isLive: control.streaming, reduceMotion: reduceMotion)
+            }
+
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Button(action: onScreen) {
+                        ZStack {
+                            if ble.state == .ready {
+                                FlipperScreenCanvas(pixels: control.screenPixels)
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 116)
+                                    .transition(.opacity)
+                            } else {
+                                VStack(spacing: 6) {
+                                    Image(systemName: "rectangle.on.rectangle.slash")
+                                        .font(.title3)
+                                    Text("Connect Flipper")
+                                        .font(.caption.weight(.semibold))
+                                }
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 116)
+                            }
                         }
-                        Image(systemName: status.systemImage)
-                            .font(.title2.weight(.semibold))
-                            .foregroundStyle(tint)
+                        .background(Color.black.opacity(0.9), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .strokeBorder(tint.opacity(0.28), lineWidth: 1)
+                        }
                     }
-                    .task(id: status) {
-                        guard status.isAnimated, !reduceMotion else { return }
-                        pulse = false
-                        withAnimation(.easeOut(duration: 1.25).repeatForever(autoreverses: false)) {
-                            pulse = true
-                        }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(control.streaming ? "Open live Flipper screen" : "Open Flipper screen")
+
+                    HStack(spacing: 7) {
+                        LiveDeckBadge(
+                            text: status.title,
+                            color: tint,
+                            systemImage: nil
+                        )
+                        LiveDeckBadge(
+                            text: transfer.activeChannel.label,
+                            color: transfer.activeChannel == .usb ? .blue : .secondary,
+                            systemImage: transfer.activeChannel.systemImage
+                        )
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .layoutPriority(1)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(ble.connectedName ?? "Flipper Zero")
+                        .font(.subheadline.weight(.bold))
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.8)
+
+                    HStack(spacing: 5) {
+                        Circle()
+                            .fill(tint)
+                            .frame(width: 7, height: 7)
+                        Text(status.shortTitle)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
                     }
 
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text("TUMO LIVE DECK")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(tint)
-                            .tracking(1.1)
-                        Text(ble.connectedName ?? "Flipper Zero")
-                            .font(.title2.weight(.bold))
-                            .foregroundStyle(.primary)
-                            .lineLimit(1)
-                        HStack(spacing: 6) {
-                            Circle().fill(tint).frame(width: 7, height: 7)
-                            Text(status.title)
-                                .font(.subheadline.weight(.medium))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    Spacer(minLength: 0)
                     if ble.state == .ready, let battery = ble.battery {
                         LiveDeckBattery(level: battery)
                     }
-                }
 
-                HStack(spacing: 8) {
-                    LiveDeckBadge(
-                        text: ble.state == .ready
-                            ? (ble.serialOwner == .claudeBuddy ? "Buddy" : "Ready")
-                            : status.shortTitle,
-                        color: ble.serialOwner == .claudeBuddy ? .purple : tint,
-                        systemImage: ble.serialOwner == .claudeBuddy ? "bell.badge.fill" : nil
-                    )
                     if ble.state == .ready {
-                        LiveDeckBadge(
-                            text: ble.supportsAppBridge
-                                ? (ble.appBridgeV2 ? "Bridge v2" : "Bridge v1")
-                                : "No bridge",
-                            color: ble.supportsAppBridge ? .green : .orange,
-                            systemImage: "antenna.radiowaves.left.and.right"
-                        )
+                        Text(ble.supportsAppBridge
+                             ? (ble.appBridgeV2 ? "Bridge v2" : "Bridge v1")
+                             : "No bridge")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(ble.supportsAppBridge ? .green : .orange)
+                            .lineLimit(1)
                     }
-                    LiveDeckBadge(
-                        text: transfer.activeChannel.label,
-                        color: transfer.activeChannel == .usb ? .blue : .secondary,
-                        systemImage: transfer.activeChannel.systemImage
-                    )
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.tertiary)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .buttonStyle(.plain)
-        .card(tint: tint, padding: 18)
-        .disabled(ble.state != .ready)
-    }
-}
 
-private struct LiveDeckBattery: View {
-    let level: Int
-
-    private var tint: Color {
-        level <= 15 ? .red : level <= 30 ? .orange : .green
-    }
-
-    var body: some View {
-        VStack(alignment: .trailing, spacing: 5) {
-            Image(systemName: batteryImage)
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(tint)
-            Text("\(level)%")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(tint)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Battery \(level) percent")
-    }
-
-    private var batteryImage: String {
-        switch level {
-        case ...10: return "battery.0"
-        case ...35: return "battery.25"
-        case ...60: return "battery.50"
-        case ...85: return "battery.75"
-        default: return "battery.100"
-        }
-    }
-}
-
-// MARK: - Screen
-
-private struct LiveDeckScreenCard: View {
-    @EnvironmentObject private var ble: FlipperBLE
-    @EnvironmentObject private var control: FlipperControl
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var pulse = false
-    let onNavigate: () -> Void
-
-    var body: some View {
-        Button(action: onNavigate) {
-            VStack(alignment: .leading, spacing: 13) {
-                HStack {
-                    Label("REMOTE SCREEN", systemImage: "rectangle.on.rectangle")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.teal)
-                        .tracking(0.7)
-                    Spacer()
-                    LiveDeckLiveIndicator(isLive: control.streaming, reduceMotion: reduceMotion)
-                    Image(systemName: "arrow.up.right")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.tertiary)
-                }
-
-                ZStack {
-                    if ble.state == .ready {
-                        FlipperScreenCanvas(pixels: control.screenPixels)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 148)
-                            .transition(.opacity)
-                    } else {
-                        VStack(spacing: 8) {
-                            Image(systemName: "rectangle.on.rectangle.slash")
-                                .font(.title2)
-                            Text("Connect a Flipper to see its screen")
-                                .font(.subheadline.weight(.medium))
-                        }
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 148)
+                    Button(action: onDeviceInfo) {
+                        Text("Info")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.blue)
                     }
-                }
-                .background(Color.black.opacity(0.86), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .strokeBorder(Color.teal.opacity(0.22), lineWidth: 1)
-                }
+                    .buttonStyle(.plain)
 
-                HStack(spacing: 7) {
-                    Circle()
-                        .fill(control.streaming ? Color.green : Color.orange)
-                        .frame(width: 7, height: 7)
-                        .overlay {
-                            if control.streaming && !reduceMotion {
-                                Circle()
-                                    .stroke(Color.green.opacity(0.6), lineWidth: 1.5)
-                                    .scaleEffect(pulse ? 2.6 : 1)
-                                    .opacity(pulse ? 0 : 0.8)
-                            }
-                        }
-                    Text(control.streaming ? "Live screen · tap to control" : "Screen mirror is waiting")
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Text("Open remote")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.teal)
+                    LiveDeckQuickAccessStrip(onNavigate: onNavigate)
                 }
+                .frame(width: 112, alignment: .leading)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+
         }
-        .buttonStyle(.plain)
-        .card(tint: .teal, padding: 14)
-        .task(id: control.streaming) {
-            guard control.streaming, !reduceMotion else { return }
-            pulse = false
-            withAnimation(.easeOut(duration: 1.35).repeatForever(autoreverses: false)) {
-                pulse = true
-            }
-        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .card(tint: tint, padding: 12)
     }
 }
 
-// MARK: - Activity
+private struct LiveDeckQuickAccessStrip: View {
+    @ObservedObject private var layout = HomeLayoutStore.shared
 
-private struct LiveDeckActivityCard: View {
-    @EnvironmentObject private var ble: FlipperBLE
-    @EnvironmentObject private var control: FlipperControl
-    @EnvironmentObject private var transfer: TransferChannelStore
-    @EnvironmentObject private var updates: UpdatesCoordinator
     let onNavigate: (HomeTileID) -> Void
 
-    private var activity: LiveDeckActivity {
-        if ble.state == .scanning || ble.state == .connecting || ble.state == .connected {
-            return .connecting
+    var body: some View {
+        if !layout.quickAccessTiles.isEmpty {
+            VStack(alignment: .leading, spacing: 2) {
+                ForEach(layout.quickAccessTiles) { tile in
+                    Button { onNavigate(tile) } label: {
+                        Text(tile.title)
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.blue)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.72)
+                            .frame(maxWidth: .infinity, minHeight: 20, alignment: .leading)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Open \(tile.title)")
+                }
+            }
         }
-        guard ble.state == .ready else { return .offline }
-        if control.streaming { return .screen }
-        if updates.packages.busy { return .packages }
-        if updates.plugins.isBusy { return .community }
-        return .idle(channel: transfer.activeChannel)
     }
+}
+
+private struct LiveDeckNearbyCard: View {
+    @EnvironmentObject private var ble: FlipperBLE
 
     var body: some View {
-        Button { onNavigate(activity.destination) } label: {
-            HStack(spacing: 14) {
-                LiveDeckActivityGlyph(activity: activity)
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("CURRENT ACTIVITY")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(activity.tint)
-                        .tracking(0.7)
-                    Text(activity.title)
-                        .font(.headline.weight(.semibold))
-                        .foregroundStyle(.primary)
-                    Text(activity.subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                }
-                Spacer(minLength: 4)
-                Image(systemName: "chevron.right")
+        if ble.state != .ready && !ble.discovered.isEmpty {
+            VStack(alignment: .leading, spacing: 9) {
+                Label("NEARBY FLIPPERS", systemImage: "wave.3.right")
                     .font(.caption.weight(.bold))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(Theme.accent)
+                    .tracking(0.7)
+
+                ForEach(ble.discovered) { flipper in
+                    Button { ble.connect(flipper.id) } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "dot.radiowaves.left.and.right")
+                                .foregroundStyle(Theme.accent)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(flipper.name)
+                                    .font(.subheadline.weight(.semibold))
+                                Text(flipper.id.uuidString.prefix(8))
+                                    .font(.caption2.monospaced())
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            LiveDeckSignal(rssi: flipper.rssi)
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .card(tint: Theme.accent, padding: 12)
         }
-        .buttonStyle(.plain)
-        .card(tint: activity.tint, padding: 16)
     }
 }
 
-private struct LiveDeckActivityGlyph: View {
-    let activity: LiveDeckActivity
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var spinning = false
+private struct LiveDeckSignal: View {
+    let rssi: Int
 
     var body: some View {
-        ZStack {
-            Circle()
-                .fill(activity.tint.opacity(0.15))
-                .frame(width: 52, height: 52)
-            Image(systemName: activity.systemImage)
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(activity.tint)
-                .rotationEffect(.degrees(spinning ? 360 : 0))
-        }
-        .task(id: activity.isBusy) {
-            guard activity.isBusy, !reduceMotion else { return }
-            spinning = false
-            withAnimation(.linear(duration: 1.15).repeatForever(autoreverses: false)) {
-                spinning = true
+        let bars = rssi > -55 ? 3 : rssi > -70 ? 2 : 1
+        return HStack(alignment: .bottom, spacing: 2) {
+            ForEach(0..<3) { index in
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(index < bars ? Theme.accent : Color.gray.opacity(0.28))
+                    .frame(width: 4, height: CGFloat(6 + index * 4))
             }
         }
+        .accessibilityLabel("Signal \(rssi) dBm")
     }
 }
-
-// MARK: - Sources
 
 private struct LiveDeckSourcesCard: View {
     @EnvironmentObject private var ble: FlipperBLE
     @EnvironmentObject private var updates: UpdatesCoordinator
+
     let onNavigate: () -> Void
 
     var body: some View {
         Button(action: onNavigate) {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack {
+            VStack(alignment: .leading, spacing: 9) {
+                HStack(spacing: 6) {
                     Label("SOURCES", systemImage: "square.stack.3d.up")
                         .font(.caption.weight(.bold))
                         .foregroundStyle(Theme.accent)
-                        .tracking(0.7)
+                        .tracking(0.8)
                     Spacer()
                     Text("Open center")
-                        .font(.caption.weight(.bold))
+                        .font(.caption2.weight(.bold))
                         .foregroundStyle(Theme.accent)
                 }
 
-                LiveDeckSourceRow(
-                    title: "Firmware",
-                    subtitle: ble.state == .ready ? "Device release channel" : "Connect to inspect releases",
-                    status: ble.state == .ready ? .ready("Ready") : .waiting("Waiting"),
-                    systemImage: "cpu"
-                )
-                LiveDeckSourceRow(
-                    title: "FW Packages",
-                    subtitle: packageSubtitle,
-                    status: packageStatus,
-                    systemImage: "shippingbox"
-                )
-                LiveDeckSourceRow(
-                    title: "Community Apps",
-                    subtitle: communitySubtitle,
-                    status: communityStatus,
-                    systemImage: "square.grid.2x2"
-                )
+                VStack(spacing: 2) {
+                    LiveDeckSourceRow(
+                        title: "Firmware",
+                        subtitle: "Device release channel",
+                        status: ble.state == .ready ? .ready("Ready") : .waiting("Waiting"),
+                        systemImage: "cpu"
+                    )
+                    LiveDeckSourceRow(
+                        title: "FW Packages",
+                        subtitle: "Catalog on demand",
+                        status: packageStatus,
+                        systemImage: "shippingbox"
+                    )
+                    LiveDeckSourceRow(
+                        title: "Community Apps",
+                        subtitle: "Audit when needed",
+                        status: communityStatus,
+                        systemImage: "square.grid.2x2"
+                    )
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .buttonStyle(.plain)
-        .card(tint: Theme.accent, padding: 16)
-    }
-
-    private var packageSubtitle: String {
-        if updates.packages.busy { return "Refreshing catalog…" }
-        if let manifest = updates.packages.manifest {
-            return manifest.isReferenceOnlyCatalog ? "Independent baseline catalog" : "Catalog ready to install"
-        }
-        return "Catalog on demand"
+        .card(tint: Theme.accent, padding: 10)
     }
 
     private var packageStatus: LiveDeckSourceStatus {
         if updates.packages.busy { return .loading("Updating") }
         if updates.packages.manifest != nil { return .ready("Ready") }
-        return .waiting("Not loaded")
-    }
-
-    private var communitySubtitle: String {
-        if updates.plugins.isBusy { return "Auditing Community Pack…" }
-        if updates.plugins.pendingProtectedReview.isEmpty, !updates.plugins.updates.isEmpty {
-            return "Audited Community Pack"
-        }
-        return "Audit when needed"
+        return .waiting("On demand")
     }
 
     private var communityStatus: LiveDeckSourceStatus {
@@ -472,169 +332,271 @@ private struct LiveDeckSourceRow: View {
     let systemImage: String
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 13) {
             Image(systemName: systemImage)
-                .font(.body.weight(.semibold))
+                .font(.title3.weight(.semibold))
                 .foregroundStyle(status.tint)
-                .frame(width: 24)
+
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.subheadline.weight(.semibold))
-                Text(subtitle).font(.caption).foregroundStyle(.secondary)
+                Text(title)
+                    .font(.callout.weight(.semibold))
+                    .lineLimit(1)
+                Text(subtitle)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
             }
+
             Spacer(minLength: 8)
-            LiveDeckStatusText(status: status)
-        }
-    }
-}
 
-private struct LiveDeckStatusText: View {
-    let status: LiveDeckSourceStatus
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var spinning = false
-
-    var body: some View {
-        HStack(spacing: 5) {
-            if status.isLoading {
-                Image(systemName: "arrow.triangle.2.circlepath")
-                    .rotationEffect(.degrees(spinning ? 360 : 0))
-                    .task {
-                        guard !reduceMotion else { return }
-                        withAnimation(.linear(duration: 1).repeatForever(autoreverses: false)) {
-                            spinning = true
-                        }
-                    }
-            } else {
-                Circle().fill(status.tint).frame(width: 7, height: 7)
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(status.tint)
+                    .frame(width: 6, height: 6)
+                Text(status.title)
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(status.tint)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
             }
-            Text(status.title)
-                .font(.caption.weight(.bold))
+            .fixedSize(horizontal: true, vertical: false)
         }
-        .foregroundStyle(status.tint)
+        .frame(maxWidth: .infinity, minHeight: 42, alignment: .leading)
+        .padding(.horizontal, 4)
     }
 }
 
-// MARK: - Quick actions and footer
+private struct LiveDeckToolsQuickAccessCard: View {
+    @ObservedObject private var layout = HomeLayoutStore.shared
 
-private struct LiveDeckQuickActions: View {
     let onNavigate: (HomeTileID) -> Void
-    private let actions: [(HomeTileID, String, String, Color)] = [
-        (.files, "Files", "folder", .blue),
-        (.apps, "Apps", "square.grid.2x2", .purple),
-        (.info, "Device", "info.circle", .green),
-        (.updates, "Updates", "arrow.down.circle", .orange)
-    ]
+
+    private var columnCount: Int {
+        switch layout.toolsQuickAccessTiles.count {
+        case 0: return 1
+        case 1...3: return layout.toolsQuickAccessTiles.count
+        case 4: return 2
+        default: return 3
+        }
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("QUICK LAUNCH")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(.secondary)
-                .tracking(0.7)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(actions, id: \.0) { tile, title, image, color in
-                        Button { onNavigate(tile) } label: {
-                            VStack(spacing: 8) {
-                                Image(systemName: image)
-                                    .font(.body.weight(.semibold))
-                                    .foregroundStyle(color)
-                                    .frame(width: 38, height: 38)
-                                    .background(color.opacity(0.13), in: Circle())
-                                Text(title)
-                                    .font(.caption.weight(.semibold))
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(spacing: 7) {
+                Label("QUICK ACCESS", systemImage: "square.grid.3x2")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(Theme.accent)
+                    .tracking(0.8)
+            }
+
+            if layout.toolsQuickAccessTiles.isEmpty {
+                Text("Choose tools in Settings → Home dashboard.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                LazyVGrid(
+                    columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: columnCount),
+                    spacing: 8
+                ) {
+                    ForEach(layout.toolsQuickAccessTiles) { tool in
+                        Button { onNavigate(tool.id) } label: {
+                            VStack(alignment: .center, spacing: 8) {
+                                Image(systemName: tool.systemImage)
+                                    .font(.title3.weight(.medium))
+                                    .foregroundStyle(.primary.opacity(0.68))
+                                Text(tool.title)
+                                    .font(.caption2.weight(.semibold))
                                     .foregroundStyle(.primary)
+                                    .multilineTextAlignment(.center)
+                                    .lineLimit(2)
+                                    .minimumScaleFactor(0.72)
                             }
-                            .frame(width: 82, height: 76)
-                            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            .frame(maxWidth: .infinity, minHeight: 58, alignment: .center)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
+                            .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                             .overlay {
-                                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                    .strokeBorder(color.opacity(0.13), lineWidth: 1)
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
                             }
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel("Open \(tool.title)")
                     }
                 }
-            }
-        }
-    }
-}
-
-private struct LiveDeckToolsCard: View {
-    @State private var expanded = false
-    let onNavigate: (HomeTileID) -> Void
-
-    private let tools: [(HomeTileID, String, String, Color)] = [
-        (.fieldServices, "Field Services", "iphone.and.arrow.forward", .blue),
-        (.wifi, "WiFi Survey", "wifi", .teal),
-        (.airadar, "AI Radar", "dot.radiowaves.left.and.right", .purple),
-        (.spectrum, "Spectrum", "waveform.path.ecg", .orange),
-        (.relay, "Relay", "switch.2", .green),
-        (.tumonet, "TumoNet", "network", .indigo),
-        (.esp32, "ESP32", "cpu", .pink),
-        (.backup, "Backup", "externaldrive", .brown),
-        (.remotes, "Remotes", "switch.2", .cyan),
-        (.media, "Media Remote", "play.rectangle", .mint)
-    ]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Button {
-                withAnimation(.snappy(duration: 0.3)) { expanded.toggle() }
-            } label: {
-                HStack {
-                    Label("TOOLS", systemImage: "slider.horizontal.3")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.secondary)
-                        .tracking(0.7)
-                    Spacer()
-                    Text("\(tools.count) tools")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                    Image(systemName: "chevron.down")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.secondary)
-                        .rotationEffect(.degrees(expanded ? 0 : -90))
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Tools")
-
-            if expanded {
-                VStack(spacing: 0) {
-                    ForEach(Array(tools.enumerated()), id: \.element.0) { index, tool in
-                        Button {
-                            expanded = false
-                            onNavigate(tool.0)
-                        } label: {
-                            HStack(spacing: 12) {
-                                Image(systemName: tool.2)
-                                    .font(.body.weight(.semibold))
-                                    .foregroundStyle(tool.3)
-                                    .frame(width: 28)
-                                Text(tool.1)
-                                    .font(.subheadline.weight(.medium))
-                                    .foregroundStyle(.primary)
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.caption.weight(.bold))
-                                    .foregroundStyle(.tertiary)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.vertical, 11)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.borderless)
-                        if index < tools.count - 1 {
-                            Divider().opacity(0.35)
-                        }
-                    }
-                }
-                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .card(padding: 16)
+        .card(tint: Theme.accent, padding: 10)
+    }
+}
+
+private struct LiveDeckToolsDrawer: View {
+    @ObservedObject private var layout = HomeLayoutStore.shared
+    @State private var isOpen = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    let onNavigate: (HomeTileID) -> Void
+
+    private var remainingTools: [HomeToolSpec] {
+        HomeToolCatalog.all.filter { !layout.isToolQuickAccess($0.id) }
+    }
+
+    private var toolRows: Int {
+        max(1, (remainingTools.count + 1) / 2)
+    }
+
+    private var gridHeight: CGFloat {
+        guard !remainingTools.isEmpty else { return 0 }
+        let rows = CGFloat(toolRows)
+        return rows * 38 + CGFloat(max(toolRows - 1, 0)) * 8
+    }
+
+    private var visibleGridHeight: CGFloat {
+        // Keep the drawer compact for the normal two-to-four item case. Only
+        // a genuinely long list becomes internally scrollable.
+        min(gridHeight, 220)
+    }
+
+    private var panelHeight: CGFloat {
+        // Handle + two VStack gaps + header/content padding. The content
+        // height is derived from the actual number of rows, so the panel does
+        // not reserve a large empty block or clip its last row.
+        let contentHeight = remainingTools.isEmpty ? 18 : visibleGridHeight
+        return 69 + contentHeight
+    }
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            if isOpen {
+                Color.black.opacity(0.16)
+                    .ignoresSafeArea()
+                    .onTapGesture { close() }
+                    .transition(.opacity)
+
+                toolsPanel
+                    .frame(height: panelHeight)
+                    .padding(.horizontal, Theme.pagePadding)
+                    .padding(.bottom, 54)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+
+            Button(action: toggle) {
+                HStack(spacing: 7) {
+                    Image(systemName: "folder.fill")
+                        .font(.caption.weight(.bold))
+                    Text("TOOLS")
+                        .font(.caption.weight(.bold))
+                        .tracking(0.8)
+                    Spacer()
+                    Text("\(remainingTools.count)")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Image(systemName: isOpen ? "chevron.down" : "chevron.up")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.secondary)
+                }
+                .foregroundStyle(Theme.accent)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(.regularMaterial, in: Capsule())
+                .overlay(Capsule().strokeBorder(Theme.accent.opacity(0.25), lineWidth: 1))
+                .shadow(color: .black.opacity(0.16), radius: 12, y: 5)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Tools")
+            .accessibilityValue(isOpen ? "Expanded" : "Collapsed")
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, Theme.pagePadding)
+            .padding(.bottom, 8)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        .zIndex(10)
+    }
+
+    @ViewBuilder
+    private var toolsPanel: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Capsule()
+                .fill(Color.secondary.opacity(0.35))
+                .frame(width: 38, height: 4)
+                .frame(maxWidth: .infinity)
+
+            HStack(spacing: 7) {
+                Label("MORE TOOLS", systemImage: "folder")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.secondary)
+                    .tracking(0.8)
+                Spacer()
+                Text("\(remainingTools.count) available")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+
+            if remainingTools.isEmpty {
+                Text("All tools are in Quick Access.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            } else {
+                ScrollView {
+                    LazyVGrid(
+                        columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)],
+                        spacing: 8
+                    ) {
+                        ForEach(remainingTools) { tool in
+                            Button {
+                                close()
+                                onNavigate(tool.id)
+                            } label: {
+                                HStack(spacing: 7) {
+                                    Image(systemName: tool.systemImage)
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(.primary.opacity(0.68))
+                                    Text(tool.title)
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(.primary)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.72)
+                                    Spacer(minLength: 0)
+                                }
+                                .frame(maxWidth: .infinity, minHeight: 38, alignment: .leading)
+                                .padding(.horizontal, 10)
+                                .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                        .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Open \(tool.title)")
+                        }
+                    }
+                }
+                .frame(height: visibleGridHeight)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 9)
+        .padding(.bottom, 14)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.18), radius: 18, y: 8)
+    }
+
+    private func toggle() {
+        withAnimation(reduceMotion ? nil : .snappy(duration: 0.28)) {
+            isOpen.toggle()
+        }
+    }
+
+    private func close() {
+        withAnimation(reduceMotion ? nil : .snappy(duration: 0.24)) {
+            isOpen = false
+        }
     }
 }
 
@@ -644,19 +606,111 @@ private struct LiveDeckFooter: View {
             Image(systemName: "sparkles")
                 .foregroundStyle(Theme.accent)
             Text("Ready for field work")
-                .font(.caption.weight(.medium))
-            Spacer()
+                .font(.caption2.weight(.medium))
+            Text("·")
+                .foregroundStyle(.tertiary)
             Text(BuildInfo.label)
                 .font(.system(.caption2, design: .monospaced))
                 .foregroundStyle(.secondary)
         }
+        .frame(maxWidth: .infinity)
         .foregroundStyle(.secondary)
-        .padding(.horizontal, 4)
-        .padding(.top, 2)
+        .padding(.horizontal, 3)
+        .padding(.vertical, 1)
+        .lineLimit(1)
+        .minimumScaleFactor(0.72)
     }
 }
 
-// MARK: - Small view models
+private struct LiveDeckBattery: View {
+    let level: Int
+
+    private var tint: Color {
+        level <= 15 ? .red : level <= 30 ? .orange : .green
+    }
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: batteryImage)
+                .font(.caption.weight(.semibold))
+            Text("\(level)%")
+                .font(.caption2.weight(.bold))
+        }
+        .foregroundStyle(tint)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Battery \(level) percent")
+    }
+
+    private var batteryImage: String {
+        switch level {
+        case ...10: return "battery.0"
+        case ...35: return "battery.25"
+        case ...60: return "battery.50"
+        case ...85: return "battery.75"
+        default: return "battery.100"
+        }
+    }
+}
+
+private struct LiveDeckBadge: View {
+    let text: String
+    let color: Color
+    let systemImage: String?
+
+    var body: some View {
+        HStack(spacing: 4) {
+            if let systemImage {
+                Image(systemName: systemImage)
+                    .font(.caption2)
+            } else {
+                Circle()
+                    .fill(color)
+                    .frame(width: 6, height: 6)
+            }
+            Text(text)
+                .font(.caption2.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .foregroundStyle(color)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 5)
+        .background(color.opacity(0.12), in: Capsule())
+    }
+}
+
+private struct LiveDeckLiveIndicator: View {
+    let isLive: Bool
+    let reduceMotion: Bool
+
+    @State private var pulse = false
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Circle()
+                .fill(isLive ? Color.green : Color.orange)
+                .frame(width: 6, height: 6)
+                .overlay {
+                    if isLive && !reduceMotion {
+                        Circle()
+                            .stroke(Color.green.opacity(0.55), lineWidth: 1.25)
+                            .scaleEffect(pulse ? 2.2 : 1)
+                            .opacity(pulse ? 0 : 0.8)
+                    }
+                }
+            Text(isLive ? "LIVE" : "IDLE")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(isLive ? .green : .orange)
+        }
+        .task(id: isLive) {
+            guard isLive, !reduceMotion else { return }
+            pulse = false
+            withAnimation(.easeOut(duration: 1.25).repeatForever(autoreverses: false)) {
+                pulse = true
+            }
+        }
+    }
+}
 
 private enum LiveDeckConnectionStatus: Equatable {
     case ready
@@ -667,8 +721,8 @@ private enum LiveDeckConnectionStatus: Equatable {
     var title: String {
         switch self {
         case .ready: return "Connected & ready"
-        case .scanning: return "Scanning for Flippers"
-        case .connecting: return "Establishing link"
+        case .scanning: return "Scanning"
+        case .connecting: return "Connecting"
         case .offline(let reason): return reason
         }
     }
@@ -682,89 +736,6 @@ private enum LiveDeckConnectionStatus: Equatable {
         }
     }
 
-    var systemImage: String {
-        switch self {
-        case .ready: return "checkmark"
-        case .scanning: return "dot.radiowaves.left.and.right"
-        case .connecting: return "bolt.horizontal"
-        case .offline: return "bolt.slash"
-        }
-    }
-
-    var isAnimated: Bool {
-        switch self {
-        case .scanning, .connecting: return true
-        default: return false
-        }
-    }
-}
-
-private enum LiveDeckActivity: Equatable {
-    case offline
-    case connecting
-    case screen
-    case packages
-    case community
-    case idle(channel: TransferChannel)
-
-    var title: String {
-        switch self {
-        case .offline: return "Waiting for a Flipper"
-        case .connecting: return "Establishing link"
-        case .screen: return "Remote stream is live"
-        case .packages: return "FW Packages are working"
-        case .community: return "Community Pack is checking"
-        case .idle: return "Ready for field work"
-        }
-    }
-
-    var subtitle: String {
-        switch self {
-        case .offline: return "Pull to refresh and reconnect"
-        case .connecting: return "Negotiating BLE services"
-        case .screen: return "Screen frames are arriving in real time"
-        case .packages: return "Catalog or package transfer is in progress"
-        case .community: return "Protected apps are being reconciled"
-        case .idle(let channel): return "Files and tools available via \(channel.label)"
-        }
-    }
-
-    var systemImage: String {
-        switch self {
-        case .offline: return "antenna.radiowaves.left.and.right.slash"
-        case .connecting: return "link"
-        case .screen: return "rectangle.on.rectangle"
-        case .packages: return "shippingbox"
-        case .community: return "square.grid.2x2"
-        case .idle: return "sparkles"
-        }
-    }
-
-    var tint: Color {
-        switch self {
-        case .offline: return .secondary
-        case .connecting: return .yellow
-        case .screen: return .teal
-        case .packages: return .orange
-        case .community: return .purple
-        case .idle: return .green
-        }
-    }
-
-    var isBusy: Bool {
-        switch self {
-        case .connecting, .packages, .community: return true
-        default: return false
-        }
-    }
-
-    var destination: HomeTileID {
-        switch self {
-        case .screen: return .screen
-        case .packages, .community: return .updates
-        default: return .info
-        }
-    }
 }
 
 private enum LiveDeckSourceStatus: Equatable {
@@ -787,72 +758,6 @@ private enum LiveDeckSourceStatus: Equatable {
         case .attention: return .red
         }
     }
-
-    var isLoading: Bool {
-        if case .loading = self { return true }
-        return false
-    }
-}
-
-private struct LiveDeckBadge: View {
-    let text: String
-    let color: Color
-    let systemImage: String?
-
-    var body: some View {
-        HStack(spacing: 5) {
-            if let systemImage {
-                Image(systemName: systemImage).font(.caption2)
-            } else {
-                Circle().fill(color).frame(width: 7, height: 7)
-            }
-            Text(text).font(.caption.weight(.semibold))
-        }
-        .foregroundStyle(color)
-        .padding(.horizontal, 9)
-        .padding(.vertical, 6)
-        .background(color.opacity(0.13), in: Capsule())
-    }
-}
-
-private struct LiveDeckLiveIndicator: View {
-    let isLive: Bool
-    let reduceMotion: Bool
-    @State private var pulse = false
-
-    var body: some View {
-        HStack(spacing: 5) {
-            Circle()
-                .fill(isLive ? Color.green : Color.orange)
-                .frame(width: 7, height: 7)
-                .overlay {
-                    if isLive && !reduceMotion {
-                        Circle()
-                            .stroke(Color.green.opacity(0.55), lineWidth: 1.5)
-                            .scaleEffect(pulse ? 2.2 : 1)
-                            .opacity(pulse ? 0 : 0.8)
-                    }
-                }
-            Text(isLive ? "LIVE" : "IDLE")
-                .font(.caption2.weight(.bold))
-                .foregroundStyle(isLive ? .green : .orange)
-        }
-        .task(id: isLive) {
-            guard isLive, !reduceMotion else { return }
-            pulse = false
-            withAnimation(.easeOut(duration: 1.3).repeatForever(autoreverses: false)) {
-                pulse = true
-            }
-        }
-    }
-}
-
-/// Kept as a small compatibility model for the existing Customize Home screen.
-/// The live deck itself no longer renders `DashTile` or a tile grid.
-struct DashTileSpec {
-    let title: String
-    let systemImage: String
-    let tint: Color
 }
 
 private extension PluginUpdater {
@@ -865,4 +770,11 @@ private extension PluginUpdater {
             return false
         }
     }
+}
+
+/// Kept as a compatibility model for the existing Customize Home screen.
+struct DashTileSpec {
+    let title: String
+    let systemImage: String
+    let tint: Color
 }

@@ -6,14 +6,32 @@ final class LiveDeckHomeUITests: XCTestCase {
         app.launchArguments = ["-onboardingDone", "YES"]
         app.launch()
 
-        XCTAssertTrue(app.staticTexts["TUMO LIVE DECK"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["CURRENT ACTIVITY"].exists)
+        XCTAssertTrue(app.staticTexts["FLIPPER CONSOLE"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["SOURCES"].exists)
-        XCTAssertTrue(app.staticTexts["QUICK LAUNCH"].exists)
+        XCTAssertTrue(app.buttons["Info"].exists)
+        XCTAssertTrue(app.buttons["Open Files"].exists)
+        XCTAssertTrue(app.buttons["Open Apps"].exists)
+        XCTAssertTrue(app.buttons["Open Backup"].exists)
+        XCTAssertFalse(app.buttons["Open Remotes"].exists)
+        XCTAssertTrue(app.buttons["Open Field Services"].exists)
+        XCTAssertTrue(app.staticTexts["QUICK ACCESS"].exists)
+        XCTAssertFalse(app.staticTexts["6/6"].exists)
         XCTAssertTrue(app.buttons["Tools"].exists)
 
+        let closedScreenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        closedScreenshot.name = "Live Deck home - closed"
+        closedScreenshot.lifetime = .keepAlways
+        add(closedScreenshot)
+
+        app.buttons["Tools"].tap()
+        XCTAssertTrue(app.buttons["Open ESP32"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["3 available"].exists)
+        XCTAssertTrue(app.buttons["Open Remotes"].exists)
+        XCTAssertFalse(app.staticTexts["CURRENT ACTIVITY"].exists)
+        XCTAssertFalse(app.staticTexts["Tap screen to open remote"].exists)
+
         let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-        screenshot.name = "Live Deck home"
+        screenshot.name = "Live Deck home - tools open"
         screenshot.lifetime = .keepAlways
         add(screenshot)
     }
