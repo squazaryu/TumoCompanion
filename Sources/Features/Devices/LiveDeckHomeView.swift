@@ -121,15 +121,20 @@ private struct LiveDeckConsoleCard: View {
                 Spacer()
             }
 
-            HStack(alignment: .top, spacing: 10) {
-                VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
                     Button(action: onScreen) {
                         ZStack {
                             if isReady {
-                                FlipperScreenCanvas(pixels: control.screenPixels)
-                                    .frame(maxWidth: .infinity)
-                                    .frame(height: 108)
-                                    .transition(.opacity)
+                                if automationPreview {
+                                    LiveDeckPreviewScreen(battery: displayedBattery ?? 0)
+                                        .transition(.opacity)
+                                } else {
+                                    FlipperScreenCanvas(pixels: control.screenPixels)
+                                        .frame(maxWidth: .infinity)
+                                        .frame(height: 108)
+                                        .transition(.opacity)
+                                }
                             } else {
                                 VStack(spacing: 6) {
                                     Image(systemName: "rectangle.on.rectangle.slash")
@@ -151,53 +156,45 @@ private struct LiveDeckConsoleCard: View {
                     .buttonStyle(.plain)
                     .accessibilityLabel((control.streaming || automationPreview) ? "Open live Flipper screen" : "Open Flipper screen")
 
-                    LiveDeckConsoleActionStrip(onNavigate: onNavigate)
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 5) {
+                            HStack(spacing: 4) {
+                                Circle()
+                                    .fill(tint)
+                                    .frame(width: 6, height: 6)
+                                Text(status.shortTitle)
+                            }
+
+                            if let battery = displayedBattery {
+                                metadataDivider
+                                LiveDeckBattery(level: battery, showsIcon: false)
+                            }
+                        }
+
+                        HStack(spacing: 5) {
+                            Image(systemName: transfer.activeChannel.systemImage)
+                                .font(.caption2.weight(.medium))
+                            Text(channelTitle)
+                            metadataDivider
+                            Text(bridgeTitle)
+                        }
+                    }
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
                 }
                 .layoutPriority(1)
 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 6) {
                     Text(displayName)
-                        .font(.subheadline.weight(.bold))
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.8)
+                        .font(.callout.weight(.bold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
 
-                    // Keep device state in the right column. Navigation lives
-                    // in the compact icon strip below the screen, so the
-                    // connected and disconnected cards keep the same shape.
-                    HStack(spacing: 5) {
-                        HStack(spacing: 4) {
-                            Circle()
-                                .fill(tint)
-                                .frame(width: 6, height: 6)
-                            Text(status.shortTitle)
-                        }
-
-                        if let battery = displayedBattery {
-                            metadataDivider
-                            LiveDeckBattery(level: battery, showsIcon: false)
-                        }
-                    }
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
-
-                    HStack(spacing: 5) {
-                        Image(systemName: transfer.activeChannel.systemImage)
-                            .font(.caption2.weight(.medium))
-                        Text(channelTitle)
-                        metadataDivider
-                        Text(bridgeTitle)
-                    }
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
+                    LiveDeckConsoleActionList(onNavigate: onNavigate)
                 }
-                // Give the compact metadata rail enough room for the three
-                // connected-state values without truncating them. The live
-                // screen keeps a near-2:1 shape at this width.
-                .frame(width: 148, alignment: .leading)
+                .frame(minWidth: 138, maxWidth: 166, alignment: .leading)
             }
 
         }
@@ -211,7 +208,63 @@ private struct LiveDeckConsoleCard: View {
     }
 }
 
-private struct LiveDeckConsoleActionStrip: View {
+/// Stable visual fixture for UI screenshots. A real connected device always
+/// uses the live pixel buffer; the fixture prevents an empty automation buffer
+/// from looking like a broken orange panel during design review.
+private struct LiveDeckPreviewScreen: View {
+    let battery: Int
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 4) {
+                Image(systemName: "rectangle.on.rectangle")
+                Text("TUMOFLIP")
+                Spacer()
+                Text("BLE")
+                Image(systemName: battery > 20 ? "battery.75percent" : "battery.25percent")
+            }
+            .font(.system(size: 8, weight: .bold, design: .monospaced))
+            .padding(.horizontal, 8)
+            .frame(height: 20)
+            .overlay(alignment: .bottom) {
+                Rectangle().fill(Color.black.opacity(0.65)).frame(height: 1)
+            }
+
+            HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("CONNECTED")
+                    Text("APP BRIDGE")
+                }
+                .font(.system(size: 8, weight: .bold, design: .monospaced))
+                Spacer()
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("READY")
+                    Text("\(battery)%")
+                }
+                .font(.system(size: 8, weight: .bold, design: .monospaced))
+            }
+            .padding(.horizontal, 10)
+            .frame(maxHeight: .infinity)
+        }
+        .foregroundStyle(.black.opacity(0.78))
+        .frame(maxWidth: .infinity)
+        .frame(height: 108)
+        .background(
+            LinearGradient(
+                colors: [Color(red: 0.98, green: 0.62, blue: 0.12), Color(red: 0.93, green: 0.48, blue: 0.05)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Color.orange.opacity(0.5), lineWidth: 1)
+        }
+    }
+}
+
+private struct LiveDeckConsoleActionList: View {
     @ObservedObject private var layout = HomeLayoutStore.shared
 
     let onNavigate: (HomeTileID) -> Void
@@ -222,28 +275,22 @@ private struct LiveDeckConsoleActionStrip: View {
         return result
     }
 
-    private var columns: [GridItem] {
-        let count = min(max(tiles.count, 1), 4)
-        return Array(repeating: GridItem(.flexible(), spacing: 5), count: count)
-    }
-
     var body: some View {
-        LazyVGrid(columns: columns, spacing: 5) {
+        LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 5) {
             ForEach(tiles) { tile in
                 Button { onNavigate(tile) } label: {
-                    Image(systemName: tile.systemImage)
-                        .font(.body.weight(.medium))
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 30)
-                        .background(
-                            Color.primary.opacity(0.06),
-                            in: RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        )
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
-                        }
+                    HStack(spacing: 5) {
+                        Image(systemName: tile.systemImage)
+                            .font(.caption2.weight(.medium))
+                            .frame(width: 14)
+                        Text(tile.title)
+                            .font(.caption2.weight(.semibold))
+                    }
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .foregroundStyle(.primary.opacity(0.82))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 24, alignment: .leading)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(tile == .info ? "Info" : "Open \(tile.title)")
