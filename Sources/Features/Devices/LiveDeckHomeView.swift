@@ -15,6 +15,14 @@ struct LiveDeckHomeView: View {
     @Binding var path: [HomeTileID]
     let refreshAction: () async -> Void
 
+    #if DEBUG
+    private var automationPreview: Bool {
+        ProcessInfo.processInfo.arguments.contains("-live-deck-connected-qa")
+    }
+    #else
+    private var automationPreview: Bool { false }
+    #endif
+
     private func navigate(_ tile: HomeTileID) {
         path.append(tile)
     }
@@ -25,7 +33,8 @@ struct LiveDeckHomeView: View {
                 LiveDeckConsoleCard(
                     onScreen: { navigate(.screen) },
                     onDeviceInfo: { navigate(.info) },
-                    onNavigate: navigate
+                    onNavigate: navigate,
+                    automationPreview: automationPreview
                 )
 
                 LiveDeckNearbyCard()
@@ -33,7 +42,10 @@ struct LiveDeckHomeView: View {
                 VStack(spacing: 10) {
                     // Keep these surfaces full width. A mixed LazyVGrid made
                     // gridCellColumns(2) unreliable on older iOS 17 layouts.
-                    LiveDeckSourcesCard(onNavigate: { navigate(.updates) })
+                    LiveDeckSourcesCard(
+                        onNavigate: { navigate(.updates) },
+                        automationPreview: automationPreview
+                    )
                     LiveDeckToolsQuickAccessCard(onNavigate: navigate)
                 }
 
@@ -59,8 +71,20 @@ private struct LiveDeckConsoleCard: View {
     let onScreen: () -> Void
     let onDeviceInfo: () -> Void
     let onNavigate: (HomeTileID) -> Void
+    let automationPreview: Bool
+
+    private var isReady: Bool { automationPreview || ble.state == .ready }
+
+    private var displayName: String {
+        automationPreview ? "Flipper TUMOFLIP" : (ble.connectedName ?? "Flipper Zero")
+    }
+
+    private var displayedBattery: Int? {
+        automationPreview ? 79 : ble.battery
+    }
 
     private var tint: Color {
+        if automationPreview { return .green }
         switch ble.state {
         case .ready: return .green
         case .connected, .connecting, .scanning: return .yellow
@@ -70,6 +94,7 @@ private struct LiveDeckConsoleCard: View {
     }
 
     private var status: LiveDeckConnectionStatus {
+        if automationPreview { return .ready }
         switch ble.state {
         case .ready: return .ready
         case .scanning: return .scanning
@@ -81,24 +106,27 @@ private struct LiveDeckConsoleCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 Label("FLIPPER CONSOLE", systemImage: "rectangle.on.rectangle")
                     .font(.caption.weight(.bold))
                     .foregroundStyle(tint)
                     .tracking(0.8)
                 Spacer()
-                LiveDeckLiveIndicator(isLive: control.streaming, reduceMotion: reduceMotion)
+                LiveDeckLiveIndicator(
+                    isLive: control.streaming || automationPreview,
+                    reduceMotion: reduceMotion
+                )
             }
 
-            HStack(alignment: .top, spacing: 12) {
+            HStack(alignment: .top, spacing: 10) {
                 VStack(alignment: .leading, spacing: 8) {
                     Button(action: onScreen) {
                         ZStack {
-                            if ble.state == .ready {
+                            if isReady {
                                 FlipperScreenCanvas(pixels: control.screenPixels)
                                     .frame(maxWidth: .infinity)
-                                    .frame(height: 116)
+                                    .frame(height: 108)
                                     .transition(.opacity)
                             } else {
                                 VStack(spacing: 6) {
@@ -109,7 +137,7 @@ private struct LiveDeckConsoleCard: View {
                                 }
                                 .foregroundStyle(.secondary)
                                 .frame(maxWidth: .infinity)
-                                .frame(height: 116)
+                                .frame(height: 108)
                             }
                         }
                         .background(Color.black.opacity(0.9), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -119,14 +147,16 @@ private struct LiveDeckConsoleCard: View {
                         }
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel(control.streaming ? "Open live Flipper screen" : "Open Flipper screen")
+                    .accessibilityLabel((control.streaming || automationPreview) ? "Open live Flipper screen" : "Open Flipper screen")
 
                     HStack(spacing: 7) {
-                        LiveDeckBadge(
-                            text: status.title,
-                            color: tint,
-                            systemImage: nil
-                        )
+                        if !isReady {
+                            LiveDeckBadge(
+                                text: status.title,
+                                color: tint,
+                                systemImage: nil
+                            )
+                        }
                         LiveDeckBadge(
                             text: transfer.activeChannel.label,
                             color: transfer.activeChannel == .usb ? .blue : .secondary,
@@ -137,34 +167,40 @@ private struct LiveDeckConsoleCard: View {
                 }
                 .layoutPriority(1)
 
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(ble.connectedName ?? "Flipper Zero")
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(displayName)
                         .font(.subheadline.weight(.bold))
                         .lineLimit(2)
                         .minimumScaleFactor(0.8)
 
+                    // Keep all connection metadata on one compact rail. The
+                    // previous stacked status/battery/bridge rows made the
+                    // connected console substantially taller than the
+                    // disconnected state and pushed the dashboard off-screen.
                     HStack(spacing: 5) {
-                        Circle()
-                            .fill(tint)
-                            .frame(width: 7, height: 7)
-                        Text(status.shortTitle)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(tint)
+                                .frame(width: 6, height: 6)
+                            Text(status.shortTitle)
+                        }
 
-                    if ble.state == .ready, let battery = ble.battery {
-                        LiveDeckBattery(level: battery)
-                    }
+                        if isReady, let battery = displayedBattery {
+                            metadataDivider
+                            LiveDeckBattery(level: battery, showsIcon: false)
+                        }
 
-                    if ble.state == .ready {
-                        Text(ble.supportsAppBridge
-                             ? (ble.appBridgeV2 ? "Bridge v2" : "Bridge v1")
-                             : "No bridge")
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(ble.supportsAppBridge ? .green : .orange)
-                            .lineLimit(1)
+                        if isReady {
+                            metadataDivider
+                            Text(automationPreview || ble.supportsAppBridge
+                                 ? (automationPreview || ble.appBridgeV2 ? "Bridge v2" : "Bridge v1")
+                                 : "No bridge")
+                        }
                     }
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
 
                     Button(action: onDeviceInfo) {
                         Text("Info")
@@ -175,12 +211,20 @@ private struct LiveDeckConsoleCard: View {
 
                     LiveDeckQuickAccessStrip(onNavigate: onNavigate)
                 }
-                .frame(width: 112, alignment: .leading)
+                // Give the compact metadata rail enough room for the three
+                // connected-state values without truncating them. The live
+                // screen keeps a near-2:1 shape at this width.
+                .frame(width: 148, alignment: .leading)
             }
 
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .card(tint: tint, padding: 12)
+    }
+
+    private var metadataDivider: some View {
+        Text("·")
+            .foregroundStyle(.tertiary)
     }
 }
 
@@ -191,15 +235,15 @@ private struct LiveDeckQuickAccessStrip: View {
 
     var body: some View {
         if !layout.quickAccessTiles.isEmpty {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 0) {
                 ForEach(layout.quickAccessTiles) { tile in
                     Button { onNavigate(tile) } label: {
                         Text(tile.title)
-                            .font(.caption.weight(.bold))
+                            .font(.caption2.weight(.bold))
                             .foregroundStyle(.blue)
                             .lineLimit(1)
                             .minimumScaleFactor(0.72)
-                            .frame(maxWidth: .infinity, minHeight: 20, alignment: .leading)
+                            .frame(maxWidth: .infinity, minHeight: 18, alignment: .leading)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Open \(tile.title)")
@@ -269,6 +313,7 @@ private struct LiveDeckSourcesCard: View {
     @EnvironmentObject private var updates: UpdatesCoordinator
 
     let onNavigate: () -> Void
+    let automationPreview: Bool
 
     var body: some View {
         Button(action: onNavigate) {
@@ -288,7 +333,7 @@ private struct LiveDeckSourcesCard: View {
                     LiveDeckSourceRow(
                         title: "Firmware",
                         subtitle: "Device release channel",
-                        status: ble.state == .ready ? .ready("Ready") : .waiting("Waiting"),
+                        status: automationPreview || ble.state == .ready ? .ready("Ready") : .waiting("Waiting"),
                         systemImage: "cpu"
                     )
                     LiveDeckSourceRow(
@@ -624,6 +669,7 @@ private struct LiveDeckFooter: View {
 
 private struct LiveDeckBattery: View {
     let level: Int
+    var showsIcon = true
 
     private var tint: Color {
         level <= 15 ? .red : level <= 30 ? .orange : .green
@@ -631,8 +677,10 @@ private struct LiveDeckBattery: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            Image(systemName: batteryImage)
-                .font(.caption.weight(.semibold))
+            if showsIcon {
+                Image(systemName: batteryImage)
+                    .font(.caption.weight(.semibold))
+            }
             Text("\(level)%")
                 .font(.caption2.weight(.bold))
         }

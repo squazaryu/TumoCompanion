@@ -35,4 +35,26 @@ final class LiveDeckHomeUITests: XCTestCase {
         screenshot.lifetime = .keepAlways
         add(screenshot)
     }
+
+    func testConnectedConsoleUsesCompactStatusRail() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-onboardingDone", "YES", "-live-deck-connected-qa"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["FLIPPER CONSOLE"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Flipper TUMOFLIP"].exists)
+        XCTAssertTrue(app.staticTexts["Ready"].exists)
+        XCTAssertTrue(app.staticTexts["Bridge v2"].exists)
+        XCTAssertFalse(app.staticTexts["Connected & ready"].exists)
+        XCTAssertFalse(app.staticTexts["Bridge v1"].exists)
+
+        let tools = app.buttons["Tools"]
+        XCTAssertTrue(tools.exists)
+        XCTAssertGreaterThan(tools.frame.minY, 0)
+
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = "Live Deck home - connected compact console"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
 }
