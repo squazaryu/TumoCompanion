@@ -31,7 +31,6 @@ struct LiveDeckHomeView: View {
             CardScroll(refreshAction: refreshAction) {
                 LiveDeckConsoleCard(
                     onScreen: { navigate(.screen) },
-                    onDeviceInfo: { navigate(.info) },
                     onNavigate: navigate,
                     automationPreview: automationPreview
                 )
@@ -64,9 +63,9 @@ struct LiveDeckHomeView: View {
 private struct LiveDeckConsoleCard: View {
     @EnvironmentObject private var ble: FlipperBLE
     @EnvironmentObject private var control: FlipperControl
+    @EnvironmentObject private var transfer: TransferChannelStore
 
     let onScreen: () -> Void
-    let onDeviceInfo: () -> Void
     let onNavigate: (HomeTileID) -> Void
     let automationPreview: Bool
 
@@ -100,6 +99,16 @@ private struct LiveDeckConsoleCard: View {
         case .unauthorized: return .offline("Bluetooth permission needed")
         case .disconnected: return .offline("No Flipper connected")
         }
+    }
+
+    private var bridgeTitle: String {
+        guard isReady else { return "No bridge" }
+        guard automationPreview || ble.supportsAppBridge else { return "No bridge" }
+        return automationPreview || ble.appBridgeV2 ? "Bridge v2" : "Bridge v1"
+    }
+
+    private var channelTitle: String {
+        transfer.activeChannel == .usb ? "USB" : "BLE"
     }
 
     var body: some View {
@@ -142,14 +151,7 @@ private struct LiveDeckConsoleCard: View {
                     .buttonStyle(.plain)
                     .accessibilityLabel((control.streaming || automationPreview) ? "Open live Flipper screen" : "Open Flipper screen")
 
-                    if !isReady {
-                        LiveDeckBadge(
-                            text: status.title,
-                            color: tint,
-                            systemImage: nil
-                        )
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
+                    LiveDeckConsoleActionStrip(onNavigate: onNavigate)
                 }
                 .layoutPriority(1)
 
@@ -159,10 +161,9 @@ private struct LiveDeckConsoleCard: View {
                         .lineLimit(2)
                         .minimumScaleFactor(0.8)
 
-                    // Keep all connection metadata on one compact rail. The
-                    // previous stacked status/battery/bridge rows made the
-                    // connected console substantially taller than the
-                    // disconnected state and pushed the dashboard off-screen.
+                    // Keep device state in the right column. Navigation lives
+                    // in the compact icon strip below the screen, so the
+                    // connected and disconnected cards keep the same shape.
                     HStack(spacing: 5) {
                         HStack(spacing: 4) {
                             Circle()
@@ -171,16 +172,9 @@ private struct LiveDeckConsoleCard: View {
                             Text(status.shortTitle)
                         }
 
-                        if isReady, let battery = displayedBattery {
+                        if let battery = displayedBattery {
                             metadataDivider
                             LiveDeckBattery(level: battery, showsIcon: false)
-                        }
-
-                        if isReady {
-                            metadataDivider
-                            Text(automationPreview || ble.supportsAppBridge
-                                 ? (automationPreview || ble.appBridgeV2 ? "Bridge v2" : "Bridge v1")
-                                 : "No bridge")
                         }
                     }
                     .font(.caption2.weight(.semibold))
@@ -188,14 +182,17 @@ private struct LiveDeckConsoleCard: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
 
-                    Button(action: onDeviceInfo) {
-                        Text("Info")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(.blue)
+                    HStack(spacing: 5) {
+                        Image(systemName: transfer.activeChannel.systemImage)
+                            .font(.caption2.weight(.medium))
+                        Text(channelTitle)
+                        metadataDivider
+                        Text(bridgeTitle)
                     }
-                    .buttonStyle(.plain)
-
-                    LiveDeckQuickAccessStrip(onNavigate: onNavigate)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
                 }
                 // Give the compact metadata rail enough room for the three
                 // connected-state values without truncating them. The live
@@ -214,26 +211,42 @@ private struct LiveDeckConsoleCard: View {
     }
 }
 
-private struct LiveDeckQuickAccessStrip: View {
+private struct LiveDeckConsoleActionStrip: View {
     @ObservedObject private var layout = HomeLayoutStore.shared
 
     let onNavigate: (HomeTileID) -> Void
 
+    private var tiles: [HomeTileID] {
+        var result: [HomeTileID] = [.info]
+        result.append(contentsOf: layout.quickAccessTiles.filter { $0 != .info })
+        return result
+    }
+
+    private var columns: [GridItem] {
+        let count = min(max(tiles.count, 1), 4)
+        return Array(repeating: GridItem(.flexible(), spacing: 5), count: count)
+    }
+
     var body: some View {
-        if !layout.quickAccessTiles.isEmpty {
-            VStack(alignment: .leading, spacing: 0) {
-                ForEach(layout.quickAccessTiles) { tile in
-                    Button { onNavigate(tile) } label: {
-                        Text(tile.title)
-                            .font(.caption.weight(.regular))
-                            .foregroundStyle(.blue)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.72)
-                            .frame(maxWidth: .infinity, minHeight: 17, alignment: .leading)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Open \(tile.title)")
+        LazyVGrid(columns: columns, spacing: 5) {
+            ForEach(tiles) { tile in
+                Button { onNavigate(tile) } label: {
+                    Image(systemName: tile.systemImage)
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 30)
+                        .background(
+                            Color.primary.opacity(0.06),
+                            in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        )
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+                        }
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel(tile == .info ? "Info" : "Open \(tile.title)")
             }
         }
     }
@@ -686,47 +699,11 @@ private struct LiveDeckBattery: View {
     }
 }
 
-private struct LiveDeckBadge: View {
-    let text: String
-    let color: Color
-    let systemImage: String?
-
-    var body: some View {
-        HStack(spacing: 4) {
-            if let systemImage {
-                Image(systemName: systemImage)
-                    .font(.caption2)
-            } else {
-                Circle()
-                    .fill(color)
-                    .frame(width: 6, height: 6)
-            }
-            Text(text)
-                .font(.caption2.weight(.semibold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-        }
-        .foregroundStyle(color)
-        .padding(.horizontal, 7)
-        .padding(.vertical, 5)
-        .background(color.opacity(0.12), in: Capsule())
-    }
-}
-
 private enum LiveDeckConnectionStatus: Equatable {
     case ready
     case scanning
     case connecting
     case offline(String)
-
-    var title: String {
-        switch self {
-        case .ready: return "Connected & ready"
-        case .scanning: return "Scanning"
-        case .connecting: return "Connecting"
-        case .offline(let reason): return reason
-        }
-    }
 
     var shortTitle: String {
         switch self {
