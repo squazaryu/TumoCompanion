@@ -40,6 +40,34 @@ final class LiveDeckHomeUITests: XCTestCase {
         add(screenshot)
     }
 
+    func testSourceRowsRouteToDedicatedUpdateScreens() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-onboardingDone", "YES"]
+
+        app.launch()
+        XCTAssertTrue(app.buttons["updates-source-firmware"].waitForExistence(timeout: 5))
+        app.buttons["updates-source-firmware"].tap()
+        XCTAssertTrue(app.navigationBars["Firmware"].waitForExistence(timeout: 3))
+
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(app.buttons["updates-source-packages"].waitForExistence(timeout: 5))
+        app.buttons["updates-source-packages"].tap()
+        XCTAssertTrue(app.navigationBars["Firmware packages"].waitForExistence(timeout: 3))
+
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(app.buttons["updates-source-community"].waitForExistence(timeout: 5))
+        app.buttons["updates-source-community"].tap()
+        XCTAssertTrue(app.navigationBars["Community apps"].waitForExistence(timeout: 3))
+
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(app.buttons["updates-open-center"].waitForExistence(timeout: 5))
+        app.buttons["updates-open-center"].tap()
+        XCTAssertTrue(app.navigationBars["Updates"].waitForExistence(timeout: 3))
+    }
+
     func testConnectedConsoleUsesCompactStatusRail() {
         let app = XCUIApplication()
         app.launchArguments = ["-onboardingDone", "YES", "-live-deck-connected-qa"]

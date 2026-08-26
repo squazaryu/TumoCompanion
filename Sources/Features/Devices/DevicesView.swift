@@ -3,6 +3,7 @@ import SwiftUI
 struct DevicesView: View {
     @EnvironmentObject var ble: FlipperBLE
     @EnvironmentObject var control: FlipperControl
+    @EnvironmentObject var updates: UpdatesCoordinator
     @Binding var path: [HomeTileID]
 
     var body: some View {
@@ -70,6 +71,9 @@ struct DevicesView: View {
         case .remotes:       RemotesView()
         case .media:         MediaRemoteView()
         case .screen:        ScreenView()
+        case .firmware:      FirmwareLibraryView(library: updates.firmware)
+        case .packages:      TumoflipUpdaterView(updater: updates.packages)
+        case .communityApps: PluginUpdatesDetailView(updater: updates.plugins)
         }
     }
 }

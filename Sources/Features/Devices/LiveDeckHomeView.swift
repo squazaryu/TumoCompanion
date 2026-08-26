@@ -42,6 +42,7 @@ struct LiveDeckHomeView: View {
                     // gridCellColumns(2) unreliable on older iOS 17 layouts.
                     LiveDeckSourcesCard(
                         onOpenCenter: { navigate(.updates) },
+                        onNavigate: navigate,
                         automationPreview: automationPreview
                     )
                     LiveDeckToolsQuickAccessCard(onNavigate: navigate)
@@ -364,6 +365,7 @@ private struct LiveDeckSourcesCard: View {
     @EnvironmentObject private var updates: UpdatesCoordinator
 
     let onOpenCenter: () -> Void
+    let onNavigate: (HomeTileID) -> Void
     let automationPreview: Bool
 
     var body: some View {
@@ -382,9 +384,7 @@ private struct LiveDeckSourcesCard: View {
             }
 
             VStack(spacing: 2) {
-                NavigationLink {
-                    FirmwareLibraryView(library: updates.firmware)
-                } label: {
+                Button { onNavigate(.firmware) } label: {
                     LiveDeckSourceRow(
                         title: "Firmware",
                         subtitle: "Device release channel",
@@ -392,14 +392,12 @@ private struct LiveDeckSourcesCard: View {
                         systemImage: "cpu"
                     )
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.borderless)
                 .accessibilityIdentifier("updates-source-firmware")
 
                 Divider()
 
-                NavigationLink {
-                    TumoflipUpdaterView(updater: updates.packages)
-                } label: {
+                Button { onNavigate(.packages) } label: {
                     LiveDeckSourceRow(
                         title: "FW Packages",
                         subtitle: "Catalog on demand",
@@ -407,14 +405,12 @@ private struct LiveDeckSourcesCard: View {
                         systemImage: "shippingbox"
                     )
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.borderless)
                 .accessibilityIdentifier("updates-source-packages")
 
                 Divider()
 
-                NavigationLink {
-                    PluginUpdatesDetailView(updater: updates.plugins)
-                } label: {
+                Button { onNavigate(.communityApps) } label: {
                     LiveDeckSourceRow(
                         title: "Community Apps",
                         subtitle: "Audit when needed",
@@ -422,7 +418,7 @@ private struct LiveDeckSourcesCard: View {
                         systemImage: "square.grid.2x2"
                     )
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.borderless)
                 .accessibilityIdentifier("updates-source-community")
             }
         }
@@ -481,6 +477,7 @@ private struct LiveDeckSourceRow: View {
             }
             .fixedSize(horizontal: true, vertical: false)
         }
+        .foregroundStyle(.primary)
         .frame(maxWidth: .infinity, minHeight: 38, alignment: .leading)
         .padding(.horizontal, 4)
     }
@@ -589,16 +586,20 @@ private struct LiveDeckToolsDrawer: View {
     var body: some View {
         ZStack(alignment: .bottom) {
             if isOpen {
-                Color.black.opacity(0.16)
-                    .ignoresSafeArea()
-                    .onTapGesture { close() }
-                    .transition(.opacity)
+                ZStack(alignment: .bottom) {
+                    Color.black.opacity(0.16)
+                        .ignoresSafeArea()
+                        .onTapGesture { close() }
+                        .transition(.opacity)
 
-                toolsPanel
-                    .frame(height: panelHeight)
-                    .padding(.horizontal, Theme.pagePadding)
-                    .padding(.bottom, 54)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    toolsPanel
+                        .frame(height: panelHeight)
+                        .padding(.horizontal, Theme.pagePadding)
+                        .padding(.bottom, 54)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                .allowsHitTesting(true)
             }
 
             Button(action: toggle) {
@@ -630,7 +631,7 @@ private struct LiveDeckToolsDrawer: View {
             .padding(.horizontal, Theme.pagePadding)
             .padding(.bottom, 8)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        .frame(maxWidth: .infinity, alignment: .bottom)
         .zIndex(10)
     }
 

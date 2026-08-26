@@ -3,6 +3,9 @@ import SwiftUI
 /// A destination that can live as a tile on the Home screen (and double as a deep-link route).
 enum HomeTileID: String, Codable, CaseIterable, Identifiable, Hashable {
     case info, apps, files, airadar, wifi, fieldServices, spectrum, relay, tumonet, esp32, updates, backup, remotes, media, screen
+    // Source-specific routes live in the Home navigation stack but are not
+    // configurable dashboard tiles.
+    case firmware, packages, communityApps
     var id: String { rawValue }
 
     var title: String {
@@ -22,6 +25,9 @@ enum HomeTileID: String, Codable, CaseIterable, Identifiable, Hashable {
         case .remotes: return "Remotes"
         case .media:   return "Media"
         case .screen:  return "Remote"
+        case .firmware: return "Firmware"
+        case .packages: return "Firmware packages"
+        case .communityApps: return "Community apps"
         }
     }
 
@@ -42,6 +48,9 @@ enum HomeTileID: String, Codable, CaseIterable, Identifiable, Hashable {
         case .remotes: return "dot.radiowaves.right"
         case .media:   return "music.note"
         case .screen:  return "rectangle.on.rectangle"
+        case .firmware: return "cpu"
+        case .packages: return "shippingbox"
+        case .communityApps: return "square.grid.2x2"
         }
     }
 
@@ -62,6 +71,17 @@ enum HomeTileID: String, Codable, CaseIterable, Identifiable, Hashable {
         case .remotes: return .orange
         case .media:   return .pink
         case .screen:  return .teal
+        case .firmware: return .orange
+        case .packages: return .blue
+        case .communityApps: return .indigo
+        }
+    }
+
+    /// Source routes must never appear in Home layout or Quick Access settings.
+    var isDashboardTile: Bool {
+        switch self {
+        case .firmware, .packages, .communityApps: return false
+        default: return true
         }
     }
 
@@ -273,7 +293,9 @@ final class HomeLayoutStore: ObservableObject {
     }
 
     private func apply(_ data: HomeLayoutData) {
-        func ids(_ a: [String]) -> [HomeTileID] { a.compactMap { HomeTileID(rawValue: $0) } }
+        func ids(_ a: [String]) -> [HomeTileID] {
+            a.compactMap { HomeTileID(rawValue: $0) }.filter(\.isDashboardTile)
+        }
         var o: [HomeGroupID: [HomeTileID]] = [
             .info: ids(data.info), .tools: ids(data.tools), .revision: ids(data.revision)
         ]
@@ -283,7 +305,7 @@ final class HomeLayoutStore: ObservableObject {
         var seen = Set<HomeTileID>()
         for g in HomeGroupID.allCases { o[g] = (o[g] ?? []).filter { seen.insert($0).inserted } }
         hid = hid.filter { seen.insert($0).inserted }
-        for t in HomeTileID.allCases where !seen.contains(t) {
+        for t in HomeTileID.allCases where t.isDashboardTile && !seen.contains(t) {
             // Remote belongs with revision/device state rather than the long tools list.
             let group: HomeGroupID = t == .screen ? .revision : .tools
             o[group, default: []].append(t); seen.insert(t)

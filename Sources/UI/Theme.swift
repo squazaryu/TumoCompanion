@@ -23,6 +23,7 @@ struct CardBackground: ViewModifier {
             .overlay(
                 RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
                     .strokeBorder((tint ?? Color.primary).opacity(0.08), lineWidth: 1)
+                    .allowsHitTesting(false)
             )
             .shadow(color: .black.opacity(0.055), radius: 12, y: 5)
     }
