@@ -122,4 +122,21 @@ final class LiveDeckHomeUITests: XCTestCase {
         screenshot.lifetime = .keepAlways
         add(screenshot)
     }
+
+    func testSettingsDoesNotRepeatBuildVersion() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-onboardingDone", "YES"]
+        app.launch()
+
+        let settings = app.tabBars.buttons["Settings"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        settings.tap()
+
+        let about = app.buttons["settings-about"]
+        XCTAssertTrue(about.waitForExistence(timeout: 5))
+        about.tap()
+
+        XCTAssertTrue(app.navigationBars["About"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.staticTexts["Version"].exists)
+    }
 }

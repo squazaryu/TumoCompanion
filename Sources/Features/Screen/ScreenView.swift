@@ -142,7 +142,8 @@ struct ScreenView: View {
             }
         }
         .sheet(item: $shareItem) { ActivityView(items: [$0.url]) }
-        .onAppear { if ble.state == .ready { control.startScreenStream() } }
+        .onAppear { control.startScreenStream(for: .remote) }
+        .onDisappear { control.stopScreenStream(for: .remote) }
     }
 
     /// Render the current mirror buffer to a PNG (orange bg, black pixels, 8×) and

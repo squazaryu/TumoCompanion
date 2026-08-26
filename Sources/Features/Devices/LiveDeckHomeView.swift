@@ -112,6 +112,10 @@ private struct LiveDeckConsoleCard: View {
         transfer.activeChannel == .usb ? "USB" : "BLE"
     }
 
+    private var statusRailFont: Font {
+        .system(size: 12, weight: .semibold, design: .rounded)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
@@ -163,25 +167,31 @@ private struct LiveDeckConsoleCard: View {
                                 .fill(tint)
                                 .frame(width: 6, height: 6)
                             Text(status.shortTitle)
+                                .font(statusRailFont)
                         }
 
                         metadataDivider
 
                         if let battery = displayedBattery {
-                            LiveDeckBattery(level: battery, showsIcon: false)
+                            LiveDeckBattery(level: battery, showsIcon: false, valueFont: statusRailFont)
                             metadataDivider
                         }
 
                         Image(systemName: transfer.activeChannel.systemImage)
                             .font(.caption2.weight(.medium))
                         Text(channelTitle)
+                            .font(statusRailFont)
                         metadataDivider
                         Text(bridgeTitle)
+                            .font(statusRailFont)
+                            .foregroundStyle(.primary.opacity(0.72))
+                            .fixedSize(horizontal: true, vertical: false)
+                            .layoutPriority(1)
                     }
-                    .font(.caption2.weight(.semibold))
+                    .font(statusRailFont)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.62)
+                    .minimumScaleFactor(0.82)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 5)
                     .background(Color.primary.opacity(0.055), in: Capsule())
@@ -745,6 +755,7 @@ private struct LiveDeckFooter: View {
 private struct LiveDeckBattery: View {
     let level: Int
     var showsIcon = true
+    var valueFont: Font = .caption2.weight(.bold)
 
     private var tint: Color {
         level <= 15 ? .red : level <= 30 ? .orange : .green
@@ -757,7 +768,7 @@ private struct LiveDeckBattery: View {
                     .font(.caption.weight(.semibold))
             }
             Text("\(level)%")
-                .font(.caption2.weight(.bold))
+                .font(valueFont)
         }
         .foregroundStyle(tint)
         .accessibilityElement(children: .combine)

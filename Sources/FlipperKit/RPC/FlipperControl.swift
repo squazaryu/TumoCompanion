@@ -1,12 +1,31 @@
 import Foundation
 import Combine
 
+/// A screen stream can be visible in more than one navigation surface at once:
+/// the Home preview remains alive while the full Remote screen is pushed. Each
+/// surface owns a lease so one view disappearing cannot stop the stream for the
+/// other one.
+enum ScreenStreamOwner: Hashable {
+    case home
+    case remote
+}
+
 /// High-level Flipper actions: launch apps/.fap, send Sub-GHz files, remote
 /// input, device info, and the screen stream decoder.
 final class FlipperControl: ObservableObject {
     let rpc: FlipperRPC
+    private let ble: FlipperBLE
     private var streamCancellable: AnyCancellable?
+    private let streamLock = NSLock()
+    private var streamOwners = Set<ScreenStreamOwner>()
     private var streamActive = false
+
+    // Screen frames can arrive faster than SwiftUI can redraw the Canvas. Keep
+    // only the newest decoded frame instead of enqueueing an unbounded backlog
+    // on the main queue (which made the mirror appear frozen after input).
+    private let frameDeliveryLock = NSLock()
+    private var pendingPixels: [Bool]?
+    private var frameDeliveryScheduled = false
 
     /// Latest decoded screen frame as a 128x64 1-bpp bitmap, expanded to bytes.
     @Published var screenPixels: [Bool] = Array(repeating: false, count: 128 * 64)
@@ -15,11 +34,12 @@ final class FlipperControl: ObservableObject {
     static let screenW = 128
     static let screenH = 64
 
-    init(rpc: FlipperRPC = .shared) {
+    init(rpc: FlipperRPC = .shared, ble: FlipperBLE = .shared) {
         self.rpc = rpc
+        self.ble = ble
         streamCancellable = rpc.unsolicited.sink { [weak self] main in
             if case .guiScreenFrame(let frame) = main.content {
-                self?.decodeScreen(frame.data)
+                self?.receiveScreenFrame(frame)
             }
         }
     }
@@ -53,22 +73,67 @@ final class FlipperControl: ObservableObject {
 
     // MARK: - Remote input (screen mirroring control)
 
-    func startScreenStream() {
-        guard !streamActive else { return }
-        streamActive = true
+    /// Acquire the stream for a view. The default keeps the old API source
+    /// compatible for callers that only have one surface.
+    func startScreenStream(for owner: ScreenStreamOwner = .home) {
+        streamLock.lock()
+        streamOwners.insert(owner)
+        let shouldStart = ble.state == .ready && !streamActive
+        if shouldStart { streamActive = true }
+        streamLock.unlock()
+
+        guard shouldStart else { return }
         rpc.send { main in
             main.content = .guiStartScreenStreamRequest(PBGui_StartScreenStreamRequest())
         }
-        DispatchQueue.main.async { self.streaming = true }
+        publishStreaming(true)
     }
 
-    func stopScreenStream() {
-        guard streamActive else { return }
-        streamActive = false
+    /// Release the stream for a view. The firmware stream is stopped only when
+    /// the last visible surface releases its lease.
+    func stopScreenStream(for owner: ScreenStreamOwner = .home) {
+        streamLock.lock()
+        streamOwners.remove(owner)
+        let shouldStop = streamActive && streamOwners.isEmpty
+        if shouldStop { streamActive = false }
+        streamLock.unlock()
+
+        guard shouldStop else { return }
         rpc.send { main in
             main.content = .guiStopScreenStreamRequest(PBGui_StopScreenStreamRequest())
         }
-        DispatchQueue.main.async { self.streaming = false }
+        publishStreaming(false)
+    }
+
+    /// Reconcile the desired owners with the current BLE link. Owners are kept
+    /// across a short reconnect, while the wire-level stream state is reset so
+    /// a later ready event can start a fresh stream instead of being blocked by
+    /// a stale local `streamActive` flag.
+    func reconcileScreenStream() {
+        streamLock.lock()
+        let shouldStart: Bool
+        let shouldStop: Bool
+        if ble.state == .ready {
+            shouldStart = !streamOwners.isEmpty && !streamActive
+            if shouldStart { streamActive = true }
+            shouldStop = false
+        } else {
+            shouldStart = false
+            shouldStop = streamActive
+            if shouldStop { streamActive = false }
+        }
+        streamLock.unlock()
+
+        if shouldStart {
+            rpc.send { main in
+                main.content = .guiStartScreenStreamRequest(PBGui_StartScreenStreamRequest())
+            }
+            publishStreaming(true)
+        } else if shouldStop {
+            // The link is no longer ready, so sending a stop frame would be
+            // discarded by the transport. The next ready event starts cleanly.
+            publishStreaming(false)
+        }
     }
 
     func press(_ key: PBGui_InputKey, type: PBGui_InputType = .short) {
@@ -92,15 +157,24 @@ final class FlipperControl: ObservableObject {
 
     // MARK: - Screen decode (128x64, 1bpp, column-major pages like SSD1306)
 
-    private func decodeScreen(_ data: Data) {
+    private func receiveScreenFrame(_ frame: PBGui_ScreenFrame) {
+        guard let pixels = Self.decodeScreenFrame(frame.data) else { return }
+        publishScreenFrame(pixels)
+    }
+
+    /// Decode the Flipper's 128×64 page-oriented framebuffer. Exposed internally
+    /// for protocol tests so malformed/short frames cannot regress into a blank
+    /// or partially rendered screen.
+    static func decodeScreenFrame(_ data: Data) -> [Bool]? {
         let w = Self.screenW, h = Self.screenH
+        let expectedBytes = w * h / 8
         var pixels = Array(repeating: false, count: w * h)
+        guard data.count >= expectedBytes else { return nil }
         let bytes = [UInt8](data)
         // Flipper sends 1024 bytes: 8 pages of 128 columns, LSB = top pixel of page.
         for page in 0..<(h / 8) {
             for x in 0..<w {
                 let idx = page * w + x
-                guard idx < bytes.count else { continue }
                 let b = bytes[idx]
                 for bit in 0..<8 {
                     let y = page * 8 + bit
@@ -108,6 +182,48 @@ final class FlipperControl: ObservableObject {
                 }
             }
         }
-        DispatchQueue.main.async { self.screenPixels = pixels }
+        return pixels
+    }
+
+    private func publishStreaming(_ value: Bool) {
+        if Thread.isMainThread {
+            streaming = value
+        } else {
+            DispatchQueue.main.async { [weak self] in self?.streaming = value }
+        }
+    }
+
+    private func publishScreenFrame(_ pixels: [Bool]) {
+        var shouldSchedule = false
+        frameDeliveryLock.lock()
+        pendingPixels = pixels
+        if !frameDeliveryScheduled {
+            frameDeliveryScheduled = true
+            shouldSchedule = true
+        }
+        frameDeliveryLock.unlock()
+
+        guard shouldSchedule else { return }
+        DispatchQueue.main.async { [weak self] in self?.deliverPendingScreenFrame() }
+    }
+
+    private func deliverPendingScreenFrame() {
+        frameDeliveryLock.lock()
+        let pixels = pendingPixels
+        pendingPixels = nil
+        if pixels == nil { frameDeliveryScheduled = false }
+        frameDeliveryLock.unlock()
+
+        guard let pixels else { return }
+        screenPixels = pixels
+
+        frameDeliveryLock.lock()
+        let needsAnotherDelivery = pendingPixels != nil
+        if !needsAnotherDelivery { frameDeliveryScheduled = false }
+        frameDeliveryLock.unlock()
+
+        if needsAnotherDelivery {
+            DispatchQueue.main.async { [weak self] in self?.deliverPendingScreenFrame() }
+        }
     }
 }

@@ -285,6 +285,15 @@ final class FlipperRPC: ObservableObject {
         var toResolve: [(Pending, [PB_Main]?, Error?)] = []
         var unsolicitedFrames: [PB_Main] = []
         for main in frames {
+            // Screen frames are asynchronous stream data. Treat them as
+            // unsolicited even if a buggy/older firmware leaves a non-zero
+            // command_id in the reusable frame object; otherwise a coincident
+            // command id can consume the frame as a response and freeze the
+            // mirror until the next reconnect.
+            if Self.isScreenFrame(main) {
+                unsolicitedFrames.append(main)
+                continue
+            }
             let id = main.commandID
             if id != 0, var p = pending[id] {
                 p.accumulated.append(main)
@@ -312,6 +321,11 @@ final class FlipperRPC: ObservableObject {
     }
 
     // MARK: - Wire format helpers
+
+    static func isScreenFrame(_ main: PB_Main) -> Bool {
+        if case .guiScreenFrame = main.content { return true }
+        return false
+    }
 
     /// Serialize a Main and prepend a protobuf base-128 varint length.
     static func delimited(_ main: PB_Main) throws -> Data {

@@ -173,15 +173,6 @@ struct AboutSettingsView: View {
                         .foregroundStyle(ble.appBridgeV2 ? .green : .secondary)
                 }
                 Divider().opacity(0.4)
-                HStack(alignment: .top, spacing: 12) {
-                    Text("Version").foregroundStyle(.secondary)
-                    Text(BuildInfo.label)
-                        .font(.system(.footnote, design: .monospaced))
-                        .frame(maxWidth: .infinity, alignment: .trailing)
-                        .multilineTextAlignment(.trailing)
-                        .textSelection(.enabled)
-                }
-                Divider().opacity(0.4)
                 Button { settings.onboardingDone = false } label: {
                     Label("Show intro again", systemImage: "questionmark.circle")
                 }

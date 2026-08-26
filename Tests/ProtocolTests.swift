@@ -60,6 +60,38 @@ final class ProtocolTests: XCTestCase {
         XCTAssertNil(FlipperRPC.readVarint(Data()))                     // empty
     }
 
+    // MARK: Screen mirror framing
+
+    func testScreenFrameDecoderUsesFlipperPageLayout() {
+        var bytes = [UInt8](repeating: 0, count: FlipperControl.screenW * FlipperControl.screenH / 8)
+        bytes[0] = 0b0000_0001                 // page 0, x 0, y 0
+        bytes[FlipperControl.screenW] = 0b1000_0000 // page 1, x 0, y 15
+
+        let pixels = FlipperControl.decodeScreenFrame(Data(bytes))
+        XCTAssertEqual(pixels?.count, FlipperControl.screenW * FlipperControl.screenH)
+        XCTAssertEqual(pixels?[0], true)
+        XCTAssertEqual(pixels?[15 * FlipperControl.screenW], true)
+        XCTAssertEqual(pixels?[1], false)
+    }
+
+    func testScreenFrameDecoderRejectsShortFrames() {
+        XCTAssertNil(FlipperControl.decodeScreenFrame(Data(repeating: 0, count: 128)))
+    }
+
+    func testScreenFramesBypassCommandCorrelation() {
+        var frame = PB_Main()
+        frame.commandID = 42
+        var screen = PBGui_ScreenFrame()
+        screen.data = Data(repeating: 0, count: 1024)
+        frame.content = .guiScreenFrame(screen)
+        XCTAssertTrue(FlipperRPC.isScreenFrame(frame))
+
+        var response = PB_Main()
+        response.commandID = 42
+        response.content = .empty(PB_Empty())
+        XCTAssertFalse(FlipperRPC.isScreenFrame(response))
+    }
+
     func testRPCCommandGateSerializesConcurrentWork() async throws {
         let gate = RPCCommandGate()
         let probe = RPCConcurrencyProbe()

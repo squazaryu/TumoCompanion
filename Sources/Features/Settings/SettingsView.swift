@@ -85,19 +85,13 @@ struct SettingsView: View {
 
             SettingsCategoryCard(
                 title: "About",
-                subtitle: "App Bridge version, build identity and onboarding",
+                subtitle: "App Bridge status and onboarding",
                 systemImage: "info.circle",
                 tint: .secondary
             ) {
                 AboutSettingsView()
             }
 
-            Text(BuildInfo.label)
-                .font(.system(.caption2, design: .monospaced))
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity)
-                .textSelection(.enabled)
-                .padding(.top, 2)
         }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)

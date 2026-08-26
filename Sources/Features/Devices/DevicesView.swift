@@ -28,17 +28,13 @@ struct DevicesView: View {
                     }
                     .onAppear {
                         if ble.state == .disconnected { ble.autoConnect() }
-                        if ble.state == .ready { control.startScreenStream() }
+                        control.startScreenStream(for: .home)
                     }
                     .onDisappear {
-                        control.stopScreenStream()
+                        control.stopScreenStream(for: .home)
                     }
-                    .onChange(of: ble.state) { _, state in
-                        if state == .ready {
-                            control.startScreenStream()
-                        } else {
-                            control.stopScreenStream()
-                        }
+                    .onChange(of: ble.state) { _, _ in
+                        control.reconcileScreenStream()
                     }
             }
             .navigationDestination(for: HomeTileID.self) { destination($0) }
@@ -47,7 +43,7 @@ struct DevicesView: View {
 
     private func refreshConnection() async {
         ble.autoConnect()
-        if ble.state == .ready { control.startScreenStream() }
+        control.startScreenStream(for: .home)
         // Give CoreBluetooth a short window to publish a retained-link state before
         // the refresh control disappears. Never start a second scan here.
         try? await Task.sleep(nanoseconds: 250_000_000)
