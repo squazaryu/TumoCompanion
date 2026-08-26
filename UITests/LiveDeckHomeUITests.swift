@@ -47,6 +47,8 @@ final class LiveDeckHomeUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Bridge v2"].exists)
         XCTAssertFalse(app.staticTexts["Connected & ready"].exists)
         XCTAssertFalse(app.staticTexts["Bridge v1"].exists)
+        XCTAssertFalse(app.staticTexts["LIVE"].exists)
+        XCTAssertFalse(app.staticTexts["BLE"].exists)
 
         let tools = app.buttons["Tools"]
         XCTAssertTrue(tools.exists)

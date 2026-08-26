@@ -8,7 +8,6 @@ import SwiftUI
 struct LiveDeckHomeView: View {
     @EnvironmentObject private var ble: FlipperBLE
     @EnvironmentObject private var control: FlipperControl
-    @EnvironmentObject private var transfer: TransferChannelStore
     @EnvironmentObject private var updates: UpdatesCoordinator
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -65,8 +64,6 @@ struct LiveDeckHomeView: View {
 private struct LiveDeckConsoleCard: View {
     @EnvironmentObject private var ble: FlipperBLE
     @EnvironmentObject private var control: FlipperControl
-    @EnvironmentObject private var transfer: TransferChannelStore
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     let onScreen: () -> Void
     let onDeviceInfo: () -> Void
@@ -113,10 +110,6 @@ private struct LiveDeckConsoleCard: View {
                     .foregroundStyle(tint)
                     .tracking(0.8)
                 Spacer()
-                LiveDeckLiveIndicator(
-                    isLive: control.streaming || automationPreview,
-                    reduceMotion: reduceMotion
-                )
             }
 
             HStack(alignment: .top, spacing: 10) {
@@ -149,21 +142,14 @@ private struct LiveDeckConsoleCard: View {
                     .buttonStyle(.plain)
                     .accessibilityLabel((control.streaming || automationPreview) ? "Open live Flipper screen" : "Open Flipper screen")
 
-                    HStack(spacing: 7) {
-                        if !isReady {
-                            LiveDeckBadge(
-                                text: status.title,
-                                color: tint,
-                                systemImage: nil
-                            )
-                        }
+                    if !isReady {
                         LiveDeckBadge(
-                            text: transfer.activeChannel.label,
-                            color: transfer.activeChannel == .usb ? .blue : .secondary,
-                            systemImage: transfer.activeChannel.systemImage
+                            text: status.title,
+                            color: tint,
+                            systemImage: nil
                         )
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .layoutPriority(1)
 
@@ -239,11 +225,11 @@ private struct LiveDeckQuickAccessStrip: View {
                 ForEach(layout.quickAccessTiles) { tile in
                     Button { onNavigate(tile) } label: {
                         Text(tile.title)
-                            .font(.caption2.weight(.bold))
+                            .font(.caption.weight(.regular))
                             .foregroundStyle(.blue)
                             .lineLimit(1)
                             .minimumScaleFactor(0.72)
-                            .frame(maxWidth: .infinity, minHeight: 18, alignment: .leading)
+                            .frame(maxWidth: .infinity, minHeight: 17, alignment: .leading)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Open \(tile.title)")
@@ -320,12 +306,12 @@ private struct LiveDeckSourcesCard: View {
             VStack(alignment: .leading, spacing: 9) {
                 HStack(spacing: 6) {
                     Label("SOURCES", systemImage: "square.stack.3d.up")
-                        .font(.caption.weight(.bold))
+                        .font(.caption2)
                         .foregroundStyle(Theme.accent)
-                        .tracking(0.8)
+                        .tracking(0.65)
                     Spacer()
                     Text("Open center")
-                        .font(.caption2.weight(.bold))
+                        .font(.caption2)
                         .foregroundStyle(Theme.accent)
                 }
 
@@ -384,7 +370,7 @@ private struct LiveDeckSourceRow: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.callout.weight(.semibold))
+                    .font(.subheadline.weight(.regular))
                     .lineLimit(1)
                 Text(subtitle)
                     .font(.caption2)
@@ -400,14 +386,14 @@ private struct LiveDeckSourceRow: View {
                     .fill(status.tint)
                     .frame(width: 6, height: 6)
                 Text(status.title)
-                    .font(.callout.weight(.semibold))
+                    .font(.caption.weight(.regular))
                     .foregroundStyle(status.tint)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
             }
             .fixedSize(horizontal: true, vertical: false)
         }
-        .frame(maxWidth: .infinity, minHeight: 42, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: 38, alignment: .leading)
         .padding(.horizontal, 4)
     }
 }
@@ -430,14 +416,14 @@ private struct LiveDeckToolsQuickAccessCard: View {
         VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 7) {
                 Label("QUICK ACCESS", systemImage: "square.grid.3x2")
-                    .font(.caption.weight(.bold))
+                    .font(.caption2)
                     .foregroundStyle(Theme.accent)
-                    .tracking(0.8)
+                    .tracking(0.65)
             }
 
             if layout.toolsQuickAccessTiles.isEmpty {
                 Text("Choose tools in Settings → Home dashboard.")
-                    .font(.caption)
+                    .font(.caption2)
                     .foregroundStyle(.secondary)
             } else {
                 LazyVGrid(
@@ -448,16 +434,16 @@ private struct LiveDeckToolsQuickAccessCard: View {
                         Button { onNavigate(tool.id) } label: {
                             VStack(alignment: .center, spacing: 8) {
                                 Image(systemName: tool.systemImage)
-                                    .font(.title3.weight(.medium))
+                                    .font(.title3.weight(.regular))
                                     .foregroundStyle(.primary.opacity(0.68))
                                 Text(tool.title)
-                                    .font(.caption2.weight(.semibold))
+                                    .font(.caption2.weight(.regular))
                                     .foregroundStyle(.primary)
                                     .multilineTextAlignment(.center)
                                     .lineLimit(2)
                                     .minimumScaleFactor(0.72)
                             }
-                            .frame(maxWidth: .infinity, minHeight: 58, alignment: .center)
+                            .frame(maxWidth: .infinity, minHeight: 56, alignment: .center)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 3)
                             .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -724,39 +710,6 @@ private struct LiveDeckBadge: View {
         .padding(.horizontal, 7)
         .padding(.vertical, 5)
         .background(color.opacity(0.12), in: Capsule())
-    }
-}
-
-private struct LiveDeckLiveIndicator: View {
-    let isLive: Bool
-    let reduceMotion: Bool
-
-    @State private var pulse = false
-
-    var body: some View {
-        HStack(spacing: 4) {
-            Circle()
-                .fill(isLive ? Color.green : Color.orange)
-                .frame(width: 6, height: 6)
-                .overlay {
-                    if isLive && !reduceMotion {
-                        Circle()
-                            .stroke(Color.green.opacity(0.55), lineWidth: 1.25)
-                            .scaleEffect(pulse ? 2.2 : 1)
-                            .opacity(pulse ? 0 : 0.8)
-                    }
-                }
-            Text(isLive ? "LIVE" : "IDLE")
-                .font(.caption2.weight(.bold))
-                .foregroundStyle(isLive ? .green : .orange)
-        }
-        .task(id: isLive) {
-            guard isLive, !reduceMotion else { return }
-            pulse = false
-            withAnimation(.easeOut(duration: 1.25).repeatForever(autoreverses: false)) {
-                pulse = true
-            }
-        }
     }
 }
 
