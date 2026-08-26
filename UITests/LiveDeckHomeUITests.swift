@@ -8,6 +8,10 @@ final class LiveDeckHomeUITests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["FLIPPER CONSOLE"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["SOURCES"].exists)
+        XCTAssertTrue(app.buttons["updates-open-center"].exists)
+        XCTAssertTrue(app.buttons["updates-source-firmware"].exists)
+        XCTAssertTrue(app.buttons["updates-source-packages"].exists)
+        XCTAssertTrue(app.buttons["updates-source-community"].exists)
         XCTAssertTrue(app.buttons["Info"].exists)
         XCTAssertTrue(app.buttons["Open Files"].exists)
         XCTAssertTrue(app.buttons["Open Apps"].exists)
@@ -46,6 +50,7 @@ final class LiveDeckHomeUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Ready"].exists)
         XCTAssertTrue(app.staticTexts["BLE"].exists)
         XCTAssertTrue(app.staticTexts["Bridge v2"].exists)
+        XCTAssertFalse(app.buttons["Ready"].exists)
         XCTAssertFalse(app.staticTexts["Connected & ready"].exists)
         XCTAssertFalse(app.staticTexts["Bridge v1"].exists)
         XCTAssertFalse(app.staticTexts["LIVE"].exists)

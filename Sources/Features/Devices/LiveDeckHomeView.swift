@@ -41,7 +41,7 @@ struct LiveDeckHomeView: View {
                     // Keep these surfaces full width. A mixed LazyVGrid made
                     // gridCellColumns(2) unreliable on older iOS 17 layouts.
                     LiveDeckSourcesCard(
-                        onNavigate: { navigate(.updates) },
+                        onOpenCenter: { navigate(.updates) },
                         automationPreview: automationPreview
                     )
                     LiveDeckToolsQuickAccessCard(onNavigate: navigate)
@@ -188,6 +188,8 @@ private struct LiveDeckConsoleCard: View {
                         Capsule()
                             .strokeBorder(tint.opacity(0.22), lineWidth: 1)
                     }
+                    .allowsHitTesting(false)
+                    .accessibilityElement(children: .combine)
                 }
                 .layoutPriority(1)
 
@@ -275,21 +277,25 @@ private struct LiveDeckConsoleActionList: View {
     private let tiles: [HomeTileID] = [.info, .files, .apps, .backup]
 
     var body: some View {
-        LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 5) {
+        LazyVGrid(columns: [GridItem(.flexible(), spacing: 7), GridItem(.flexible(), spacing: 7)], spacing: 7) {
             ForEach(tiles) { tile in
                 Button { onNavigate(tile) } label: {
-                    HStack(spacing: 5) {
+                    VStack(spacing: 3) {
                         Image(systemName: tile.systemImage)
-                            .font(.caption2.weight(.medium))
-                            .frame(width: 14)
+                            .font(.subheadline.weight(.medium))
                         Text(tile.title)
-                            .font(.caption2.weight(.semibold))
+                            .font(.caption2.weight(.medium))
                     }
                     .lineLimit(1)
-                    .minimumScaleFactor(0.7)
                     .foregroundStyle(.primary.opacity(0.82))
                     .frame(maxWidth: .infinity)
-                    .frame(height: 24, alignment: .leading)
+                    .frame(minHeight: 37)
+                    .padding(.horizontal, 4)
+                    .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+                    }
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(tile == .info ? "Info" : "Open \(tile.title)")
@@ -357,36 +363,58 @@ private struct LiveDeckSourcesCard: View {
     @EnvironmentObject private var ble: FlipperBLE
     @EnvironmentObject private var updates: UpdatesCoordinator
 
-    let onNavigate: () -> Void
+    let onOpenCenter: () -> Void
     let automationPreview: Bool
 
     var body: some View {
-        Button(action: onNavigate) {
-            VStack(alignment: .leading, spacing: 9) {
-                HStack(spacing: 6) {
-                    Label("SOURCES", systemImage: "square.stack.3d.up")
-                        .font(.caption2)
-                        .foregroundStyle(Theme.accent)
-                        .tracking(0.65)
-                    Spacer()
-                    Text("Open center")
-                        .font(.caption2)
-                        .foregroundStyle(Theme.accent)
-                }
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(spacing: 6) {
+                Label("SOURCES", systemImage: "square.stack.3d.up")
+                    .font(.caption2)
+                    .foregroundStyle(Theme.accent)
+                    .tracking(0.65)
+                Spacer()
+                Button("Open center", action: onOpenCenter)
+                    .font(.caption2)
+                    .foregroundStyle(Theme.accent)
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("updates-open-center")
+            }
 
-                VStack(spacing: 2) {
+            VStack(spacing: 2) {
+                NavigationLink {
+                    FirmwareLibraryView(library: updates.firmware)
+                } label: {
                     LiveDeckSourceRow(
                         title: "Firmware",
                         subtitle: "Device release channel",
                         status: automationPreview || ble.state == .ready ? .ready("Ready") : .waiting("Waiting"),
                         systemImage: "cpu"
                     )
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("updates-source-firmware")
+
+                Divider()
+
+                NavigationLink {
+                    TumoflipUpdaterView(updater: updates.packages)
+                } label: {
                     LiveDeckSourceRow(
                         title: "FW Packages",
                         subtitle: "Catalog on demand",
                         status: packageStatus,
                         systemImage: "shippingbox"
                     )
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("updates-source-packages")
+
+                Divider()
+
+                NavigationLink {
+                    PluginUpdatesDetailView(updater: updates.plugins)
+                } label: {
                     LiveDeckSourceRow(
                         title: "Community Apps",
                         subtitle: "Audit when needed",
@@ -394,10 +422,11 @@ private struct LiveDeckSourcesCard: View {
                         systemImage: "square.grid.2x2"
                     )
                 }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("updates-source-community")
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .card(tint: Theme.accent, padding: 10)
     }
 
