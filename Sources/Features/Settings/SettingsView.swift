@@ -49,7 +49,7 @@ struct SettingsView: View {
 
             SettingsCategoryCard(
                 title: "Home dashboard",
-                subtitle: "Customize Console and Tools Quick Access",
+                subtitle: "Choose Tools for Quick Access and the More Tools drawer",
                 systemImage: "square.grid.2x2",
                 tint: .purple
             ) {

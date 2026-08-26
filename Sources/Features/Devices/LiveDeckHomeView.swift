@@ -156,33 +156,38 @@ private struct LiveDeckConsoleCard: View {
                     .buttonStyle(.plain)
                     .accessibilityLabel((control.streaming || automationPreview) ? "Open live Flipper screen" : "Open Flipper screen")
 
-                    VStack(alignment: .leading, spacing: 3) {
-                        HStack(spacing: 5) {
-                            HStack(spacing: 4) {
-                                Circle()
-                                    .fill(tint)
-                                    .frame(width: 6, height: 6)
-                                Text(status.shortTitle)
-                            }
-
-                            if let battery = displayedBattery {
-                                metadataDivider
-                                LiveDeckBattery(level: battery, showsIcon: false)
-                            }
+                    HStack(spacing: 5) {
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(tint)
+                                .frame(width: 6, height: 6)
+                            Text(status.shortTitle)
                         }
 
-                        HStack(spacing: 5) {
-                            Image(systemName: transfer.activeChannel.systemImage)
-                                .font(.caption2.weight(.medium))
-                            Text(channelTitle)
+                        metadataDivider
+
+                        if let battery = displayedBattery {
+                            LiveDeckBattery(level: battery, showsIcon: false)
                             metadataDivider
-                            Text(bridgeTitle)
                         }
+
+                        Image(systemName: transfer.activeChannel.systemImage)
+                            .font(.caption2.weight(.medium))
+                        Text(channelTitle)
+                        metadataDivider
+                        Text(bridgeTitle)
                     }
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.72)
+                    .minimumScaleFactor(0.62)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(Color.primary.opacity(0.055), in: Capsule())
+                    .overlay {
+                        Capsule()
+                            .strokeBorder(tint.opacity(0.22), lineWidth: 1)
+                    }
                 }
                 .layoutPriority(1)
 
@@ -265,15 +270,9 @@ private struct LiveDeckPreviewScreen: View {
 }
 
 private struct LiveDeckConsoleActionList: View {
-    @ObservedObject private var layout = HomeLayoutStore.shared
-
     let onNavigate: (HomeTileID) -> Void
 
-    private var tiles: [HomeTileID] {
-        var result: [HomeTileID] = [.info]
-        result.append(contentsOf: layout.quickAccessTiles.filter { $0 != .info })
-        return result
-    }
+    private let tiles: [HomeTileID] = [.info, .files, .apps, .backup]
 
     var body: some View {
         LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 5) {

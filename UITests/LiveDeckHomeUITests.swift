@@ -59,4 +59,34 @@ final class LiveDeckHomeUITests: XCTestCase {
         screenshot.lifetime = .keepAlways
         add(screenshot)
     }
+
+    func testHomeLayoutSettingsMatchCurrentDashboard() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-onboardingDone", "YES"]
+        app.launch()
+
+        let settings = app.tabBars.buttons["Settings"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        settings.tap()
+
+        let homeLayout = app.buttons["settings-home-dashboard"]
+        XCTAssertTrue(homeLayout.waitForExistence(timeout: 5))
+        homeLayout.tap()
+
+        XCTAssertTrue(app.staticTexts["Flipper Console"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["Quick Access"].exists)
+        XCTAssertFalse(app.staticTexts["Revision"].exists)
+        XCTAssertFalse(app.staticTexts["Tools Quick Access"].exists)
+
+        app.swipeUp()
+        XCTAssertTrue(app.staticTexts["Drawer"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["Add ESP32"].exists)
+        XCTAssertFalse(app.staticTexts["Add (tool.title)"].exists)
+        XCTAssertTrue(app.staticTexts["More Tools"].exists)
+
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = "Home layout current settings"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
 }
