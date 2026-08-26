@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.10.45",
-      "versionDate": "2026-08-25",
-      "versionDescription": "TumoCompanion 1.10.45 introduces the Tumo Live Deck home experience.\n\nHighlights:\n- Replaced the launcher grid with a vertical dashboard of independent live surfaces.\n- Added live device and BLE state, battery and bridge status, nearby Flippers, remote-screen preview, current activity, source health, quick launch actions, and an expandable Tools surface.\n- Added state-aware loading and activity animations with Reduce Motion support.\n- Preserved existing navigation routes, pull-to-refresh, package workflows, and device-service behavior.\n- Added a dedicated UI smoke test for the Live Deck and verified the complete simulator test suite.\n\nValidation:\n- iOS Simulator unit and UI tests: 16 passed, 0 failed.\n- No firmware or FW Packages behavior changes.\n- This is a UI-focused patch release with no migration required.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.10.45/TumoCompanion-unsigned.ipa",
-      "size": 25368144,
+      "version": "1.11.0",
+      "versionDate": "2026-08-26",
+      "versionDescription": "TumoCompanion 1.11.0 refines the Home experience into a compact, live control deck.\n\n### Highlights\n\n- Reworked the Home dashboard around a compact Flipper Console with live screen preview, device status, BLE state, firmware details, and direct actions.\n- Quick Access is now configured from Settings and rendered as a consistent text list inside the console; the six-item limit and ordering remain intact.\n- Files, Apps, Backup, and Field Services are available from the console without a second launcher grid; Remotes and other tools stay in the adaptive More Tools drawer.\n- More Tools now sizes itself to the remaining tools and excludes items already selected for Quick Access.\n- Removed the redundant Home refresh button; pull-to-refresh is the single refresh path, while the scan stop control appears only during an active BLE scan.\n- Improved dashboard status/source presentation and accessibility coverage for the new navigation.\n\n### Compatibility\n\n- No firmware or FW Packages payload changes.\n- No breaking migrations. Existing Quick Access selections are preserved.\n\n### Validation\n\n- 561 unit tests passed.\n- Home dashboard and Field Services UI smoke tests passed on iPhone 17 Simulator (iOS 26.4.1).\n\nThis release is published as TumoCompanion 1.11.0.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.0/TumoCompanion-unsigned.ipa",
+      "size": 25438130,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.11.0",
+          "date": "2026-08-26",
+          "localizedDescription": "TumoCompanion 1.11.0 refines the Home experience into a compact, live control deck.\n\n### Highlights\n\n- Reworked the Home dashboard around a compact Flipper Console with live screen preview, device status, BLE state, firmware details, and direct actions.\n- Quick Access is now configured from Settings and rendered as a consistent text list inside the console; the six-item limit and ordering remain intact.\n- Files, Apps, Backup, and Field Services are available from the console without a second launcher grid; Remotes and other tools stay in the adaptive More Tools drawer.\n- More Tools now sizes itself to the remaining tools and excludes items already selected for Quick Access.\n- Removed the redundant Home refresh button; pull-to-refresh is the single refresh path, while the scan stop control appears only during an active BLE scan.\n- Improved dashboard status/source presentation and accessibility coverage for the new navigation.\n\n### Compatibility\n\n- No firmware or FW Packages payload changes.\n- No breaking migrations. Existing Quick Access selections are preserved.\n\n### Validation\n\n- 561 unit tests passed.\n- Home dashboard and Field Services UI smoke tests passed on iPhone 17 Simulator (iOS 26.4.1).\n\nThis release is published as TumoCompanion 1.11.0.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.0/TumoCompanion-unsigned.ipa",
+          "size": 25438130,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.10.45",
           "date": "2026-08-25",
