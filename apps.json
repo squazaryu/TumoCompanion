@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.11.1",
+      "version": "1.11.2",
       "versionDate": "2026-08-27",
-      "versionDescription": "## TumoCompanion 1.11.1\n\nThis update keeps the existing 1.11.1 identity and replaces the IPA with the latest Home Sources improvements.\n\n### Fixed\n\n- Added compact animated status indicators for Firmware, FW Packages and Community Apps.\n- Sources now distinguish Checking, Downloading, Transferring, Installing and Cleaning, with byte or item progress where available.\n- Community Pack installation no longer stays incorrectly on Checking while files are being transferred.\n- Progress indicators respect Reduce Motion and long status text remains readable on narrow screens.\n\n### Compatibility\n\n- No Flipper firmware or package format changes.\n- Requires iOS 17 or later.\n\n### Validation\n\n- Debug iOS Simulator build passed.\n- LiveDeckHome UI tests passed on iPhone 17 Simulator, iOS 26.5.\n- Release IPA packaging and strict code-signature verification passed.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.1/TumoCompanion-unsigned.ipa",
-      "size": 25452704,
+      "versionDescription": "Fix FW Packages catalog validation for cumulative delta manifests",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.2/TumoCompanion-unsigned.ipa",
+      "size": 25456843,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.11.2",
+          "date": "2026-08-27",
+          "localizedDescription": "Fix FW Packages catalog validation for cumulative delta manifests",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.2/TumoCompanion-unsigned.ipa",
+          "size": 25456843,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.11.1",
           "date": "2026-08-27",
