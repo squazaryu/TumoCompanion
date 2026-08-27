@@ -185,7 +185,7 @@ private struct LiveDeckConsoleCard: View {
                     Text(status.shortTitle)
                         .font(statusRailFont)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .center)
 
                 metadataDivider
 
@@ -209,7 +209,7 @@ private struct LiveDeckConsoleCard: View {
                     .foregroundStyle(.primary.opacity(0.72))
                     .fixedSize(horizontal: true, vertical: false)
                     .layoutPriority(1)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .frame(maxWidth: .infinity, alignment: .center)
             }
             .font(statusRailFont)
             .foregroundStyle(.secondary)
