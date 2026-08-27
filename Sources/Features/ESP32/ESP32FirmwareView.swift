@@ -7,6 +7,7 @@ struct ESP32FirmwareView: View {
     @StateObject private var up: ESP32Updater
     @State private var expandedVersionGroups: Set<String> = []
     @State private var packageDrawerExpanded = false
+    @State private var versionHistoryExpanded = false
     @State private var deleteTarget: ESP32Updater.Board?
     @State private var deleteAll = false
     @State private var deleteArchived = false
@@ -28,14 +29,16 @@ struct ESP32FirmwareView: View {
             // history live in the adaptive drawer below, while this compact
             // summary remains visible next to the release status.
             Color.clear.frame(height: packageDrawerExpanded ? 8 : 2)
-        }
-        .navigationTitle("ESP32 Firmware")
-        .navigationBarTitleDisplayMode(.inline)
-        .safeAreaInset(edge: .bottom, spacing: 0) {
+
             if hasStagedPackages {
                 packageDrawer
             }
+            if !up.versionGroups.isEmpty {
+                versionHistoryDrawer
+            }
         }
+        .navigationTitle("ESP32 Firmware")
+        .navigationBarTitleDisplayMode(.inline)
         .task { if up.latestTag == nil { await up.refresh() } }
         .alert("Remove this folder?", isPresented: Binding(
             get: { deleteTarget != nil }, set: { if !$0 { deleteTarget = nil } })) {
@@ -118,9 +121,7 @@ struct ESP32FirmwareView: View {
     private func boardSummaryRow(_ board: ESP32Updater.Board) -> some View {
         let newer = up.newVersion(for: board)
         return Button {
-            withAnimation(.snappy(duration: 0.26)) {
-                packageDrawerExpanded = true
-            }
+            packageDrawerExpanded = true
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "memorychip")
@@ -153,53 +154,6 @@ struct ESP32FirmwareView: View {
         .accessibilityLabel("Open \(board.display) package details")
     }
 
-    private func boardCard(_ b: ESP32Updater.Board) -> some View {
-        let newer = up.newVersion(for: b)
-        let archivedSource = up.isArchived(b)
-        return SectionCard(title: b.display, systemImage: "memorychip",
-                           accessory: AnyView(
-                            StatusPill(text: newer ? "Update" : "Latest",
-                                       color: newer ? .orange : .green,
-                                       systemImage: newer ? "arrow.down.circle.fill" : "checkmark.circle.fill"))) {
-            HStack {
-                Text(archivedSource ? "Archived source" : "Active package")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text(b.currentVersion).font(.caption).fontWeight(.medium)
-            }
-            if let tag = up.latestTag {
-                HStack {
-                    Text("Latest").font(.caption).foregroundStyle(.secondary)
-                    Spacer()
-                    Text(tag).font(.caption).fontWeight(.medium)
-                        .foregroundStyle(newer ? .orange : .green)
-                }
-            }
-            Divider().opacity(0.4)
-            if newer, let tag = up.latestTag {
-                PillButton(title: "Update to \(tag) via \(currentChannel.label)", systemImage: "arrow.down.circle", tint: Theme.accent) {
-                    Task { await up.install(b) }
-                }
-                .disabled(up.busy || !hasFileChannel)
-            } else {
-                Label("Up to date", systemImage: "checkmark.circle.fill")
-                    .font(.caption).foregroundStyle(.green)
-                PillButton(title: "Download again via \(currentChannel.label)", systemImage: "arrow.down.circle", tint: Theme.accent) {
-                    Task { await up.install(b) }
-                }
-                .disabled(up.busy || !hasFileChannel || !up.canStageLatest)
-            }
-            if archivedSource {
-                Text("Creates a new active package. The archived copy stays unchanged.")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Text("Board key: \(b.key)").font(.caption2).foregroundStyle(.secondary)
-        }
-    }
-
     private var currentChannel: TransferChannel {
         up.busy ? up.transferChannel : transfer.activeChannel
     }
@@ -215,50 +169,136 @@ struct ESP32FirmwareView: View {
     /// Folder-tab drawer matching the Home Tools interaction. The collapsed tab
     /// is always visible; the full board controls and version history only take
     /// space after the user asks for them.
+    @ViewBuilder
     private var packageDrawer: some View {
-        VStack(spacing: 0) {
-            if packageDrawerExpanded {
+        if packageDrawerExpanded {
+            VStack(spacing: 0) {
                 packageDrawerPanel
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                packageDrawerTab(expanded: true)
+            }
+        } else {
+            packageDrawerTab(expanded: false)
+        }
+    }
+
+    private func packageDrawerTab(expanded: Bool) -> some View {
+        Button {
+            packageDrawerExpanded.toggle()
+            if packageDrawerExpanded { versionHistoryExpanded = false }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "folder.fill")
+                    .font(.caption.weight(.bold))
+                Text("ESP32 PACKAGES")
+                    .font(.caption.weight(.bold))
+                    .tracking(0.8)
+                Spacer(minLength: 8)
+                Text(drawerSummary)
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                Image(systemName: expanded ? "chevron.down" : "chevron.up")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.secondary)
+            }
+            .foregroundStyle(Theme.accent)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 11)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(.systemGroupedBackground), in: Capsule())
+            .overlay {
+                Capsule().strokeBorder(Theme.accent.opacity(0.25), lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("esp32-packages-drawer-toggle")
+        .accessibilityLabel("ESP32 packages")
+        .accessibilityValue(expanded ? "Expanded" : "Collapsed")
+    }
+
+    /// Version history is intentionally a separate drawer. The board overview
+    /// should never end with a partially visible archive card when two boards
+    /// are present, while archive/restore/delete controls remain discoverable.
+    @ViewBuilder
+    private var versionHistoryDrawer: some View {
+        if versionHistoryExpanded {
+            VStack(spacing: 0) {
+                versionHistoryPanel
+                versionHistoryTab(expanded: true)
+            }
+        } else {
+            versionHistoryTab(expanded: false)
+        }
+    }
+
+    private func versionHistoryTab(expanded: Bool) -> some View {
+        Button {
+            versionHistoryExpanded.toggle()
+            if versionHistoryExpanded { packageDrawerExpanded = false }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "clock.arrow.circlepath")
+                    .font(.caption.weight(.bold))
+                Text("VERSION HISTORY")
+                    .font(.caption.weight(.bold))
+                    .tracking(0.8)
+                Spacer(minLength: 8)
+                Text("\(up.versionGroups.count) board\(up.versionGroups.count == 1 ? "" : "s")")
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.secondary)
+                Image(systemName: expanded ? "chevron.down" : "chevron.up")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.secondary)
+            }
+            .foregroundStyle(Theme.accent)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 11)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(.systemGroupedBackground), in: Capsule())
+            .overlay {
+                Capsule().strokeBorder(Theme.accent.opacity(0.25), lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("esp32-version-history-toggle")
+        .accessibilityLabel("ESP32 version history")
+        .accessibilityValue(expanded ? "Expanded" : "Collapsed")
+    }
+
+    private var versionHistoryPanel: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Capsule()
+                .fill(Color.secondary.opacity(0.35))
+                .frame(width: 38, height: 4)
+                .frame(maxWidth: .infinity)
+
+            HStack(spacing: 7) {
+                Label("VERSION HISTORY", systemImage: "clock.arrow.circlepath")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.secondary)
+                    .tracking(0.7)
+                Spacer()
+                Text("\(up.versionGroups.count) board\(up.versionGroups.count == 1 ? "" : "s")")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
             }
 
-            Button {
-                withAnimation(.snappy(duration: 0.26)) {
-                    packageDrawerExpanded.toggle()
-                }
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "folder.fill")
-                        .font(.caption.weight(.bold))
-                    Text("ESP32 PACKAGES")
-                        .font(.caption.weight(.bold))
-                        .tracking(0.8)
-                    Spacer(minLength: 8)
-                    Text(drawerSummary)
-                        .font(.caption2.weight(.medium))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                    Image(systemName: packageDrawerExpanded ? "chevron.down" : "chevron.up")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.secondary)
-                }
-                .foregroundStyle(Theme.accent)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 11)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(.regularMaterial, in: Capsule())
-                .overlay {
-                    Capsule().strokeBorder(Theme.accent.opacity(0.25), lineWidth: 1)
-                }
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("esp32-packages-drawer-toggle")
-            .accessibilityLabel("ESP32 packages")
-            .accessibilityValue(packageDrawerExpanded ? "Expanded" : "Collapsed")
+            // The parent CardScroll is the single scrolling surface for this
+            // screen. Let the history drawer size itself instead of nesting a
+            // capped ScrollView that can clip archive controls.
+            versionManagerCard
+                .padding(.bottom, 2)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, Theme.pagePadding)
+        .padding(.horizontal, 16)
+        .padding(.top, 9)
+        .padding(.bottom, 12)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.14), radius: 14, y: 6)
     }
 
     private var packageDrawerPanel: some View {
@@ -279,17 +319,14 @@ struct ESP32FirmwareView: View {
                     .foregroundStyle(.secondary)
             }
 
-            ScrollView {
-                LazyVStack(spacing: 12) {
-                    ForEach(up.stagingBoards) { board in
-                        boardCard(board)
-                    }
-                    if !up.versionGroups.isEmpty {
-                        versionManagerCard
-                    }
+            // Keep one page-level scrolling surface. The drawer grows to the
+            // number of board cards, so C5 and Module One can never be clipped
+            // or painted behind the folder tab.
+            VStack(spacing: 12) {
+                ForEach(up.stagingBoards) { board in
+                    packageBoardRow(board)
                 }
             }
-            .frame(maxHeight: packageDrawerPanelHeight)
         }
         .padding(.horizontal, 16)
         .padding(.top, 9)
@@ -302,17 +339,71 @@ struct ESP32FirmwareView: View {
         .shadow(color: .black.opacity(0.14), radius: 14, y: 6)
     }
 
-    private var packageDrawerPanelHeight: CGFloat {
-        let boardHeight = CGFloat(up.stagingBoards.count) * 154
-        let historyHeight: CGFloat = up.versionGroups.isEmpty ? 0 : 90
-        return min(max(CGFloat(150), boardHeight + historyHeight), CGFloat(340))
-    }
-
     private var drawerSummary: String {
         let boards = up.stagingBoards.count
         let updates = up.stagingBoards.filter { up.newVersion(for: $0) }.count
         if updates > 0 { return "\(updates) update\(updates == 1 ? "" : "s")" }
         return "\(boards) board\(boards == 1 ? "" : "s")"
+    }
+
+    /// A compact board row for the drawer. The release summary already exposes
+    /// the board list, so the expanded view only adds the action and provenance
+    /// needed to download or restore a package.
+    private func packageBoardRow(_ board: ESP32Updater.Board) -> some View {
+        let newer = up.newVersion(for: board)
+        let archivedSource = up.isArchived(board)
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "memorychip")
+                    .foregroundStyle(Theme.accent)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(board.display)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                    Text("\(archivedSource ? "Archived" : "Active") · \(board.currentVersion)")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 8)
+                StatusPill(
+                    text: newer ? "Update" : "Latest",
+                    color: newer ? .orange : .green,
+                    systemImage: newer ? "arrow.down.circle.fill" : "checkmark.circle.fill"
+                )
+            }
+
+            HStack(spacing: 8) {
+                Text("Latest \(up.latestTag ?? "—")")
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(newer ? .orange : .secondary)
+                Spacer(minLength: 8)
+                if newer, let tag = up.latestTag {
+                    Button("Update to \(tag)") { Task { await up.install(board) } }
+                        .font(.caption.weight(.semibold))
+                        .buttonStyle(.borderedProminent)
+                        .tint(Theme.accent)
+                        .disabled(up.busy || !hasFileChannel)
+                } else {
+                    Button("Download again") { Task { await up.install(board) } }
+                        .font(.caption.weight(.semibold))
+                        .buttonStyle(.bordered)
+                        .tint(Theme.accent)
+                        .disabled(up.busy || !hasFileChannel || !up.canStageLatest)
+                }
+            }
+            if archivedSource {
+                Text("Archived copy stays unchanged.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(12)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+        }
     }
 
     private var versionManagerCard: some View {

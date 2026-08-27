@@ -144,6 +144,17 @@ final class ESP32Updater: ObservableObject {
     static func archivedRedownloadQA() -> ESP32Updater {
         let updater = ESP32Updater()
         updater.latestTag = "v1.14.1"
+        // Keep the archived-package regression scenario representative of the
+        // production catalog: C5 remains visible alongside an archived Module One
+        // package instead of making the latter look like the only supported board.
+        updater.boards = [Board(
+            folder: "\(flasherDir)/esp32c5devkitc1_v1_14_1_manual",
+            base: "esp32c5devkitc1_v1_14_1",
+            display: "C5",
+            key: "esp32c5devkitc1",
+            currentVersion: "v1.14.1",
+            appName: "esp32_marauder_v1_14_1_esp32c5devkitc1_0x10000.bin",
+            bootFiles: ["c5_adapter_v1_13_0_bootloader.bin", "partitions_0x8000.bin"])]
         updater.archivedBoards = [Board(
             folder: "\(archiveDir)/module_one_v6_1_v1_14_1_manual",
             base: "module_one_v6_1_v1_14_1",

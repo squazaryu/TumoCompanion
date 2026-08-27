@@ -77,14 +77,16 @@ final class FWPackagesActionBarUITests: XCTestCase {
     }
 
     func testActionsFillBottomBarAndTransactionsReplaceThemWithProgress() throws {
-        let channel = app.buttons.matching(
-            NSPredicate(format: "label CONTAINS[c] %@", "PACKAGE CHANNEL")
-        ).firstMatch
+        let channel = app.buttons["fw-packages-channel-drawer-toggle"]
         XCTAssertTrue(channel.waitForExistence(timeout: 2))
         XCTAssertFalse(
             app.staticTexts["Installed"].exists,
             "Package channel must start collapsed"
         )
+        let collapsedScreenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        collapsedScreenshot.name = "FW Packages compact overview"
+        collapsedScreenshot.lifetime = .keepAlways
+        add(collapsedScreenshot)
         channel.tap()
         XCTAssertTrue(
             app.staticTexts["Installed"].waitForExistence(timeout: 2),
@@ -112,6 +114,11 @@ final class FWPackagesActionBarUITests: XCTestCase {
             "Package groups should be available from the compact drawer"
         )
         groupsDrawer.tap()
+
+        let groupsScreenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        groupsScreenshot.name = "FW Packages groups drawer"
+        groupsScreenshot.lifetime = .keepAlways
+        add(groupsScreenshot)
 
         for group in ["base", "arf", "module_one", "protocol_packs"] {
             XCTAssertTrue(
@@ -219,15 +226,28 @@ final class ESP32ArchivedRedownloadUITests: XCTestCase {
 
         let drawer = app.buttons["esp32-packages-drawer-toggle"]
         XCTAssertTrue(drawer.waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["esp32-board-summary-esp32c5devkitc1"].exists)
+        XCTAssertTrue(app.buttons["esp32-board-summary-v6_1"].exists)
+        let overviewScreenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        overviewScreenshot.name = "ESP32 compact overview"
+        overviewScreenshot.lifetime = .keepAlways
+        add(overviewScreenshot)
         drawer.tap()
-        XCTAssertTrue(app.staticTexts["Archived source"].waitForExistence(timeout: 3))
+        XCTAssertTrue(
+            app.staticTexts.matching(
+                NSPredicate(format: "label CONTAINS[c] %@", "Archived")
+            ).firstMatch.waitForExistence(timeout: 3)
+        )
         XCTAssertTrue(app.staticTexts["v1.14.1"].exists)
         XCTAssertTrue(
             app.buttons.matching(
                 NSPredicate(format: "label CONTAINS[c] %@", "Download again")
             ).firstMatch.exists)
         XCTAssertTrue(
-            app.staticTexts["Creates a new active package. The archived copy stays unchanged."].exists)
+            app.staticTexts.matching(
+                NSPredicate(format: "label CONTAINS[c] %@", "Archived copy stays unchanged")
+            ).firstMatch.exists
+        )
         XCTAssertFalse(app.staticTexts["No Marauder flash folders found under esp_flasher."].exists)
 
         let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
