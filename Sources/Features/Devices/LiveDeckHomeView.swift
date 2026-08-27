@@ -160,47 +160,6 @@ private struct LiveDeckConsoleCard: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel((control.streaming || automationPreview) ? "Open live Flipper screen" : "Open Flipper screen")
-
-                    HStack(spacing: 5) {
-                        HStack(spacing: 4) {
-                            Circle()
-                                .fill(tint)
-                                .frame(width: 6, height: 6)
-                            Text(status.shortTitle)
-                                .font(statusRailFont)
-                        }
-
-                        metadataDivider
-
-                        if let battery = displayedBattery {
-                            LiveDeckBattery(level: battery, showsIcon: false, valueFont: statusRailFont)
-                            metadataDivider
-                        }
-
-                        Image(systemName: transfer.activeChannel.systemImage)
-                            .font(.caption2.weight(.medium))
-                        Text(channelTitle)
-                            .font(statusRailFont)
-                        metadataDivider
-                        Text(bridgeTitle)
-                            .font(statusRailFont)
-                            .foregroundStyle(.primary.opacity(0.72))
-                            .fixedSize(horizontal: true, vertical: false)
-                            .layoutPriority(1)
-                    }
-                    .font(statusRailFont)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.82)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 5)
-                    .background(Color.primary.opacity(0.055), in: Capsule())
-                    .overlay {
-                        Capsule()
-                            .strokeBorder(tint.opacity(0.22), lineWidth: 1)
-                    }
-                    .allowsHitTesting(false)
-                    .accessibilityElement(children: .combine)
                 }
                 .layoutPriority(1)
 
@@ -214,6 +173,52 @@ private struct LiveDeckConsoleCard: View {
                 }
                 .frame(minWidth: 138, maxWidth: 166, alignment: .leading)
             }
+
+            // The status rail belongs to the whole console card, not only the
+            // screen column. A full-width rail keeps longer states such as
+            // "Connecting" readable and leaves room for the battery glyph.
+            HStack(spacing: 5) {
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(tint)
+                        .frame(width: 6, height: 6)
+                    Text(status.shortTitle)
+                        .font(statusRailFont)
+                }
+
+                metadataDivider
+
+                if let battery = displayedBattery {
+                    LiveDeckBattery(level: battery, showsIcon: true, valueFont: statusRailFont)
+                    metadataDivider
+                }
+
+                Image(systemName: transfer.activeChannel.systemImage)
+                    .font(.caption2.weight(.medium))
+                Text(channelTitle)
+                    .font(statusRailFont)
+                metadataDivider
+                Text(bridgeTitle)
+                    .font(statusRailFont)
+                    .foregroundStyle(.primary.opacity(0.72))
+                    .fixedSize(horizontal: true, vertical: false)
+                    .layoutPriority(1)
+                Spacer(minLength: 0)
+            }
+            .font(statusRailFont)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.82)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.primary.opacity(0.055), in: Capsule())
+            .overlay {
+                Capsule()
+                    .strokeBorder(tint.opacity(0.22), lineWidth: 1)
+            }
+            .allowsHitTesting(false)
+            .accessibilityElement(children: .combine)
 
         }
         .frame(maxWidth: .infinity, alignment: .leading)
