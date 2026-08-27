@@ -177,7 +177,7 @@ private struct LiveDeckConsoleCard: View {
             // The status rail belongs to the whole console card, not only the
             // screen column. A full-width rail keeps longer states such as
             // "Connecting" readable and leaves room for the battery glyph.
-            HStack(spacing: 5) {
+            HStack(spacing: 0) {
                 HStack(spacing: 4) {
                     Circle()
                         .fill(tint)
@@ -185,25 +185,31 @@ private struct LiveDeckConsoleCard: View {
                     Text(status.shortTitle)
                         .font(statusRailFont)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
 
                 metadataDivider
 
                 if let battery = displayedBattery {
                     LiveDeckBattery(level: battery, showsIcon: true, valueFont: statusRailFont)
+                        .frame(maxWidth: .infinity, alignment: .center)
                     metadataDivider
                 }
 
-                Image(systemName: transfer.activeChannel.systemImage)
-                    .font(.caption2.weight(.medium))
-                Text(channelTitle)
-                    .font(statusRailFont)
+                HStack(spacing: 4) {
+                    Image(systemName: transfer.activeChannel.systemImage)
+                        .font(.caption2.weight(.medium))
+                    Text(channelTitle)
+                        .font(statusRailFont)
+                }
+                .frame(maxWidth: .infinity, alignment: .center)
+
                 metadataDivider
                 Text(bridgeTitle)
                     .font(statusRailFont)
                     .foregroundStyle(.primary.opacity(0.72))
                     .fixedSize(horizontal: true, vertical: false)
                     .layoutPriority(1)
-                Spacer(minLength: 0)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
             }
             .font(statusRailFont)
             .foregroundStyle(.secondary)
