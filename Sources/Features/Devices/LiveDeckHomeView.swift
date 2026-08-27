@@ -409,7 +409,7 @@ private struct LiveDeckSourcesCard: View {
                     LiveDeckSourceRow(
                         title: "Firmware",
                         subtitle: "Device release channel",
-                        status: automationPreview || ble.state == .ready ? .ready("Ready") : .waiting("Waiting"),
+                        status: firmwareStatus,
                         systemImage: "cpu"
                     )
                 }
@@ -447,21 +447,162 @@ private struct LiveDeckSourcesCard: View {
         .card(tint: Theme.accent, padding: 10)
     }
 
+    private var firmwareStatus: LiveDeckSourceStatus {
+        if automationPreview {
+            return .ready("Ready")
+        }
+
+        switch updates.firmware.phase {
+        case .loading, .verifying:
+            return .loading(.init(kind: .checking))
+        case .downloading(_, let fraction):
+            return .loading(.init(kind: .downloading, progress: fraction))
+        case .staging(_, _, let doneBytes, let totalBytes):
+            let progress = totalBytes > 0 ? Double(doneBytes) / Double(totalBytes) : nil
+            return .loading(.init(
+                kind: .transferring,
+                progress: progress,
+                progressText: progress.map(Self.percentText)
+            ))
+        case .failed:
+            return .attention("Retry")
+        case .done:
+            return .ready("Ready")
+        case .idle, .ready:
+            return ble.state == .ready ? .ready("Ready") : .waiting("Waiting")
+        }
+    }
+
     private var packageStatus: LiveDeckSourceStatus {
-        if updates.packages.busy { return .loading("Updating") }
-        if updates.packages.manifest != nil { return .ready("Ready") }
-        return .waiting("On demand")
+        switch updates.packages.phase {
+        case .checking:
+            return .loading(.init(kind: .checking))
+        case .syncingCatalog:
+            return .loading(.init(kind: .transferring, label: "Syncing catalog"))
+        case .downloading:
+            return .loading(.init(kind: .downloading))
+        case .installing(let done, let total, let file):
+            return .loading(packageActivity(done: done, total: total, file: file))
+        case .cleaning(let done, let total, _):
+            return .loading(.init(
+                kind: .cleaning,
+                progress: Self.fraction(done: done, total: total),
+                progressText: Self.countText(done: done, total: total),
+                label: "Cleaning"
+            ))
+        case .failed:
+            return .attention("Retry")
+        case .done, .ready:
+            return updates.packages.manifest != nil ? .ready("Ready") : .waiting("On demand")
+        case .idle:
+            return updates.packages.manifest != nil ? .ready("Ready") : .waiting("On demand")
+        }
     }
 
     private var communityStatus: LiveDeckSourceStatus {
-        if updates.plugins.isBusy { return .loading("Checking") }
-        if !updates.plugins.pendingProtectedReview.isEmpty { return .attention("Review") }
-        if !updates.plugins.updates.isEmpty { return .ready("Ready") }
-        return .waiting("On demand")
+        switch updates.plugins.phase {
+        case .fetching:
+            return .loading(.init(kind: .checking))
+        case .downloading:
+            return .loading(.init(kind: .downloading))
+        case .scanning(let done, let total):
+            return .loading(.init(
+                kind: .checking,
+                progress: Self.fraction(done: done, total: total),
+                progressText: Self.countText(done: done, total: total)
+            ))
+        case .installing(let done, let total):
+            if let detail = updates.plugins.installDetail,
+               detail.total > 0,
+               detail.sent < detail.total {
+                let progress = Double(detail.sent) / Double(detail.total)
+                return .loading(.init(
+                    kind: .transferring,
+                    progress: progress,
+                    progressText: Self.percentText(progress)
+                ))
+            }
+            return .loading(.init(
+                kind: .installing,
+                progress: Self.fraction(done: done, total: total),
+                progressText: Self.countText(done: done, total: total)
+            ))
+        case .cleaning(let done, let total):
+            return .loading(.init(
+                kind: .cleaning,
+                progress: Self.fraction(done: done, total: total),
+                progressText: Self.countText(done: done, total: total),
+                label: "Cleaning"
+            ))
+        case .verifying(let done, let total):
+            return .loading(.init(
+                kind: .checking,
+                progress: Self.fraction(done: done, total: total),
+                progressText: Self.countText(done: done, total: total)
+            ))
+        case .failed:
+            return .attention("Retry")
+        case .needsBaseline:
+            return .attention("Review")
+        case .done:
+            if !updates.plugins.pendingProtectedReview.isEmpty { return .attention("Review") }
+            return updates.plugins.updates.isEmpty ? .ready("Ready") : .ready("Updates")
+        case .idle:
+            if updates.plugins.validating { return .loading(.init(kind: .checking)) }
+            if !updates.plugins.pendingProtectedReview.isEmpty { return .attention("Review") }
+            if !updates.plugins.updates.isEmpty { return .ready("Updates") }
+            return .waiting("On demand")
+        }
+    }
+
+    private func packageActivity(
+        done: Int,
+        total: Int,
+        file: String
+    ) -> LiveDeckSourceActivity {
+        let lowercased = file.lowercased()
+        let progress = Self.fraction(done: done, total: total)
+        let count = Self.countText(done: done, total: total)
+
+        if lowercased.hasPrefix("uploading") {
+            let transferProgress = lowercased
+                .split(separator: "·")
+                .last
+                .flatMap { token -> Double? in
+                    let value = token.trimmingCharacters(in: .whitespaces)
+                    guard value.hasSuffix("%"), let percent = Double(value.dropLast()) else { return nil }
+                    return percent / 100
+                }
+            return .init(
+                kind: .transferring,
+                progress: transferProgress ?? progress,
+                progressText: transferProgress.map(Self.percentText) ?? count
+            )
+        }
+        if lowercased.hasPrefix("verifying") {
+            return .init(kind: .checking, progress: progress, progressText: count)
+        }
+        return .init(kind: .installing, progress: progress, progressText: count)
+    }
+
+    private static func fraction(done: Int, total: Int) -> Double? {
+        guard total > 0 else { return nil }
+        return min(1, max(0, Double(done) / Double(total)))
+    }
+
+    private static func countText(done: Int, total: Int) -> String {
+        guard total > 0 else { return "" }
+        return "\(min(total, max(0, done)))/\(total)"
+    }
+
+    private static func percentText(_ progress: Double) -> String {
+        "\(Int((min(1, max(0, progress)) * 100).rounded()))%"
     }
 }
 
 private struct LiveDeckSourceRow: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     let title: String
     let subtitle: String
     let status: LiveDeckSourceStatus
@@ -486,6 +627,20 @@ private struct LiveDeckSourceRow: View {
 
             Spacer(minLength: 8)
 
+            statusView
+        }
+        .foregroundStyle(.primary)
+        .frame(maxWidth: .infinity, minHeight: 38, alignment: .leading)
+        .padding(.horizontal, 4)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: status)
+    }
+
+    @ViewBuilder
+    private var statusView: some View {
+        if let activity = status.activity {
+            LiveDeckSourceActivityView(activity: activity)
+                .transition(.opacity.combined(with: .scale(scale: 0.92)))
+        } else {
             HStack(spacing: 6) {
                 Circle()
                     .fill(status.tint)
@@ -498,9 +653,65 @@ private struct LiveDeckSourceRow: View {
             }
             .fixedSize(horizontal: true, vertical: false)
         }
-        .foregroundStyle(.primary)
-        .frame(maxWidth: .infinity, minHeight: 38, alignment: .leading)
-        .padding(.horizontal, 4)
+    }
+}
+
+private struct LiveDeckSourceActivityView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isSpinning = false
+
+    let activity: LiveDeckSourceActivity
+
+    var body: some View {
+        HStack(spacing: 5) {
+            ZStack {
+                Circle()
+                    .stroke(Theme.accent.opacity(0.18), lineWidth: 2)
+
+                if let progress = activity.normalizedProgress {
+                    Circle()
+                        .trim(from: 0, to: progress)
+                        .stroke(
+                            Theme.accent,
+                            style: StrokeStyle(lineWidth: 2, lineCap: .round)
+                        )
+                        .rotationEffect(.degrees(-90))
+                        .animation(
+                            reduceMotion ? nil : .easeInOut(duration: 0.2),
+                            value: progress
+                        )
+                } else {
+                    Circle()
+                        .trim(from: 0.08, to: 0.72)
+                        .stroke(
+                            Theme.accent,
+                            style: StrokeStyle(lineWidth: 2, lineCap: .round)
+                        )
+                        .rotationEffect(.degrees(isSpinning && !reduceMotion ? 360 : 0))
+                        .animation(
+                            reduceMotion ? nil : .linear(duration: 0.9).repeatForever(autoreverses: false),
+                            value: isSpinning
+                        )
+                }
+
+                Image(systemName: activity.kind.systemImage)
+                    .font(.system(size: 7, weight: .bold))
+                    .foregroundStyle(Theme.accent)
+            }
+            .frame(width: 18, height: 18)
+
+            Text(activity.displayTitle)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(Theme.accent)
+                .lineLimit(1)
+                .minimumScaleFactor(0.68)
+                .contentTransition(.numericText())
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(activity.displayTitle)
+        .onAppear {
+            if !reduceMotion { isSpinning = true }
+        }
     }
 }
 
@@ -814,16 +1025,78 @@ private enum LiveDeckConnectionStatus: Equatable {
 
 }
 
+private enum LiveDeckSourceActivityKind: Equatable {
+    case checking
+    case downloading
+    case transferring
+    case installing
+    case cleaning
+
+    var defaultLabel: String {
+        switch self {
+        case .checking: return "Checking"
+        case .downloading: return "Downloading"
+        case .transferring: return "Transferring"
+        case .installing: return "Installing"
+        case .cleaning: return "Cleaning"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .checking: return "magnifyingglass"
+        case .downloading: return "arrow.down.circle"
+        case .transferring: return "arrow.up.arrow.down.circle"
+        case .installing: return "checkmark.circle"
+        case .cleaning: return "trash"
+        }
+    }
+}
+
+private struct LiveDeckSourceActivity: Equatable {
+    let kind: LiveDeckSourceActivityKind
+    let progress: Double?
+    let progressText: String?
+    let label: String
+
+    init(
+        kind: LiveDeckSourceActivityKind,
+        progress: Double? = nil,
+        progressText: String? = nil,
+        label: String? = nil
+    ) {
+        self.kind = kind
+        self.progress = progress
+        self.progressText = progressText
+        self.label = label ?? kind.defaultLabel
+    }
+
+    var normalizedProgress: CGFloat? {
+        progress.map { CGFloat(min(1, max(0, $0))) }
+    }
+
+    var displayTitle: String {
+        guard let progressText, !progressText.isEmpty else { return label }
+        return "\(label) \(progressText)"
+    }
+}
+
 private enum LiveDeckSourceStatus: Equatable {
     case ready(String)
-    case loading(String)
+    case loading(LiveDeckSourceActivity)
     case waiting(String)
     case attention(String)
 
     var title: String {
         switch self {
-        case .ready(let value), .loading(let value), .waiting(let value), .attention(let value): return value
+        case .ready(let value), .waiting(let value), .attention(let value): return value
+        case .loading(let activity): return activity.displayTitle
         }
+    }
+
+    var activity: LiveDeckSourceActivity? {
+        if case .loading(let activity) = self { return activity }
+        return nil
     }
 
     var tint: Color {
