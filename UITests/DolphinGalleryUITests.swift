@@ -106,6 +106,13 @@ final class FWPackagesActionBarUITests: XCTestCase {
         add(revisionScreenshot)
         channel.tap()
 
+        let groupsDrawer = app.buttons["fw-packages-groups-drawer-toggle"]
+        XCTAssertTrue(
+            groupsDrawer.waitForExistence(timeout: 2),
+            "Package groups should be available from the compact drawer"
+        )
+        groupsDrawer.tap()
+
         for group in ["base", "arf", "module_one", "protocol_packs"] {
             XCTAssertTrue(
                 app.buttons["fw-packages-expand-\(group)"].waitForExistence(timeout: 2),
@@ -210,6 +217,9 @@ final class ESP32ArchivedRedownloadUITests: XCTestCase {
         ]
         app.launch()
 
+        let drawer = app.buttons["esp32-packages-drawer-toggle"]
+        XCTAssertTrue(drawer.waitForExistence(timeout: 3))
+        drawer.tap()
         XCTAssertTrue(app.staticTexts["Archived source"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.staticTexts["v1.14.1"].exists)
         XCTAssertTrue(

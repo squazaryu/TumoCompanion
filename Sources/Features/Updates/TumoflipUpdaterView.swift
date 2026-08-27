@@ -13,6 +13,7 @@ struct TumoflipUpdaterView: View {
     @State private var pendingOverride: TumoflipFirmwareChannel?
     @State private var pendingCleanupCount: Int?
     @State private var showHelp = false
+    @State private var packageGroupsExpanded = false
 
     private let groupLabels: [(key: String, title: String, icon: String)] = [
         ("base", "Base", "shippingbox.fill"),
@@ -40,7 +41,11 @@ struct TumoflipUpdaterView: View {
 
             channelCard
 
-            if updater.manifest != nil { groupsCard }
+            // The groups are intentionally not part of the scrolling page. They
+            // are available from the adaptive drawer below, so the normal state
+            // remains readable on one screen even when the catalog has dozens of
+            // firmware-owned entries.
+            Color.clear.frame(height: packageGroupsExpanded ? 8 : 2)
         }
         .navigationTitle("Firmware packages")
         .navigationBarTitleDisplayMode(.inline)
@@ -52,19 +57,17 @@ struct TumoflipUpdaterView: View {
                 .accessibilityLabel("FW Packages help")
             }
             ToolbarItem(placement: .topBarTrailing) {
-                if updater.busy {
-                    ProgressView()
-                } else {
-                    Button {
-                        Task {
-                            await updater.reload(recover: hasFileChannel)
-                            await updater.validateCompatibility()
-                        }
-                    } label: { Image(systemName: "arrow.clockwise") }
-                }
+                if updater.busy { ProgressView() }
             }
         }
-        .safeAreaInset(edge: .bottom) { actionBar }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(spacing: 8) {
+                if updater.manifest != nil {
+                    packageGroupsDrawer
+                }
+                actionBar
+            }
+        }
         .onAppear {
             Task {
                 if updater.manifest == nil {
@@ -128,13 +131,83 @@ struct TumoflipUpdaterView: View {
         await updater.validateCompatibility()
     }
 
-    private var groupsCard: some View {
-        SectionCard(title: "Package groups", systemImage: "shippingbox") {
-            LazyVStack(spacing: 14) {
-                ForEach(groupLabels, id: \.key) { g in
-                    groupRow(g)
+    /// Compact folder tab which replaces the old always-expanded groups card.
+    /// The collapsed state is deliberately small enough to coexist with the
+    /// install action bar; expanding it reveals the same complete group/file
+    /// controls in a height derived from the actual catalog.
+    private var packageGroupsDrawer: some View {
+        VStack(spacing: 0) {
+            if packageGroupsExpanded {
+                packageGroupsPanel
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+
+            Button {
+                withAnimation(.snappy(duration: 0.26)) {
+                    packageGroupsExpanded.toggle()
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "shippingbox.fill")
+                        .font(.caption.weight(.bold))
+                    Text("PACKAGE GROUPS")
+                        .font(.caption.weight(.bold))
+                        .tracking(0.8)
+                    Spacer(minLength: 8)
+                    Text(packageGroupsSummary)
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                    Image(systemName: packageGroupsExpanded ? "chevron.down" : "chevron.up")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.secondary)
+                }
+                .foregroundStyle(Theme.accent)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 11)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.regularMaterial, in: Capsule())
+                .overlay {
+                    Capsule().strokeBorder(Theme.accent.opacity(0.25), lineWidth: 1)
                 }
             }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("fw-packages-groups-drawer-toggle")
+            .accessibilityLabel("Package groups")
+            .accessibilityValue(packageGroupsExpanded ? "Expanded" : "Collapsed")
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, Theme.pagePadding)
+    }
+
+    private var packageGroupsPanel: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Capsule()
+                .fill(Color.secondary.opacity(0.35))
+                .frame(width: 38, height: 4)
+                .frame(maxWidth: .infinity)
+
+            HStack(spacing: 7) {
+                Label("PACKAGE GROUPS", systemImage: "shippingbox")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.secondary)
+                    .tracking(0.7)
+                Spacer()
+                Text(packageGroupsSummary)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+
+            ScrollView {
+                LazyVStack(spacing: 12) {
+                    ForEach(groupLabels, id: \.key) { g in
+                        groupRow(g)
+                    }
+                }
+            }
+            .frame(maxHeight: packageGroupsPanelHeight)
+
             if updater.hasFirmwareOwnedBaseline {
                 Label(
                     "\(updater.firmwareOwnedFileCount) FAPs belong to the firmware baseline. FW Packages manages only independent overlays and never reinstalls these files.",
@@ -154,10 +227,42 @@ struct TumoflipUpdaterView: View {
             if !updater.hasPackageZip {
                 Label("This release has the manifest but no install archive (tumoflip-packages.zip) yet — installing isn't available until a release publishes it.",
                       systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption2).foregroundStyle(.orange)
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+        .padding(.horizontal, 16)
+        .padding(.top, 9)
+        .padding(.bottom, 12)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.14), radius: 14, y: 6)
+    }
+
+    private var packageGroupsPanelHeight: CGFloat {
+        // Four groups are short in the common case. A larger catalog remains
+        // scrollable inside the drawer rather than pushing the install bar off
+        // screen or clipping the final row.
+        let populatedGroups = CGFloat(groupLabels.filter { updater.count($0.key) > 0 }.count)
+        return min(max(116, populatedGroups * 76), 300)
+    }
+
+    private var packageGroupsSummary: String {
+        let standalone = groupLabels.reduce(0) { $0 + updater.selectableCount($1.key) }
+        let pending = groupLabels.reduce(0) { total, group in
+            total + updater.files(group.key).filter { updater.status(file: $0.target) != .upToDate }.count
+        }
+        if pending > 0 {
+            return "\(pending) update\(pending == 1 ? "" : "s")"
+        }
+        if standalone > 0 {
+            return "\(standalone) standalone"
+        }
+        return "Reference only"
     }
 
     private var channelCard: some View {
