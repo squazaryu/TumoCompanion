@@ -127,6 +127,42 @@ final class TumoflipPackageCatalogTests: XCTestCase {
         XCTAssertEqual(selected.revision, 8)
     }
 
+    func testRequiredPrimaryRecheckPreservesCatalogIndexEvidence() async throws {
+        let tag = "fw-packages-dev-009"
+        let releaseID = String(repeating: "a", count: 64)
+        let manifestData = manifest(tag: tag, revision: 9, releaseID: releaseID)
+        let client = makeClient(
+            primaryPages: [releasesData([release(id: 9, tag: tag)])],
+            manifests: [manifestURL(tag): manifestData],
+            catalogIndex: catalogIndex(
+                channel: "dev",
+                tag: tag,
+                revision: 9,
+                manifestReleaseID: releaseID,
+                manifestSHA256: TumoflipHash.sha256(manifestData)
+            )
+        )
+
+        let initial = try await client.latest(
+            for: .dev,
+            installedVersion: "t-dev-004-015",
+            installedAPI: "88.0",
+            installedTarget: 7
+        )
+        let rechecked = try await client.latest(
+            for: .dev,
+            installedVersion: "t-dev-004-015",
+            installedAPI: "88.0",
+            installedTarget: 7,
+            forceRemote: true,
+            requiredRepository: .primary
+        )
+
+        XCTAssertEqual(initial.identity, rechecked.identity)
+        XCTAssertEqual(rechecked.identity.manifestSHA256, TumoflipHash.sha256(manifestData))
+        XCTAssertEqual(rechecked.identity.archiveSHA256, String(repeating: "b", count: 64))
+    }
+
     func testUnavailablePrimaryFallsBackToImmutableLegacyCatalog() async throws {
         let legacy = release(id: 8, tag: "fw-packages-dev-008")
         let client = makeClient(
