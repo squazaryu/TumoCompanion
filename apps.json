@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.11.2",
+      "version": "1.11.3",
       "versionDate": "2026-08-27",
-      "versionDescription": "Fix FW Packages catalog validation for cumulative delta manifests",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.2/TumoCompanion-unsigned.ipa",
-      "size": 25456843,
+      "versionDescription": "Fix FW Packages install recheck identity",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.3/TumoCompanion-unsigned.ipa",
+      "size": 25457380,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.11.3",
+          "date": "2026-08-27",
+          "localizedDescription": "Fix FW Packages install recheck identity",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.3/TumoCompanion-unsigned.ipa",
+          "size": 25457380,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.11.2",
           "date": "2026-08-27",
