@@ -158,6 +158,46 @@ final class TumoflipManifestPackageReleaseTests: XCTestCase {
         XCTAssertFalse(manifest.isReferenceOnlyCatalog)
     }
 
+    func testIndependentDeltaAcceptsCumulativeModifiedTargets() throws {
+        let independent = packageRelease.replacingOccurrences(
+            of: "\"firmware_flash_unchanged\": true",
+            with: """
+            "firmware_flash_unchanged": true,
+              "catalog_channel": "dev",
+              "catalog_revision": 9,
+              "catalog_release_tag": "fw-packages-dev-009",
+              "catalog_install_scope": "delta",
+              "catalog_modified_targets": ["apps/base.fap", "apps/esp.fap"],
+              "overlay_targets": ["apps/esp.fap"]
+            """
+        )
+        let manifest = try TumoflipManifest.decode(fixture(packageRelease: independent))
+
+        XCTAssertNoThrow(try manifest.validate())
+        XCTAssertEqual(
+            manifest.packageManagedManifest().packages["base"]?.map(\.source),
+            ["apps/base.fap", "apps/esp.fap"]
+        )
+    }
+
+    func testIndependentDeltaRejectsOverlayOutsideCumulativeTargets() throws {
+        let invalid = packageRelease.replacingOccurrences(
+            of: "\"firmware_flash_unchanged\": true",
+            with: """
+            "firmware_flash_unchanged": true,
+              "catalog_channel": "dev",
+              "catalog_revision": 9,
+              "catalog_release_tag": "fw-packages-dev-009",
+              "catalog_install_scope": "delta",
+              "catalog_modified_targets": ["apps/base.fap"],
+              "overlay_targets": ["apps/esp.fap"]
+            """
+        )
+        let manifest = try TumoflipManifest.decode(fixture(packageRelease: invalid))
+
+        XCTAssertThrowsError(try manifest.validate())
+    }
+
     func testLegacyManifestIsNotReferenceOnly() throws {
         let manifest = try TumoflipManifest.decode(fixture(packageRelease: nil))
 

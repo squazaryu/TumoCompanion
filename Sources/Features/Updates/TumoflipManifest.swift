@@ -620,7 +620,11 @@ extension TumoflipManifest {
                 }
                 if let modified = packageRelease.catalogModifiedTargets,
                    let overlays = packageRelease.overlayTargets,
-                   !Set(modified).isSubset(of: Set(overlays)) {
+                   !Set(overlays).isSubset(of: Set(modified)) {
+                    // `catalog_modified_targets` is the cumulative package-owned
+                    // surface. `overlay_targets` is the subset changed by this
+                    // revision. A revision may therefore add a new overlay while
+                    // retaining older modified targets in the cumulative list.
                     throw TumoflipManifestError.invalidPackageRelease(packageRelease.id)
                 }
             } else if !referencedCompatibleReleaseIDs.isEmpty ||
