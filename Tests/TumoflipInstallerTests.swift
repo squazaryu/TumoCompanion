@@ -450,6 +450,38 @@ final class TumoflipInstallerTests: XCTestCase {
         XCTAssertEqual(state?.ledger[target]?.md5, TumoflipHash.md5(bytes))
     }
 
+    func testPreserveExistingRefusesToReplaceDifferentUserFile() async throws {
+        let userData = Data("user-owned".utf8)
+        let packageData = Data("package-data".utf8)
+        let target = "/ext/rfidfuzzer/tumoflip_utergrooll_em4100_v1.txt"
+        let base = file("rfidfuzzer/tumoflip_utergrooll_em4100_v1.txt", target, packageData)
+        let protected = TumoflipManifest.PackageFile(
+            bytes: base.bytes,
+            sha256: base.sha256,
+            md5: base.md5,
+            compatibleBuilds: base.compatibleBuilds,
+            source: base.source,
+            target: base.target,
+            preserveExisting: true
+        )
+        let fs = FakeFS()
+        fs.files[target] = userData
+        let installer = TumoflipInstaller(
+            fs: fs,
+            source: FakeSource(data: [protected.source: packageData])
+        )
+
+        await assertThrows(
+            { try await installer.install(plan([protected])) },
+            .preservedExisting(target)
+        )
+
+        XCTAssertEqual(fs.files[target], userData)
+        XCTAssertNil(fs.files[target + ".ucnew"])
+        let recoveredState = await fs.readState()
+        XCTAssertNil(recoveredState?.txn)
+    }
+
     // MARK: - Abort with no partial activation
 
     func testHashMismatchActivatesNothing() async throws {

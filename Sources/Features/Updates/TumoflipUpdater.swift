@@ -63,6 +63,9 @@ protocol TumoflipPackageSource {
 enum TumoflipInstallError: Error, Equatable {
     case sourceMissing(String)
     case hashMismatch(String)
+    /// A data-only package explicitly owns a path but is not allowed to replace
+    /// a different user-created file already present there.
+    case preservedExisting(String)
     case deviceVerifyFailed(String)
     case deviceVerificationUnavailable(String)
     case stagingVerifyFailed(target: String, expectedBytes: Int, actualBytes: Int?)
@@ -1065,6 +1068,12 @@ struct TumoflipInstaller {
                         journal.ops[i].state = .unchanged
                         state.txn = journal; try await saveState(&state)
                         continue
+                    }
+                    if plan.files[i].preserveExisting {
+                        // Data overlays are additive. A package-owned filename is
+                        // deliberately namespaced, but a user may still have
+                        // created it already. Never back it up or replace it.
+                        throw TumoflipInstallError.preservedExisting(journal.ops[i].target)
                     }
                     journal.ops[i].hadOriginal = true
                     journal.ops[i].originalMD5 = originalMD5
