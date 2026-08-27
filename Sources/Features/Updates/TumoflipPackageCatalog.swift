@@ -246,6 +246,32 @@ struct TumoflipPackageCatalogClient {
                     forceRemote: forceRemote
                 )
             }
+            if requiredRepository.role == .primary {
+                // The initial selection is resolved through the immutable index,
+                // which contributes manifest/archive digests to its identity. A
+                // pre-install recheck must use the same evidence; otherwise the
+                // identical release appears changed solely because the recheck
+                // omitted those digests.
+                let indexed = try await indexedAuthoritativeReleases(
+                    authoritativeReleases(releases, channel: channel),
+                    channel: channel,
+                    installedAPI: installedAPI,
+                    installedTarget: installedTarget,
+                    forceRemote: forceRemote
+                )
+                return try await selectAllAuthoritative(
+                    indexed.releases,
+                    in: requiredRepository,
+                    channel: channel,
+                    installedVersion: installedVersion,
+                    installedAPI: installedAPI,
+                    installedTarget: installedTarget,
+                    installedCommit: installedCommit,
+                    installedCommitDirty: installedCommitDirty,
+                    forceRemote: forceRemote,
+                    indexEvidence: indexed.evidence
+                )
+            }
             return try await selectAll(
                 releases,
                 in: requiredRepository,
