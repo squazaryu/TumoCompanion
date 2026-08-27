@@ -59,6 +59,25 @@ final class TumoflipManifestTests: XCTestCase {
         XCTAssertEqual(m.cleanup.first?.legacy, "/ext/apps/ARF Tools/ARF Car Emulate.fap")
     }
 
+    func testLegacyPackageEntryDefaultsToReplacementPolicy() throws {
+        let manifest = try decode(base())
+        let entry = try XCTUnwrap(manifest.packages["base"]?.first)
+        XCTAssertFalse(entry.preserveExisting)
+    }
+
+    func testDataPackageEntryDecodesPreserveExistingPolicy() throws {
+        var d = base()
+        var packages = d["packages"] as! [String: Any]
+        var baseFiles = packages["base"] as! [[String: Any]]
+        baseFiles[0]["kind"] = "dictionary"
+        baseFiles[0]["preserve_existing"] = true
+        packages["base"] = baseFiles
+        d["packages"] = packages
+
+        let manifest = try decode(d)
+        XCTAssertTrue(manifest.packages["base"]?.first?.preserveExisting == true)
+    }
+
     func testValidatePasses() throws {
         XCTAssertNoThrow(try decode(base()).validate())
     }

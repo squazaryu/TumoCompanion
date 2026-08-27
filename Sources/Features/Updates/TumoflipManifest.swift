@@ -47,6 +47,10 @@ struct TumoflipManifest: Codable, Equatable {
         let compatibleBuilds: [CompatibleBuild]?
         let source: String
         let target: String
+        /// When true, installation may only add this package-owned file when the
+        /// target path is absent. Existing user data at the target is preserved;
+        /// a different existing payload fails closed instead of being replaced.
+        let preserveExisting: Bool
 
         struct CompatibleBuild: Codable, Equatable {
             let bytes: Int
@@ -72,7 +76,8 @@ struct TumoflipManifest: Codable, Equatable {
             md5: String? = nil,
             compatibleBuilds: [CompatibleBuild]? = nil,
             source: String,
-            target: String
+            target: String,
+            preserveExisting: Bool = false
         ) {
             self.bytes = bytes
             self.sha256 = sha256
@@ -80,6 +85,27 @@ struct TumoflipManifest: Codable, Equatable {
             self.compatibleBuilds = compatibleBuilds
             self.source = source
             self.target = target
+            self.preserveExisting = preserveExisting
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            bytes = try container.decode(Int.self, forKey: .bytes)
+            sha256 = try container.decode(String.self, forKey: .sha256)
+            md5 = try container.decodeIfPresent(String.self, forKey: .md5)
+            compatibleBuilds = try container.decodeIfPresent(
+                [CompatibleBuild].self,
+                forKey: .compatibleBuilds
+            )
+            source = try container.decode(String.self, forKey: .source)
+            target = try container.decode(String.self, forKey: .target)
+            // This field was added after schema-v2 was already deployed. Missing
+            // metadata therefore means the legacy replacement policy, not a
+            // malformed manifest.
+            preserveExisting = try container.decodeIfPresent(
+                Bool.self,
+                forKey: .preserveExisting
+            ) ?? false
         }
 
         func acceptedBuild(matchingMD5 actual: String) -> BuildIdentity? {
@@ -104,6 +130,7 @@ struct TumoflipManifest: Codable, Equatable {
 
         enum CodingKeys: String, CodingKey {
             case bytes, sha256, md5, source, target
+            case preserveExisting = "preserve_existing"
             case compatibleBuilds = "compatible_builds"
         }
     }
@@ -708,7 +735,8 @@ struct TumoflipInstallPlan: Equatable {
                     md5: f.md5,
                     compatibleBuilds: f.compatibleBuilds,
                     source: f.source,
-                    target: safe
+                    target: safe,
+                    preserveExisting: f.preserveExisting
                 ))
             }
         }

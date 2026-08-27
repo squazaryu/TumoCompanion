@@ -1392,6 +1392,8 @@ final class TumoflipUpdater: ObservableObject {
         switch e {
         case .sourceMissing(let s): return "Missing in archive: \(s) — rolled back."
         case .hashMismatch(let s): return "Hash mismatch: \(s) — rolled back."
+        case .preservedExisting(let target):
+            return "Existing file preserved: \(target). The package will not replace user data; remove or rename that file yourself if it is yours, then retry."
         case .deviceVerifyFailed(let t): return "On-device verify failed: \(t) — rolled back."
         case .deviceVerificationUnavailable(let t):
             return "On-device MD5 timed out: \(t) — rolled back without deleting the last verified copy."
