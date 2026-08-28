@@ -8,6 +8,7 @@ final class UpdatesCoordinator: ObservableObject {
     let plugins = PluginUpdater()
     let packages = TumoflipUpdater()
     let firmware = FirmwareLibrary()
+    let esp32 = ESP32Updater()
 
     private var pluginLoadTask: Task<Void, Never>?
     private var packageLoadTask: Task<Void, Never>?
@@ -15,10 +16,11 @@ final class UpdatesCoordinator: ObservableObject {
     private var observations = Set<AnyCancellable>()
 
     init() {
-        Publishers.Merge3(
+        Publishers.Merge4(
             plugins.objectWillChange,
             packages.objectWillChange,
-            firmware.objectWillChange
+            firmware.objectWillChange,
+            esp32.objectWillChange
         )
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &observations)

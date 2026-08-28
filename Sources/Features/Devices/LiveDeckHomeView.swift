@@ -48,7 +48,6 @@ struct LiveDeckHomeView: View {
                     LiveDeckToolsQuickAccessCard(onNavigate: navigate)
                 }
 
-                LiveDeckFooter()
                 // Leave room for the fixed folder tab without making the tab
                 // part of the scrolling content.
                 Color.clear.frame(height: 34)
@@ -390,7 +389,7 @@ private struct LiveDeckSourcesCard: View {
     let automationPreview: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 9) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
                 Label("SOURCES", systemImage: "square.stack.3d.up")
                     .font(.caption2)
@@ -416,8 +415,6 @@ private struct LiveDeckSourcesCard: View {
                 .buttonStyle(.borderless)
                 .accessibilityIdentifier("updates-source-firmware")
 
-                Divider()
-
                 Button { onNavigate(.packages) } label: {
                     LiveDeckSourceRow(
                         title: "FW Packages",
@@ -429,8 +426,6 @@ private struct LiveDeckSourcesCard: View {
                 .buttonStyle(.borderless)
                 .accessibilityIdentifier("updates-source-packages")
 
-                Divider()
-
                 Button { onNavigate(.communityApps) } label: {
                     LiveDeckSourceRow(
                         title: "Community Apps",
@@ -441,10 +436,21 @@ private struct LiveDeckSourcesCard: View {
                 }
                 .buttonStyle(.borderless)
                 .accessibilityIdentifier("updates-source-community")
+
+                Button { onNavigate(.esp32) } label: {
+                    LiveDeckSourceRow(
+                        title: "ESP32",
+                        subtitle: "Marauder board firmware",
+                        status: esp32Status,
+                        systemImage: "memorychip"
+                    )
+                }
+                .buttonStyle(.borderless)
+                .accessibilityIdentifier("updates-source-esp32")
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .card(tint: Theme.accent, padding: 10)
+        .card(tint: Theme.accent, padding: 11)
     }
 
     private var firmwareStatus: LiveDeckSourceStatus {
@@ -555,6 +561,39 @@ private struct LiveDeckSourcesCard: View {
         }
     }
 
+    private var esp32Status: LiveDeckSourceStatus {
+        let updater = updates.esp32
+        if updater.busy {
+            let status = updater.status?.lowercased() ?? ""
+            let progressText = updater.progressText ?? updater.progress.map(Self.percentText)
+            if status.contains("download") {
+                return .loading(.init(
+                    kind: .downloading,
+                    progress: updater.progress,
+                    progressText: progressText
+                ))
+            }
+            if status.contains("writ") || status.contains("staging") || status.contains("upload") {
+                return .loading(.init(
+                    kind: .transferring,
+                    progress: updater.progress,
+                    progressText: progressText
+                ))
+            }
+            return .loading(.init(kind: .checking))
+        }
+        if updater.manifestError != nil || (updater.latestTag == nil && updater.status != nil) {
+            return .attention("Retry")
+        }
+        if updater.updateAvailable {
+            return .ready("Updates")
+        }
+        if updater.latestTag != nil {
+            return .ready("Ready")
+        }
+        return .waiting("On demand")
+    }
+
     private func packageActivity(
         done: Int,
         total: Int,
@@ -609,17 +648,18 @@ private struct LiveDeckSourceRow: View {
     let systemImage: String
 
     var body: some View {
-        HStack(spacing: 13) {
+        HStack(spacing: 10) {
             Image(systemName: systemImage)
-                .font(.title3.weight(.semibold))
+                .font(.body.weight(.semibold))
                 .foregroundStyle(status.tint)
+                .frame(width: 22)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.subheadline.weight(.regular))
+                    .font(.subheadline.weight(.medium))
                     .lineLimit(1)
                 Text(subtitle)
-                    .font(.caption2)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
@@ -630,8 +670,9 @@ private struct LiveDeckSourceRow: View {
             statusView
         }
         .foregroundStyle(.primary)
-        .frame(maxWidth: .infinity, minHeight: 38, alignment: .leading)
-        .padding(.horizontal, 4)
+        .frame(maxWidth: .infinity, minHeight: 42, alignment: .leading)
+        .padding(.horizontal, 3)
+        .contentShape(Rectangle())
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: status)
     }
 
@@ -949,28 +990,6 @@ private struct LiveDeckToolsDrawer: View {
         withAnimation(reduceMotion ? nil : .snappy(duration: 0.24)) {
             isOpen = false
         }
-    }
-}
-
-private struct LiveDeckFooter: View {
-    var body: some View {
-        HStack(spacing: 7) {
-            Image(systemName: "sparkles")
-                .foregroundStyle(Theme.accent)
-            Text("Ready for field work")
-                .font(.caption2.weight(.medium))
-            Text("·")
-                .foregroundStyle(.tertiary)
-            Text(BuildInfo.label)
-                .font(.system(.caption2, design: .monospaced))
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 3)
-        .padding(.vertical, 1)
-        .lineLimit(1)
-        .minimumScaleFactor(0.72)
     }
 }
 

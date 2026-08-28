@@ -195,13 +195,13 @@ struct FirmwareLibraryView: View {
     }
 
     private var releaseDrawerHeight: CGFloat {
-        // Include the drawer handle/padding and the real action-row footprint.
-        // The old estimate was smaller than the rendered content, so the last
-        // release could sit underneath the folder tab even with only two builds.
-        let drawerChromeAndSections: CGFloat = 132
-        let groupHeaders = CGFloat(library.visibleGroups.count) * 30
-        let releaseRows = CGFloat(min(library.visibleReleases.count, 5)) * 56
-        return min(420, max(280, drawerChromeAndSections + groupHeaders + releaseRows))
+        // A group with one release is already identified by its release row;
+        // only multi-build Dev groups need an extra heading.
+        let drawerChromeAndSections: CGFloat = 120
+        let multiBuildHeaders = library.visibleGroups.filter { $0.releases.count > 1 }.count
+        let groupHeaders = CGFloat(multiBuildHeaders) * 24
+        let releaseRows = CGFloat(min(library.visibleReleases.count, 5)) * 36
+        return min(420, max(230, drawerChromeAndSections + groupHeaders + releaseRows))
     }
 
     private var releaseDetailsPanel: some View {
@@ -240,22 +240,27 @@ struct FirmwareLibraryView: View {
     }
 
     private func releaseGroupSection(_ group: FirmwareVersionGroup) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(alignment: .firstTextBaseline, spacing: 7) {
-                Image(systemName: library.selectedChannel == .dev ? "hammer.fill" : "checkmark.seal.fill")
-                    .font(.caption2)
-                    .foregroundStyle(Theme.accent)
-                Text("Version \(group.line)")
-                    .font(.caption2.weight(.semibold))
-                Spacer(minLength: 8)
-                Text("\(group.releases.count) \(group.releases.count == 1 ? "build" : "builds")")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 3) {
+            if group.releases.count > 1 {
+                HStack(alignment: .firstTextBaseline, spacing: 7) {
+                    Image(systemName: "square.stack.3d.up")
+                        .font(.caption2)
+                        .foregroundStyle(Theme.accent)
+                    Text("Version \(group.line)")
+                        .font(.caption2.weight(.semibold))
+                    Spacer(minLength: 8)
+                    Text("\(group.releases.count) builds")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             ForEach(Array(group.releases.enumerated()), id: \.element.id) { index, release in
                 compactReleaseRow(
                     release,
+                    title: group.releases.count == 1
+                        ? "Version \(group.line)"
+                        : release.buildLabel,
                     isLatest: index == 0 && group.id == library.visibleGroups.first?.id
                 )
                 if index < group.releases.count - 1 {
@@ -265,29 +270,33 @@ struct FirmwareLibraryView: View {
         }
     }
 
-    private func compactReleaseRow(_ release: FirmwareRelease, isLatest: Bool) -> some View {
-        HStack(spacing: 6) {
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
-                    Text(library.selectedChannel == .stable ? release.version : release.buildLabel)
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                    if library.installedVersion == release.version {
-                        Label("Installed", systemImage: "checkmark.circle.fill")
-                            .font(.caption2)
-                            .foregroundStyle(Theme.success)
-                    } else if isLatest {
-                        Text("Latest")
-                            .font(.caption2)
-                            .foregroundStyle(Theme.accent)
-                    }
-                }
-                Text(releaseMetadata(release))
+    private func compactReleaseRow(
+        _ release: FirmwareRelease,
+        title: String,
+        isLatest: Bool
+    ) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: library.selectedChannel == .dev ? "hammer.fill" : "checkmark.seal.fill")
+                .font(.caption2)
+                .foregroundStyle(Theme.accent)
+                .frame(width: 16)
+
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .lineLimit(1)
+
+            if library.installedVersion == release.version {
+                Label("Installed", systemImage: "checkmark.circle.fill")
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.success)
+                    .lineLimit(1)
+            } else if isLatest {
+                Text("Latest")
+                    .font(.caption2)
+                    .foregroundStyle(Theme.accent)
             }
 
-            Spacer(minLength: 6)
+            Spacer(minLength: 4)
 
             HStack(spacing: 0) {
                 Button { detailsRelease = release } label: {
@@ -314,7 +323,8 @@ struct FirmwareLibraryView: View {
                 )
             }
         }
-        .padding(.vertical, 1)
+        .frame(minHeight: 31)
+        .accessibilityIdentifier("firmware-release-\(release.version)")
     }
 
     private func compactActionIcon(
@@ -325,12 +335,12 @@ struct FirmwareLibraryView: View {
         ZStack {
             Circle()
                 .fill(background)
-                .frame(width: 28, height: 28)
+                .frame(width: 24, height: 24)
             Image(systemName: systemName)
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(foreground)
         }
-        .frame(width: 34, height: 34)
+        .frame(width: 29, height: 29)
         .contentShape(Rectangle())
     }
 

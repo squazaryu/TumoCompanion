@@ -1,9 +1,27 @@
 import XCTest
 
 final class LiveDeckHomeUITests: XCTestCase {
+    func testHomeSourceListRendersInDarkMode() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-onboardingDone", "YES",
+            "-appearanceMode", "dark",
+        ]
+        app.launch()
+
+        XCTAssertTrue(app.buttons["updates-source-esp32"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Tools"].exists)
+        XCTAssertFalse(app.buttons["Open ESP32"].exists)
+
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = "Live Deck home - dark"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+
     func testHomeShowsIndependentLiveDeckSurfaces() {
         let app = XCUIApplication()
-        app.launchArguments = ["-onboardingDone", "YES"]
+        app.launchArguments = ["-onboardingDone", "YES", "-appearanceMode", "light"]
         app.launch()
 
         XCTAssertTrue(app.staticTexts["FLIPPER CONSOLE"].waitForExistence(timeout: 5))
@@ -12,6 +30,7 @@ final class LiveDeckHomeUITests: XCTestCase {
         XCTAssertTrue(app.buttons["updates-source-firmware"].exists)
         XCTAssertTrue(app.buttons["updates-source-packages"].exists)
         XCTAssertTrue(app.buttons["updates-source-community"].exists)
+        XCTAssertTrue(app.buttons["updates-source-esp32"].exists)
         XCTAssertTrue(app.buttons["Info"].exists)
         XCTAssertTrue(app.buttons["Open Files"].exists)
         XCTAssertTrue(app.buttons["Open Apps"].exists)
@@ -28,8 +47,8 @@ final class LiveDeckHomeUITests: XCTestCase {
         add(closedScreenshot)
 
         app.buttons["Tools"].tap()
-        XCTAssertTrue(app.buttons["Open ESP32"].waitForExistence(timeout: 2))
-        XCTAssertTrue(app.staticTexts["3 available"].exists)
+        XCTAssertFalse(app.buttons["Open ESP32"].exists)
+        XCTAssertTrue(app.staticTexts["2 available"].exists)
         XCTAssertTrue(app.buttons["Open Remotes"].exists)
         XCTAssertFalse(app.staticTexts["CURRENT ACTIVITY"].exists)
         XCTAssertFalse(app.staticTexts["Tap screen to open remote"].exists)
@@ -42,7 +61,7 @@ final class LiveDeckHomeUITests: XCTestCase {
 
     func testSourceRowsRouteToDedicatedUpdateScreens() {
         let app = XCUIApplication()
-        app.launchArguments = ["-onboardingDone", "YES"]
+        app.launchArguments = ["-onboardingDone", "YES", "-appearanceMode", "light"]
 
         app.launch()
         XCTAssertTrue(app.buttons["updates-source-firmware"].waitForExistence(timeout: 5))
@@ -63,6 +82,12 @@ final class LiveDeckHomeUITests: XCTestCase {
 
         app.terminate()
         app.launch()
+        XCTAssertTrue(app.buttons["updates-source-esp32"].waitForExistence(timeout: 5))
+        app.buttons["updates-source-esp32"].tap()
+        XCTAssertTrue(app.navigationBars["ESP32 Firmware"].waitForExistence(timeout: 3))
+
+        app.terminate()
+        app.launch()
         XCTAssertTrue(app.buttons["updates-open-center"].waitForExistence(timeout: 5))
         app.buttons["updates-open-center"].tap()
         XCTAssertTrue(app.navigationBars["Updates"].waitForExistence(timeout: 3))
@@ -70,7 +95,11 @@ final class LiveDeckHomeUITests: XCTestCase {
 
     func testConnectedConsoleUsesCompactStatusRail() {
         let app = XCUIApplication()
-        app.launchArguments = ["-onboardingDone", "YES", "-live-deck-connected-qa"]
+        app.launchArguments = [
+            "-onboardingDone", "YES",
+            "-appearanceMode", "light",
+            "-live-deck-connected-qa",
+        ]
         app.launch()
 
         XCTAssertTrue(app.staticTexts["FLIPPER CONSOLE"].waitForExistence(timeout: 5))
@@ -95,7 +124,7 @@ final class LiveDeckHomeUITests: XCTestCase {
 
     func testHomeLayoutSettingsMatchCurrentDashboard() {
         let app = XCUIApplication()
-        app.launchArguments = ["-onboardingDone", "YES"]
+        app.launchArguments = ["-onboardingDone", "YES", "-appearanceMode", "light"]
         app.launch()
 
         let settings = app.tabBars.buttons["Settings"]
@@ -113,7 +142,7 @@ final class LiveDeckHomeUITests: XCTestCase {
 
         app.swipeUp()
         XCTAssertTrue(app.staticTexts["Drawer"].waitForExistence(timeout: 2))
-        XCTAssertTrue(app.staticTexts["Add ESP32"].exists)
+        XCTAssertFalse(app.staticTexts["Add ESP32"].exists)
         XCTAssertFalse(app.staticTexts["Add (tool.title)"].exists)
         XCTAssertTrue(app.staticTexts["More Tools"].exists)
 
@@ -123,10 +152,13 @@ final class LiveDeckHomeUITests: XCTestCase {
         add(screenshot)
     }
 
-    func testSettingsDoesNotRepeatBuildVersion() {
+    func testBuildVersionLivesInAboutInsteadOfHome() {
         let app = XCUIApplication()
-        app.launchArguments = ["-onboardingDone", "YES"]
+        app.launchArguments = ["-onboardingDone", "YES", "-appearanceMode", "light"]
         app.launch()
+
+        XCTAssertFalse(app.staticTexts["Ready for field work"].exists)
+        XCTAssertFalse(app.staticTexts["about-app-version"].exists)
 
         let settings = app.tabBars.buttons["Settings"]
         XCTAssertTrue(settings.waitForExistence(timeout: 5))
@@ -137,6 +169,12 @@ final class LiveDeckHomeUITests: XCTestCase {
         about.tap()
 
         XCTAssertTrue(app.navigationBars["About"].waitForExistence(timeout: 3))
-        XCTAssertFalse(app.staticTexts["Version"].exists)
+        XCTAssertTrue(app.staticTexts["Version"].exists)
+        XCTAssertTrue(app.staticTexts["about-app-version"].exists)
+
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = "About with app version"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
     }
 }

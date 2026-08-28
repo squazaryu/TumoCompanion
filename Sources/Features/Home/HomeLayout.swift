@@ -80,7 +80,7 @@ enum HomeTileID: String, Codable, CaseIterable, Identifiable, Hashable {
     /// Source routes must never appear in Home layout or Quick Access settings.
     var isDashboardTile: Bool {
         switch self {
-        case .firmware, .packages, .communityApps: return false
+        case .firmware, .packages, .communityApps, .esp32: return false
         default: return true
         }
     }
@@ -103,7 +103,6 @@ enum HomeToolCatalog {
         .init(id: .spectrum, title: "Spectrum", systemImage: "waveform.path.ecg", tint: Theme.accent),
         .init(id: .relay, title: "Relay", systemImage: "switch.2", tint: Theme.success),
         .init(id: .tumonet, title: "TumoNet", systemImage: "network", tint: Theme.indigo),
-        .init(id: .esp32, title: "ESP32", systemImage: "cpu", tint: Theme.pink),
         .init(id: .remotes, title: "Remotes", systemImage: "switch.2", tint: Theme.cyan),
         .init(id: .media, title: "Media Remote", systemImage: "play.rectangle", tint: Theme.mint)
     ]
@@ -142,7 +141,7 @@ private struct HomeLayoutData: Codable {
 
     static var `default`: HomeLayoutData {
         .init(info: ["info", "apps", "files"],
-              tools: ["airadar", "wifi", "fieldServices", "spectrum", "relay", "tumonet", "esp32"],
+              tools: ["airadar", "wifi", "fieldServices", "spectrum", "relay", "tumonet"],
         revision: ["updates", "backup", "remotes", "screen"],
               hidden: [],
               collapsed: [])
@@ -329,7 +328,8 @@ final class HomeLayoutStore: ObservableObject {
     private func normalizeQuickAccess(_ tiles: [HomeTileID]) -> [HomeTileID] {
         var seen = Set<HomeTileID>()
         return tiles.filter { tile in
-            guard tile != .info,
+            guard tile.isDashboardTile,
+                  tile != .info,
                   tile != .screen,
                   tile != .remotes,
                   seen.insert(tile).inserted else { return false }
