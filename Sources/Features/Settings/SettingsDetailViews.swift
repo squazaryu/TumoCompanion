@@ -166,6 +166,14 @@ struct AboutSettingsView: View {
         CardScroll {
             SectionCard(title: "About", systemImage: "info.circle") {
                 HStack {
+                    Text("Version").foregroundStyle(.secondary)
+                    Spacer()
+                    Text(BuildInfo.label)
+                        .font(.system(.footnote, design: .monospaced))
+                        .accessibilityIdentifier("about-app-version")
+                }
+                Divider().opacity(0.4)
+                HStack {
                     Text("App Bridge").foregroundStyle(.secondary)
                     Spacer()
                     Text(ble.state == .ready ? (ble.appBridgeV2 ? "v2 (FAB2)" : "v1 (FAB1)") : "—")

@@ -76,7 +76,7 @@ final class FWPackagesActionBarUITests: XCTestCase {
         app.launch()
     }
 
-    func testActionsFillBottomBarAndTransactionsReplaceThemWithProgress() throws {
+    func testActionsStayCompactAndTransactionsShowOneProgressSurface() throws {
         let drawer = app.buttons["fw-packages-details-drawer-toggle"]
         XCTAssertTrue(drawer.waitForExistence(timeout: 2))
         XCTAssertFalse(
@@ -162,6 +162,11 @@ final class FWPackagesActionBarUITests: XCTestCase {
         XCTAssertFalse(install.exists)
         XCTAssertFalse(cleanup.exists)
         XCTAssertTrue(app.progressIndicators["fw-packages-progress"].waitForExistence(timeout: 2))
+        XCTAssertEqual(
+            app.progressIndicators.matching(identifier: "fw-packages-progress").count,
+            1,
+            "A live transaction must not repeat the same progress above the stop action"
+        )
         XCTAssertTrue(app.buttons["fw-packages-stop-action"].exists)
 
         let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
@@ -284,8 +289,8 @@ final class UpdateSourceLayoutUITests: XCTestCase {
 
         drawer.tap()
         XCTAssertTrue(app.segmentedControls["firmware-channel-picker"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.staticTexts["t-flppr-fw-008"].exists)
-        XCTAssertTrue(app.staticTexts["t-flppr-fw-007"].exists)
+        XCTAssertTrue(app.staticTexts["Version 008"].exists)
+        XCTAssertTrue(app.staticTexts["Version 007"].exists)
         XCTAssertTrue(app.staticTexts["Installed"].isHittable)
         attach("Firmware release drawer - dark")
     }

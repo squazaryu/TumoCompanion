@@ -623,7 +623,6 @@ struct TumoflipUpdaterView: View {
             canInstall: hasFileChannel && !updater.busy,
             canCleanUp: hasFileChannel && !updater.busy,
             stopRequested: updater.stopRequested,
-            transferChannel: updater.transferChannel,
             identityNotice: identityNotice,
             install: { Task { await updater.install() } },
             cleanUp: { pendingCleanupCount = updater.cleanupFileCount },
@@ -653,6 +652,7 @@ struct TumoflipUpdaterView: View {
         case .downloading:
             VStack(alignment: .leading, spacing: 4) {
                 progress("Downloading package archive…")
+                    .accessibilityIdentifier("fw-packages-progress")
                 keepAwakeNote
             }
         case .installing(let done, let total, let file):
@@ -663,6 +663,7 @@ struct TumoflipUpdaterView: View {
                     fraction: Double(min(done, total)) / Double(max(total, 1)),
                     tint: Theme.accent
                 )
+                .accessibilityIdentifier("fw-packages-progress")
                 keepAwakeNote
             }
         case .cleaning(let done, let total, let file):
@@ -673,6 +674,7 @@ struct TumoflipUpdaterView: View {
                     fraction: Double(min(done, total)) / Double(max(total, 1)),
                     tint: Theme.warning
                 )
+                .accessibilityIdentifier("fw-packages-progress")
                 keepAwakeNote
             }
         case .done(let m):
@@ -873,7 +875,6 @@ struct FWPackagesActionBar: View {
     let canInstall: Bool
     let canCleanUp: Bool
     let stopRequested: Bool
-    let transferChannel: TransferChannel
     let identityNotice: FWPackagesIdentityNotice?
     let install: () -> Void
     let cleanUp: () -> Void
@@ -884,31 +885,10 @@ struct FWPackagesActionBar: View {
         switch phase {
         case .checking, .syncingCatalog:
             EmptyView()
-        case .downloading:
-            transactionBar(
-                title: "Downloading package archive",
-                detail: transferChannel.label,
-                progress: nil,
-                tint: Theme.accent,
-                stopTitle: "Stop install"
-            )
-        case .installing(let done, let total, let file):
-            let percent = Int(Double(min(done, total)) / Double(max(total, 1)) * 100)
-            transactionBar(
-                title: file,
-                detail: "\(percent)% · \(transferChannel.label)",
-                progress: Double(min(done, total)) / Double(max(total, 1)),
-                tint: Theme.accent,
-                stopTitle: "Stop install"
-            )
-        case .cleaning(let done, let total, let file):
-            transactionBar(
-                title: file,
-                detail: "\(done)/\(total) · \(transferChannel.label)",
-                progress: Double(min(done, total)) / Double(max(total, 1)),
-                tint: Theme.warning,
-                stopTitle: "Stop cleanup"
-            )
+        case .downloading, .installing:
+            transactionStop(title: "Stop install")
+        case .cleaning:
+            transactionStop(title: "Stop cleanup")
         default:
             if installCount > 0 || cleanupCount > 0 {
                 actionButtons
@@ -981,32 +961,16 @@ struct FWPackagesActionBar: View {
         }
     }
 
-    private func transactionBar(
-        title: String,
-        detail: String,
-        progress: Double?,
-        tint: Color,
-        stopTitle: String
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            UnifiedProgressView(
-                title: stopRequested ? "Stopping safely…" : title,
-                detail: detail,
-                fraction: progress,
-                tint: tint
-            )
-            .accessibilityIdentifier("fw-packages-progress")
-
-            compactAction(
-                title: stopRequested ? "Stopping safely…" : stopTitle,
-                systemImage: "stop.circle.fill",
-                tint: Theme.danger,
-                role: .destructive,
-                action: stop
-            )
-            .disabled(stopRequested)
-            .accessibilityIdentifier("fw-packages-stop-action")
-        }
+    private func transactionStop(title: String) -> some View {
+        compactAction(
+            title: stopRequested ? "Stopping safely…" : title,
+            systemImage: "stop.circle.fill",
+            tint: Theme.danger,
+            role: .destructive,
+            action: stop
+        )
+        .disabled(stopRequested)
+        .accessibilityIdentifier("fw-packages-stop-action")
         .padding(.horizontal, 2)
         .padding(.vertical, 2)
     }
@@ -1044,8 +1008,15 @@ struct FWPackagesActionBarQAView: View {
     @State private var scenario: TumoflipUpdater.ActionBarQAScenario
 
     init() {
-        let initial: TumoflipUpdater.ActionBarQAScenario = ProcessInfo.processInfo.arguments
-            .contains("-fw-packages-identity-pending") ? .identity : .both
+        let arguments = ProcessInfo.processInfo.arguments
+        let initial: TumoflipUpdater.ActionBarQAScenario
+        if arguments.contains("-fw-packages-installing-qa") {
+            initial = .installing
+        } else if arguments.contains("-fw-packages-identity-pending") {
+            initial = .identity
+        } else {
+            initial = .both
+        }
         _updater = StateObject(
             wrappedValue: TumoflipUpdater.actionBarQAFixture(initial: initial)
         )

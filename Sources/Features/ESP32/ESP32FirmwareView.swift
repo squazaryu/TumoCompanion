@@ -4,19 +4,15 @@ import SwiftUI
 struct ESP32FirmwareView: View {
     @EnvironmentObject var ble: FlipperBLE
     @EnvironmentObject var transfer: TransferChannelStore
-    @StateObject private var up: ESP32Updater
+    @ObservedObject private var up: ESP32Updater
     @State private var expandedVersionGroups: Set<String> = []
     @State private var packageDrawerExpanded = false
     @State private var deleteTarget: ESP32Updater.Board?
     @State private var deleteAll = false
     @State private var deleteArchived = false
 
-    init() {
-        _up = StateObject(wrappedValue: ESP32Updater())
-    }
-
     init(updater: ESP32Updater) {
-        _up = StateObject(wrappedValue: updater)
+        up = updater
     }
 
     var body: some View {
@@ -26,7 +22,7 @@ struct ESP32FirmwareView: View {
                 if up.boards.isEmpty && up.archivedBoards.isEmpty && !up.busy { emptyCard }
 
                 // The folder tab is fixed above the app tab bar, just like
-                // Home → Tools. Keep only its collapsed footprint in the page
+                // Home → Sources. Keep only its collapsed footprint in the page
                 // content so the overview remains one screen tall.
                 Color.clear.frame(height: 58)
             }
@@ -219,7 +215,7 @@ struct ESP32FirmwareView: View {
     }
 
     private var packageDrawerHeight: CGFloat {
-        // Match Home → Tools: the drawer grows with the number of visible
+        // Match the adaptive drawers used by the update sources: the drawer grows with the number of visible
         // cards, while a longer history remains scrollable inside the drawer.
         let boardRows = CGFloat(max(up.stagingBoards.count, 1)) * 90
         // Version history is intentionally a compact preview. Its rows remain

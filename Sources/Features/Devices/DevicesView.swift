@@ -61,7 +61,7 @@ struct DevicesView: View {
         case .spectrum:      TumoSpectrumView()
         case .relay:         BridgeView()
         case .tumonet:       TumoNetView()
-        case .esp32:         ESP32FirmwareView()
+        case .esp32:         ESP32FirmwareView(updater: updates.esp32)
         case .updates:       UpdatesView()
         case .backup:        BackupView()
         case .remotes:       RemotesView()
