@@ -31,9 +31,15 @@ final class DolphinGalleryUITests: XCTestCase {
         XCTAssertTrue(duration.waitForExistence(timeout: 5))
         duration.tap()
 
+        let hourWheel = app.pickerWheels.element(boundBy: 0)
         let minuteWheel = app.pickerWheels.element(boundBy: 1)
+        let secondWheel = app.pickerWheels.element(boundBy: 2)
+        XCTAssertTrue(hourWheel.waitForExistence(timeout: 5))
         XCTAssertTrue(minuteWheel.waitForExistence(timeout: 5))
+        XCTAssertTrue(secondWheel.waitForExistence(timeout: 5))
+        hourWheel.adjust(toPickerWheelValue: "00")
         minuteWheel.adjust(toPickerWheelValue: "02")
+        secondWheel.adjust(toPickerWheelValue: "00")
         app.buttons["dolphin-duration-save"].tap()
         XCTAssertEqual(duration.label, "Duration, 00:02:00")
 
