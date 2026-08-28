@@ -89,8 +89,8 @@ final class FWPackagesActionBarUITests: XCTestCase {
         add(collapsedScreenshot)
         drawer.tap()
         XCTAssertTrue(
-            app.staticTexts["Installed"].waitForExistence(timeout: 2),
-            "Package metadata must remain available in the bottom drawer"
+            app.staticTexts["fw-packages-revision"].waitForExistence(timeout: 2),
+            "The compact catalog identity must remain available in the bottom drawer"
         )
         XCTAssertEqual(
             app.staticTexts["fw-packages-compatible-firmware"].label,
@@ -107,7 +107,7 @@ final class FWPackagesActionBarUITests: XCTestCase {
         revisionScreenshot.lifetime = .keepAlways
         add(revisionScreenshot)
         let groupsScreenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-        groupsScreenshot.name = "FW Packages groups drawer"
+        groupsScreenshot.name = "FW Packages compact groups drawer"
         groupsScreenshot.lifetime = .keepAlways
         add(groupsScreenshot)
 
@@ -119,16 +119,18 @@ final class FWPackagesActionBarUITests: XCTestCase {
         }
         XCTAssertEqual(
             app.staticTexts["fw-packages-status-base"].label,
-            "Up to date"
+            "Current"
         )
         XCTAssertEqual(
             app.staticTexts["fw-packages-status-module_one"].label,
-            "1 of 3 need updates"
+            "1 update"
         )
         XCTAssertEqual(
             app.staticTexts["fw-packages-cleanup-status-module_one"].label,
-            "1 Cleanup required"
+            "1 cleanup"
         )
+
+        app.buttons["fw-packages-expand-module_one"].tap()
         XCTAssertTrue(
             app.switches[
                 "fw-packages-file-module_one-tumoflip_xremote.fap"

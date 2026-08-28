@@ -54,7 +54,9 @@ struct TumoflipUpdaterView: View {
                     title: "PACKAGE DETAILS",
                     summary: packageDetailsSummary,
                     systemImage: "shippingbox.fill",
-                    accessibilityIdentifier: "fw-packages-details-drawer-toggle"
+                    accessibilityIdentifier: "fw-packages-details-drawer-toggle",
+                    panelHeight: packageDetailsDrawerHeight,
+                    maxPanelHeight: 400
                 ) {
                     packageDetailsPanel
                 }
@@ -191,7 +193,7 @@ struct TumoflipUpdaterView: View {
     }
 
     private var packageDetailsPanel: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 7) {
                 Label("PACKAGE CHANNEL", systemImage: "point.3.connected.trianglepath.dotted")
                     .font(.caption.weight(.bold))
@@ -220,7 +222,7 @@ struct TumoflipUpdaterView: View {
                     .foregroundStyle(Color.primary.opacity(0.62))
             }
 
-            VStack(spacing: 6) {
+            VStack(spacing: 0) {
                 ForEach(groupLabels, id: \.key) { g in
                     groupRow(g)
                 }
@@ -228,7 +230,7 @@ struct TumoflipUpdaterView: View {
 
             if updater.hasFirmwareOwnedBaseline {
                 Label(
-                    "\(updater.firmwareOwnedFileCount) FAPs belong to the firmware baseline. FW Packages manages only independent overlays and never reinstalls these files.",
+                    "\(updater.firmwareOwnedFileCount) built-in FAPs · reference only",
                     systemImage: "shippingbox.fill"
                 )
                 .font(.caption2)
@@ -250,6 +252,12 @@ struct TumoflipUpdaterView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+    }
+
+    private var packageDetailsDrawerHeight: CGFloat {
+        // Keep the initial drawer visibly smaller than the primary screen.
+        // Expanded per-file lists scroll inside the panel instead of growing it.
+        360
     }
 
     private var packageGroupsSummary: String {
@@ -298,59 +306,12 @@ struct TumoflipUpdaterView: View {
                     enabled: !updater.busy && updater.manualChannelOverride != .dev,
                     action: { pendingOverride = .dev }
                 )
+                Spacer(minLength: 2)
+                catalogRevisionPicker
             }
 
-            if !updater.availableCatalogOptions.isEmpty {
-                Menu {
-                    Button(action: selectLatestCatalogRevision) {
-                        Label("Automatic (latest compatible)", systemImage: "wand.and.stars")
-                    }
-                    ForEach(updater.availableCatalogOptions) { option in
-                        Button { selectCatalogRevision(option.revision) } label: {
-                            Label(
-                                catalogOptionLabel(option),
-                                systemImage: option.revision == updater.selectedCatalogRevision
-                                    ? "checkmark.circle.fill" : "clock.arrow.circlepath"
-                            )
-                        }
-                    }
-                } label: {
-                    Label("Choose package revision", systemImage: "clock.arrow.circlepath")
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .accessibilityIdentifier("fw-packages-revision-picker")
-            }
-
-            Divider().opacity(0.4)
-            VStack(alignment: .leading, spacing: 5) {
-                compactMetadataRow("Installed", updater.deviceIdentity?.firmwareVersion ?? "Unknown")
-                compactMetadataRow("Origin", updater.deviceIdentity?.originFork ?? "Unknown")
-                compactMetadataRow("Detected", updater.firmwareRoute.detectedChannel?.packageLabel ?? "Unknown")
-                compactMetadataRow("Selected", updater.firmwareRoute.channel.packageLabel)
-            }
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Image(systemName: "link.badge.plus")
-                    .font(.caption2)
-                Text("Catalog is independent of firmware; compatibility uses channel, API major and target.")
-                    .font(.caption2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .foregroundStyle(Color.primary.opacity(0.62))
             if let manifest = updater.manifest {
-                VStack(alignment: .leading, spacing: 5) {
-                    compactMetadataRow(
-                        "Compatible FW",
-                        firmwareCompatibilityDisplay(manifest),
-                        identifier: "fw-packages-compatible-firmware"
-                    )
-                    compactMetadataRow(
-                        "FW Packages",
-                        packageRevisionDisplay,
-                        identifier: "fw-packages-revision"
-                    )
-                    compactMetadataRow("Package API", manifest.firmware.api)
-                }
+                catalogSummary(manifest)
                 if let selected = updater.selectedCatalogRevision,
                    let current = updater.availableCatalogOptions.compactMap(\.revision).max(),
                    selected < current {
@@ -363,62 +324,88 @@ struct TumoflipUpdaterView: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("fw-packages-rollback-selected")
                 }
-                if updater.firmwareFlashUnchanged {
-                    Label(
-                        manifest.isFirmwareSnapshotCatalog
-                            ? "Exact firmware package snapshot. Missing or changed bundled files can be reinstalled; firmware flashing is unchanged."
-                            : manifest.isIndependentBaselineCatalog
-                                ? "Independent baseline catalog. Firmware-owned files are reference-only; no FAP files are managed here."
-                                : "Apps-only package update. Firmware flashing is unchanged.",
-                        systemImage: "checkmark.shield.fill"
-                    )
-                    .font(.caption2)
-                    .foregroundStyle(.green)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("fw-packages-apps-only")
-                }
-            }
-            if let api = updater.deviceIdentity?.firmwareAPI {
-                VStack(alignment: .leading, spacing: 5) {
-                    compactMetadataRow("Installed API", api)
-                    if let commit = updater.deviceIdentity?.firmwareCommit, !commit.isEmpty {
-                        compactMetadataRow("Commit", commit)
-                    }
-                }
-            } else if let commit = updater.deviceIdentity?.firmwareCommit, !commit.isEmpty {
-                compactMetadataRow("Commit", commit)
             }
         }
+    }
+
+    @ViewBuilder
+    private var catalogRevisionPicker: some View {
+        if !updater.availableCatalogOptions.isEmpty {
+            Menu {
+                Button(action: selectLatestCatalogRevision) {
+                    Label("Automatic (latest compatible)", systemImage: "wand.and.stars")
+                }
+                ForEach(updater.availableCatalogOptions) { option in
+                    Button { selectCatalogRevision(option.revision) } label: {
+                        Label(
+                            catalogOptionLabel(option),
+                            systemImage: option.revision == updater.selectedCatalogRevision
+                                ? "checkmark.circle.fill" : "clock.arrow.circlepath"
+                        )
+                    }
+                }
+            } label: {
+                Label("Revision", systemImage: "clock.arrow.circlepath")
+                    .font(.caption.weight(.semibold))
+                    .lineLimit(1)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .foregroundStyle(Theme.accent)
+                    .background(Theme.accent.opacity(0.14), in: Capsule())
+                    .overlay {
+                        Capsule().strokeBorder(Theme.accent.opacity(0.2), lineWidth: 1)
+                    }
+            }
+            .disabled(updater.busy)
+            .accessibilityIdentifier("fw-packages-revision-picker")
+        }
+    }
+
+    private func catalogSummary(_ manifest: TumoflipManifest) -> some View {
+        HStack(alignment: .center, spacing: 10) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(packageRevisionDisplay)
+                    .font(.caption2.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .accessibilityIdentifier("fw-packages-revision")
+                HStack(spacing: 3) {
+                    Text(firmwareCompatibilityDisplay(manifest))
+                        .accessibilityIdentifier("fw-packages-compatible-firmware")
+                    Text("· API \(manifest.firmware.api)")
+                }
+                .font(.caption2)
+                .foregroundStyle(Color.primary.opacity(0.62))
+                .lineLimit(1)
+                .minimumScaleFactor(0.68)
+            }
+            Spacer(minLength: 4)
+            if updater.firmwareFlashUnchanged {
+                Label(catalogRoleTitle(manifest), systemImage: "checkmark.shield.fill")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.green)
+                    .lineLimit(1)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(Color.green.opacity(0.12), in: Capsule())
+                    .accessibilityIdentifier("fw-packages-apps-only")
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color.primary.opacity(0.055), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private func catalogRoleTitle(_ manifest: TumoflipManifest) -> String {
+        if manifest.isIndependentBaselineCatalog { return "Baseline" }
+        if manifest.isFirmwareSnapshotCatalog { return "Snapshot" }
+        return "Apps only"
     }
 
     private var channelDrawerSummary: String {
         let channel = updater.firmwareRoute.channel.label
         let revision = updater.packageRevision.isEmpty ? "latest" : "Rev \(updater.packageRevision)"
         return "\(channel) · \(revision)"
-    }
-
-    private func compactMetadataRow(
-        _ title: String,
-        _ value: String,
-        identifier: String? = nil
-    ) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text(title)
-                .font(.caption2.weight(.medium))
-                // Use an explicit color instead of the inherited secondary
-                // style. The drawer is presented over a material surface and
-                // the relative style can collapse to a near-black value in
-                // the dark accessibility theme.
-                .foregroundStyle(Color.primary.opacity(0.62))
-                .frame(width: 92, alignment: .leading)
-            metadataValue(value, identifier: identifier)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .multilineTextAlignment(.leading)
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
-                .truncationMode(.middle)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func channelChoiceButton(
@@ -430,8 +417,8 @@ struct TumoflipUpdaterView: View {
             Text(title)
                 .font(.caption.weight(.semibold))
                 .lineLimit(1)
-                .padding(.horizontal, 11)
-                .padding(.vertical, 6)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 5)
         }
         .buttonStyle(.plain)
         .foregroundStyle(enabled ? Theme.accent : Color.primary.opacity(0.68))
@@ -449,20 +436,6 @@ struct TumoflipUpdaterView: View {
         .disabled(!enabled)
         .accessibilityLabel(title)
         .accessibilityValue(enabled ? "Available" : "Unavailable")
-    }
-
-    @ViewBuilder
-    private func metadataValue(_ value: String, identifier: String?) -> some View {
-        if let identifier {
-            Text(value)
-                .font(.caption2)
-                .foregroundStyle(Color.primary)
-                .accessibilityIdentifier(identifier)
-        } else {
-            Text(value)
-                .font(.caption2)
-                .foregroundStyle(Color.primary)
-        }
     }
 
     private var packageRevisionDisplay: String {
@@ -494,17 +467,17 @@ struct TumoflipUpdaterView: View {
         let selectable = updater.selectableCount(g.key)
         let firmwareOwned = updater.firmwareOwnedCount(g.key)
         let cleanupEntries = updater.cleanupEntries(g.key)
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 7) {
                 if n > 0 {
                     // Tri-state selection is limited to standalone overlays. The
                     // firmware-owned baseline is visible, but cannot be overwritten
                     // from this screen.
                     Button { updater.setGroup(g.key, selected: sel < selectable) } label: {
                         Image(systemName: sel == 0 ? "square" : (sel == selectable ? "checkmark.square.fill" : "minus.square.fill"))
-                            .font(.title3)
+                            .font(.body)
                             .foregroundStyle(sel == 0 ? Color.secondary : Theme.accent)
-                            .frame(width: 28, height: 30)
+                            .frame(width: 24, height: 28)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
@@ -512,25 +485,32 @@ struct TumoflipUpdaterView: View {
                     .accessibilityIdentifier("fw-packages-select-\(g.key)")
                 } else {
                     Image(systemName: firmwareOwned > 0 ? "shippingbox" : "square")
-                        .font(.title3)
+                        .font(.body)
                         .foregroundStyle(.secondary)
-                        .frame(width: 28, height: 30)
+                        .frame(width: 24, height: 28)
                 }
 
-                Image(systemName: g.icon).foregroundStyle(.orange).frame(width: 22)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(g.title).font(.subheadline)
+                Image(systemName: g.icon)
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .frame(width: 18)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(g.title)
+                        .font(.caption.weight(.semibold))
+                        .lineLimit(1)
                     if n > 0 {
-                        Text("\(sel)/\(selectable) standalone · \(byteStr(updater.bytes(g.key)))")
+                        Text("\(sel)/\(selectable) · \(byteStr(updater.bytes(g.key)))")
                             .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
-                    }
-                    if firmwareOwned > 0 {
-                        Text("\(firmwareOwned) firmware-owned · not managed here")
+                    } else if firmwareOwned > 0 {
+                        Text("\(firmwareOwned) built-in")
                             .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
                             .accessibilityIdentifier("fw-packages-baseline-\(g.key)")
                     }
+                }
+                Spacer(minLength: 4)
+                VStack(alignment: .trailing, spacing: 1) {
                     if let info = groupSummaryInfo(g.key) {
-                        Label(info.text, systemImage: info.icon)
+                        Label(compactGroupStatus(g.key), systemImage: info.icon)
                             .font(.caption2)
                             .foregroundStyle(info.color)
                             .labelStyle(.titleAndIcon)
@@ -539,7 +519,7 @@ struct TumoflipUpdaterView: View {
                     }
                     if !cleanupEntries.isEmpty {
                         Label(
-                            "\(cleanupEntries.count) Cleanup required",
+                            "\(cleanupEntries.count) cleanup",
                             systemImage: "trash.circle.fill"
                         )
                         .font(.caption2)
@@ -549,14 +529,13 @@ struct TumoflipUpdaterView: View {
                         .accessibilityIdentifier("fw-packages-cleanup-status-\(g.key)")
                     }
                 }
-                Spacer()
                 if n > 0 {
                     Button {
                         withAnimation { toggleExpanded(g.key) }
                     } label: {
                         Image(systemName: expanded.contains(g.key) ? "chevron.up" : "chevron.down")
                             .font(.caption).foregroundStyle(.secondary)
-                            .frame(width: 28, height: 28)
+                            .frame(width: 22, height: 28)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.borderless)
@@ -620,8 +599,16 @@ struct TumoflipUpdaterView: View {
                     }
                 }
             }
-            if g.key != groupLabels.last?.key { Divider() }
+            if g.key != groupLabels.last?.key { Divider().opacity(0.45) }
         }
+        .padding(.vertical, 4)
+    }
+
+    private func compactGroupStatus(_ group: String) -> String {
+        let files = updater.files(group)
+        let pending = files.lazy.filter { updater.status(file: $0.target) != .upToDate }.count
+        if pending == 0 { return "Current" }
+        return "\(pending) update\(pending == 1 ? "" : "s")"
     }
 
     private func fileBinding(_ target: String) -> Binding<Bool> {
@@ -1067,10 +1054,7 @@ struct FWPackagesActionBarQAView: View {
 
     var body: some View {
         NavigationStack {
-            TumoflipUpdaterView(
-                updater: updater,
-                initiallyExpanded: ["module_one"]
-            )
+            TumoflipUpdaterView(updater: updater)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Menu {

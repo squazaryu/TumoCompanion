@@ -226,7 +226,10 @@ struct ESP32FirmwareView: View {
         // scrollable inside the drawer, so the tab never grows a large empty
         // tail just because an archive exists on disk.
         let history = up.versionGroups.isEmpty ? 0 : min(80, up.versionGroups.count * 40)
-        return min(500, max(180, CGFloat(44) + boardRows + CGFloat(history)))
+        // Include enough drawer chrome to leave only a deliberate visual gap
+        // below the overview card instead of a large unused band.
+        let drawerChrome: CGFloat = 84
+        return min(500, max(220, drawerChrome + boardRows + CGFloat(history)))
     }
 
     /// A compact board row for the drawer. The release summary already exposes
