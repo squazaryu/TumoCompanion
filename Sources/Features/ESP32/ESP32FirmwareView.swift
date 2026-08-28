@@ -5,21 +5,32 @@ struct ESP32FirmwareView: View {
     @EnvironmentObject var ble: FlipperBLE
     @EnvironmentObject var transfer: TransferChannelStore
     @ObservedObject private var up: ESP32Updater
+    private let autoRefresh: Bool
     @State private var expandedVersionGroups: Set<String> = []
     @State private var packageDrawerExpanded = false
     @State private var deleteTarget: ESP32Updater.Board?
     @State private var deleteAll = false
     @State private var deleteArchived = false
 
-    init(updater: ESP32Updater) {
+    init(updater: ESP32Updater, autoRefresh: Bool = true) {
         up = updater
+        self.autoRefresh = autoRefresh
     }
 
     var body: some View {
         ZStack(alignment: .bottom) {
             CardScroll(refreshAction: { await up.refresh() }) {
                 statusCard
-                if up.boards.isEmpty && up.archivedBoards.isEmpty && !up.busy { emptyCard }
+                if up.stagingBoards.isEmpty && !up.busy {
+                    switch up.deviceScanState {
+                    case .loaded:
+                        emptyCard
+                    case .failed:
+                        EmptyView()
+                    case .idle, .scanning:
+                        EmptyView()
+                    }
+                }
 
                 // The folder tab is fixed above the app tab bar, just like
                 // Home → Sources. Keep only its collapsed footprint in the page
@@ -42,7 +53,14 @@ struct ESP32FirmwareView: View {
         }
         .navigationTitle("ESP32 Firmware")
         .navigationBarTitleDisplayMode(.inline)
-        .task { if up.latestTag == nil { await up.refresh() } }
+        .task {
+            guard autoRefresh else { return }
+            await up.refresh()
+        }
+        .onChange(of: ble.state) { _, state in
+            guard autoRefresh, state == .ready else { return }
+            Task { await up.refreshDevicePackages() }
+        }
         .alert("Remove this folder?", isPresented: Binding(
             get: { deleteTarget != nil }, set: { if !$0 { deleteTarget = nil } })) {
             Button("Delete", role: .destructive) {
@@ -69,10 +87,7 @@ struct ESP32FirmwareView: View {
 
     private var statusCard: some View {
         SectionCard(title: "ESP32 Marauder", systemImage: "cpu",
-                    accessory: up.latestTag == nil ? nil : AnyView(
-                        StatusPill(text: up.updateAvailable ? "Update" : "Latest",
-                                   color: up.updateAvailable ? Theme.warning : Theme.success,
-                                   systemImage: up.updateAvailable ? "arrow.down.circle.fill" : "checkmark.circle.fill"))) {
+                    accessory: overviewAccessory) {
             HStack {
                 Text("Latest release").font(.subheadline).foregroundStyle(.secondary)
                 Spacer()
@@ -101,6 +116,31 @@ struct ESP32FirmwareView: View {
                 Text(s).font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            if up.overviewState == .deviceUnavailable {
+                HStack(spacing: 10) {
+                    Label("Last confirmed list preserved", systemImage: "shield.checkered")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    Spacer(minLength: 6)
+                    Button {
+                        Task { await up.refreshDevicePackages() }
+                    } label: {
+                        Label("Retry", systemImage: "arrow.clockwise")
+                            .font(.caption.weight(.semibold))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Theme.accent)
+                    .background(Theme.accent.opacity(0.15), in: Capsule())
+                    .overlay {
+                        Capsule().strokeBorder(Theme.accent.opacity(0.22), lineWidth: 1)
+                    }
+                    .disabled(up.busy)
+                    .accessibilityIdentifier("esp32-retry-device-scan")
+                }
+            }
             if up.verifiedPackageAvailable {
                 Label("Verified full installer package", systemImage: "checkmark.shield.fill")
                     .font(.caption)
@@ -114,10 +154,47 @@ struct ESP32FirmwareView: View {
                 }
             }
 
-            Text("Packages are staged on the Flipper SD and flashed from esp_flasher.")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            if up.overviewState != .deviceUnavailable {
+                Text("Packages are staged on the Flipper SD and flashed from esp_flasher.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var overviewAccessory: AnyView? {
+        switch up.overviewState {
+        case .checking:
+            return AnyView(StatusPill(
+                text: "Checking",
+                color: Theme.warning,
+                systemImage: "arrow.triangle.2.circlepath"))
+        case .deviceUnavailable:
+            return AnyView(StatusPill(
+                text: "Read error",
+                color: Theme.warning,
+                systemImage: "exclamationmark.triangle.fill"))
+        case .noPackages:
+            return AnyView(StatusPill(
+                text: "Not staged",
+                color: .secondary,
+                systemImage: "folder.badge.questionmark"))
+        case .releaseUnavailable:
+            return AnyView(StatusPill(
+                text: "Check failed",
+                color: Theme.warning,
+                systemImage: "exclamationmark.triangle.fill"))
+        case .update:
+            return AnyView(StatusPill(
+                text: "Update",
+                color: Theme.warning,
+                systemImage: "arrow.down.circle.fill"))
+        case .latest:
+            return AnyView(StatusPill(
+                text: "Latest",
+                color: Theme.success,
+                systemImage: "checkmark.circle.fill"))
         }
     }
 
@@ -484,4 +561,5 @@ struct ESP32FirmwareView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .card()
     }
+
 }

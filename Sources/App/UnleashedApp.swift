@@ -103,7 +103,15 @@ struct RootView: View {
             CommunityAppsLayoutQAView()
         } else if ProcessInfo.processInfo.arguments.contains("-esp32-archived-redownload-qa") {
             NavigationStack {
-                ESP32FirmwareView(updater: .archivedRedownloadQA())
+                ESP32FirmwareView(updater: .archivedRedownloadQA(), autoRefresh: false)
+            }
+        } else if ProcessInfo.processInfo.arguments.contains("-esp32-staged-update-qa") {
+            NavigationStack {
+                ESP32FirmwareView(updater: .stagedUpdateQA(), autoRefresh: false)
+            }
+        } else if ProcessInfo.processInfo.arguments.contains("-esp32-device-scan-failure-qa") {
+            NavigationStack {
+                ESP32FirmwareView(updater: .scanFailureQA(), autoRefresh: false)
             }
         } else if ProcessInfo.processInfo.arguments.contains("-device-info-layout-qa") {
             DeviceInfoLayoutQAView()
