@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.11.7",
+      "version": "1.11.8",
       "versionDate": "2026-08-28",
-      "versionDescription": "TumoCompanion 1.11.7 \u2014 stable Home navigation chrome\n\n- Home no longer gains an opaque header or separator after a small scroll.\n- The fix is scoped to the Home root; destination screens retain their navigation appearance.\n- Added light and dark UI regression coverage for the scroll transition.\n- Made the Dolphin Gallery duration UI test deterministic on reused simulators.\n\nValidation: 597/597 tests passed, including 27/27 UI tests. Home was visually checked in light and dark themes before and after scrolling.\n\nBreaking changes: none. No Flipper firmware, FAP, FW Packages, or user data changes.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.7/TumoCompanion-unsigned.ipa",
-      "size": 25607380,
+      "versionDescription": "TumoCompanion 1.11.8 \u2014 clean firmware transfer states\n\n- Firmware preparation now uses a centered confirmation alert instead of an anchored popover.\n- The release drawer closes before confirmation and remains hidden during preparation, transfer, completion, and failure.\n- Preparing, progress, and error feedback are mutually exclusive; duplicate busy/error indicators were removed.\n- Retry now restarts the exact firmware release that failed instead of only refreshing the catalog.\n\nValidation: 570 unit tests and 6 focused light/dark UI tests passed. Confirmation, preparing, and failure renders were manually inspected.\n\nBreaking changes: none. No Flipper firmware, FAP, or FW Packages changes.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.8/TumoCompanion-unsigned.ipa",
+      "size": 25607740,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.11.8",
+          "date": "2026-08-28",
+          "localizedDescription": "TumoCompanion 1.11.8 \u2014 clean firmware transfer states\n\n- Firmware preparation now uses a centered confirmation alert instead of an anchored popover.\n- The release drawer closes before confirmation and remains hidden during preparation, transfer, completion, and failure.\n- Preparing, progress, and error feedback are mutually exclusive; duplicate busy/error indicators were removed.\n- Retry now restarts the exact firmware release that failed instead of only refreshing the catalog.\n\nValidation: 570 unit tests and 6 focused light/dark UI tests passed. Confirmation, preparing, and failure renders were manually inspected.\n\nBreaking changes: none. No Flipper firmware, FAP, or FW Packages changes.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.8/TumoCompanion-unsigned.ipa",
+          "size": 25607740,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.11.7",
           "date": "2026-08-28",
