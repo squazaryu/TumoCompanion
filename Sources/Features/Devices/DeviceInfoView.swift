@@ -143,11 +143,11 @@ struct DeviceInfoView: View {
                 CardScroll {
                     if let error = vm.error {
                         HStack(alignment: .top, spacing: 10) {
-                            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.accent)
                             Text(error).font(.caption).fixedSize(horizontal: false, vertical: true)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .card(tint: .orange)
+                        .card(tint: Theme.accent)
                     }
 
                     SectionCard(title: "Device", systemImage: "cpu") {
@@ -205,7 +205,7 @@ struct DeviceInfoView: View {
                         accessory: AnyView(runtimeAccessory)) {
             if let error = vm.runtimeError {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption2).foregroundStyle(.orange)
+                    .font(.caption2).foregroundStyle(Theme.accent)
             }
             if let status = vm.runtimeStatus {
                 if let fw = vm.runtimeFirmwareDisplay(status.firmwareVersion) {
@@ -260,7 +260,7 @@ struct DeviceInfoView: View {
                         HStack(spacing: 6) {
                             Image(systemName: entry.ok ? "checkmark.circle" : "xmark.circle")
                                 .font(.caption2)
-                                .foregroundStyle(entry.ok ? Color.secondary : Color.orange)
+                                .foregroundStyle(entry.ok ? Color.secondary : Theme.accent)
                             Text("\(entry.codeLabel) · \(entry.command)")
                                 .font(.system(.caption2, design: .monospaced))
                                 .foregroundStyle(.secondary)
@@ -280,7 +280,7 @@ struct DeviceInfoView: View {
         if vm.runtimeLoading {
             ProgressView().scaleEffect(0.8)
         } else if let sid = vm.runtimeStatus?.sessionID, sid != "00000000" {
-            StatusPill(text: "Session", color: .green, systemImage: "checkmark.circle.fill")
+            StatusPill(text: "Session", color: Theme.success, systemImage: "checkmark.circle.fill")
         }
     }
 

@@ -200,7 +200,7 @@ struct CatalogAppDetailView: View {
                 }
             } else {
                 Label("No build is published for this app yet.", systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption2).foregroundStyle(.orange)
+                    .font(.caption2).foregroundStyle(Theme.accent)
             }
         }
     }
@@ -264,12 +264,12 @@ struct CatalogAppDetailView: View {
 
                 if let reason = vm.protectionReason {
                     Label(reason, systemImage: "lock.shield.fill")
-                        .font(.caption2).foregroundStyle(.orange)
+                        .font(.caption2).foregroundStyle(Theme.accent)
                 } else if ble.state != .ready {
                     Text("Connect to a Flipper to install.").font(.caption2).foregroundStyle(.secondary)
                 } else if let installedPath = vm.installedPath {
                     Label("Installed at \(installedPath)", systemImage: "checkmark.seal.fill")
-                        .font(.caption2).foregroundStyle(.green)
+                        .font(.caption2).foregroundStyle(Theme.success)
                 } else if let status = vm.status {
                     Text(status).font(.caption2).foregroundStyle(.secondary)
                 }

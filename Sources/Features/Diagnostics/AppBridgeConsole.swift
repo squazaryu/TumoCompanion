@@ -103,10 +103,10 @@ struct AppBridgeLogEntry: Identifiable, Equatable {
     }
     var color: Color {
         switch kind {
-        case .tx: return .blue
-        case .rx: return .green
-        case .event: return .orange
-        case .error: return .red
+        case .tx: return Theme.info
+        case .rx: return Theme.success
+        case .event: return Theme.accent
+        case .error: return Theme.danger
         }
     }
 }
@@ -223,7 +223,7 @@ struct AppBridgeConsoleView: View {
                 Spacer()
                 if vm.target.usesSession {
                     if let sid = vm.sessionID {
-                        StatusPill(text: "sid \(sid)", color: .green, systemImage: "key.fill")
+                        StatusPill(text: "sid \(sid)", color: Theme.success, systemImage: "key.fill")
                     } else {
                         StatusPill(text: "no session", color: .secondary)
                     }
@@ -241,20 +241,20 @@ struct AppBridgeConsoleView: View {
         if ble.state != .ready {
             StatusPill(text: "Disconnected", color: .secondary)
         } else if ble.appBridgeV2 {
-            StatusPill(text: "FAB2", color: .green, systemImage: "checkmark.seal.fill")
+            StatusPill(text: "FAB2", color: Theme.success, systemImage: "checkmark.seal.fill")
         } else {
-            StatusPill(text: "FAB1 only", color: .orange, systemImage: "exclamationmark.triangle.fill")
+            StatusPill(text: "FAB1 only", color: Theme.accent, systemImage: "exclamationmark.triangle.fill")
         }
     }
 
     private var fab2Warning: some View {
         HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.accent)
             Text("This console needs App Bridge v2 (FAB2). The connected firmware only negotiated FAB1 — update to a build that advertises FAB2.")
                 .font(.caption).fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .card(tint: .orange)
+        .card(tint: Theme.accent)
     }
 
     // Command buttons + echo text.
@@ -319,8 +319,8 @@ struct AppBridgeConsoleView: View {
 
     private static func tint(for command: String) -> Color {
         switch command {
-        case "hello": return .green
-        case "release": return .orange
+        case "hello": return Theme.success
+        case "release": return Theme.accent
         default: return Theme.accent
         }
     }

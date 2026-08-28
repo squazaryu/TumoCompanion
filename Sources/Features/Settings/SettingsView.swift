@@ -42,7 +42,7 @@ struct SettingsView: View {
                 title: "Personalization",
                 subtitle: "Dolphin Gallery, theme and iOS Home Screen icon styles",
                 systemImage: "paintbrush.pointed",
-                tint: .orange
+                tint: Theme.accent
             ) {
                 PersonalizationSettingsView()
             }
@@ -51,7 +51,7 @@ struct SettingsView: View {
                 title: "Home dashboard",
                 subtitle: "Choose Tools for Quick Access and the More Tools drawer",
                 systemImage: "square.grid.2x2",
-                tint: .purple
+                tint: Theme.purple
             ) {
                 CustomizeHomeView()
             }
@@ -60,7 +60,7 @@ struct SettingsView: View {
                 title: "Connectivity",
                 subtitle: "BLE keep-alive, iPhone services and Claude Buddy passthrough",
                 systemImage: "antenna.radiowaves.left.and.right",
-                tint: .blue
+                tint: Theme.info
             ) {
                 ConnectivitySettingsView()
             }
@@ -69,7 +69,7 @@ struct SettingsView: View {
                 title: "Automation",
                 subtitle: "Local update notifications and background refresh status",
                 systemImage: "bolt.badge.clock",
-                tint: .green
+                tint: Theme.success
             ) {
                 AutomationSettingsView()
             }
@@ -78,7 +78,7 @@ struct SettingsView: View {
                 title: "Developer",
                 subtitle: "GitHub access, App Bridge console and protocol diagnostics",
                 systemImage: "wrench.and.screwdriver",
-                tint: .indigo
+                tint: Theme.indigo
             ) {
                 DeveloperSettingsView()
             }

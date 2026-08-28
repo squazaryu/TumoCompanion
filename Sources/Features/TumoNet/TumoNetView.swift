@@ -134,19 +134,19 @@ struct TumoNetView: View {
                 Text("Source \(model.sourceLabel)")
                 Spacer()
                 Text("\(model.textBytes)/\(TumoNetEnvelope.textLimit) bytes")
-                    .foregroundStyle(model.textBytes > TumoNetEnvelope.textLimit ? .red : .secondary)
+                    .foregroundStyle(model.textBytes > TumoNetEnvelope.textLimit ? Theme.danger : .secondary)
             }
             .font(.caption.monospaced())
             .foregroundStyle(.secondary)
 
             HStack(spacing: 10) {
-                PillButton(title: "Retry", systemImage: "arrow.clockwise", tint: .blue) {
+                PillButton(title: "Retry", systemImage: "arrow.clockwise", tint: Theme.info) {
                     Task { await model.retry(ble) }
                 }
                 .disabled(!model.canRetry || !linkReady)
                 .opacity(model.canRetry && linkReady ? 1 : 0.4)
 
-                PillButton(title: "Send", systemImage: "paperplane.fill", tint: .orange) {
+                PillButton(title: "Send", systemImage: "paperplane.fill", tint: Theme.accent) {
                     Task { await model.send(ble) }
                 }
                 .disabled(!model.messageValid || model.busy || !linkReady || model.gatewayStatus?.active != true)
@@ -161,7 +161,7 @@ struct TumoNetView: View {
             systemImage: "checkmark.seal",
             accessory: AnyView(StatusPill(
                 text: receipt.result == .delivered ? "Delivered" : "Duplicate",
-                color: receipt.result == .delivered ? .green : .blue))) {
+                color: receipt.result == .delivered ? Theme.success : Theme.info))) {
             infoRow("Message", value: TumoNetCodec.hex(receipt.messageID))
             infoRow("Route", value: receipt.route)
             infoRow("Identity", value: TumoNetCodec.hex(receipt.sourceID))
@@ -174,15 +174,15 @@ struct TumoNetView: View {
         } else if !linkReady {
             StatusPill(text: "Offline", color: .secondary)
         } else if model.gatewayStatus?.active == true {
-            StatusPill(text: "Active", color: .green, systemImage: "checkmark.circle.fill")
+            StatusPill(text: "Active", color: Theme.success, systemImage: "checkmark.circle.fill")
         } else {
-            StatusPill(text: "Stopped", color: .orange)
+            StatusPill(text: "Stopped", color: Theme.accent)
         }
     }
 
     private func errorCard(_ message: String) -> some View {
         SectionCard(title: "Failure", systemImage: "exclamationmark.triangle") {
-            Text(message).foregroundStyle(.red)
+            Text(message).foregroundStyle(Theme.danger)
         }
     }
 

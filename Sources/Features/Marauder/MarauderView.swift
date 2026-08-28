@@ -289,7 +289,7 @@ struct MarauderView: View {
             NavigationLink {
                 WiFiMapperLiveMapView()
             } label: {
-                mapperRow(icon: "location.viewfinder", tint: .green,
+                mapperRow(icon: "location.viewfinder", tint: Theme.success,
                           title: "Live map (iPhone GPS)",
                           subtitle: "Triangulate APs live from your phone's location")
             }
@@ -446,7 +446,7 @@ struct MarauderView: View {
 
                 if vm.needsRebuild {
                     Label("Filter or scope changed — tap to rebuild.", systemImage: "arrow.triangle.2.circlepath")
-                        .font(.caption2).foregroundStyle(.orange)
+                        .font(.caption2).foregroundStyle(Theme.accent)
                 } else if let s = vm.status {
                     Text(s).font(.caption2).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -505,12 +505,12 @@ struct MarauderView: View {
 
     private func credsCard(_ r: MarauderParseResult) -> some View {
         SectionCard(title: "Captured credentials", systemImage: "key.fill",
-                    accessory: AnyView(StatusPill(text: "\(r.credentials.count)", color: .orange))) {
+                    accessory: AnyView(StatusPill(text: "\(r.credentials.count)", color: Theme.accent))) {
             VStack(alignment: .leading, spacing: 12) {
                 ForEach(r.credentials) { c in
                     VStack(alignment: .leading, spacing: 2) {
                         Text(c.username).font(.headline)
-                        Text(c.password).font(.system(.body, design: .monospaced)).foregroundStyle(.orange)
+                        Text(c.password).font(.system(.body, design: .monospaced)).foregroundStyle(Theme.accent)
                         Text(c.source).font(.caption2).foregroundStyle(.secondary)
                     }
                     .fixedSize(horizontal: false, vertical: true)
@@ -561,7 +561,7 @@ struct FlipperFilePickerView: View {
                         ForEach(folders) { d in
                             Button { Task { await load(d.path) } } label: {
                                 HStack {
-                                    Image(systemName: "folder.fill").foregroundStyle(.orange)
+                                    Image(systemName: "folder.fill").foregroundStyle(Theme.accent)
                                     Text(d.name)
                                     Spacer()
                                     Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.secondary)

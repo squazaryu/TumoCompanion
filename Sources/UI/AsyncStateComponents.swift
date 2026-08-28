@@ -108,7 +108,7 @@ struct ActionableErrorView: View {
                 titleText
             }
             .font(.subheadline.weight(.semibold))
-            .foregroundStyle(.red)
+            .foregroundStyle(Theme.danger)
             Text(message)
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -119,10 +119,10 @@ struct ActionableErrorView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
-        .background(.red.opacity(0.07), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(Theme.danger.opacity(0.07), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(.red.opacity(0.16), lineWidth: 1)
+                .strokeBorder(Theme.danger.opacity(0.16), lineWidth: 1)
         }
         .accessibilityElement(children: .contain)
     }

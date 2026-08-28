@@ -33,7 +33,7 @@ struct TumoflipUpdaterView: View {
                 SectionCard(title: "Firmware packages", systemImage: "cpu.fill",
                             accessory: AnyView(StatusPill(
                                 text: transfer.activeChannel.label,
-                                color: transfer.activeChannel == .usb ? .blue : .secondary,
+                                color: transfer.activeChannel == .usb ? Theme.info : .secondary,
                                 systemImage: transfer.activeChannel.systemImage))) {
                     statusRow
                     syncCatalogRow
@@ -193,10 +193,10 @@ struct TumoflipUpdaterView: View {
     }
 
     private var packageDetailsPanel: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 7) {
             HStack(spacing: 7) {
                 Label("PACKAGE CHANNEL", systemImage: "point.3.connected.trianglepath.dotted")
-                    .font(.caption.weight(.bold))
+                    .font(.caption2.weight(.bold))
                     .foregroundStyle(Color.primary.opacity(0.62))
                     .tracking(0.7)
                 Spacer()
@@ -213,7 +213,7 @@ struct TumoflipUpdaterView: View {
 
             HStack(spacing: 7) {
                 Label("PACKAGE GROUPS", systemImage: "shippingbox")
-                    .font(.caption.weight(.bold))
+                    .font(.caption2.weight(.bold))
                     .foregroundStyle(Color.primary.opacity(0.62))
                     .tracking(0.7)
                 Spacer()
@@ -241,14 +241,14 @@ struct TumoflipUpdaterView: View {
             if updater.compatibilityChecked && updater.hasUnvalidatedBinaries {
                 Label(FapCompatibility.unknownDeviceReason, systemImage: "antenna.radiowaves.left.and.right.slash")
                     .font(.caption2)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Theme.danger)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if !updater.hasPackageZip {
                 Label("This release has the manifest but no install archive (tumoflip-packages.zip) yet — installing isn't available until a release publishes it.",
                       systemImage: "exclamationmark.triangle.fill")
                     .font(.caption2)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(Theme.warning)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -281,13 +281,13 @@ struct TumoflipUpdaterView: View {
                 Label("Installed firmware reports a dirty commit; package compatibility should be treated as higher risk.",
                       systemImage: "exclamationmark.triangle.fill")
                     .font(.caption2)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(Theme.warning)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if let warning = updater.firmwareRoute.warning {
                 Label(warning.message, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption2)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(Theme.warning)
                     .fixedSize(horizontal: false, vertical: true)
             }
             HStack(spacing: 6) {
@@ -320,7 +320,7 @@ struct TumoflipUpdaterView: View {
                         systemImage: "arrow.uturn.backward.circle.fill"
                     )
                     .font(.caption2)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(Theme.warning)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("fw-packages-rollback-selected")
                 }
@@ -346,10 +346,10 @@ struct TumoflipUpdaterView: View {
                 }
             } label: {
                 Label("Revision", systemImage: "clock.arrow.circlepath")
-                    .font(.caption.weight(.semibold))
+                    .font(.caption2.weight(.semibold))
                     .lineLimit(1)
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 5)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
                     .foregroundStyle(Theme.accent)
                     .background(Theme.accent.opacity(0.14), in: Capsule())
                     .overlay {
@@ -383,11 +383,11 @@ struct TumoflipUpdaterView: View {
             if updater.firmwareFlashUnchanged {
                 Label(catalogRoleTitle(manifest), systemImage: "checkmark.shield.fill")
                     .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.green)
+                    .foregroundStyle(Theme.success)
                     .lineLimit(1)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 5)
-                    .background(Color.green.opacity(0.12), in: Capsule())
+                    .background(Theme.success.opacity(0.16), in: Capsule())
                     .accessibilityIdentifier("fw-packages-apps-only")
             }
         }
@@ -415,10 +415,10 @@ struct TumoflipUpdaterView: View {
     ) -> some View {
         Button(action: action) {
             Text(title)
-                .font(.caption.weight(.semibold))
+                .font(.caption2.weight(.semibold))
                 .lineLimit(1)
-                .padding(.horizontal, 9)
-                .padding(.vertical, 5)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
         }
         .buttonStyle(.plain)
         .foregroundStyle(enabled ? Theme.accent : Color.primary.opacity(0.68))
@@ -495,7 +495,7 @@ struct TumoflipUpdaterView: View {
 
                 Image(systemName: g.icon)
                     .font(.caption)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(Theme.warning)
                     .frame(width: 18)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(g.title)
@@ -556,7 +556,7 @@ struct TumoflipUpdaterView: View {
                             .accessibilityValue(fileStatusInfo(updater.status(file: f.target)).text)
                             if let reason = updater.blocked[f.target] {
                                 Label(reason, systemImage: "exclamationmark.octagon.fill")
-                                    .font(.caption2).foregroundStyle(.red)
+                                    .font(.caption2).foregroundStyle(Theme.danger)
                                     .labelStyle(.titleAndIcon)
                                     .fixedSize(horizontal: false, vertical: true)
                             }
@@ -567,11 +567,11 @@ struct TumoflipUpdaterView: View {
                         HStack(alignment: .top, spacing: 8) {
                             Image(systemName: "trash.circle.fill")
                                 .font(.caption2)
-                                .foregroundStyle(.orange)
+                                .foregroundStyle(Theme.warning)
                             VStack(alignment: .leading, spacing: 3) {
                                 Text("Cleanup required")
                                     .font(.caption2)
-                                    .foregroundStyle(.orange)
+                                    .foregroundStyle(Theme.warning)
                                 Text(entry.legacy)
                                     .font(.caption2.monospaced())
                                     .foregroundStyle(.secondary)
@@ -642,7 +642,7 @@ struct TumoflipUpdaterView: View {
                         .foregroundStyle(.secondary)
                     Spacer()
                     if updater.manifest?.isReferenceOnlyCatalog == true {
-                        StatusPill(text: "Catalog ready", color: .green, systemImage: "checkmark.seal.fill")
+                        StatusPill(text: "Catalog ready", color: Theme.success, systemImage: "checkmark.seal.fill")
                     } else if let info = statusInfo(updater.overallStatus) {
                         StatusPill(text: info.text, color: info.color, systemImage: info.icon)
                     }
@@ -671,12 +671,12 @@ struct TumoflipUpdaterView: View {
                     title: file,
                     detail: "\(done)/\(total) · \(updater.transferChannel.label)",
                     fraction: Double(min(done, total)) / Double(max(total, 1)),
-                    tint: .orange
+                    tint: Theme.warning
                 )
                 keepAwakeNote
             }
         case .done(let m):
-            Label(m, systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+            Label(m, systemImage: "checkmark.circle.fill").foregroundStyle(Theme.success)
                 .fixedSize(horizontal: false, vertical: true)
         case .failed(let m):
             ActionableErrorView(
@@ -701,7 +701,7 @@ struct TumoflipUpdaterView: View {
               ? "Keep USB SD Mode active on the Flipper until this finishes."
               : "Keep the screen on and the app open — don't lock your phone until this finishes.",
               systemImage: transfer.activeChannel == .usb ? "cable.connector" : "lock.open.iphone")
-            .font(.caption2).foregroundStyle(.orange)
+            .font(.caption2).foregroundStyle(Theme.warning)
             .fixedSize(horizontal: false, vertical: true)
     }
 
@@ -750,7 +750,7 @@ struct TumoflipUpdaterView: View {
                     Spacer()
                     if updater.lastVerifiedOnDevice && !updater.verifying {
                         Label("device-checked", systemImage: "checkmark.seal.fill")
-                            .font(.caption2).foregroundStyle(.green).labelStyle(.titleAndIcon)
+                            .font(.caption2).foregroundStyle(Theme.success).labelStyle(.titleAndIcon)
                     }
                 }
             }
@@ -797,18 +797,18 @@ struct TumoflipUpdaterView: View {
     ) -> (text: String, color: Color, icon: String) {
         switch status {
         case .upToDate:
-            return ("Up to date", .green, "checkmark.circle.fill")
+            return ("Up to date", Theme.success, "checkmark.circle.fill")
         case .needsUpdate, .missing, .unknown, .validationError:
             // Keep fail-closed transport/validation distinctions in the model while
             // presenting the agreed three-state package-row vocabulary.
-            return ("Needs update", .orange, "arrow.down.circle.fill")
+            return ("Needs update", Theme.warning, "arrow.down.circle.fill")
         }
     }
 
     private func channelColor(_ channel: TumoflipFirmwareChannel) -> Color {
         switch channel {
-        case .stable: return .green
-        case .dev: return .purple
+        case .stable: return Theme.success
+        case .dev: return Theme.purple
         }
     }
 
@@ -822,8 +822,8 @@ struct TumoflipUpdaterView: View {
     /// Display mapping for a group/overall status. `nil` for `.empty` (no badge).
     private func statusInfo(_ s: TumoflipInstaller.GroupStatus) -> (text: String, color: Color, icon: String)? {
         switch s {
-        case .upToDate:        return ("Up to date", .green, "checkmark.circle.fill")
-        case .updateAvailable: return ("Update available", .orange, "arrow.down.circle.fill")
+        case .upToDate:        return ("Up to date", Theme.success, "checkmark.circle.fill")
+        case .updateAvailable: return ("Update available", Theme.warning, "arrow.down.circle.fill")
         case .notInstalled:    return ("Not installed", .secondary, "circle.dashed")
         case .empty:           return nil
         }
@@ -839,13 +839,13 @@ private struct PackageGroupStatusBadge: View {
         Group {
             if pendingUpdates == 0 && cleanupCount == 0 {
                 Label("Current", systemImage: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
+                    .foregroundStyle(Theme.success)
             } else {
                 Text(actionSummary)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(Theme.warning)
                     .padding(.horizontal, 7)
                     .padding(.vertical, 4)
-                    .background(Color.orange.opacity(0.12), in: Capsule())
+                    .background(Theme.warning.opacity(0.16), in: Capsule())
             }
         }
         .font(.caption2.weight(.medium))
@@ -906,7 +906,7 @@ struct FWPackagesActionBar: View {
                 title: file,
                 detail: "\(done)/\(total) · \(transferChannel.label)",
                 progress: Double(min(done, total)) / Double(max(total, 1)),
-                tint: .orange,
+                tint: Theme.warning,
                 stopTitle: "Stop cleanup"
             )
         default:
@@ -921,7 +921,7 @@ struct FWPackagesActionBar: View {
             if installCount > 0, let identityNotice {
                 Label(identityNotice.text, systemImage: identityNotice.systemImage)
                     .font(.caption2)
-                    .foregroundStyle(identityNotice.isBlocking ? .red : .orange)
+                    .foregroundStyle(identityNotice.isBlocking ? Theme.danger : Theme.warning)
                     .fixedSize(horizontal: false, vertical: true)
             }
             HStack(spacing: 10) {
@@ -942,7 +942,7 @@ struct FWPackagesActionBar: View {
                     compactAction(
                         title: "Clean Up \(cleanupCount)",
                         systemImage: "trash",
-                        tint: .orange,
+                        tint: Theme.warning,
                         role: .destructive,
                         action: cleanUp
                     )
@@ -1000,7 +1000,7 @@ struct FWPackagesActionBar: View {
             compactAction(
                 title: stopRequested ? "Stopping safely…" : stopTitle,
                 systemImage: "stop.circle.fill",
-                tint: .red,
+                tint: Theme.danger,
                 role: .destructive,
                 action: stop
             )

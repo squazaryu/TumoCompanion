@@ -19,7 +19,7 @@ struct GitHubAccessCard: View {
             if let error = auth.errorMessage {
                 Text(error)
                     .font(.caption2)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Theme.danger)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("github-auth-error")
             }
@@ -36,7 +36,7 @@ struct GitHubAccessCard: View {
                 Label("@\(account.login)", systemImage: "person.crop.circle.badge.checkmark")
                     .fontWeight(.medium)
                 Spacer()
-                StatusPill(text: "Connected", color: .green, systemImage: "checkmark.circle.fill")
+                StatusPill(text: "Connected", color: Theme.success, systemImage: "checkmark.circle.fill")
             }
             .accessibilityIdentifier("github-auth-connected")
 
@@ -133,7 +133,7 @@ struct GitHubAccessCard: View {
                 Spacer()
                 StatusPill(
                     text: auth.hasStoredCredential ? "Checking" : "60 / hour",
-                    color: auth.hasStoredCredential ? .orange : .secondary
+                    color: auth.hasStoredCredential ? Theme.accent : .secondary
                 )
             }
 

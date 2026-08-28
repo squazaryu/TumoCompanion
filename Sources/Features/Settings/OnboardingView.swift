@@ -37,7 +37,7 @@ struct OnboardingView: View {
                     VStack(spacing: 24) {
                         Spacer()
                         Image(systemName: step.icon)
-                            .font(.system(size: 64)).foregroundStyle(.orange)
+                            .font(.system(size: 64)).foregroundStyle(Theme.accent)
                         Text(step.title).font(.title2).bold().multilineTextAlignment(.center)
                         Text(step.body)
                             .multilineTextAlignment(.center).foregroundStyle(.secondary)

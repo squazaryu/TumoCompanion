@@ -75,7 +75,7 @@ struct ESP32FirmwareView: View {
         SectionCard(title: "ESP32 Marauder", systemImage: "cpu",
                     accessory: up.latestTag == nil ? nil : AnyView(
                         StatusPill(text: up.updateAvailable ? "Update" : "Latest",
-                                   color: up.updateAvailable ? .orange : .green,
+                                   color: up.updateAvailable ? Theme.warning : Theme.success,
                                    systemImage: up.updateAvailable ? "arrow.down.circle.fill" : "checkmark.circle.fill"))) {
             HStack {
                 Text("Latest release").font(.subheadline).foregroundStyle(.secondary)
@@ -97,7 +97,7 @@ struct ESP32FirmwareView: View {
                 Spacer()
                 StatusPill(
                     text: currentChannel.label,
-                    color: currentChannel == .usb ? .blue : .secondary,
+                    color: currentChannel == .usb ? Theme.info : .secondary,
                     systemImage: currentChannel.systemImage
                 )
             }
@@ -108,7 +108,7 @@ struct ESP32FirmwareView: View {
             if up.verifiedPackageAvailable {
                 Label("Verified full installer package", systemImage: "checkmark.shield.fill")
                     .font(.caption)
-                    .foregroundStyle(.green)
+                    .foregroundStyle(Theme.success)
             }
 
             if !up.stagingBoards.isEmpty {
@@ -147,7 +147,7 @@ struct ESP32FirmwareView: View {
                 Spacer(minLength: 8)
                 StatusPill(
                     text: newer ? "Update" : "Latest",
-                    color: newer ? .orange : .green,
+                    color: newer ? Theme.warning : Theme.success,
                     systemImage: newer ? "arrow.down.circle.fill" : "checkmark.circle.fill"
                 )
                 Image(systemName: "chevron.up")
@@ -174,10 +174,10 @@ struct ESP32FirmwareView: View {
     }
 
     private var esp32DetailsPanel: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 7) {
                 Label("ESP32 PACKAGES", systemImage: "folder")
-                    .font(.caption.weight(.bold))
+                    .font(.caption2.weight(.bold))
                     .foregroundStyle(.secondary)
                     .tracking(0.8)
                 Spacer()
@@ -187,7 +187,7 @@ struct ESP32FirmwareView: View {
             }
 
             if !up.stagingBoards.isEmpty {
-                VStack(spacing: 10) {
+                VStack(spacing: 7) {
                     ForEach(up.stagingBoards) { board in
                         packageBoardRow(board)
                     }
@@ -198,7 +198,7 @@ struct ESP32FirmwareView: View {
                 Divider().opacity(0.45)
                 HStack(spacing: 7) {
                     Label("VERSION HISTORY", systemImage: "clock.arrow.circlepath")
-                        .font(.caption.weight(.bold))
+                        .font(.caption2.weight(.bold))
                         .foregroundStyle(Color.primary.opacity(0.62))
                         .tracking(0.8)
                     Spacer()
@@ -244,7 +244,7 @@ struct ESP32FirmwareView: View {
                     .foregroundStyle(Theme.accent)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(board.display)
-                        .font(.subheadline.weight(.semibold))
+                        .font(.caption.weight(.semibold))
                         .lineLimit(1)
                     Text("\(archivedSource ? "Archived" : "Active") · \(board.currentVersion)")
                         .font(.caption2)
@@ -253,7 +253,7 @@ struct ESP32FirmwareView: View {
                 Spacer(minLength: 8)
                 StatusPill(
                     text: newer ? "Update" : "Latest",
-                    color: newer ? .orange : .green,
+                    color: newer ? Theme.warning : Theme.success,
                     systemImage: newer ? "arrow.down.circle.fill" : "checkmark.circle.fill"
                 )
             }
@@ -261,7 +261,7 @@ struct ESP32FirmwareView: View {
             HStack(spacing: 8) {
                 Text("Latest \(up.latestTag ?? "—")")
                     .font(.caption2.monospacedDigit())
-                    .foregroundStyle(newer ? .orange : .secondary)
+                    .foregroundStyle(newer ? Theme.warning : Color.secondary)
                 Spacer(minLength: 8)
                 if newer, let tag = up.latestTag {
                     packageActionButton(
@@ -286,10 +286,10 @@ struct ESP32FirmwareView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(12)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .padding(10)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
         }
     }
@@ -301,11 +301,11 @@ struct ESP32FirmwareView: View {
     ) -> some View {
         Button(action: action) {
             Label(title, systemImage: "arrow.down.circle")
-                .font(.caption.weight(.semibold))
+                .font(.caption2.weight(.semibold))
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
         }
         .buttonStyle(.plain)
         .foregroundStyle(enabled ? Theme.accent : Color.secondary)
@@ -325,22 +325,7 @@ struct ESP32FirmwareView: View {
     }
 
     private var versionManagerCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 7) {
-                Label("FIRMWARE VERSIONS", systemImage: "clock.arrow.circlepath")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(.secondary)
-                    .tracking(0.8)
-                Spacer()
-                Text("\(up.versionGroups.count)")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.secondary)
-            }
-
-            Text("Choose a staged Marauder version per board key. Active folders are visible to esp_flasher; archived folders are hidden until restored.")
-                .font(.caption2).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-
+        VStack(alignment: .leading, spacing: 7) {
             if !up.olderBoards.isEmpty {
                 PillButton(title: "Archive all active older", systemImage: "archivebox", tint: Theme.accent) {
                     Task { await up.archiveOlder() }
@@ -348,38 +333,57 @@ struct ESP32FirmwareView: View {
                 .disabled(up.busy)
             }
 
-            VStack(spacing: 10) {
+            VStack(spacing: 6) {
                 ForEach(up.versionGroups) { group in
-                    DisclosureGroup(isExpanded: versionGroupBinding(group.key)) {
-                        VStack(spacing: 8) {
-                            if let current = group.current {
-                                versionRow(current, location: .current)
+                    VStack(alignment: .leading, spacing: 5) {
+                        Button {
+                            toggleVersionGroup(group.key)
+                        } label: {
+                            HStack(spacing: 7) {
+                                Image(systemName: "memorychip")
+                                    .font(.caption2)
+                                    .foregroundStyle(Color.primary.opacity(0.58))
+                                    .frame(width: 18)
+                                VStack(alignment: .leading, spacing: 0) {
+                                    Text(group.display)
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(.primary)
+                                        .lineLimit(1)
+                                    Text("\(group.versions.count) version\(group.versions.count == 1 ? "" : "s")")
+                                        .font(.caption2)
+                                        .foregroundStyle(Color.primary.opacity(0.58))
+                                }
+                                Spacer(minLength: 8)
+                                Image(systemName: expandedVersionGroups.contains(group.key)
+                                      ? "chevron.up" : "chevron.down")
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(Theme.accent)
                             }
-                            ForEach(group.activeOlder) { board in
-                                versionRow(board, location: .activeOlder)
-                            }
-                            ForEach(group.archived) { board in
-                                versionRow(board, location: .archived)
-                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
                         }
-                        .padding(.top, 4)
-                    } label: {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text(group.display)
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                                Text(group.key)
-                                    .font(.system(.caption2, design: .monospaced))
-                                    .foregroundStyle(.secondary)
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("esp32-version-group-\(group.key)")
+                        .accessibilityValue(
+                            expandedVersionGroups.contains(group.key) ? "Expanded" : "Collapsed"
+                        )
+
+                        if expandedVersionGroups.contains(group.key) {
+                            VStack(spacing: 8) {
+                                if let current = group.current {
+                                    versionRow(current, location: .current)
+                                }
+                                ForEach(group.activeOlder) { board in
+                                    versionRow(board, location: .activeOlder)
+                                }
+                                ForEach(group.archived) { board in
+                                    versionRow(board, location: .archived)
+                                }
                             }
-                            Spacer()
-                            Text("\(group.versions.count)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                            .padding(.leading, 25)
                         }
                     }
-                    .tint(.secondary)
+                    .padding(.vertical, 2)
                 }
             }
 
@@ -425,7 +429,7 @@ struct ESP32FirmwareView: View {
     private func versionRow(_ b: ESP32Updater.Board, location: VersionLocation) -> some View {
         HStack {
             Image(systemName: location.icon)
-                .foregroundStyle(location == .current ? .green : .secondary)
+                .foregroundStyle(location == .current ? Theme.success : Color.secondary)
                 .frame(width: 22)
             VStack(alignment: .leading, spacing: 1) {
                 Text(b.currentVersion).font(.subheadline)
@@ -466,17 +470,12 @@ struct ESP32FirmwareView: View {
         .contentShape(Rectangle())
     }
 
-    private func versionGroupBinding(_ key: String) -> Binding<Bool> {
-        Binding(
-            get: { expandedVersionGroups.contains(key) },
-            set: { expanded in
-                if expanded {
-                    expandedVersionGroups.insert(key)
-                } else {
-                    expandedVersionGroups.remove(key)
-                }
-            }
-        )
+    private func toggleVersionGroup(_ key: String) {
+        if expandedVersionGroups.contains(key) {
+            expandedVersionGroups.remove(key)
+        } else {
+            expandedVersionGroups.insert(key)
+        }
     }
 
     private var emptyCard: some View {

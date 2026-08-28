@@ -86,16 +86,16 @@ struct MarauderLiveView: View {
         SectionCard(title: "TumoSurvey Live", systemImage: "dot.radiowaves.left.and.right",
                     accessory: AnyView(StatusPill(
                         text: ble.appBridgeV2 ? "App Bridge v2" : "No bridge",
-                        color: ble.appBridgeV2 ? .green : .orange,
+                        color: ble.appBridgeV2 ? Theme.success : Theme.accent,
                         systemImage: "antenna.radiowaves.left.and.right"))) {
             if !ble.appBridgeV2 {
                 Label("App Bridge v2 is unavailable for this firmware.",
                       systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption).foregroundStyle(.orange)
+                    .font(.caption).foregroundStyle(Theme.accent)
                     .fixedSize(horizontal: false, vertical: true)
             } else if let last = live.lastLineAt {
                 HStack(spacing: 6) {
-                    Circle().fill(.green).frame(width: 7, height: 7)
+                    Circle().fill(Theme.success).frame(width: 7, height: 7)
                     Text("Receiving — last line").font(.caption).foregroundStyle(.secondary)
                     Text(last, style: .relative).font(.caption).foregroundStyle(.secondary)
                     Text("ago").font(.caption).foregroundStyle(.secondary)

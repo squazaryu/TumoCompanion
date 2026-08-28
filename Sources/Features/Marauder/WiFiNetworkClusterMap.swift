@@ -10,19 +10,19 @@ enum WiFiNetworkMapTone: Equatable {
 
     var color: Color {
         switch self {
-        case .green: return .green
-        case .orange: return .orange
-        case .red: return .red
-        case .blue: return .blue
+        case .green: return Theme.success
+        case .orange: return Theme.warning
+        case .red: return Theme.danger
+        case .blue: return Theme.info
         }
     }
 
     var uiColor: UIColor {
         switch self {
-        case .green: return .systemGreen
-        case .orange: return .systemOrange
-        case .red: return .systemRed
-        case .blue: return .systemBlue
+        case .green: return UIColor(Theme.success)
+        case .orange: return UIColor(Theme.warning)
+        case .red: return UIColor(Theme.danger)
+        case .blue: return UIColor(Theme.info)
         }
     }
 }
@@ -297,7 +297,7 @@ struct WiFiNetworkClusterMap: UIViewRepresentable {
                     withIdentifier: Self.clusterReuseIdentifier,
                     for: cluster) as! MKMarkerAnnotationView
                 view.annotation = cluster
-                view.markerTintColor = .systemIndigo
+                view.markerTintColor = UIColor(Theme.indigo)
                 view.glyphTintColor = .white
                 view.glyphImage = nil
                 view.glyphText = cluster.memberAnnotations.count > 99 ? "99+" : "\(cluster.memberAnnotations.count)"
@@ -646,7 +646,7 @@ struct WiFiNetworkMapDensityQAView: View {
             .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle("Map density QA")
         }
-        .tint(.orange)
+        .tint(Theme.accent)
     }
 }
 #endif

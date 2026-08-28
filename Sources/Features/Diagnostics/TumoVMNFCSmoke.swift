@@ -29,9 +29,9 @@ final class TumoVMNFCSmokeController: NSObject, ObservableObject {
 
         var color: Color {
             switch self {
-            case .passed: return .green
-            case .failed: return .red
-            case .scanning, .running: return .orange
+            case .passed: return Theme.success
+            case .failed: return Theme.danger
+            case .scanning, .running: return Theme.accent
             case .idle: return .secondary
             }
         }
@@ -291,7 +291,7 @@ struct TumoVMNFCSmokeView: View {
 
             if case let .failed(message) = controller.state {
                 SectionCard(title: "Failure", systemImage: "exclamationmark.triangle") {
-                    Text(message).font(.caption).foregroundStyle(.red)
+                    Text(message).font(.caption).foregroundStyle(Theme.danger)
                 }
             }
         }

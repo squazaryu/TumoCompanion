@@ -75,7 +75,7 @@ struct FirmwareLibraryView: View {
             systemImage: "arrow.down.to.line.compact",
             accessory: AnyView(StatusPill(
                 text: transfer.activeChannel.label,
-                color: transfer.activeChannel == .usb ? .blue : .secondary,
+                color: transfer.activeChannel == .usb ? Theme.info : .secondary,
                 systemImage: transfer.activeChannel.systemImage
             ))
         ) {
@@ -107,6 +107,7 @@ struct FirmwareLibraryView: View {
             Text("Dev").tag(TumoflipFirmwareChannel.dev)
         }
         .pickerStyle(.segmented)
+        .controlSize(.small)
         .disabled(library.busy)
         .accessibilityIdentifier("firmware-channel-picker")
     }
@@ -138,7 +139,7 @@ struct FirmwareLibraryView: View {
             systemImage: "memorychip.fill",
             accessory: AnyView(StatusPill(
                 text: library.selectedChannel == .stable ? "Main" : "Dev",
-                color: library.selectedChannel == .stable ? .green : .purple,
+                color: library.selectedChannel == .stable ? Theme.success : Theme.purple,
                 systemImage: library.selectedChannel == .stable
                     ? "checkmark.seal.fill" : "hammer.fill"
             ))
@@ -204,10 +205,10 @@ struct FirmwareLibraryView: View {
     }
 
     private var releaseDetailsPanel: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 7) {
                 Label("RELEASE CHANNEL", systemImage: "point.3.connected.trianglepath.dotted")
-                    .font(.caption.weight(.bold))
+                    .font(.caption2.weight(.bold))
                     .foregroundStyle(Color.primary.opacity(0.62))
                     .tracking(0.8)
                 Spacer(minLength: 8)
@@ -221,7 +222,7 @@ struct FirmwareLibraryView: View {
 
             HStack(spacing: 7) {
                 Label("AVAILABLE BUILDS", systemImage: "square.stack.3d.up")
-                    .font(.caption.weight(.bold))
+                    .font(.caption2.weight(.bold))
                     .foregroundStyle(Color.primary.opacity(0.62))
                     .tracking(0.8)
                 Spacer(minLength: 8)
@@ -230,7 +231,7 @@ struct FirmwareLibraryView: View {
                     .foregroundStyle(.secondary)
             }
 
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 7) {
                 ForEach(library.visibleGroups) { group in
                     releaseGroupSection(group)
                 }
@@ -242,10 +243,10 @@ struct FirmwareLibraryView: View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(alignment: .firstTextBaseline, spacing: 7) {
                 Image(systemName: library.selectedChannel == .dev ? "hammer.fill" : "checkmark.seal.fill")
-                    .font(.caption)
+                    .font(.caption2)
                     .foregroundStyle(Theme.accent)
                 Text("Version \(group.line)")
-                    .font(.caption.weight(.semibold))
+                    .font(.caption2.weight(.semibold))
                 Spacer(minLength: 8)
                 Text("\(group.releases.count) \(group.releases.count == 1 ? "build" : "builds")")
                     .font(.caption2)
@@ -269,12 +270,12 @@ struct FirmwareLibraryView: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text(library.selectedChannel == .stable ? release.version : release.buildLabel)
-                        .font(.subheadline)
+                        .font(.caption)
                         .fontWeight(.semibold)
                     if library.installedVersion == release.version {
                         Label("Installed", systemImage: "checkmark.circle.fill")
                             .font(.caption2)
-                            .foregroundStyle(.green)
+                            .foregroundStyle(Theme.success)
                     } else if isLatest {
                         Text("Latest")
                             .font(.caption2)
@@ -324,12 +325,12 @@ struct FirmwareLibraryView: View {
         ZStack {
             Circle()
                 .fill(background)
-                .frame(width: 32, height: 32)
+                .frame(width: 28, height: 28)
             Image(systemName: systemName)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(foreground)
         }
-        .frame(width: 40, height: 40)
+        .frame(width: 34, height: 34)
         .contentShape(Rectangle())
     }
 
@@ -351,9 +352,9 @@ struct FirmwareLibraryView: View {
     @ViewBuilder private var phasePill: some View {
         switch library.phase {
         case .done:
-            StatusPill(text: "Prepared", color: .green, systemImage: "checkmark.circle.fill")
+            StatusPill(text: "Prepared", color: Theme.success, systemImage: "checkmark.circle.fill")
         case .failed:
-            StatusPill(text: "Error", color: .red, systemImage: "exclamationmark.triangle.fill")
+            StatusPill(text: "Error", color: Theme.danger, systemImage: "exclamationmark.triangle.fill")
         case .loading, .downloading, .verifying, .staging:
             ProgressView().scaleEffect(0.85)
         case .idle, .ready:
@@ -373,11 +374,11 @@ struct FirmwareLibraryView: View {
                 fraction: total > 0 ? Double(done) / Double(total) : nil,
                 canStop: true)
         case .done(let message):
-            resultBar(message, color: .green, icon: "checkmark.circle.fill")
+            resultBar(message, color: Theme.success, icon: "checkmark.circle.fill")
         case .failed(let message):
             resultBar(
                 message,
-                color: .red,
+                color: Theme.danger,
                 icon: "exclamationmark.triangle.fill",
                 actionTitle: "Retry",
                 action: { library.refresh() }

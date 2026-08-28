@@ -49,7 +49,7 @@ struct UnleashedApp: App {
                 .environmentObject(updates)
                 .environmentObject(deviceServices)
                 .environmentObject(fieldServices)
-                .tint(.orange)
+                .tint(Theme.accent)
                 .background(WindowStyleApplier(style: settings.appearance.uiStyle))
         }
         .onChange(of: scenePhase) { _, phase in

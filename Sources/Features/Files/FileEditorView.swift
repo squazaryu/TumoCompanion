@@ -61,9 +61,9 @@ struct FileEditorView: View {
                 VStack(spacing: 4) {
                     Label("Editing via \(storage.channel.label)", systemImage: storage.channel.systemImage)
                         .font(.caption2)
-                        .foregroundStyle(storage.channel == .usb ? .blue : .secondary)
+                        .foregroundStyle(storage.channel == .usb ? Theme.info : .secondary)
                     if let e = error {
-                        Text(e).font(.caption).foregroundStyle(.red)
+                        Text(e).font(.caption).foregroundStyle(Theme.danger)
                     }
                 }
                 .frame(maxWidth: .infinity)

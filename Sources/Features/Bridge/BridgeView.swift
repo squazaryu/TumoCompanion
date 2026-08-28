@@ -39,13 +39,13 @@ struct BridgeView: View {
         SectionCard(title: "Relay", systemImage: "switch.2",
                     accessory: AnyView(statePill)) {
             HStack(spacing: 10) {
-                PillButton(title: "On", systemImage: "power", tint: .green) { relay.test(action: "on") }
+                PillButton(title: "On", systemImage: "power", tint: Theme.success) { relay.test(action: "on") }
                 PillButton(title: "Off", systemImage: "poweroff", tint: .secondary) { relay.test(action: "off") }
                 PillButton(title: "Toggle", systemImage: "arrow.triangle.2.circlepath") { relay.test(action: "toggle") }
             }
             HStack(spacing: 8) {
                 StatusPill(text: relay.enabled ? "Bridge on" : "Bridge off",
-                           color: relay.enabled ? .green : .secondary)
+                           color: relay.enabled ? Theme.success : .secondary)
                 Text(relay.path.label).font(.caption2).foregroundStyle(.secondary)
                 Spacer()
             }
@@ -57,7 +57,7 @@ struct BridgeView: View {
 
     @ViewBuilder private var statePill: some View {
         if let s = relay.relayState {
-            StatusPill(text: s ? "On" : "Off", color: s ? .green : .secondary,
+            StatusPill(text: s ? "On" : "Off", color: s ? Theme.success : .secondary,
                        systemImage: s ? "lightbulb.fill" : "lightbulb")
         } else {
             StatusPill(text: "Unknown", color: .secondary)
@@ -66,12 +66,12 @@ struct BridgeView: View {
 
     private var appBridgeWarning: some View {
         HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.accent)
             Text("App Bridge service not detected. Enable Settings → Bluetooth → App Bridge on the Flipper.")
                 .font(.caption).fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .card(tint: .orange)
+        .card(tint: Theme.accent)
     }
 }
 
@@ -107,7 +107,7 @@ struct RelaySettingsView: View {
         SectionCard(title: "Executor", systemImage: "antenna.radiowaves.left.and.right",
                     accessory: AnyView(
                         StatusPill(text: relay.enabled ? "Active" : "Off",
-                                   color: relay.enabled ? .green : .secondary)
+                                   color: relay.enabled ? Theme.success : .secondary)
                     )) {
             Toggle("Listen for Flipper events", isOn: $relay.enabled).tint(Theme.accent)
             Divider().opacity(0.4)
@@ -133,7 +133,7 @@ struct RelaySettingsView: View {
             fieldRow("HA base URL — leave empty to auto-find", text: $relay.haBaseURL, url: true)
             if !haBaseIsPinned, let host = haDiscovery.discoveredHost {
                 Label("Auto-discovered \(host)", systemImage: "house.circle.fill")
-                    .font(.caption).foregroundStyle(.green)
+                    .font(.caption).foregroundStyle(Theme.success)
             }
             Text("POST \(relay.effectiveHABase)/api/webhook/flipper_sber_relay_<cmd>")
                 .font(.caption2).foregroundStyle(.secondary)
@@ -167,7 +167,7 @@ struct RelaySettingsView: View {
         SectionCard(title: "Sber account", systemImage: "person.badge.key.fill",
                     accessory: AnyView(
                         StatusPill(text: relay.hasSberToken ? "Linked" : "Not linked",
-                                   color: relay.hasSberToken ? .green : .orange,
+                                   color: relay.hasSberToken ? Theme.success : Theme.accent,
                                    systemImage: relay.hasSberToken ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
                     )) {
             Button { showSberLogin = true } label: {
@@ -218,7 +218,7 @@ struct RelaySettingsView: View {
                     ForEach(relay.log) { e in
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
                             Image(systemName: e.ok ? "checkmark.circle.fill" : "xmark.circle.fill")
-                                .foregroundStyle(e.ok ? .green : .red).font(.caption)
+                                .foregroundStyle(e.ok ? Theme.success : Theme.danger).font(.caption)
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(e.text).font(.system(.caption, design: .monospaced))
                                 Text(e.time, style: .time).font(.caption2).foregroundStyle(.secondary)

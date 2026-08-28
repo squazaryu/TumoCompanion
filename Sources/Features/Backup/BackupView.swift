@@ -12,12 +12,12 @@ struct BackupView: View {
         CardScroll {
             if ble.state != .ready {
                 HStack(alignment: .top, spacing: 10) {
-                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.accent)
                     Text("Connect to a Flipper to back up.")
                         .font(.caption).fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .card(tint: .orange)
+                .card(tint: Theme.accent)
             }
 
             SectionCard(title: "Folders to back up", systemImage: "folder") {
@@ -28,7 +28,7 @@ struct BackupView: View {
                     Button { toggle(f) } label: {
                         HStack {
                             Image(systemName: selected.contains(f) ? "checkmark.square.fill" : "square")
-                                .foregroundStyle(selected.contains(f) ? .orange : .secondary)
+                                .foregroundStyle(selected.contains(f) ? Theme.accent : .secondary)
                             Text(f).foregroundStyle(.primary)
                             Spacer()
                         }

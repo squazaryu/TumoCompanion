@@ -45,7 +45,7 @@ struct TumoSpectrumView: View {
             systemImage: "waveform.path.ecg",
             accessory: AnyView(StatusPill(
                 text: viewModel.isLoading ? "Loading" : (viewModel.document == nil ? "Ready" : "Report"),
-                color: viewModel.errorMessage == nil ? (viewModel.document == nil ? .secondary : .green) : .red,
+                color: viewModel.errorMessage == nil ? (viewModel.document == nil ? .secondary : Theme.success) : Theme.danger,
                 systemImage: viewModel.isLoading ? "arrow.triangle.2.circlepath" : nil
             ))
         ) {
@@ -56,7 +56,7 @@ struct TumoSpectrumView: View {
                 Text(ble.appBridgeV2 ? "Bridge v2" : "No bridge")
             }
             .font(.caption)
-            .foregroundStyle(ble.state == .ready ? Color.secondary : Color.orange)
+            .foregroundStyle(ble.state == .ready ? Color.secondary : Theme.accent)
 
             Text(viewModel.status)
                 .font(.subheadline)
@@ -65,7 +65,7 @@ struct TumoSpectrumView: View {
             if let error = viewModel.errorMessage {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Theme.danger)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -126,7 +126,7 @@ struct TumoSpectrumView: View {
                 Label("Statistics use a bounded preview of the capture.",
                       systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(Theme.accent)
             }
             if !capture.note.isEmpty {
                 Divider().opacity(0.35)
@@ -146,7 +146,7 @@ struct TumoSpectrumView: View {
             systemImage: "square.split.2x1",
             accessory: AnyView(StatusPill(
                 text: comparison.likelySame ? "Likely same" : "Different",
-                color: comparison.likelySame ? .green : .orange
+                color: comparison.likelySame ? Theme.success : Theme.accent
             ))
         ) {
             HStack {
@@ -211,7 +211,7 @@ struct TumoSpectrumView: View {
             systemImage: "chart.xyaxis.line",
             accessory: AnyView(StatusPill(
                 text: report.inference.replayClass,
-                color: report.inference.replayClass == "Static-like" ? .green : .orange
+                color: report.inference.replayClass == "Static-like" ? Theme.success : Theme.accent
             ))
         ) {
             Chart(stabilityItems(report)) { item in
@@ -422,24 +422,24 @@ struct TumoSpectrumView: View {
 
     private func stabilityItems(_ report: TumoSpectrumCaptureSetReport) -> [StabilityItem] {
         [
-            StabilityItem(label: "Stable", value: report.inference.stablePoints, color: .green),
-            StabilityItem(label: "Changing", value: report.inference.changingPoints, color: .orange)
+            StabilityItem(label: "Stable", value: report.inference.stablePoints, color: Theme.success),
+            StabilityItem(label: "Changing", value: report.inference.changingPoints, color: Theme.accent)
         ]
     }
 
     private func bitColor(_ value: Character) -> Color {
         switch value {
-        case "*": return .orange.opacity(0.24)
+        case "*": return Theme.accent.opacity(0.24)
         case "?": return Color.secondary.opacity(0.16)
-        default: return .green.opacity(0.20)
+        default: return Theme.success.opacity(0.20)
         }
     }
 
     private func bitForeground(_ value: Character) -> Color {
         switch value {
-        case "*": return .orange
+        case "*": return Theme.accent
         case "?": return .secondary
-        default: return .green
+        default: return Theme.success
         }
     }
 
@@ -453,9 +453,9 @@ struct TumoSpectrumView: View {
 
     private func fieldColor(_ kind: String) -> Color {
         switch kind {
-        case "changing": return .orange
+        case "changing": return Theme.accent
         case "unknown": return .secondary
-        default: return .green
+        default: return Theme.success
         }
     }
 

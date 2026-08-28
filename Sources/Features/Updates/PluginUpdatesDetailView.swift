@@ -89,7 +89,7 @@ struct PluginUpdatesDetailView: View {
             systemImage: "shippingbox",
             accessory: AnyView(StatusPill(
                 text: transfer.activeChannel.label,
-                color: transfer.activeChannel == .usb ? .blue : .secondary,
+                color: transfer.activeChannel == .usb ? Theme.info : .secondary,
                 systemImage: transfer.activeChannel.systemImage
             ))
         ) {
@@ -113,7 +113,7 @@ struct PluginUpdatesDetailView: View {
             systemImage: "puzzlepiece.extension.fill",
             accessory: AnyView(StatusPill(
                 text: updater.manualReleaseTag ?? "Auto",
-                color: updater.manualReleaseTag == nil ? .secondary : .orange,
+                color: updater.manualReleaseTag == nil ? Color.secondary : Theme.warning,
                 systemImage: updater.manualReleaseTag == nil ? "wand.and.stars" : "pin.fill"
             ))
         ) {
@@ -148,7 +148,7 @@ struct PluginUpdatesDetailView: View {
         HStack(spacing: 10) {
             Image(systemName: systemImage)
                 .font(.subheadline)
-                .foregroundStyle(lastRunNeedsAttention && title == "Last run" ? .orange : Theme.accent)
+                .foregroundStyle(lastRunNeedsAttention && title == "Last run" ? Theme.warning : Theme.accent)
                 .frame(width: 22)
             Text(title)
                 .font(.subheadline.weight(.medium))
@@ -190,7 +190,7 @@ struct PluginUpdatesDetailView: View {
             compactCommunityAction(
                 title: updater.stopRequested ? "Stopping…" : "Stop install",
                 systemImage: "stop.circle.fill",
-                tint: .red,
+                tint: Theme.danger,
                 role: .destructive,
                 action: updater.requestStop
             )
@@ -212,7 +212,7 @@ struct PluginUpdatesDetailView: View {
                     compactCommunityAction(
                         title: "Clean Up \(updater.pendingCleanupCount)",
                         systemImage: "trash",
-                        tint: .orange,
+                        tint: Theme.warning,
                         role: .destructive,
                         action: { showCleanupConfirmation = true }
                     )
@@ -266,16 +266,16 @@ struct PluginUpdatesDetailView: View {
     }
 
     private var communityDetailsPanel: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 7) {
                 Label("COMMUNITY RELEASE", systemImage: "tag")
-                    .font(.caption.weight(.bold))
+                    .font(.caption2.weight(.bold))
                     .foregroundStyle(Color.primary.opacity(0.62))
                     .tracking(0.8)
                 Spacer(minLength: 8)
                 StatusPill(
                     text: updater.manualReleaseTag ?? "Auto",
-                    color: updater.manualReleaseTag == nil ? .secondary : .orange,
+                    color: updater.manualReleaseTag == nil ? Color.secondary : Theme.warning,
                     systemImage: updater.manualReleaseTag == nil ? "wand.and.stars" : "pin.fill"
                 )
             }
@@ -283,7 +283,7 @@ struct PluginUpdatesDetailView: View {
             HStack(spacing: 8) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(updater.tag.isEmpty ? "No release loaded" : updater.tag)
-                        .font(.caption.weight(.semibold))
+                        .font(.caption2.weight(.semibold))
                         .lineLimit(1)
                     Text(updater.manualReleaseTag == nil ? "Latest compatible release" : "Pinned release")
                         .font(.caption2)
@@ -292,9 +292,9 @@ struct PluginUpdatesDetailView: View {
                 Spacer(minLength: 8)
                 Button { showReleasePicker = true } label: {
                     Label("Choose", systemImage: "list.bullet")
-                        .font(.caption.weight(.semibold))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
+                        .font(.caption2.weight(.semibold))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
                         .foregroundStyle(Theme.accent)
                         .background(Theme.accent.opacity(0.13), in: Capsule())
                 }
@@ -322,7 +322,7 @@ struct PluginUpdatesDetailView: View {
     private var firstSyncDetails: some View {
         VStack(alignment: .leading, spacing: 8) {
             Label("FIRST SYNC", systemImage: "scope")
-                .font(.caption.weight(.bold))
+                .font(.caption2.weight(.bold))
                 .foregroundStyle(Color.primary.opacity(0.62))
                 .tracking(0.8)
             HStack(spacing: 8) {
@@ -347,7 +347,7 @@ struct PluginUpdatesDetailView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 7) {
                 Label("CHANGED APPS", systemImage: "checklist")
-                    .font(.caption.weight(.bold))
+                    .font(.caption2.weight(.bold))
                     .foregroundStyle(Color.primary.opacity(0.62))
                     .tracking(0.8)
                 Spacer(minLength: 8)
@@ -359,7 +359,7 @@ struct PluginUpdatesDetailView: View {
                     systemImage: "exclamationmark.shield.fill"
                 )
                 .font(.caption2)
-                .foregroundStyle(.orange)
+                .foregroundStyle(Theme.warning)
             }
             LazyVStack(spacing: 6) {
                 ForEach(installCategories, id: \.self) { category in
@@ -378,8 +378,8 @@ struct PluginUpdatesDetailView: View {
                     systemImage: lastRunNeedsAttention
                         ? "exclamationmark.triangle.fill" : "checkmark.seal"
                 )
-                .font(.caption.weight(.bold))
-                .foregroundStyle(lastRunNeedsAttention ? .orange : Color.primary.opacity(0.62))
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(lastRunNeedsAttention ? Theme.warning : Color.primary.opacity(0.62))
                 .tracking(0.8)
                 Spacer(minLength: 8)
                 lastRunPills
@@ -408,8 +408,8 @@ struct PluginUpdatesDetailView: View {
         } label: {
             HStack(spacing: 4) {
                 Text("\(updater.selectedCount)/\(updater.installableUpdates.count)")
-                    .font(.caption).foregroundStyle(.secondary)
-                Image(systemName: "checklist").font(.caption).foregroundStyle(Theme.accent)
+                    .font(.caption2).foregroundStyle(.secondary)
+                Image(systemName: "checklist").font(.caption2).foregroundStyle(Theme.accent)
             }
         }
     }
@@ -456,15 +456,15 @@ struct PluginUpdatesDetailView: View {
 
     private func verifyPills(_ vr: VerifyResult) -> some View {
         HStack(spacing: 6) {
-            Text("\(vr.verified)✓").font(.caption).foregroundStyle(.green)
-            if !vr.ok { Text("\(vr.failed.count)✗").font(.caption).foregroundStyle(.orange) }
+            Text("\(vr.verified)✓").font(.caption).foregroundStyle(Theme.success)
+            if !vr.ok { Text("\(vr.failed.count)✗").font(.caption).foregroundStyle(Theme.warning) }
         }
     }
 
     private func cleanupPills(_ cl: CleanupResult) -> some View {
         HStack(spacing: 6) {
-            if !cl.removed.isEmpty { Text("\(cl.removed.count) removed").font(.caption).foregroundStyle(.green) }
-            if !cl.kept.isEmpty { Text("\(cl.kept.count) kept").font(.caption).foregroundStyle(.orange) }
+            if !cl.removed.isEmpty { Text("\(cl.removed.count) removed").font(.caption).foregroundStyle(Theme.success) }
+            if !cl.kept.isEmpty { Text("\(cl.kept.count) kept").font(.caption).foregroundStyle(Theme.warning) }
         }
     }
 
@@ -474,7 +474,7 @@ struct PluginUpdatesDetailView: View {
                 .font(.caption2).foregroundStyle(.secondary)
                 .accessibilityIdentifier("community-cleanup-removed")
             Text(cl.removed.prefix(12).joined(separator: "\n") + (cl.removed.count > 12 ? "\n…" : ""))
-                .font(.system(.caption2, design: .monospaced)).foregroundStyle(.green)
+                .font(.system(.caption2, design: .monospaced)).foregroundStyle(Theme.success)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("community-cleanup-removed-paths")
         }
@@ -486,7 +486,7 @@ struct PluginUpdatesDetailView: View {
                 .font(.caption2).foregroundStyle(.secondary)
                 .accessibilityIdentifier("community-cleanup-kept")
             Text(cl.kept.prefix(12).joined(separator: "\n") + (cl.kept.count > 12 ? "\n…" : ""))
-                .font(.system(.caption2, design: .monospaced)).foregroundStyle(.orange)
+                .font(.system(.caption2, design: .monospaced)).foregroundStyle(Theme.warning)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("community-cleanup-kept-paths")
         }
@@ -494,9 +494,9 @@ struct PluginUpdatesDetailView: View {
 
     @ViewBuilder private func verifyDetail(_ vr: VerifyResult) -> some View {
         HStack(spacing: 8) {
-            StatusPill(text: "\(vr.verified) verified", color: .green, systemImage: "checkmark.circle.fill")
+            StatusPill(text: "\(vr.verified) verified", color: Theme.success, systemImage: "checkmark.circle.fill")
             if !vr.ok {
-                StatusPill(text: "\(vr.failed.count) failed", color: .orange, systemImage: "xmark.circle.fill")
+                StatusPill(text: "\(vr.failed.count) failed", color: Theme.warning, systemImage: "xmark.circle.fill")
             }
             Spacer()
             Text(vr.tag).font(.caption2).foregroundStyle(.secondary)
@@ -532,9 +532,9 @@ struct PluginUpdatesDetailView: View {
             HStack(spacing: 10) {
                 Button { setSelected(sel < items.count, inCategory: category) } label: {
                     Image(systemName: box)
-                        .font(.body)
-                        .foregroundStyle(sel == 0 ? Color.secondary : Theme.accent)
-                        .frame(width: 26, height: 30)
+                        .font(.caption)
+                        .foregroundStyle(sel == 0 ? Color.primary.opacity(0.55) : Theme.accent)
+                        .frame(width: 22, height: 26)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -543,7 +543,7 @@ struct PluginUpdatesDetailView: View {
                 } label: {
                     HStack(spacing: 6) {
                         Text(category.isEmpty ? "Other" : category)
-                            .font(.subheadline).fontWeight(.medium)
+                            .font(.caption).fontWeight(.medium)
                         Text("\(sel)/\(items.count)")
                             .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
                         Spacer()
@@ -587,7 +587,7 @@ struct PluginUpdatesDetailView: View {
                 withAnimation(.snappy) { incompatibleExpanded.toggle() }
             } label: {
                 HStack(spacing: 8) {
-                    Image(systemName: "exclamationmark.octagon.fill").foregroundStyle(.red)
+                    Image(systemName: "exclamationmark.octagon.fill").foregroundStyle(Theme.danger)
                     Text("Incompatible").font(.subheadline).fontWeight(.medium)
                     Text("\(updater.blockedUpdates.count)")
                         .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
@@ -603,11 +603,11 @@ struct PluginUpdatesDetailView: View {
                 ForEach(updater.blockedUpdates) { update in
                     HStack(alignment: .top, spacing: 8) {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.caption).foregroundStyle(.red).frame(width: 18)
+                            .font(.caption).foregroundStyle(Theme.danger).frame(width: 18)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(update.name).font(.subheadline)
                             Text(updater.reason(update) ?? FapCompatibility.unknownDeviceReason)
-                                .font(.caption2).foregroundStyle(.red)
+                                .font(.caption2).foregroundStyle(Theme.danger)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                         Spacer()
@@ -636,7 +636,7 @@ struct PluginUpdatesDetailView: View {
         case .installing(let i, let n): installingRow(i, n)
         case .cleaning(let i, let n): progress("Cleaning old routes… \(i)/\(n)")
         case .done(let m):
-            Label(m, systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+            Label(m, systemImage: "checkmark.circle.fill").foregroundStyle(Theme.success)
                 .fixedSize(horizontal: false, vertical: true)
         case .failed(let m):
             ActionableErrorView(
@@ -668,7 +668,7 @@ struct PluginUpdatesDetailView: View {
                         ? "retry \(d.attempt) · \(byteStr(d.sent)) / \(byteStr(d.total))"
                         : "\(byteStr(d.sent)) / \(byteStr(d.total))",
                     fraction: Double(d.sent) / Double(max(d.total, 1)),
-                    tint: .orange
+                    tint: Theme.warning
                 )
             }
         }
@@ -700,7 +700,7 @@ struct PluginUpdatesDetailView: View {
                 VStack(alignment: .trailing, spacing: 1) {
                     Text(u.isNew ? "NEW" : "UPD")
                         .font(.caption2).bold()
-                        .foregroundStyle(u.isNew ? .green : .orange)
+                        .foregroundStyle(u.isNew ? Theme.success : Theme.warning)
                     Text(byteStr(u.size))
                         .font(.caption2).foregroundStyle(.secondary)
                 }
@@ -809,7 +809,7 @@ struct PluginReleasePickerView: View {
                             }
                             Spacer()
                             if !release.hasPacks {
-                                Text("no packs").font(.caption2).foregroundStyle(.orange)
+                                Text("no packs").font(.caption2).foregroundStyle(Theme.warning)
                             } else if updater.manualReleaseTag == release.tag {
                                 Image(systemName: "checkmark").foregroundStyle(Theme.accent)
                             }

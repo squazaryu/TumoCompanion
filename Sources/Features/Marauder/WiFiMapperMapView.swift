@@ -572,16 +572,16 @@ struct WiFiMapperMapView: View {
 
     private func signalColor(_ point: WiFiMapperPoint) -> Color {
         guard let rssi = point.primaryRSSI else { return .secondary }
-        if rssi >= -55 { return .green }
-        if rssi >= -70 { return .orange }
-        return .red
+        if rssi >= -55 { return Theme.success }
+        if rssi >= -70 { return Theme.accent }
+        return Theme.danger
     }
 
     private func confidenceColor(_ estimate: WiFiMapperAPEstimate) -> Color {
         switch estimate.confidence {
-        case .high: return .green
-        case .medium: return .orange
-        case .low: return .red
+        case .high: return Theme.success
+        case .medium: return Theme.accent
+        case .low: return Theme.danger
         }
     }
 

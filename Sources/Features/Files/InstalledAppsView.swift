@@ -84,7 +84,7 @@ struct InstalledAppsView: View {
 
     private func row(_ f: FlipperFile) -> some View {
         HStack {
-            Image(systemName: "app.badge").foregroundStyle(.green)
+            Image(systemName: "app.badge").foregroundStyle(Theme.success)
             VStack(alignment: .leading, spacing: 1) {
                 Text(f.name.replacingOccurrences(of: ".fap", with: ""))
                 Text(category(f)).font(.caption2).foregroundStyle(.secondary)

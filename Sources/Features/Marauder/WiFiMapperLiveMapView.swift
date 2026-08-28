@@ -273,12 +273,12 @@ struct WiFiMapperLiveMapView: View {
         SectionCard(title: "Live WiFi Map", systemImage: "location.viewfinder",
                     accessory: AnyView(StatusPill(
                         text: ble.appBridgeV2 ? "App Bridge v2" : "No bridge",
-                        color: ble.appBridgeV2 ? .green : .orange,
+                        color: ble.appBridgeV2 ? Theme.success : Theme.accent,
                         systemImage: "antenna.radiowaves.left.and.right"))) {
             if vm.location.isDenied {
                 Label("Location access is off. Enable it in Settings so scans can be placed on the map.",
                       systemImage: "location.slash.fill")
-                    .font(.caption).foregroundStyle(.orange)
+                    .font(.caption).foregroundStyle(Theme.accent)
                     .fixedSize(horizontal: false, vertical: true)
                 if let url = URL(string: UIApplication.openSettingsURLString) {
                     Link("Open Settings", destination: url).font(.caption)
@@ -286,7 +286,7 @@ struct WiFiMapperLiveMapView: View {
             } else if !ble.appBridgeV2 {
                 Label("App Bridge v2 not available — needs a firmware that negotiates it.",
                       systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption).foregroundStyle(.orange)
+                    .font(.caption).foregroundStyle(Theme.accent)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
                 gpsRow
@@ -303,7 +303,7 @@ struct WiFiMapperLiveMapView: View {
                 } else if !vm.hasPreferredLocation {
                     Label("Using an approximate iPhone fix. The map stays available and shows a wider uncertainty area.",
                           systemImage: "location.circle")
-                        .font(.caption2).foregroundStyle(.orange)
+                        .font(.caption2).foregroundStyle(Theme.accent)
                         .fixedSize(horizontal: false, vertical: true)
                 } else if vm.observations == 0 {
                     Label(vm.session.isActive ? "Survey active — waiting for mapped observations." : "Waiting for an active survey.",
@@ -317,7 +317,7 @@ struct WiFiMapperLiveMapView: View {
 
     private var gpsRow: some View {
         HStack(spacing: 6) {
-            Circle().fill(vm.hasPreferredLocation ? .green : .orange).frame(width: 7, height: 7)
+            Circle().fill(vm.hasPreferredLocation ? Theme.success : Theme.accent).frame(width: 7, height: 7)
             if let fix = vm.location.location {
                 let state = vm.hasUsableLocation ? (vm.hasPreferredLocation ? "" : " · approximate") : " · waiting"
                 Text("GPS ±\(Int(fix.horizontalAccuracy)) m\(state)")
@@ -561,9 +561,9 @@ struct WiFiMapperLiveMapView: View {
 
     private func confidenceColor(_ estimate: WiFiMapperAPEstimate) -> Color {
         switch estimate.confidence {
-        case .high: return .green
-        case .medium: return .orange
-        case .low: return .red
+        case .high: return Theme.success
+        case .medium: return Theme.accent
+        case .low: return Theme.danger
         }
     }
 
