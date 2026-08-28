@@ -122,6 +122,54 @@ final class LiveDeckHomeUITests: XCTestCase {
         add(screenshot)
     }
 
+    func testHomeKeepsNavigationChromeStableAfterSmallScroll() {
+        assertNavigationChromeStaysStable(
+            appearance: "light",
+            screenshotPrefix: "Live Deck home - light navigation"
+        )
+    }
+
+    func testHomeKeepsNavigationChromeStableAfterSmallScrollInDarkMode() {
+        assertNavigationChromeStaysStable(
+            appearance: "dark",
+            screenshotPrefix: "Live Deck home - dark navigation"
+        )
+    }
+
+    private func assertNavigationChromeStaysStable(
+        appearance: String,
+        screenshotPrefix: String
+    ) {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-onboardingDone", "YES",
+            "-appearanceMode", appearance,
+            "-live-deck-connected-qa",
+        ]
+        app.launch()
+
+        XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["FLIPPER CONSOLE"].exists)
+
+        let initialScreenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        initialScreenshot.name = "\(screenshotPrefix) - initial"
+        initialScreenshot.lifetime = .keepAlways
+        add(initialScreenshot)
+
+        let screen = app.windows.firstMatch
+        let start = screen.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.58))
+        let end = screen.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.50))
+        start.press(forDuration: 0.1, thenDragTo: end)
+
+        XCTAssertTrue(app.navigationBars["Home"].exists)
+        XCTAssertTrue(app.staticTexts["FLIPPER CONSOLE"].exists)
+
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = "\(screenshotPrefix) - lightly scrolled"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+
     func testHomeLayoutSettingsMatchCurrentDashboard() {
         let app = XCUIApplication()
         app.launchArguments = ["-onboardingDone", "YES", "-appearanceMode", "light"]
