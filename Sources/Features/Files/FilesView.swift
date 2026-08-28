@@ -448,7 +448,7 @@ struct FilesView: View {
                     Spacer()
                     StatusPill(
                         text: vm.channel.label,
-                        color: vm.channel == .usb ? .blue : .secondary,
+                        color: vm.channel == .usb ? Theme.info : .secondary,
                         systemImage: vm.channel.systemImage
                     )
                 }
@@ -458,7 +458,7 @@ struct FilesView: View {
             if transfer.usbInterrupted {
                 Section {
                     HStack(alignment: .top, spacing: 10) {
-                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.accent)
                         VStack(alignment: .leading, spacing: 6) {
                             Text("USB SD disconnected").font(.subheadline).fontWeight(.medium)
                             Text("Switched to BLE. Reconnect the cable and open USB SD Mode on the Flipper, then tap Reconnect.")
@@ -502,7 +502,7 @@ struct FilesView: View {
                         } else if let ack = companion.lastAck {
                             let ok = ack.hasPrefix("ok")
                             Image(systemName: ok ? "checkmark.circle.fill" : "xmark.circle.fill")
-                                .foregroundStyle(ok ? .green : .red)
+                                .foregroundStyle(ok ? Theme.success : Theme.danger)
                             Text(ack).font(.system(.caption, design: .monospaced))
                                 .fixedSize(horizontal: false, vertical: true)
                         }
@@ -542,7 +542,7 @@ struct FilesView: View {
                 }
             }
             if let err = vm.error {
-                Section { Text(err).foregroundStyle(.red).font(.caption) }
+                Section { Text(err).foregroundStyle(Theme.danger).font(.caption) }
             }
             Section {
                 if vm.loading {
@@ -571,7 +571,7 @@ struct FilesView: View {
                     .foregroundStyle(selectedPaths.contains(f.path) ? Theme.accent : .secondary)
             }
             Image(systemName: f.isDirectory ? "folder.fill" : icon(for: f.name))
-                .foregroundStyle(f.isDirectory ? .orange : .secondary)
+                .foregroundStyle(f.isDirectory ? Theme.accent : .secondary)
             Text(f.name)
             Spacer()
             if !f.isDirectory {
@@ -623,15 +623,15 @@ struct FilesView: View {
                 switch ext {
                 case "sub":
                     Button { Task { await vm.run(f) } } label: { Label("Send", systemImage: "dot.radiowaves.right") }
-                        .tint(.orange)
+                        .tint(Theme.accent)
                 case "nfc", "rfid":
                     Button { Task { await vm.run(f) } } label: { Label("Emulate", systemImage: "wave.3.right.circle") }
-                        .tint(.purple)
+                        .tint(Theme.purple)
                 default: EmptyView()
                 }
                 if ["sub", "nfc", "rfid"].contains(ext) {
                     Button { Task { await vm.open(f) } } label: { Label("Open", systemImage: "arrow.up.forward.app") }
-                        .tint(.blue)
+                        .tint(Theme.info)
                 }
             }
         }
@@ -719,7 +719,7 @@ struct FolderPickerView: View {
                         }
                         StatusPill(
                             text: storage.channel.label,
-                            color: storage.channel == .usb ? .blue : .secondary,
+                            color: storage.channel == .usb ? Theme.info : .secondary,
                             systemImage: storage.channel.systemImage
                         )
                     }
@@ -729,7 +729,7 @@ struct FolderPickerView: View {
                     ForEach(dirs) { d in
                         Button { Task { await load(d.path) } } label: {
                             HStack {
-                                Image(systemName: "folder.fill").foregroundStyle(.orange)
+                                Image(systemName: "folder.fill").foregroundStyle(Theme.accent)
                                 Text(d.name)
                                 Spacer()
                                 Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.secondary)

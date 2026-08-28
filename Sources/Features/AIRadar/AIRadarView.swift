@@ -75,11 +75,11 @@ struct AIRadarView: View {
             sourceCard
             if let err = vm.error, vm.snapshot.isEmpty {
                 HStack(alignment: .top, spacing: 10) {
-                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.accent)
                     Text(err).font(.footnote).fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .card(tint: .orange)
+                .card(tint: Theme.accent)
             }
             ForEach(vm.snapshot.providers) { p in providerCard(p) }
         }
@@ -104,7 +104,7 @@ struct AIRadarView: View {
             if let host = discovery.discoveredHost,
                vm.bridgeURL.trimmingCharacters(in: .whitespaces).isEmpty {
                 Label("Auto-discovered \(host)", systemImage: "wifi.circle.fill")
-                    .font(.caption).foregroundStyle(.green)
+                    .font(.caption).foregroundStyle(Theme.success)
             }
             Text(vm.bridgeURL.trimmingCharacters(in: .whitespaces).isEmpty
                  ? "Leave empty to auto-find the Mac bridge (Bonjour) — survives IP changes. Or type host:port to pin it."
@@ -123,7 +123,7 @@ struct AIRadarView: View {
                     .background(Theme.accent.opacity(0.18), in: RoundedRectangle(cornerRadius: 5))
                 Text(p.name).font(.headline)
                 Spacer()
-                StatusPill(text: p.source, color: stale ? .orange : .secondary,
+                StatusPill(text: p.source, color: stale ? Theme.accent : .secondary,
                            systemImage: stale ? "exclamationmark.triangle.fill" : nil)
             }
             window(p.short)
@@ -131,7 +131,7 @@ struct AIRadarView: View {
             if stale {
                 Label("Stale — token expired. Re-login (`claude` on the Mac).",
                       systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption2).foregroundStyle(.orange)
+                    .font(.caption2).foregroundStyle(Theme.accent)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -157,6 +157,6 @@ struct AIRadarView: View {
     }
 
     private func color(_ remaining: Int) -> Color {
-        remaining <= 10 ? .red : remaining <= 30 ? .orange : .green
+        remaining <= 10 ? Theme.danger : remaining <= 30 ? Theme.accent : Theme.success
     }
 }

@@ -77,18 +77,20 @@ final class FWPackagesActionBarUITests: XCTestCase {
     }
 
     func testActionsFillBottomBarAndTransactionsReplaceThemWithProgress() throws {
-        let channel = app.buttons.matching(
-            NSPredicate(format: "label CONTAINS[c] %@", "PACKAGE CHANNEL")
-        ).firstMatch
-        XCTAssertTrue(channel.waitForExistence(timeout: 2))
+        let drawer = app.buttons["fw-packages-details-drawer-toggle"]
+        XCTAssertTrue(drawer.waitForExistence(timeout: 2))
         XCTAssertFalse(
             app.staticTexts["Installed"].exists,
-            "Package channel must start collapsed"
+            "Package details must start collapsed"
         )
-        channel.tap()
+        let collapsedScreenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        collapsedScreenshot.name = "FW Packages compact overview"
+        collapsedScreenshot.lifetime = .keepAlways
+        add(collapsedScreenshot)
+        drawer.tap()
         XCTAssertTrue(
-            app.staticTexts["Installed"].waitForExistence(timeout: 2),
-            "Package channel metadata must remain available after expansion"
+            app.staticTexts["fw-packages-revision"].waitForExistence(timeout: 2),
+            "The compact catalog identity must remain available in the bottom drawer"
         )
         XCTAssertEqual(
             app.staticTexts["fw-packages-compatible-firmware"].label,
@@ -104,7 +106,10 @@ final class FWPackagesActionBarUITests: XCTestCase {
         revisionScreenshot.name = "FW Packages compatibility and revision"
         revisionScreenshot.lifetime = .keepAlways
         add(revisionScreenshot)
-        channel.tap()
+        let groupsScreenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        groupsScreenshot.name = "FW Packages compact groups drawer"
+        groupsScreenshot.lifetime = .keepAlways
+        add(groupsScreenshot)
 
         for group in ["base", "arf", "module_one", "protocol_packs"] {
             XCTAssertTrue(
@@ -114,16 +119,14 @@ final class FWPackagesActionBarUITests: XCTestCase {
         }
         XCTAssertEqual(
             app.staticTexts["fw-packages-status-base"].label,
-            "Up to date"
+            "Current"
         )
         XCTAssertEqual(
             app.staticTexts["fw-packages-status-module_one"].label,
-            "1 of 3 need updates"
+            "1 update · 1 cleanup"
         )
-        XCTAssertEqual(
-            app.staticTexts["fw-packages-cleanup-status-module_one"].label,
-            "1 Cleanup required"
-        )
+
+        app.buttons["fw-packages-expand-module_one"].tap()
         XCTAssertTrue(
             app.switches[
                 "fw-packages-file-module_one-tumoflip_xremote.fap"
@@ -131,19 +134,24 @@ final class FWPackagesActionBarUITests: XCTestCase {
             "Expanded categories must retain their per-file selection toggles"
         )
 
+        drawer.tap()
+
         let install = app.buttons["fw-packages-install-action"]
         let cleanup = app.buttons["fw-packages-cleanup-action"]
         XCTAssertTrue(install.waitForExistence(timeout: 5))
         XCTAssertTrue(cleanup.exists)
-        let splitInstallWidth = install.frame.width
-
+        XCTAssertLessThanOrEqual(
+            install.frame.height,
+            52,
+            "Install must remain a compact action, not a full-width bottom sheet button"
+        )
         selectScenario("Install only")
         XCTAssertTrue(install.waitForExistence(timeout: 2))
         XCTAssertFalse(cleanup.exists)
-        XCTAssertGreaterThan(
+        XCTAssertLessThan(
             install.frame.width,
-            splitInstallWidth * 1.7,
-            "A single action should fill the pinned bar"
+            220,
+            "A single action should remain an intrinsic compact capsule"
         )
 
         selectScenario("Cleanup only")
@@ -186,6 +194,10 @@ final class CommunityRouteCleanupUITests: XCTestCase {
             "cleanup-only must stay available when there are no app updates to reinstall"
         )
         XCTAssertTrue(app.buttons["community-cleanup-action"].label.contains("Clean Up 1"))
+
+        let details = app.buttons["community-apps-details-drawer-toggle"]
+        XCTAssertTrue(details.waitForExistence(timeout: 3))
+        details.tap()
         XCTAssertTrue(app.staticTexts["community-cleanup-removed"].waitForExistence(timeout: 3))
         XCTAssertTrue(
             app.staticTexts["community-cleanup-removed-paths"].label.contains(
@@ -210,20 +222,108 @@ final class ESP32ArchivedRedownloadUITests: XCTestCase {
         ]
         app.launch()
 
-        XCTAssertTrue(app.staticTexts["Archived source"].waitForExistence(timeout: 3))
+        let drawer = app.buttons["esp32-packages-drawer-toggle"]
+        XCTAssertTrue(drawer.waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["esp32-board-summary-esp32c5devkitc1"].exists)
+        XCTAssertTrue(app.buttons["esp32-board-summary-v6_1"].exists)
+        let overviewScreenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        overviewScreenshot.name = "ESP32 compact overview"
+        overviewScreenshot.lifetime = .keepAlways
+        add(overviewScreenshot)
+        drawer.tap()
+        XCTAssertTrue(
+            app.staticTexts.matching(
+                NSPredicate(format: "label CONTAINS[c] %@", "Archived")
+            ).firstMatch.waitForExistence(timeout: 3)
+        )
         XCTAssertTrue(app.staticTexts["v1.14.1"].exists)
         XCTAssertTrue(
             app.buttons.matching(
                 NSPredicate(format: "label CONTAINS[c] %@", "Download again")
             ).firstMatch.exists)
         XCTAssertTrue(
-            app.staticTexts["Creates a new active package. The archived copy stays unchanged."].exists)
+            app.staticTexts.matching(
+                NSPredicate(format: "label CONTAINS[c] %@", "Archived copy stays unchanged")
+            ).firstMatch.exists
+        )
         XCTAssertFalse(app.staticTexts["No Marauder flash folders found under esp_flasher."].exists)
 
         let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         screenshot.name = "ESP32 archived package redownload"
         screenshot.lifetime = .keepAlways
         add(screenshot)
+    }
+}
+
+final class UpdateSourceLayoutUITests: XCTestCase {
+    private func launch(_ route: String, appearance: String) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-onboardingDone", "YES",
+            "-appearanceMode", appearance,
+            route,
+        ]
+        app.launch()
+        return app
+    }
+
+    private func attach(_ name: String) {
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = name
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+
+    func testFirmwareOverviewAndDrawerRenderInDarkMode() {
+        let app = launch("-firmware-library-layout-qa", appearance: "dark")
+        let drawer = app.buttons["firmware-releases-drawer-toggle"]
+        XCTAssertTrue(drawer.waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["RELEASE CATALOG"].exists)
+        XCTAssertFalse(app.segmentedControls["firmware-channel-picker"].exists)
+        attach("Firmware compact overview - dark")
+
+        drawer.tap()
+        XCTAssertTrue(app.segmentedControls["firmware-channel-picker"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["t-flppr-fw-008"].exists)
+        XCTAssertTrue(app.staticTexts["t-flppr-fw-007"].exists)
+        XCTAssertTrue(app.staticTexts["Installed"].isHittable)
+        attach("Firmware release drawer - dark")
+    }
+
+    func testFirmwareOverviewAndDrawerRenderInLightMode() {
+        let app = launch("-firmware-library-layout-qa", appearance: "light")
+        let drawer = app.buttons["firmware-releases-drawer-toggle"]
+        XCTAssertTrue(drawer.waitForExistence(timeout: 3))
+        attach("Firmware compact overview - light")
+        drawer.tap()
+        XCTAssertTrue(app.segmentedControls["firmware-channel-picker"].waitForExistence(timeout: 3))
+        attach("Firmware release drawer - light")
+    }
+
+    func testCommunityOverviewAndDrawerRenderInDarkMode() {
+        let app = launch("-community-apps-layout-qa", appearance: "dark")
+        let drawer = app.buttons["community-apps-details-drawer-toggle"]
+        XCTAssertTrue(drawer.waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["COMMUNITY CATALOG"].exists)
+        XCTAssertTrue(app.buttons["community-install-action"].exists)
+        attach("Community apps compact overview - dark")
+
+        drawer.tap()
+        XCTAssertTrue(app.buttons["community-release-picker-action"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["GPIO"].exists)
+        XCTAssertTrue(app.staticTexts["Tools"].exists)
+        XCTAssertTrue(app.staticTexts["Games"].exists)
+        attach("Community app details drawer - dark")
+    }
+
+    func testCommunityOverviewAndDrawerRenderInLightMode() {
+        let app = launch("-community-apps-layout-qa", appearance: "light")
+        let drawer = app.buttons["community-apps-details-drawer-toggle"]
+        XCTAssertTrue(drawer.waitForExistence(timeout: 3))
+        attach("Community apps compact overview - light")
+        drawer.tap()
+        XCTAssertTrue(app.buttons["community-release-picker-action"].waitForExistence(timeout: 3))
+        attach("Community app details drawer - light")
     }
 }
 

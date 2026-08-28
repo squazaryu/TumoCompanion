@@ -161,16 +161,16 @@ struct UpdatesView: View {
 
     private var headerVerdict: (text: String, color: Color, showSpinner: Bool) {
         if pluginChecking || firmwareChecking { return ("Checking for updates…", .secondary, true) }
-        if hasAttentionItems { return ("Needs your attention", .orange, false) }
+        if hasAttentionItems { return ("Needs your attention", Theme.accent, false) }
         let pluginNeedsAction = !updater.updates.isEmpty
         let firmwareAction = firmwareNeedsAction
-        if pluginNeedsAction && firmwareAction { return ("FW Package and app updates available", .orange, false) }
-        if firmwareAction { return ("FW Package updates available", .orange, false) }
-        if pluginNeedsAction { return ("Community app updates available", .orange, false) }
+        if pluginNeedsAction && firmwareAction { return ("FW Package and app updates available", Theme.accent, false) }
+        if firmwareAction { return ("FW Package updates available", Theme.accent, false) }
+        if pluginNeedsAction { return ("Community app updates available", Theme.accent, false) }
         if updater.tag.isEmpty && packages.manifest == nil && firmware.releases.isEmpty {
             return ("Choose a source", .secondary, false)
         }
-        return ("Everything is up to date", .green, false)
+        return ("Everything is up to date", Theme.success, false)
     }
 
     private var headerView: some View {
@@ -183,7 +183,7 @@ struct UpdatesView: View {
             Spacer()
             StatusPill(
                 text: transfer.activeChannel.label,
-                color: transfer.activeChannel == .usb ? .blue : .secondary,
+                color: transfer.activeChannel == .usb ? Theme.info : .secondary,
                 systemImage: transfer.activeChannel.systemImage
             )
         }
@@ -223,19 +223,19 @@ struct UpdatesView: View {
         SectionCard(title: "Sources", systemImage: "shippingbox") {
             VStack(spacing: 14) {
                 NavigationLink { FirmwareLibraryView(library: firmware) } label: {
-                    SourceRow(icon: "memorychip.fill", tint: .orange, title: "Firmware",
+                    SourceRow(icon: "memorychip.fill", tint: Theme.accent, title: "Firmware",
                               subtitle: "Main and Dev releases",
                               badge: firmwareLibraryBadge, busy: firmware.busy)
                 }
                 Divider()
                 NavigationLink { TumoflipUpdaterView(updater: packages) } label: {
-                    SourceRow(icon: "shippingbox.fill", tint: .blue, title: "FW Packages",
+                    SourceRow(icon: "shippingbox.fill", tint: Theme.info, title: "FW Packages",
                               subtitle: packages.firmwareRoute.channel.packageLabel,
                               badge: packagesBadge, busy: firmwareChecking)
                 }
                 Divider()
                 NavigationLink { PluginUpdatesDetailView(updater: updater) } label: {
-                    SourceRow(icon: "puzzlepiece.extension.fill", tint: .indigo, title: "Community apps",
+                    SourceRow(icon: "puzzlepiece.extension.fill", tint: Theme.indigo, title: "Community apps",
                               subtitle: updater.pendingCleanupCount > 0
                                 ? "\(updater.pendingCleanupCount) old routes to clean"
                                 : "all-the-plugins",
@@ -253,7 +253,7 @@ struct UpdatesView: View {
                 VStack(spacing: 10) {
                     if updater.phase == .needsBaseline {
                         NavigationLink { PluginUpdatesDetailView(updater: updater) } label: {
-                            AttentionRow(systemImage: "magnifyingglass", text: "Community apps — first sync needed", tint: .blue)
+                            AttentionRow(systemImage: "magnifyingglass", text: "Community apps — first sync needed", tint: Theme.info)
                         }
                     }
                     if !updater.protectedDeviceCheckReviews.isEmpty {
@@ -267,7 +267,7 @@ struct UpdatesView: View {
                         let n = updater.protectedDeviceDiffReviews.count
                         NavigationLink { ProtectedAppsView(updater: updater) } label: {
                             AttentionRow(systemImage: "lock.trianglebadge.exclamationmark",
-                                         text: "\(n) protected app\(n == 1 ? "" : "s") to review", tint: .orange)
+                                         text: "\(n) protected app\(n == 1 ? "" : "s") to review", tint: Theme.accent)
                         }
                     }
                     if updater.pendingCleanupCount > 0 {
@@ -275,7 +275,7 @@ struct UpdatesView: View {
                             AttentionRow(
                                 systemImage: "trash",
                                 text: "\(updater.pendingCleanupCount) old Community app routes to clean",
-                                tint: .orange
+                                tint: Theme.accent
                             )
                         }
                     }
@@ -284,30 +284,30 @@ struct UpdatesView: View {
                             AttentionRow(
                                 systemImage: "questionmark.shield",
                                 text: failure.failureKind?.label ?? "AUDIT UNAVAILABLE",
-                                tint: failure.failureKind == .invalid ? .red : .orange)
+                                tint: failure.failureKind == .invalid ? Theme.danger : Theme.accent)
                         }
                     }
                     if let vr = updater.verifyResult, !vr.ok {
                         NavigationLink { PluginUpdatesDetailView(updater: updater) } label: {
                             AttentionRow(systemImage: "exclamationmark.triangle.fill",
-                                         text: "Last verify found \(vr.failed.count) issue\(vr.failed.count == 1 ? "" : "s")", tint: .red)
+                                         text: "Last verify found \(vr.failed.count) issue\(vr.failed.count == 1 ? "" : "s")", tint: Theme.danger)
                         }
                     }
                     if case .failed(let msg) = packages.phase {
                         NavigationLink { TumoflipUpdaterView(updater: packages) } label: {
-                            AttentionRow(systemImage: "exclamationmark.triangle.fill", text: "FW Packages: \(msg)", tint: .red)
+                            AttentionRow(systemImage: "exclamationmark.triangle.fill", text: "FW Packages: \(msg)", tint: Theme.danger)
                         }
                     }
                     if let warning = packages.firmwareRoute.warning, warning != .identityUnavailable {
                         NavigationLink { TumoflipUpdaterView(updater: packages) } label: {
                             AttentionRow(systemImage: "point.3.connected.trianglepath.dotted",
-                                         text: "Firmware channel: \(warning.message)", tint: .orange)
+                                         text: "Firmware channel: \(warning.message)", tint: Theme.accent)
                         }
                     }
                     if case .failed(let message) = firmware.phase {
                         NavigationLink { FirmwareLibraryView(library: firmware) } label: {
                             AttentionRow(systemImage: "exclamationmark.triangle.fill",
-                                         text: "Firmware library: \(message)", tint: .red)
+                                         text: "Firmware library: \(message)", tint: Theme.danger)
                         }
                     }
                 }
@@ -320,7 +320,7 @@ struct UpdatesView: View {
     private var moreCard: some View {
         SectionCard(title: "More", systemImage: "ellipsis.circle") {
             NavigationLink { ProtectedAppsView(updater: updater) } label: {
-                navRow(icon: "lock.shield.fill", color: .indigo, title: "Protected apps",
+                navRow(icon: "lock.shield.fill", color: Theme.indigo, title: "Protected apps",
                        subtitle: protectedAppsSubtitle)
             }
             Divider()
@@ -380,7 +380,7 @@ struct UpdatesView: View {
                     if packages.selectedRequiresCompatibilityIdentity && !packages.hasFreshCompatibilityIdentity {
                         Label("Connect Flipper over BLE to validate apps before installing via \(transfer.activeChannel.label).",
                               systemImage: "antenna.radiowaves.left.and.right.slash")
-                            .font(.caption2).foregroundStyle(.red)
+                            .font(.caption2).foregroundStyle(Theme.danger)
                     }
                     installButton(title: "Install \(firmwareN) FW Package file\(firmwareN == 1 ? "" : "s")",
                                   blocked: firmwareBlocked) {
@@ -453,20 +453,20 @@ struct ProtectedAppsView: View {
                     let lifted = updater.isBuiltInUnprotected(name)
                     HStack {
                         Image(systemName: lifted ? "lock.open" : "lock.shield.fill")
-                            .foregroundStyle(lifted ? .orange : .indigo).font(.caption)
+                            .foregroundStyle(lifted ? Theme.accent : Theme.indigo).font(.caption)
                         Text(name).font(.system(.footnote, design: .monospaced))
                             .foregroundStyle(lifted ? .secondary : .primary)
                             .fixedSize(horizontal: false, vertical: true)
                         Spacer(minLength: 8)
                         Text(lifted ? "unprotected" : "tumoflip")
                             .font(.caption2)
-                            .foregroundStyle(lifted ? .orange : .secondary)
+                            .foregroundStyle(lifted ? Theme.accent : .secondary)
                     }
                     .swipeActions(edge: .trailing) {
                         if lifted {
                             Button { updater.addExclusion(name) } label: {
                                 Label("Re-protect", systemImage: "lock.shield")
-                            }.tint(.indigo)
+                            }.tint(Theme.indigo)
                         } else {
                             Button(role: .destructive) { updater.removeExclusion(name) } label: {
                                 Label("Unprotect", systemImage: "lock.open")
@@ -488,7 +488,7 @@ struct ProtectedAppsView: View {
                 }
                 ForEach(updater.customProtectedNames, id: \.self) { name in
                     HStack {
-                        Image(systemName: "lock.fill").foregroundStyle(.indigo).font(.caption)
+                        Image(systemName: "lock.fill").foregroundStyle(Theme.indigo).font(.caption)
                         Text(name).font(.system(.footnote, design: .monospaced))
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -725,10 +725,10 @@ struct ProtectedAppDetailSheet: View {
 
     private var statusColor: Color {
         switch detail.status {
-        case .verified, .sourceMatches, .intentionallyReplaced: return .green
+        case .verified, .sourceMatches, .intentionallyReplaced: return Theme.success
         case .unverified: return .secondary
         case .needsReview:
-            return detail.item.deviceKnown && detail.item.deviceMD5 == nil ? .orange : .red
+            return detail.item.deviceKnown && detail.item.deviceMD5 == nil ? Theme.accent : Theme.danger
         }
     }
 }
@@ -755,7 +755,7 @@ struct HistoryView: View {
                                     Spacer()
                                     Text(rec.wasNew ? "NEW" : "UPD")
                                         .font(.caption2).bold()
-                                        .foregroundStyle(rec.wasNew ? .green : .orange)
+                                        .foregroundStyle(rec.wasNew ? Theme.success : Theme.accent)
                                 }
                             }
                         }
@@ -807,7 +807,7 @@ struct ProtectedReviewRow: View {
                 Image(systemName: isAudited
                       ? "checkmark.seal.fill"
                       : (isUnverified || !item.deviceKnown ? "questionmark.circle.fill" : "lock.fill"))
-                    .foregroundStyle(isAudited ? .green : (isUnverified || !item.deviceKnown ? .secondary : .orange))
+                    .foregroundStyle(isAudited ? Theme.success : (isUnverified || !item.deviceKnown ? .secondary : Theme.accent))
                     .frame(width: 20)
                     .padding(.top, 2)
                 VStack(alignment: .leading, spacing: 3) {
@@ -822,7 +822,7 @@ struct ProtectedReviewRow: View {
                     if let reason = compatibility.reason {
                         Text(reason)
                             .font(.caption2)
-                            .foregroundStyle(.red)
+                            .foregroundStyle(Theme.danger)
                             .fixedSize(horizontal: false, vertical: true)
                     } else if let metadata = compatibility.metadata {
                         Text("API \(metadata.apiVersionString) · target \(metadata.hardwareTarget)")
@@ -833,7 +833,7 @@ struct ProtectedReviewRow: View {
                     Text(statusText)
                         .font(.caption2)
                         .bold()
-                        .foregroundStyle(isAudited ? .green : (isUnverified || !item.deviceKnown ? .secondary : .orange))
+                        .foregroundStyle(isAudited ? Theme.success : (isUnverified || !item.deviceKnown ? .secondary : Theme.accent))
                         .accessibilityIdentifier("protected-app-review-status-\(item.name)")
                 }
                 Spacer(minLength: 8)

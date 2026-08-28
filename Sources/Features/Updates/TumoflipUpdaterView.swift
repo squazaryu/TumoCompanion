@@ -13,6 +13,7 @@ struct TumoflipUpdaterView: View {
     @State private var pendingOverride: TumoflipFirmwareChannel?
     @State private var pendingCleanupCount: Int?
     @State private var showHelp = false
+    @State private var packageDrawerExpanded = false
 
     private let groupLabels: [(key: String, title: String, icon: String)] = [
         ("base", "Base", "shippingbox.fill"),
@@ -27,20 +28,39 @@ struct TumoflipUpdaterView: View {
     }
 
     var body: some View {
-        CardScroll(refreshAction: refreshPackages) {
-            SectionCard(title: "Firmware packages", systemImage: "cpu.fill",
-                        accessory: AnyView(StatusPill(
-                            text: transfer.activeChannel.label,
-                            color: transfer.activeChannel == .usb ? .blue : .secondary,
-                            systemImage: transfer.activeChannel.systemImage))) {
-                statusRow
-                syncCatalogRow
-                verifyRow
+        ZStack(alignment: .bottom) {
+            CardScroll(refreshAction: refreshPackages) {
+                SectionCard(title: "Firmware packages", systemImage: "cpu.fill",
+                            accessory: AnyView(StatusPill(
+                                text: transfer.activeChannel.label,
+                                color: transfer.activeChannel == .usb ? Theme.info : .secondary,
+                                systemImage: transfer.activeChannel.systemImage))) {
+                    statusRow
+                    syncCatalogRow
+                    verifyRow
+                }
+
+                packageOverviewCard
+                actionBar
+
+                // The folder tab is fixed above the app tab bar, matching Home
+                // → Tools. Reserve only its collapsed height in the page flow.
+                Color.clear.frame(height: 58)
             }
 
-            channelCard
-
-            if updater.manifest != nil { groupsCard }
+            if updater.manifest != nil {
+                BottomFolderDrawer(
+                    isExpanded: $packageDrawerExpanded,
+                    title: "PACKAGE DETAILS",
+                    summary: packageDetailsSummary,
+                    systemImage: "shippingbox.fill",
+                    accessibilityIdentifier: "fw-packages-details-drawer-toggle",
+                    panelHeight: packageDetailsDrawerHeight,
+                    maxPanelHeight: 400
+                ) {
+                    packageDetailsPanel
+                }
+            }
         }
         .navigationTitle("Firmware packages")
         .navigationBarTitleDisplayMode(.inline)
@@ -52,19 +72,9 @@ struct TumoflipUpdaterView: View {
                 .accessibilityLabel("FW Packages help")
             }
             ToolbarItem(placement: .topBarTrailing) {
-                if updater.busy {
-                    ProgressView()
-                } else {
-                    Button {
-                        Task {
-                            await updater.reload(recover: hasFileChannel)
-                            await updater.validateCompatibility()
-                        }
-                    } label: { Image(systemName: "arrow.clockwise") }
-                }
+                if updater.busy { ProgressView() }
             }
         }
-        .safeAreaInset(edge: .bottom) { actionBar }
         .onAppear {
             Task {
                 if updater.manifest == nil {
@@ -128,16 +138,99 @@ struct TumoflipUpdaterView: View {
         await updater.validateCompatibility()
     }
 
-    private var groupsCard: some View {
-        SectionCard(title: "Package groups", systemImage: "shippingbox") {
-            LazyVStack(spacing: 14) {
+    private var packageOverviewCard: some View {
+        SectionCard(
+            title: "Package catalog",
+            systemImage: "shippingbox.fill",
+            accessory: AnyView(StatusPill(
+                text: updater.firmwareRoute.channel.label,
+                color: channelColor(updater.firmwareRoute.channel),
+                systemImage: channelIcon(updater.firmwareRoute.channel)
+            ))
+        ) {
+            packageOverviewRow(
+                title: "Channel",
+                detail: channelDrawerSummary,
+                systemImage: "point.3.connected.trianglepath.dotted"
+            )
+            packageOverviewRow(
+                title: "Groups",
+                detail: packageGroupsSummary,
+                systemImage: "shippingbox"
+            )
+            Text("Open the folder tab below for channel controls, revisions, and per-file selection.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func packageOverviewRow(title: String, detail: String, systemImage: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: systemImage)
+                .font(.subheadline)
+                .foregroundStyle(Theme.accent)
+                .frame(width: 22)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.subheadline.weight(.medium))
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    private var packageDetailsSummary: String {
+        let pending = groupLabels.reduce(0) { total, group in
+            total + updater.files(group.key).filter { updater.status(file: $0.target) != .upToDate }.count
+        }
+        if pending > 0 { return "\(pending) update\(pending == 1 ? "" : "s")" }
+        return updater.firmwareRoute.channel.label
+    }
+
+    private var packageDetailsPanel: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 7) {
+                Label("PACKAGE CHANNEL", systemImage: "point.3.connected.trianglepath.dotted")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(Color.primary.opacity(0.62))
+                    .tracking(0.7)
+                Spacer()
+                StatusPill(
+                    text: updater.firmwareRoute.channel.label,
+                    color: channelColor(updater.firmwareRoute.channel),
+                    systemImage: channelIcon(updater.firmwareRoute.channel)
+                )
+            }
+
+            channelDetails
+
+            Divider().opacity(0.45)
+
+            HStack(spacing: 7) {
+                Label("PACKAGE GROUPS", systemImage: "shippingbox")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(Color.primary.opacity(0.62))
+                    .tracking(0.7)
+                Spacer()
+                Text(packageGroupsSummary)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(Color.primary.opacity(0.62))
+            }
+
+            VStack(spacing: 0) {
                 ForEach(groupLabels, id: \.key) { g in
                     groupRow(g)
                 }
             }
+
             if updater.hasFirmwareOwnedBaseline {
                 Label(
-                    "\(updater.firmwareOwnedFileCount) FAPs belong to the firmware baseline. FW Packages manages only independent overlays and never reinstalls these files.",
+                    "\(updater.firmwareOwnedFileCount) built-in FAPs · reference only",
                     systemImage: "shippingbox.fill"
                 )
                 .font(.caption2)
@@ -148,168 +241,201 @@ struct TumoflipUpdaterView: View {
             if updater.compatibilityChecked && updater.hasUnvalidatedBinaries {
                 Label(FapCompatibility.unknownDeviceReason, systemImage: "antenna.radiowaves.left.and.right.slash")
                     .font(.caption2)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Theme.danger)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if !updater.hasPackageZip {
                 Label("This release has the manifest but no install archive (tumoflip-packages.zip) yet — installing isn't available until a release publishes it.",
                       systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption2).foregroundStyle(.orange)
+                    .font(.caption2)
+                    .foregroundStyle(Theme.warning)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
 
-    private var channelCard: some View {
-        CollapsibleCard(
-            title: "Package channel",
-            systemImage: "point.3.connected.trianglepath.dotted",
-            accessory: AnyView(StatusPill(
-                text: updater.firmwareRoute.channel.label,
-                color: channelColor(updater.firmwareRoute.channel),
-                systemImage: channelIcon(updater.firmwareRoute.channel)
-            ))
-        ) {
-            VStack(alignment: .leading, spacing: 8) {
-                if updater.deviceIdentity?.firmwareCommitDirty == true {
-                    Label("Installed firmware reports a dirty commit; package compatibility should be treated as higher risk.",
-                          systemImage: "exclamationmark.triangle.fill")
-                        .font(.caption2)
-                        .foregroundStyle(.orange)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                if let warning = updater.firmwareRoute.warning {
-                    Label(warning.message, systemImage: "exclamationmark.triangle.fill")
-                        .font(.caption2)
-                        .foregroundStyle(.orange)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                HStack(spacing: 8) {
-                    Button("Auto") {
-                        Task {
-                            updater.clearManualChannelOverride()
-                            await updater.reload(recover: false)
-                        }
-                    }
-                    .disabled(updater.manualChannelOverride == nil || updater.busy)
+    private var packageDetailsDrawerHeight: CGFloat {
+        // Keep the initial drawer visibly smaller than the primary screen.
+        // Expanded per-file lists scroll inside the panel instead of growing it.
+        360
+    }
 
-                    Button("Stable") { pendingOverride = .stable }
-                        .disabled(updater.busy || updater.manualChannelOverride == .stable)
-                    Button("Dev") { pendingOverride = .dev }
-                        .disabled(updater.busy || updater.manualChannelOverride == .dev)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                if !updater.availableCatalogOptions.isEmpty {
-                    Menu {
-                        Button {
-                            Task { await updater.selectCatalogRevision(nil) }
-                        } label: {
-                            Label("Automatic (latest compatible)", systemImage: "wand.and.stars")
-                        }
-                        ForEach(updater.availableCatalogOptions) { option in
-                            Button {
-                                Task { await updater.selectCatalogRevision(option.revision) }
-                            } label: {
-                                Label(catalogOptionLabel(option), systemImage: option.revision == updater.selectedCatalogRevision ? "checkmark.circle.fill" : "clock.arrow.circlepath")
-                            }
-                        }
-                    } label: {
-                        Label("Choose package revision", systemImage: "clock.arrow.circlepath")
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .accessibilityIdentifier("fw-packages-revision-picker")
-                }
-                Divider().opacity(0.4)
-                metadataRow("Installed", updater.deviceIdentity?.firmwareVersion ?? "Unknown")
-                metadataRow("Origin", updater.deviceIdentity?.originFork ?? "Unknown")
-                metadataRow("Detected", updater.firmwareRoute.detectedChannel?.packageLabel ?? "Unknown")
-                metadataRow("Selected", updater.firmwareRoute.channel.packageLabel)
-                Label(
-                    "Catalog history is independent of the firmware release. Compatibility is checked by channel, API major and hardware target.",
-                    systemImage: "link.badge.plus"
+    private var packageGroupsSummary: String {
+        let standalone = groupLabels.reduce(0) { $0 + updater.selectableCount($1.key) }
+        let pending = groupLabels.reduce(0) { total, group in
+            total + updater.files(group.key).filter { updater.status(file: $0.target) != .upToDate }.count
+        }
+        if pending > 0 {
+            return "\(pending) update\(pending == 1 ? "" : "s")"
+        }
+        if standalone > 0 {
+            return "\(standalone) standalone"
+        }
+        return "Reference only"
+    }
+
+    @ViewBuilder
+    private var channelDetails: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if updater.deviceIdentity?.firmwareCommitDirty == true {
+                Label("Installed firmware reports a dirty commit; package compatibility should be treated as higher risk.",
+                      systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption2)
+                    .foregroundStyle(Theme.warning)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let warning = updater.firmwareRoute.warning {
+                Label(warning.message, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption2)
+                    .foregroundStyle(Theme.warning)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            HStack(spacing: 6) {
+                channelChoiceButton(
+                    "Auto",
+                    enabled: updater.manualChannelOverride != nil && !updater.busy,
+                    action: clearManualChannelOverride
                 )
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                if let manifest = updater.manifest {
-                    metadataRow(
-                        "Compatible FW",
-                        firmwareCompatibilityDisplay(manifest),
-                        identifier: "fw-packages-compatible-firmware"
+                channelChoiceButton(
+                    "Stable",
+                    enabled: !updater.busy && updater.manualChannelOverride != .stable,
+                    action: { pendingOverride = .stable }
+                )
+                channelChoiceButton(
+                    "Dev",
+                    enabled: !updater.busy && updater.manualChannelOverride != .dev,
+                    action: { pendingOverride = .dev }
+                )
+                Spacer(minLength: 2)
+                catalogRevisionPicker
+            }
+
+            if let manifest = updater.manifest {
+                catalogSummary(manifest)
+                if let selected = updater.selectedCatalogRevision,
+                   let current = updater.availableCatalogOptions.compactMap(\.revision).max(),
+                   selected < current {
+                    Label(
+                        "Rollback revision selected. Install will restore this immutable package snapshot; firmware is unchanged.",
+                        systemImage: "arrow.uturn.backward.circle.fill"
                     )
-                    metadataRow(
-                        "FW Packages",
-                        packageRevisionDisplay,
-                        identifier: "fw-packages-revision"
-                    )
-                    if let selected = updater.selectedCatalogRevision,
-                       let current = updater.availableCatalogOptions.compactMap(\.revision).max(),
-                       selected < current {
-                        Label(
-                            "Rollback revision selected. Install will restore this immutable package snapshot; firmware is unchanged.",
-                            systemImage: "arrow.uturn.backward.circle.fill"
-                        )
-                        .font(.caption2)
-                        .foregroundStyle(.orange)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityIdentifier("fw-packages-rollback-selected")
-                    }
-                    metadataRow("Package API", manifest.firmware.api)
-                    if updater.firmwareFlashUnchanged {
-                        Label(
-                            manifest.isFirmwareSnapshotCatalog
-                                ? "Exact firmware package snapshot. Missing or changed bundled files can be reinstalled; firmware flashing is unchanged."
-                                : manifest.isIndependentBaselineCatalog
-                                    ? "Independent baseline catalog. Firmware-owned files are reference-only; no FAP files are managed here."
-                                    : "Apps-only package update. Firmware flashing is unchanged.",
-                            systemImage: "checkmark.shield.fill"
-                        )
-                        .font(.caption2)
-                        .foregroundStyle(.green)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityIdentifier("fw-packages-apps-only")
-                    }
-                }
-                if let api = updater.deviceIdentity?.firmwareAPI {
-                    metadataRow("Installed API", api)
-                }
-                if let commit = updater.deviceIdentity?.firmwareCommit, !commit.isEmpty {
-                    metadataRow("Commit", commit)
+                    .font(.caption2)
+                    .foregroundStyle(Theme.warning)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("fw-packages-rollback-selected")
                 }
             }
         }
     }
 
-    private func metadataRow(
-        _ title: String,
-        _ value: String,
-        identifier: String? = nil
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(title)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-            metadataValue(value, identifier: identifier)
+    @ViewBuilder
+    private var catalogRevisionPicker: some View {
+        if !updater.availableCatalogOptions.isEmpty {
+            Menu {
+                Button(action: selectLatestCatalogRevision) {
+                    Label("Automatic (latest compatible)", systemImage: "wand.and.stars")
+                }
+                ForEach(updater.availableCatalogOptions) { option in
+                    Button { selectCatalogRevision(option.revision) } label: {
+                        Label(
+                            catalogOptionLabel(option),
+                            systemImage: option.revision == updater.selectedCatalogRevision
+                                ? "checkmark.circle.fill" : "clock.arrow.circlepath"
+                        )
+                    }
+                }
+            } label: {
+                Label("Revision", systemImage: "clock.arrow.circlepath")
+                    .font(.caption2.weight(.semibold))
+                    .lineLimit(1)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .foregroundStyle(Theme.accent)
+                    .background(Theme.accent.opacity(0.14), in: Capsule())
+                    .overlay {
+                        Capsule().strokeBorder(Theme.accent.opacity(0.2), lineWidth: 1)
+                    }
+            }
+            .disabled(updater.busy)
+            .accessibilityIdentifier("fw-packages-revision-picker")
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    @ViewBuilder
-    private func metadataValue(_ value: String, identifier: String?) -> some View {
-        if let identifier {
-            Text(value)
+    private func catalogSummary(_ manifest: TumoflipManifest) -> some View {
+        HStack(alignment: .center, spacing: 10) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(packageRevisionDisplay)
+                    .font(.caption2.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .accessibilityIdentifier("fw-packages-revision")
+                HStack(spacing: 3) {
+                    Text(firmwareCompatibilityDisplay(manifest))
+                        .accessibilityIdentifier("fw-packages-compatible-firmware")
+                    Text("· API \(manifest.firmware.api)")
+                }
                 .font(.caption2)
-                .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityIdentifier(identifier)
-        } else {
-            Text(value)
-                .font(.caption2)
-                .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
+                .foregroundStyle(Color.primary.opacity(0.62))
+                .lineLimit(1)
+                .minimumScaleFactor(0.68)
+            }
+            Spacer(minLength: 4)
+            if updater.firmwareFlashUnchanged {
+                Label(catalogRoleTitle(manifest), systemImage: "checkmark.shield.fill")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(Theme.success)
+                    .lineLimit(1)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(Theme.success.opacity(0.16), in: Capsule())
+                    .accessibilityIdentifier("fw-packages-apps-only")
+            }
         }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color.primary.opacity(0.055), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private func catalogRoleTitle(_ manifest: TumoflipManifest) -> String {
+        if manifest.isIndependentBaselineCatalog { return "Baseline" }
+        if manifest.isFirmwareSnapshotCatalog { return "Snapshot" }
+        return "Apps only"
+    }
+
+    private var channelDrawerSummary: String {
+        let channel = updater.firmwareRoute.channel.label
+        let revision = updater.packageRevision.isEmpty ? "latest" : "Rev \(updater.packageRevision)"
+        return "\(channel) · \(revision)"
+    }
+
+    private func channelChoiceButton(
+        _ title: String,
+        enabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.caption2.weight(.semibold))
+                .lineLimit(1)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(enabled ? Theme.accent : Color.primary.opacity(0.68))
+        .background(
+            (enabled ? Theme.accent : Color.primary).opacity(enabled ? 0.16 : 0.10),
+            in: Capsule()
+        )
+        .overlay {
+            Capsule()
+                .strokeBorder(
+                    (enabled ? Theme.accent : Color.primary).opacity(0.22),
+                    lineWidth: 1
+                )
+        }
+        .disabled(!enabled)
+        .accessibilityLabel(title)
+        .accessibilityValue(enabled ? "Available" : "Unavailable")
     }
 
     private var packageRevisionDisplay: String {
@@ -341,17 +467,20 @@ struct TumoflipUpdaterView: View {
         let selectable = updater.selectableCount(g.key)
         let firmwareOwned = updater.firmwareOwnedCount(g.key)
         let cleanupEntries = updater.cleanupEntries(g.key)
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
+        let pendingUpdates = updater.files(g.key).lazy.filter {
+            updater.status(file: $0.target) != .upToDate
+        }.count
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(alignment: .firstTextBaseline, spacing: 7) {
                 if n > 0 {
                     // Tri-state selection is limited to standalone overlays. The
                     // firmware-owned baseline is visible, but cannot be overwritten
                     // from this screen.
                     Button { updater.setGroup(g.key, selected: sel < selectable) } label: {
                         Image(systemName: sel == 0 ? "square" : (sel == selectable ? "checkmark.square.fill" : "minus.square.fill"))
-                            .font(.title3)
+                            .font(.body)
                             .foregroundStyle(sel == 0 ? Color.secondary : Theme.accent)
-                            .frame(width: 28, height: 30)
+                            .frame(width: 24, height: 28)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
@@ -359,51 +488,41 @@ struct TumoflipUpdaterView: View {
                     .accessibilityIdentifier("fw-packages-select-\(g.key)")
                 } else {
                     Image(systemName: firmwareOwned > 0 ? "shippingbox" : "square")
-                        .font(.title3)
+                        .font(.body)
                         .foregroundStyle(.secondary)
-                        .frame(width: 28, height: 30)
+                        .frame(width: 24, height: 28)
                 }
 
-                Image(systemName: g.icon).foregroundStyle(.orange).frame(width: 22)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(g.title).font(.subheadline)
+                Image(systemName: g.icon)
+                    .font(.caption)
+                    .foregroundStyle(Theme.warning)
+                    .frame(width: 18)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(g.title)
+                        .font(.caption.weight(.semibold))
+                        .lineLimit(1)
                     if n > 0 {
-                        Text("\(sel)/\(selectable) standalone · \(byteStr(updater.bytes(g.key)))")
+                        Text("\(sel)/\(selectable) · \(byteStr(updater.bytes(g.key)))")
                             .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
-                    }
-                    if firmwareOwned > 0 {
-                        Text("\(firmwareOwned) firmware-owned · not managed here")
+                    } else if firmwareOwned > 0 {
+                        Text("\(firmwareOwned) built-in")
                             .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
                             .accessibilityIdentifier("fw-packages-baseline-\(g.key)")
                     }
-                    if let info = groupSummaryInfo(g.key) {
-                        Label(info.text, systemImage: info.icon)
-                            .font(.caption2)
-                            .foregroundStyle(info.color)
-                            .labelStyle(.titleAndIcon)
-                            .lineLimit(1)
-                            .accessibilityIdentifier("fw-packages-status-\(g.key)")
-                    }
-                    if !cleanupEntries.isEmpty {
-                        Label(
-                            "\(cleanupEntries.count) Cleanup required",
-                            systemImage: "trash.circle.fill"
-                        )
-                        .font(.caption2)
-                        .foregroundStyle(.orange)
-                        .labelStyle(.titleAndIcon)
-                        .lineLimit(1)
-                        .accessibilityIdentifier("fw-packages-cleanup-status-\(g.key)")
-                    }
                 }
-                Spacer()
+                Spacer(minLength: 4)
+                PackageGroupStatusBadge(
+                    pendingUpdates: pendingUpdates,
+                    cleanupCount: cleanupEntries.count,
+                    accessibilityIdentifier: "fw-packages-status-\(g.key)"
+                )
                 if n > 0 {
                     Button {
                         withAnimation { toggleExpanded(g.key) }
                     } label: {
                         Image(systemName: expanded.contains(g.key) ? "chevron.up" : "chevron.down")
                             .font(.caption).foregroundStyle(.secondary)
-                            .frame(width: 28, height: 28)
+                            .frame(width: 22, height: 28)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.borderless)
@@ -437,7 +556,7 @@ struct TumoflipUpdaterView: View {
                             .accessibilityValue(fileStatusInfo(updater.status(file: f.target)).text)
                             if let reason = updater.blocked[f.target] {
                                 Label(reason, systemImage: "exclamationmark.octagon.fill")
-                                    .font(.caption2).foregroundStyle(.red)
+                                    .font(.caption2).foregroundStyle(Theme.danger)
                                     .labelStyle(.titleAndIcon)
                                     .fixedSize(horizontal: false, vertical: true)
                             }
@@ -448,11 +567,11 @@ struct TumoflipUpdaterView: View {
                         HStack(alignment: .top, spacing: 8) {
                             Image(systemName: "trash.circle.fill")
                                 .font(.caption2)
-                                .foregroundStyle(.orange)
+                                .foregroundStyle(Theme.warning)
                             VStack(alignment: .leading, spacing: 3) {
                                 Text("Cleanup required")
                                     .font(.caption2)
-                                    .foregroundStyle(.orange)
+                                    .foregroundStyle(Theme.warning)
                                 Text(entry.legacy)
                                     .font(.caption2.monospaced())
                                     .foregroundStyle(.secondary)
@@ -467,8 +586,9 @@ struct TumoflipUpdaterView: View {
                     }
                 }
             }
-            if g.key != groupLabels.last?.key { Divider() }
+            if g.key != groupLabels.last?.key { Divider().opacity(0.45) }
         }
+        .padding(.vertical, 4)
     }
 
     private func fileBinding(_ target: String) -> Binding<Bool> {
@@ -522,7 +642,7 @@ struct TumoflipUpdaterView: View {
                         .foregroundStyle(.secondary)
                     Spacer()
                     if updater.manifest?.isReferenceOnlyCatalog == true {
-                        StatusPill(text: "Catalog ready", color: .green, systemImage: "checkmark.seal.fill")
+                        StatusPill(text: "Catalog ready", color: Theme.success, systemImage: "checkmark.seal.fill")
                     } else if let info = statusInfo(updater.overallStatus) {
                         StatusPill(text: info.text, color: info.color, systemImage: info.icon)
                     }
@@ -551,12 +671,12 @@ struct TumoflipUpdaterView: View {
                     title: file,
                     detail: "\(done)/\(total) · \(updater.transferChannel.label)",
                     fraction: Double(min(done, total)) / Double(max(total, 1)),
-                    tint: .orange
+                    tint: Theme.warning
                 )
                 keepAwakeNote
             }
         case .done(let m):
-            Label(m, systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+            Label(m, systemImage: "checkmark.circle.fill").foregroundStyle(Theme.success)
                 .fixedSize(horizontal: false, vertical: true)
         case .failed(let m):
             ActionableErrorView(
@@ -581,7 +701,7 @@ struct TumoflipUpdaterView: View {
               ? "Keep USB SD Mode active on the Flipper until this finishes."
               : "Keep the screen on and the app open — don't lock your phone until this finishes.",
               systemImage: transfer.activeChannel == .usb ? "cable.connector" : "lock.open.iphone")
-            .font(.caption2).foregroundStyle(.orange)
+            .font(.caption2).foregroundStyle(Theme.warning)
             .fixedSize(horizontal: false, vertical: true)
     }
 
@@ -630,7 +750,7 @@ struct TumoflipUpdaterView: View {
                     Spacer()
                     if updater.lastVerifiedOnDevice && !updater.verifying {
                         Label("device-checked", systemImage: "checkmark.seal.fill")
-                            .font(.caption2).foregroundStyle(.green).labelStyle(.titleAndIcon)
+                            .font(.caption2).foregroundStyle(Theme.success).labelStyle(.titleAndIcon)
                     }
                 }
             }
@@ -644,6 +764,21 @@ struct TumoflipUpdaterView: View {
 
     private func toggleExpanded(_ key: String) {
         if expanded.contains(key) { expanded.remove(key) } else { expanded.insert(key) }
+    }
+
+    private func clearManualChannelOverride() {
+        Task {
+            updater.clearManualChannelOverride()
+            await updater.reload(recover: false)
+        }
+    }
+
+    private func selectLatestCatalogRevision() {
+        Task { await updater.selectCatalogRevision(nil) }
+    }
+
+    private func selectCatalogRevision(_ revision: Int?) {
+        Task { await updater.selectCatalogRevision(revision) }
     }
 
     private func fileName(_ target: String) -> String { (target as NSString).lastPathComponent }
@@ -662,18 +797,18 @@ struct TumoflipUpdaterView: View {
     ) -> (text: String, color: Color, icon: String) {
         switch status {
         case .upToDate:
-            return ("Up to date", .green, "checkmark.circle.fill")
+            return ("Up to date", Theme.success, "checkmark.circle.fill")
         case .needsUpdate, .missing, .unknown, .validationError:
             // Keep fail-closed transport/validation distinctions in the model while
             // presenting the agreed three-state package-row vocabulary.
-            return ("Needs update", .orange, "arrow.down.circle.fill")
+            return ("Needs update", Theme.warning, "arrow.down.circle.fill")
         }
     }
 
     private func channelColor(_ channel: TumoflipFirmwareChannel) -> Color {
         switch channel {
-        case .stable: return .green
-        case .dev: return .purple
+        case .stable: return Theme.success
+        case .dev: return Theme.purple
         }
     }
 
@@ -684,30 +819,50 @@ struct TumoflipUpdaterView: View {
         }
     }
 
-    /// Group summaries use the same per-target truth as the expanded FAP rows. Unknown,
-    /// missing, changed, and validation-error targets remain fail-closed as updates.
-    private func groupSummaryInfo(
-        _ group: String
-    ) -> (text: String, color: Color, icon: String)? {
-        let files = updater.files(group)
-        guard !files.isEmpty else { return nil }
-        let needsUpdate = files.lazy.filter {
-            updater.status(file: $0.target) != .upToDate
-        }.count
-        let badge: SourceBadge = needsUpdate == 0
-            ? .upToDate
-            : .updatesAvailable(needsUpdate, of: files.count)
-        return (badge.text, badge.color, badge.systemImage)
-    }
-
     /// Display mapping for a group/overall status. `nil` for `.empty` (no badge).
     private func statusInfo(_ s: TumoflipInstaller.GroupStatus) -> (text: String, color: Color, icon: String)? {
         switch s {
-        case .upToDate:        return ("Up to date", .green, "checkmark.circle.fill")
-        case .updateAvailable: return ("Update available", .orange, "arrow.down.circle.fill")
+        case .upToDate:        return ("Up to date", Theme.success, "checkmark.circle.fill")
+        case .updateAvailable: return ("Update available", Theme.warning, "arrow.down.circle.fill")
         case .notInstalled:    return ("Not installed", .secondary, "circle.dashed")
         case .empty:           return nil
         }
+    }
+}
+
+private struct PackageGroupStatusBadge: View {
+    let pendingUpdates: Int
+    let cleanupCount: Int
+    let accessibilityIdentifier: String
+
+    var body: some View {
+        Group {
+            if pendingUpdates == 0 && cleanupCount == 0 {
+                Label("Current", systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(Theme.success)
+            } else {
+                Text(actionSummary)
+                    .foregroundStyle(Theme.warning)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 4)
+                    .background(Theme.warning.opacity(0.16), in: Capsule())
+            }
+        }
+        .font(.caption2.weight(.medium))
+        .lineLimit(1)
+        .minimumScaleFactor(0.72)
+        .accessibilityIdentifier(accessibilityIdentifier)
+    }
+
+    private var actionSummary: String {
+        var parts: [String] = []
+        if pendingUpdates > 0 {
+            parts.append("\(pendingUpdates) update\(pendingUpdates == 1 ? "" : "s")")
+        }
+        if cleanupCount > 0 {
+            parts.append("\(cleanupCount) cleanup")
+        }
+        return parts.joined(separator: " · ")
     }
 }
 
@@ -751,7 +906,7 @@ struct FWPackagesActionBar: View {
                 title: file,
                 detail: "\(done)/\(total) · \(transferChannel.label)",
                 progress: Double(min(done, total)) / Double(max(total, 1)),
-                tint: .orange,
+                tint: Theme.warning,
                 stopTitle: "Stop cleanup"
             )
         default:
@@ -766,20 +921,17 @@ struct FWPackagesActionBar: View {
             if installCount > 0, let identityNotice {
                 Label(identityNotice.text, systemImage: identityNotice.systemImage)
                     .font(.caption2)
-                    .foregroundStyle(identityNotice.isBlocking ? .red : .orange)
+                    .foregroundStyle(identityNotice.isBlocking ? Theme.danger : Theme.warning)
                     .fixedSize(horizontal: false, vertical: true)
             }
             HStack(spacing: 10) {
                 if installCount > 0 {
-                    Button(action: install) {
-                        Label(
-                            "Install \(installCount)",
-                            systemImage: "square.and.arrow.down.on.square"
-                        )
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(Theme.accent)
+                    compactAction(
+                        title: "Install \(installCount)",
+                        systemImage: "square.and.arrow.down.on.square",
+                        tint: Theme.accent,
+                        action: install
+                    )
                     .disabled(!canInstall)
                     .accessibilityIdentifier("fw-packages-install-action")
                     .accessibilityLabel(
@@ -787,12 +939,13 @@ struct FWPackagesActionBar: View {
                     )
                 }
                 if cleanupCount > 0 {
-                    Button(role: .destructive, action: cleanUp) {
-                        Label("Clean Up \(cleanupCount)", systemImage: "trash")
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.orange)
+                    compactAction(
+                        title: "Clean Up \(cleanupCount)",
+                        systemImage: "trash",
+                        tint: Theme.warning,
+                        role: .destructive,
+                        action: cleanUp
+                    )
                     .disabled(!canCleanUp)
                     .accessibilityIdentifier("fw-packages-cleanup-action")
                     .accessibilityLabel(
@@ -801,9 +954,31 @@ struct FWPackagesActionBar: View {
                 }
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(.bar)
+        .padding(.horizontal, 2)
+        .padding(.vertical, 2)
+    }
+
+    private func compactAction(
+        title: String,
+        systemImage: String,
+        tint: Color,
+        role: ButtonRole? = nil,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(role: role, action: action) {
+            Label(title, systemImage: systemImage)
+                .font(.caption2.weight(.semibold))
+                .labelStyle(.titleAndIcon)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(tint)
+        .background(tint.opacity(0.14), in: Capsule())
+        .overlay {
+            Capsule()
+                .strokeBorder(tint.opacity(0.18), lineWidth: 1)
+        }
     }
 
     private func transactionBar(
@@ -822,21 +997,18 @@ struct FWPackagesActionBar: View {
             )
             .accessibilityIdentifier("fw-packages-progress")
 
-            Button(role: .destructive, action: stop) {
-                Label(
-                    stopRequested ? "Stopping safely…" : stopTitle,
-                    systemImage: "stop.circle.fill"
-                )
-                .frame(maxWidth: .infinity, minHeight: 44)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.red)
+            compactAction(
+                title: stopRequested ? "Stopping safely…" : stopTitle,
+                systemImage: "stop.circle.fill",
+                tint: Theme.danger,
+                role: .destructive,
+                action: stop
+            )
             .disabled(stopRequested)
             .accessibilityIdentifier("fw-packages-stop-action")
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(.bar)
+        .padding(.horizontal, 2)
+        .padding(.vertical, 2)
     }
 }
 
@@ -882,10 +1054,7 @@ struct FWPackagesActionBarQAView: View {
 
     var body: some View {
         NavigationStack {
-            TumoflipUpdaterView(
-                updater: updater,
-                initiallyExpanded: ["module_one"]
-            )
+            TumoflipUpdaterView(updater: updater)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Menu {

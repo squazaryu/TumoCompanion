@@ -32,8 +32,8 @@ enum SourceBadge: Equatable {
         switch self {
         case .notChecked, .notInstalled: return .secondary
         case .checking: return .secondary
-        case .upToDate, .catalogReady: return .green
-        case .updatesAvailable: return .orange
+        case .upToDate, .catalogReady: return Theme.success
+        case .updatesAvailable: return Theme.accent
         }
     }
 
@@ -94,7 +94,7 @@ struct SourceRow: View {
 struct AttentionRow: View {
     let systemImage: String
     let text: String
-    var tint: Color = .orange
+    var tint: Color = Theme.accent
 
     var body: some View {
         HStack(spacing: 10) {

@@ -30,7 +30,7 @@ enum AppIconOption: String, CaseIterable, Identifiable {
 
     var swatch: Color {
         switch self {
-        case .orange, .dolphin: return .orange
+        case .orange, .dolphin: return Theme.accent
         case .green: return Color(white: 0.12)
         case .purple: return Color(white: 0.88)
         case .mono: return Color(white: 0.22)
@@ -137,9 +137,9 @@ struct SettingsHeroCard: View {
 
     private var connectionColor: Color {
         switch ble.state {
-        case .ready: return .green
-        case .connected, .connecting, .scanning: return .orange
-        case .poweredOff, .unauthorized: return .red
+        case .ready: return Theme.success
+        case .connected, .connecting, .scanning: return Theme.warning
+        case .poweredOff, .unauthorized: return Theme.danger
         default: return .secondary
         }
     }

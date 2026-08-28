@@ -42,14 +42,14 @@ struct FlipperScreenCanvas: View {
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(.orange.opacity(0.45), lineWidth: 1)
+                .stroke(Theme.accent.opacity(0.45), lineWidth: 1)
         }
         .shadow(color: .black.opacity(0.18), radius: 8, y: 4)
     }
 }
 
 private struct FlipperRemoteButtonStyle: ButtonStyle {
-    var tint: Color = .orange
+    var tint: Color = Theme.accent
     var diameter: CGFloat = 54
 
     func makeBody(configuration: Configuration) -> some View {
@@ -78,12 +78,12 @@ private struct FlipperBackButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.subheadline.weight(.semibold))
-            .foregroundStyle(configuration.isPressed ? .orange : .primary)
+            .foregroundStyle(configuration.isPressed ? Theme.accent : .primary)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 13)
             .background(Color(.secondarySystemBackground), in: Capsule())
             .overlay {
-                Capsule().strokeBorder(.orange.opacity(configuration.isPressed ? 0.65 : 0.2), lineWidth: 1)
+                Capsule().strokeBorder(Theme.accent.opacity(configuration.isPressed ? 0.65 : 0.2), lineWidth: 1)
             }
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
@@ -191,7 +191,7 @@ struct ScreenView: View {
                 dpadButton(.up, "chevron.up", "Up")
                 HStack(spacing: 8) {
                     dpadButton(.left, "chevron.left", "Left")
-                    dpadButton(.ok, "circle.fill", "OK", tint: .orange)
+                    dpadButton(.ok, "circle.fill", "OK", tint: Theme.accent)
                     dpadButton(.right, "chevron.right", "Right")
                 }
                 dpadButton(.down, "chevron.down", "Down")
@@ -201,7 +201,7 @@ struct ScreenView: View {
             .background {
                 Circle()
                     .fill(Color(.tertiarySystemFill))
-                    .overlay { Circle().strokeBorder(.orange.opacity(0.12), lineWidth: 1) }
+                    .overlay { Circle().strokeBorder(Theme.accent.opacity(0.12), lineWidth: 1) }
             }
 
             Button {
@@ -213,7 +213,7 @@ struct ScreenView: View {
         }
         .frame(maxWidth: 360)
         .frame(maxWidth: .infinity)
-        .card(tint: .orange, padding: 14)
+        .card(tint: Theme.accent, padding: 14)
     }
 
     private func dpadButton(_ key: PBGui_InputKey,

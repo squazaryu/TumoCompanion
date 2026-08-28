@@ -38,7 +38,7 @@ struct RemotesView: View {
                             } else if let ack = companion.lastAck {
                                 let ok = ack.hasPrefix("ok")
                                 Image(systemName: ok ? "checkmark.circle.fill" : "xmark.circle.fill")
-                                    .foregroundStyle(ok ? .green : .red)
+                                    .foregroundStyle(ok ? Theme.success : Theme.danger)
                                 Text(ack).font(.system(.caption, design: .monospaced))
                             }
                             Spacer()
@@ -54,10 +54,10 @@ struct RemotesView: View {
                                     Task { await companion.transmitSubGhz(path) }
                                 } label: {
                                     HStack {
-                                        Image(systemName: "dot.radiowaves.right").foregroundStyle(.orange)
+                                        Image(systemName: "dot.radiowaves.right").foregroundStyle(Theme.accent)
                                         Text(name(path)).foregroundStyle(.primary)
                                         Spacer()
-                                        Image(systemName: "paperplane.fill").foregroundStyle(.orange)
+                                        Image(systemName: "paperplane.fill").foregroundStyle(Theme.accent)
                                     }
                                     .contentShape(Rectangle())
                                 }

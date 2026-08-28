@@ -294,7 +294,7 @@ struct DolphinGalleryView: View {
         case .idle:
             HStack {
                 Circle()
-                    .fill(ble.state == .ready ? Color.green : Color.secondary)
+                    .fill(ble.state == .ready ? Theme.success : Color.secondary)
                     .frame(width: 7, height: 7)
                 Text(ble.state == .ready ? "Flipper connected" : "Connect Flipper to apply")
                     .font(.caption)
@@ -321,11 +321,11 @@ struct DolphinGalleryView: View {
         case .applied:
             Label("Profile applied", systemImage: "checkmark.circle.fill")
                 .font(.caption)
-                .foregroundStyle(.green)
+                .foregroundStyle(Theme.success)
         case .failed(let message):
             Label(message, systemImage: "exclamationmark.triangle.fill")
                 .font(.caption)
-                .foregroundStyle(.red)
+                .foregroundStyle(Theme.danger)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -625,7 +625,7 @@ private struct DolphinLibraryTile: View {
             case .downloaded:
                 Label("On iPhone", systemImage: "checkmark.circle.fill")
                     .font(.caption)
-                    .foregroundStyle(.green)
+                    .foregroundStyle(Theme.success)
             case .unknown, .notDownloaded, .failed:
                 Button {
                     action?()

@@ -45,7 +45,7 @@ struct ConnectivitySettingsView: View {
                 if let error = deviceServices.lastError {
                     Text("Last error: \(error)")
                         .font(.system(.caption2, design: .monospaced))
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Theme.accent)
                 }
                 NavigationLink { FieldServicesView() } label: {
                     Label("Field Services settings", systemImage: "location.viewfinder")
@@ -65,7 +65,7 @@ struct ConnectivitySettingsView: View {
                 if buddy.enabled {
                     HStack {
                         Image(systemName: buddy.active ? "dot.radiowaves.left.and.right" : "moon.zzz")
-                            .foregroundStyle(buddy.active ? .green : .secondary)
+                            .foregroundStyle(buddy.active ? Theme.success : .secondary)
                         Text(buddy.active ? "Active — RPC is paused" : "Idle — RPC is available")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
@@ -91,7 +91,7 @@ struct ConnectivitySettingsView: View {
             Spacer()
             Text(status.label)
                 .font(.caption)
-                .foregroundStyle(status == .inUse ? .green : .secondary)
+                .foregroundStyle(status == .inUse ? Theme.success : .secondary)
         }
     }
 }
@@ -107,7 +107,7 @@ struct AutomationSettingsView: View {
                     Spacer()
                     Text(statusText)
                         .font(.caption)
-                        .foregroundStyle(status == .authorized ? .green : .secondary)
+                        .foregroundStyle(status == .authorized ? Theme.success : .secondary)
                 }
                 if status == .notDetermined {
                     Button("Enable notifications") {
@@ -170,7 +170,7 @@ struct AboutSettingsView: View {
                     Spacer()
                     Text(ble.state == .ready ? (ble.appBridgeV2 ? "v2 (FAB2)" : "v1 (FAB1)") : "—")
                         .font(.system(.footnote, design: .monospaced))
-                        .foregroundStyle(ble.appBridgeV2 ? .green : .secondary)
+                        .foregroundStyle(ble.appBridgeV2 ? Theme.success : .secondary)
                 }
                 Divider().opacity(0.4)
                 Button { settings.onboardingDone = false } label: {

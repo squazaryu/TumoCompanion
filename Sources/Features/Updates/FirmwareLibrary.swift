@@ -482,6 +482,49 @@ final class FirmwareLibrary: ObservableObject {
     }
 }
 
+#if DEBUG
+extension FirmwareLibrary {
+    static func layoutQAFixture() -> FirmwareLibrary {
+        let library = FirmwareLibrary()
+        let baseDate = Date(timeIntervalSince1970: 1_787_875_200)
+
+        func release(
+            _ version: String,
+            channel: TumoflipFirmwareChannel,
+            daysAgo: Double,
+            size: Int64
+        ) -> FirmwareRelease {
+            FirmwareRelease(
+                id: version,
+                tag: version,
+                title: version,
+                version: version,
+                channel: channel,
+                publishedAt: baseDate.addingTimeInterval(-daysAgo * 86_400),
+                notes: "Deterministic firmware layout fixture.",
+                updaterURL: URL(string: "https://example.invalid/\(version).tgz")!,
+                updaterSize: size,
+                updaterSHA256: String(repeating: "a", count: 64),
+                checksumsURL: nil,
+                manifestURL: nil
+            )
+        }
+
+        library.releases = [
+            release("t-dev-008-002", channel: .dev, daysAgo: 0, size: 1_920_000),
+            release("t-dev-008-001", channel: .dev, daysAgo: 1, size: 1_910_000),
+            release("t-flppr-fw-008", channel: .stable, daysAgo: 2, size: 1_900_000),
+            release("t-flppr-fw-007", channel: .stable, daysAgo: 8, size: 1_860_000),
+        ]
+        library.installedVersion = "t-flppr-fw-007"
+        library.installedAPI = "88.4"
+        library.selectedChannel = .stable
+        library.phase = .ready
+        return library
+    }
+}
+#endif
+
 enum FirmwareCatalog {
     static func decode(_ data: Data) throws -> [FirmwareRelease] {
         try decode([data])

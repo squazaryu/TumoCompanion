@@ -161,7 +161,7 @@ struct CatalogListView: View {
                     HStack { Spacer(); ProgressView(); Spacer() }
                 } else if let error = vm.errorMessage {
                     Label(error, systemImage: "exclamationmark.triangle.fill")
-                        .font(.caption).foregroundStyle(.orange)
+                        .font(.caption).foregroundStyle(Theme.accent)
                 } else if vm.apps.isEmpty {
                     if vm.sort == .installed {
                         ContentUnavailableView("Nothing installed", systemImage: "square.grid.2x2",

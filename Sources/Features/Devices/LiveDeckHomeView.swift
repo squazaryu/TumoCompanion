@@ -81,11 +81,11 @@ private struct LiveDeckConsoleCard: View {
     }
 
     private var tint: Color {
-        if automationPreview { return .green }
+        if automationPreview { return Theme.success }
         switch ble.state {
-        case .ready: return .green
-        case .connected, .connecting, .scanning: return .yellow
-        case .poweredOff, .unauthorized: return .red
+        case .ready: return Theme.success
+        case .connected, .connecting, .scanning: return Theme.caution
+        case .poweredOff, .unauthorized: return Theme.danger
         default: return .secondary
         }
     }
@@ -288,7 +288,7 @@ private struct LiveDeckPreviewScreen: View {
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.orange.opacity(0.5), lineWidth: 1)
+                .strokeBorder(Theme.accent.opacity(0.5), lineWidth: 1)
         }
     }
 }
@@ -980,7 +980,7 @@ private struct LiveDeckBattery: View {
     var valueFont: Font = .caption2.weight(.bold)
 
     private var tint: Color {
-        level <= 15 ? .red : level <= 30 ? .orange : .green
+        level <= 15 ? Theme.danger : level <= 30 ? Theme.accent : Theme.success
     }
 
     var body: some View {
@@ -1101,10 +1101,10 @@ private enum LiveDeckSourceStatus: Equatable {
 
     var tint: Color {
         switch self {
-        case .ready: return .green
-        case .loading: return .orange
+        case .ready: return Theme.success
+        case .loading: return Theme.accent
         case .waiting: return .secondary
-        case .attention: return .red
+        case .attention: return Theme.danger
         }
     }
 }

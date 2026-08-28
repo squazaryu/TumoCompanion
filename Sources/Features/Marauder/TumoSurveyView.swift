@@ -55,7 +55,7 @@ struct TumoSurveyView: View {
                 Label("App Bridge v2 is unavailable for this firmware.",
                       systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(Theme.accent)
             } else {
                 HStack {
                     statTile("\(live.result.aps.count)", "networks")
@@ -165,8 +165,8 @@ struct TumoSurveyView: View {
     }
 
     private var statusColor: Color {
-        guard ble.appBridgeV2 else { return .orange }
-        return live.session.isActive ? .green : .secondary
+        guard ble.appBridgeV2 else { return Theme.accent }
+        return live.session.isActive ? Theme.success : .secondary
     }
 
     private var securedCount: Int {

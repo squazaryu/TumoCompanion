@@ -165,12 +165,12 @@ struct MediaRemoteView: View {
         SectionCard(title: "MediaRemote", systemImage: "music.note.list",
                     accessory: AnyView(StatusPill(
                         text: vm.isAvailable ? "Available" : "Unavailable",
-                        color: vm.isAvailable ? .green : .orange,
+                        color: vm.isAvailable ? Theme.success : Theme.accent,
                         systemImage: vm.isAvailable ? "checkmark.circle.fill" : "xmark.circle.fill"))) {
             if !vm.isAvailable {
                 Label("iOS doesn't expose the system now-playing to this app on your version — the MediaRemote private framework is restricted here. The Flipper relay can't read tracks on this device.",
                       systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption).foregroundStyle(.orange)
+                    .font(.caption).foregroundStyle(Theme.accent)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
                 Text("Reads whatever app currently holds the system media session (Spotify, Apple Music, Podcasts, …).")
@@ -190,7 +190,7 @@ struct MediaRemoteView: View {
                     Text("State").foregroundStyle(.secondary)
                     Spacer()
                     StatusPill(text: np.isPlaying ? "Playing" : "Paused",
-                               color: np.isPlaying ? .green : .secondary,
+                               color: np.isPlaying ? Theme.success : .secondary,
                                systemImage: np.isPlaying ? "play.fill" : "pause.fill")
                 }
             } else {
@@ -222,7 +222,7 @@ struct MediaRemoteView: View {
         SectionCard(title: "Relay to Flipper", systemImage: "antenna.radiowaves.left.and.right",
                     accessory: AnyView(StatusPill(
                         text: ble.supportsAppBridge ? "App Bridge" : "No bridge",
-                        color: ble.supportsAppBridge ? .green : .orange,
+                        color: ble.supportsAppBridge ? Theme.success : Theme.accent,
                         systemImage: "dot.radiowaves.left.and.right"))) {
             Toggle(isOn: Binding(get: { vm.relaying }, set: { vm.setRelaying($0) })) {
                 Text("Stream now-playing to the media_remote FAP")
@@ -231,7 +231,7 @@ struct MediaRemoteView: View {
             .disabled(!ble.supportsAppBridge)
             if let at = vm.lastRelayAt {
                 HStack(spacing: 6) {
-                    Circle().fill(.green).frame(width: 7, height: 7)
+                    Circle().fill(Theme.success).frame(width: 7, height: 7)
                     Text("Sent").font(.caption).foregroundStyle(.secondary)
                     Text(at, style: .relative).font(.caption).foregroundStyle(.secondary)
                     Text("ago").font(.caption).foregroundStyle(.secondary)

@@ -56,24 +56,24 @@ enum HomeTileID: String, Codable, CaseIterable, Identifiable, Hashable {
 
     var tint: Color {
         switch self {
-        case .info:    return .blue
-        case .apps:    return .indigo
-        case .files:   return .cyan
-        case .airadar: return .green
-        case .wifi:    return .mint
-        case .fieldServices: return .blue
-        case .spectrum: return .orange
-        case .relay:   return .red
-        case .tumonet: return .orange
-        case .esp32:   return .pink
-        case .updates: return .teal
-        case .backup:  return .purple
-        case .remotes: return .orange
-        case .media:   return .pink
-        case .screen:  return .teal
-        case .firmware: return .orange
-        case .packages: return .blue
-        case .communityApps: return .indigo
+        case .info:    return Theme.info
+        case .apps:    return Theme.indigo
+        case .files:   return Theme.cyan
+        case .airadar: return Theme.success
+        case .wifi:    return Theme.mint
+        case .fieldServices: return Theme.info
+        case .spectrum: return Theme.accent
+        case .relay:   return Theme.danger
+        case .tumonet: return Theme.accent
+        case .esp32:   return Theme.pink
+        case .updates: return Theme.teal
+        case .backup:  return Theme.purple
+        case .remotes: return Theme.accent
+        case .media:   return Theme.pink
+        case .screen:  return Theme.teal
+        case .firmware: return Theme.accent
+        case .packages: return Theme.info
+        case .communityApps: return Theme.indigo
         }
     }
 
@@ -97,15 +97,15 @@ struct HomeToolSpec: Identifiable {
 
 enum HomeToolCatalog {
     static let all: [HomeToolSpec] = [
-        .init(id: .fieldServices, title: "Field Services", systemImage: "iphone.and.arrow.forward", tint: .blue),
-        .init(id: .wifi, title: "WiFi Survey", systemImage: "wifi", tint: .teal),
-        .init(id: .airadar, title: "AI Radar", systemImage: "dot.radiowaves.left.and.right", tint: .purple),
-        .init(id: .spectrum, title: "Spectrum", systemImage: "waveform.path.ecg", tint: .orange),
-        .init(id: .relay, title: "Relay", systemImage: "switch.2", tint: .green),
-        .init(id: .tumonet, title: "TumoNet", systemImage: "network", tint: .indigo),
-        .init(id: .esp32, title: "ESP32", systemImage: "cpu", tint: .pink),
-        .init(id: .remotes, title: "Remotes", systemImage: "switch.2", tint: .cyan),
-        .init(id: .media, title: "Media Remote", systemImage: "play.rectangle", tint: .mint)
+        .init(id: .fieldServices, title: "Field Services", systemImage: "iphone.and.arrow.forward", tint: Theme.info),
+        .init(id: .wifi, title: "WiFi Survey", systemImage: "wifi", tint: Theme.teal),
+        .init(id: .airadar, title: "AI Radar", systemImage: "dot.radiowaves.left.and.right", tint: Theme.purple),
+        .init(id: .spectrum, title: "Spectrum", systemImage: "waveform.path.ecg", tint: Theme.accent),
+        .init(id: .relay, title: "Relay", systemImage: "switch.2", tint: Theme.success),
+        .init(id: .tumonet, title: "TumoNet", systemImage: "network", tint: Theme.indigo),
+        .init(id: .esp32, title: "ESP32", systemImage: "cpu", tint: Theme.pink),
+        .init(id: .remotes, title: "Remotes", systemImage: "switch.2", tint: Theme.cyan),
+        .init(id: .media, title: "Media Remote", systemImage: "play.rectangle", tint: Theme.mint)
     ]
 
     static let ids = all.map(\.id)

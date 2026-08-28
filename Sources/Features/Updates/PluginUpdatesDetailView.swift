@@ -13,38 +13,31 @@ struct PluginUpdatesDetailView: View {
     @State private var incompatibleExpanded = false
     @State private var showHelp = false
     @State private var showCleanupConfirmation = false
+    @State private var detailsDrawerExpanded = false
 
     var body: some View {
-        CardScroll(refreshAction: refreshCommunityApps) {
-            SectionCard(title: "Community apps", systemImage: "shippingbox",
-                        accessory: AnyView(StatusPill(
-                            text: transfer.activeChannel.label,
-                            color: transfer.activeChannel == .usb ? .blue : .secondary,
-                            systemImage: transfer.activeChannel.systemImage))) {
-                statusRow
-                HStack(spacing: 10) {
-                    if showInlineCheck {
-                        PillButton(title: "Check", systemImage: "arrow.triangle.2.circlepath") {
-                            Task { await updater.check() }
-                        }
-                        .disabled(busy)
-                    }
-                    if updater.canVerifyOnDevice {
-                        PillButton(title: "Verify on device", systemImage: "checkmark.seal", tint: .secondary) {
-                            Task { await updater.verifyInstalled() }
-                        }
-                        .disabled(busy || !hasFileChannel)
-                    }
-                }
+        ZStack(alignment: .bottom) {
+            CardScroll(refreshAction: refreshCommunityApps) {
+                communityStatusCard
+                communityOverviewCard
+                communityActionBar
+
+                // Keep only the folder tab's collapsed footprint in the page.
+                // Release selection and long app lists slide over the overview.
+                Color.clear.frame(height: 58)
             }
 
-            releaseCard
-
-            if updater.phase == .needsBaseline { baselineCard }
-
-            if !updater.updates.isEmpty { changedCard }
-
-            if updater.verifyResult != nil || updater.lastCleanup != nil { lastRunCard }
+            BottomFolderDrawer(
+                isExpanded: $detailsDrawerExpanded,
+                title: "APP DETAILS",
+                summary: communityDetailsSummary,
+                systemImage: "puzzlepiece.extension.fill",
+                accessibilityIdentifier: "community-apps-details-drawer-toggle",
+                panelHeight: communityDetailsDrawerHeight,
+                maxPanelHeight: 420
+            ) {
+                communityDetailsPanel
+            }
         }
         .navigationTitle("Community apps")
         .navigationBarTitleDisplayMode(.inline)
@@ -62,9 +55,6 @@ struct PluginUpdatesDetailView: View {
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
-                    Button { Task { await updater.check() } } label: {
-                        Label("Check now", systemImage: "arrow.triangle.2.circlepath")
-                    }
                     Button {
                         updater.resetBaseline()
                         Task { await updater.check() }   // forces the baseline choice → re-scan
@@ -73,53 +63,6 @@ struct PluginUpdatesDetailView: View {
                     }
                 } label: { Image(systemName: "ellipsis.circle") }
                 .disabled(busy)
-            }
-        }
-        .safeAreaInset(edge: .bottom) {
-            if case .installing = updater.phase {
-                VStack(spacing: 6) {
-                    Button(role: .destructive) { updater.requestStop() } label: {
-                        Label(updater.stopRequested ? "Stopping after current app…" : "Stop install",
-                              systemImage: "stop.circle.fill")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent).tint(.red)
-                    .disabled(updater.stopRequested)
-                }
-                .padding()
-                .background(.bar)
-            } else if !busy,
-                      updater.selectedCount > 0 || updater.pendingCleanupCount > 0 {
-                VStack(spacing: 6) {
-                    if updater.selectedCount > 0 {
-                        Button {
-                            Task { await updater.install() }
-                        } label: {
-                            Label("Install \(updater.selectedCount) selected via \(transfer.activeChannel.label)",
-                                  systemImage: "square.and.arrow.down.on.square")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(!hasFileChannel || ble.state != .ready || updater.validating)
-                    }
-                    if updater.pendingCleanupCount > 0 {
-                        Button(role: .destructive) {
-                            showCleanupConfirmation = true
-                        } label: {
-                            Label(
-                                "Clean Up \(updater.pendingCleanupCount)",
-                                systemImage: "trash"
-                            )
-                            .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(.orange)
-                        .disabled(!hasFileChannel)
-                        .accessibilityIdentifier("community-cleanup-action")
-                    }
-                }
-                .padding()
-                .background(.bar)
             }
         }
         .onAppear { if case .idle = updater.phase, updater.updates.isEmpty { Task { await updater.check() } } }
@@ -140,32 +83,318 @@ struct PluginUpdatesDetailView: View {
         }
     }
 
-    /// xMasterX occasionally ships a same-day follow-up build (tag suffixed p2, p3, …)
-    /// when the first cut needed a fix — "Auto" (GitHub's own "latest") should track that,
-    /// but this lets you pin an exact release if Auto hasn't picked it up yet, or to roll
-    /// back deliberately.
-    private var releaseCard: some View {
-        CollapsibleCard(title: "Release", systemImage: "tag",
-                        accessory: AnyView(StatusPill(
-                            text: updater.manualReleaseTag ?? "Auto",
-                            color: updater.manualReleaseTag == nil ? .secondary : .orange,
-                            systemImage: updater.manualReleaseTag == nil ? "wand.and.stars" : "pin.fill"))) {
-            Text(updater.manualReleaseTag == nil ? "Latest release" : "Pinned: \(updater.manualReleaseTag ?? "")")
-                .font(.caption2).foregroundStyle(.secondary)
-            PillButton(title: "Choose release…", systemImage: "list.bullet") {
-                showReleasePicker = true
+    private var communityStatusCard: some View {
+        SectionCard(
+            title: "Community apps",
+            systemImage: "shippingbox",
+            accessory: AnyView(StatusPill(
+                text: transfer.activeChannel.label,
+                color: transfer.activeChannel == .usb ? Theme.info : .secondary,
+                systemImage: transfer.activeChannel.systemImage
+            ))
+        ) {
+            statusRow
+            if updater.canVerifyOnDevice {
+                PillButton(
+                    title: "Verify on device",
+                    systemImage: "checkmark.seal",
+                    tint: .secondary
+                ) {
+                    Task { await updater.verifyInstalled() }
+                }
+                .disabled(busy || !hasFileChannel)
             }
         }
     }
 
-    /// Inline re-check button: shown once a check has finished (done/failed/baseline),
-    /// hidden while idle (onAppear auto-checks) or busy. The toolbar always has "Check now".
-    private var showInlineCheck: Bool {
-        if case .idle = updater.phase { return false }
-        return !busy
+    private var communityOverviewCard: some View {
+        SectionCard(
+            title: "Community catalog",
+            systemImage: "puzzlepiece.extension.fill",
+            accessory: AnyView(StatusPill(
+                text: updater.manualReleaseTag ?? "Auto",
+                color: updater.manualReleaseTag == nil ? Color.secondary : Theme.warning,
+                systemImage: updater.manualReleaseTag == nil ? "wand.and.stars" : "pin.fill"
+            ))
+        ) {
+            communityOverviewRow(
+                title: "Release",
+                detail: updater.tag.isEmpty ? "Not checked" : updater.tag,
+                systemImage: "tag"
+            )
+            communityOverviewRow(
+                title: "Changes",
+                detail: communityChangesSummary,
+                systemImage: "checklist"
+            )
+            communityOverviewRow(
+                title: "Last run",
+                detail: communityLastRunSummary,
+                systemImage: lastRunNeedsAttention
+                    ? "exclamationmark.triangle.fill" : "checkmark.seal"
+            )
+            Text("Pull down to check again. Open the folder tab below for releases, app selection, and audit details.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 
-    /// Bulk-selection menu, used as the changed-card's header accessory.
+    private func communityOverviewRow(
+        title: String,
+        detail: String,
+        systemImage: String
+    ) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: systemImage)
+                .font(.subheadline)
+                .foregroundStyle(lastRunNeedsAttention && title == "Last run" ? Theme.warning : Theme.accent)
+                .frame(width: 22)
+            Text(title)
+                .font(.subheadline.weight(.medium))
+            Spacer(minLength: 8)
+            Text(detail)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.68)
+        }
+    }
+
+    private var communityChangesSummary: String {
+        if updater.phase == .needsBaseline { return "First sync required" }
+        if !updater.updates.isEmpty {
+            return "\(updater.updates.count) changed · \(updater.selectedCount) selected"
+        }
+        if busy { return "Checking…" }
+        return updater.tag.isEmpty ? "Not checked" : "Up to date"
+    }
+
+    private var communityLastRunSummary: String {
+        if let result = updater.verifyResult {
+            return result.ok
+                ? "\(result.verified) verified"
+                : "\(result.failed.count) need review"
+        }
+        if let cleanup = updater.lastCleanup {
+            return cleanup.kept.isEmpty
+                ? "\(cleanup.removed.count) cleaned"
+                : "\(cleanup.kept.count) kept for review"
+        }
+        return "No device check yet"
+    }
+
+    @ViewBuilder
+    private var communityActionBar: some View {
+        if case .installing = updater.phase {
+            compactCommunityAction(
+                title: updater.stopRequested ? "Stopping…" : "Stop install",
+                systemImage: "stop.circle.fill",
+                tint: Theme.danger,
+                role: .destructive,
+                action: updater.requestStop
+            )
+            .disabled(updater.stopRequested)
+        } else if !busy,
+                  updater.selectedCount > 0 || updater.pendingCleanupCount > 0 {
+            HStack(spacing: 10) {
+                if updater.selectedCount > 0 {
+                    compactCommunityAction(
+                        title: "Install \(updater.selectedCount)",
+                        systemImage: "square.and.arrow.down.on.square",
+                        tint: Theme.accent,
+                        action: { Task { await updater.install() } }
+                    )
+                    .disabled(!hasFileChannel || updater.validating)
+                    .accessibilityIdentifier("community-install-action")
+                }
+                if updater.pendingCleanupCount > 0 {
+                    compactCommunityAction(
+                        title: "Clean Up \(updater.pendingCleanupCount)",
+                        systemImage: "trash",
+                        tint: Theme.warning,
+                        role: .destructive,
+                        action: { showCleanupConfirmation = true }
+                    )
+                    .disabled(!hasFileChannel)
+                    .accessibilityIdentifier("community-cleanup-action")
+                }
+            }
+            .padding(.horizontal, 2)
+            .padding(.vertical, 2)
+        }
+    }
+
+    private func compactCommunityAction(
+        title: String,
+        systemImage: String,
+        tint: Color,
+        role: ButtonRole? = nil,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(role: role, action: action) {
+            Label(title, systemImage: systemImage)
+                .font(.caption2.weight(.semibold))
+                .lineLimit(1)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 9)
+                .foregroundStyle(tint)
+                .background(tint.opacity(0.13), in: Capsule())
+                .overlay {
+                    Capsule().strokeBorder(tint.opacity(0.2), lineWidth: 1)
+                }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var communityDetailsSummary: String {
+        if updater.phase == .needsBaseline { return "First sync" }
+        if !updater.updates.isEmpty {
+            return "\(updater.updates.count) update\(updater.updates.count == 1 ? "" : "s")"
+        }
+        return updater.tag.isEmpty ? "Not checked" : "Up to date"
+    }
+
+    private var communityDetailsDrawerHeight: CGFloat {
+        let releaseSection: CGFloat = 82
+        let baselineSection: CGFloat = updater.phase == .needsBaseline ? 100 : 0
+        let categoryRows = CGFloat(min(max(installCategories.count, 1), 4)) * 40
+        let updateSection: CGFloat = updater.updates.isEmpty ? 36 : 42 + categoryRows
+        let lastRunSection: CGFloat = updater.verifyResult != nil || updater.lastCleanup != nil ? 110 : 0
+        return min(420, max(240, releaseSection + baselineSection + updateSection + lastRunSection))
+    }
+
+    private var communityDetailsPanel: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 7) {
+                Label("COMMUNITY RELEASE", systemImage: "tag")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(Color.primary.opacity(0.62))
+                    .tracking(0.8)
+                Spacer(minLength: 8)
+                StatusPill(
+                    text: updater.manualReleaseTag ?? "Auto",
+                    color: updater.manualReleaseTag == nil ? Color.secondary : Theme.warning,
+                    systemImage: updater.manualReleaseTag == nil ? "wand.and.stars" : "pin.fill"
+                )
+            }
+
+            HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(updater.tag.isEmpty ? "No release loaded" : updater.tag)
+                        .font(.caption2.weight(.semibold))
+                        .lineLimit(1)
+                    Text(updater.manualReleaseTag == nil ? "Latest compatible release" : "Pinned release")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 8)
+                Button { showReleasePicker = true } label: {
+                    Label("Choose", systemImage: "list.bullet")
+                        .font(.caption2.weight(.semibold))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .foregroundStyle(Theme.accent)
+                        .background(Theme.accent.opacity(0.13), in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("community-release-picker-action")
+            }
+
+            if updater.phase == .needsBaseline {
+                Divider().opacity(0.45)
+                firstSyncDetails
+            }
+
+            if !updater.updates.isEmpty || !updater.blockedUpdates.isEmpty {
+                Divider().opacity(0.45)
+                changedAppsDetails
+            }
+
+            if updater.verifyResult != nil || updater.lastCleanup != nil {
+                Divider().opacity(0.45)
+                lastRunDetails
+            }
+        }
+    }
+
+    private var firstSyncDetails: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("FIRST SYNC", systemImage: "scope")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(Color.primary.opacity(0.62))
+                .tracking(0.8)
+            HStack(spacing: 8) {
+                compactCommunityAction(
+                    title: "Scan Flipper",
+                    systemImage: "magnifyingglass",
+                    tint: Theme.accent,
+                    action: { Task { await updater.scanBaseline() } }
+                )
+                .disabled(!hasFileChannel)
+                compactCommunityAction(
+                    title: "Already installed",
+                    systemImage: "checkmark.circle",
+                    tint: .secondary,
+                    action: updater.seedBaseline
+                )
+            }
+        }
+    }
+
+    private var changedAppsDetails: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 7) {
+                Label("CHANGED APPS", systemImage: "checklist")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(Color.primary.opacity(0.62))
+                    .tracking(0.8)
+                Spacer(minLength: 8)
+                selectMenu
+            }
+            if updater.changedFromScan > 0 {
+                Label(
+                    "\(updater.changedFromScan) local build\(updater.changedFromScan == 1 ? "" : "s") left unselected",
+                    systemImage: "exclamationmark.shield.fill"
+                )
+                .font(.caption2)
+                .foregroundStyle(Theme.warning)
+            }
+            LazyVStack(spacing: 6) {
+                ForEach(installCategories, id: \.self) { category in
+                    categorySection(category)
+                }
+                if !updater.blockedUpdates.isEmpty { incompatibleSection }
+            }
+        }
+    }
+
+    private var lastRunDetails: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 7) {
+                Label(
+                    "LAST RUN",
+                    systemImage: lastRunNeedsAttention
+                        ? "exclamationmark.triangle.fill" : "checkmark.seal"
+                )
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(lastRunNeedsAttention ? Theme.warning : Color.primary.opacity(0.62))
+                .tracking(0.8)
+                Spacer(minLength: 8)
+                lastRunPills
+            }
+            if let result = updater.verifyResult {
+                verifyDetail(result)
+            }
+            if let cleanup = updater.lastCleanup {
+                if updater.verifyResult != nil { Divider().opacity(0.35) }
+                cleanupDetail(cleanup)
+            }
+        }
+    }
+
+    /// Bulk-selection menu used in the bottom app-details drawer.
     private var selectMenu: some View {
         Menu {
             Button("Select all") { select { _ in true } }
@@ -179,14 +408,19 @@ struct PluginUpdatesDetailView: View {
         } label: {
             HStack(spacing: 4) {
                 Text("\(updater.selectedCount)/\(updater.installableUpdates.count)")
-                    .font(.caption).foregroundStyle(.secondary)
-                Image(systemName: "checklist").font(.caption).foregroundStyle(Theme.accent)
+                    .font(.caption2).foregroundStyle(.secondary)
+                Image(systemName: "checklist").font(.caption2).foregroundStyle(Theme.accent)
             }
         }
     }
 
     private var hasFileChannel: Bool {
-        transfer.activeChannel == .usb || ble.state == .ready || ble.state == .connected
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-community-apps-layout-qa") {
+            return true
+        }
+        #endif
+        return transfer.activeChannel == .usb || ble.state == .ready || ble.state == .connected
     }
 
     private func refreshCommunityApps() async {
@@ -204,36 +438,6 @@ struct PluginUpdatesDetailView: View {
         }
     }
 
-    private var baselineCard: some View {
-        SectionCard(title: "First sync", systemImage: "magnifyingglass") {
-            Text(updater.tag).font(.caption).foregroundStyle(.secondary)
-            PillButton(title: "Scan Flipper (accurate)", systemImage: "magnifyingglass") {
-                Task { await updater.scanBaseline() }
-            }.disabled(!hasFileChannel)
-            PillButton(title: "This build is already installed", systemImage: "checkmark.circle", tint: .secondary) {
-                updater.seedBaseline()
-            }
-        }
-    }
-
-    private var changedCard: some View {
-        SectionCard(title: "\(updater.updates.count) changed · \(updater.tag)",
-                    systemImage: "checklist", accessory: AnyView(selectMenu)) {
-            if updater.changedFromScan > 0 {
-                Label("\(updater.changedFromScan) app\(updater.changedFromScan == 1 ? "" : "s") differ from the pack (marked UPD) — may be YOUR modified builds, left unticked. Long-press a row → Protect to keep yours.",
-                      systemImage: "exclamationmark.shield.fill")
-                    .font(.caption2).foregroundStyle(.orange)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            LazyVStack(spacing: 8) {
-                ForEach(installCategories, id: \.self) { category in
-                    categorySection(category)
-                }
-                if !updater.blockedUpdates.isEmpty { incompatibleSection }
-            }
-        }
-    }
-
     /// Whether the consolidated "Last run" card should open expanded — only when there's
     /// something that actually needs a look (a failed verify, or a duplicate kept for
     /// manual review), not just routine "everything's fine" output.
@@ -241,26 +445,6 @@ struct PluginUpdatesDetailView: View {
         if let vr = updater.verifyResult, !vr.ok { return true }
         if let cl = updater.lastCleanup, !cl.kept.isEmpty { return true }
         return false
-    }
-
-    /// Combines the last install's signature verification and legacy-duplicate cleanup
-    /// into one card instead of two, since they're both "what happened last time".
-    private var lastRunCard: some View {
-        CollapsibleCard(title: "Last run",
-                        systemImage: lastRunNeedsAttention ? "exclamationmark.triangle.fill" : "checkmark.seal",
-                        accessory: AnyView(lastRunPills), startExpanded: lastRunNeedsAttention) {
-            if let vr = updater.verifyResult {
-                Text((vr.kind == .onDevice ? "Device verification" : "Install").uppercased())
-                    .font(.caption2).fontWeight(.semibold).foregroundStyle(.secondary).tracking(0.5)
-                verifyDetail(vr)
-            }
-            if let cl = updater.lastCleanup {
-                if updater.verifyResult != nil { Divider() }
-                Text("Cleanup".uppercased())
-                    .font(.caption2).fontWeight(.semibold).foregroundStyle(.secondary).tracking(0.5)
-                cleanupDetail(cl)
-            }
-        }
     }
 
     private var lastRunPills: some View {
@@ -272,15 +456,15 @@ struct PluginUpdatesDetailView: View {
 
     private func verifyPills(_ vr: VerifyResult) -> some View {
         HStack(spacing: 6) {
-            Text("\(vr.verified)✓").font(.caption).foregroundStyle(.green)
-            if !vr.ok { Text("\(vr.failed.count)✗").font(.caption).foregroundStyle(.orange) }
+            Text("\(vr.verified)✓").font(.caption).foregroundStyle(Theme.success)
+            if !vr.ok { Text("\(vr.failed.count)✗").font(.caption).foregroundStyle(Theme.warning) }
         }
     }
 
     private func cleanupPills(_ cl: CleanupResult) -> some View {
         HStack(spacing: 6) {
-            if !cl.removed.isEmpty { Text("\(cl.removed.count) removed").font(.caption).foregroundStyle(.green) }
-            if !cl.kept.isEmpty { Text("\(cl.kept.count) kept").font(.caption).foregroundStyle(.orange) }
+            if !cl.removed.isEmpty { Text("\(cl.removed.count) removed").font(.caption).foregroundStyle(Theme.success) }
+            if !cl.kept.isEmpty { Text("\(cl.kept.count) kept").font(.caption).foregroundStyle(Theme.warning) }
         }
     }
 
@@ -290,7 +474,7 @@ struct PluginUpdatesDetailView: View {
                 .font(.caption2).foregroundStyle(.secondary)
                 .accessibilityIdentifier("community-cleanup-removed")
             Text(cl.removed.prefix(12).joined(separator: "\n") + (cl.removed.count > 12 ? "\n…" : ""))
-                .font(.system(.caption2, design: .monospaced)).foregroundStyle(.green)
+                .font(.system(.caption2, design: .monospaced)).foregroundStyle(Theme.success)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("community-cleanup-removed-paths")
         }
@@ -302,7 +486,7 @@ struct PluginUpdatesDetailView: View {
                 .font(.caption2).foregroundStyle(.secondary)
                 .accessibilityIdentifier("community-cleanup-kept")
             Text(cl.kept.prefix(12).joined(separator: "\n") + (cl.kept.count > 12 ? "\n…" : ""))
-                .font(.system(.caption2, design: .monospaced)).foregroundStyle(.orange)
+                .font(.system(.caption2, design: .monospaced)).foregroundStyle(Theme.warning)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("community-cleanup-kept-paths")
         }
@@ -310,9 +494,9 @@ struct PluginUpdatesDetailView: View {
 
     @ViewBuilder private func verifyDetail(_ vr: VerifyResult) -> some View {
         HStack(spacing: 8) {
-            StatusPill(text: "\(vr.verified) verified", color: .green, systemImage: "checkmark.circle.fill")
+            StatusPill(text: "\(vr.verified) verified", color: Theme.success, systemImage: "checkmark.circle.fill")
             if !vr.ok {
-                StatusPill(text: "\(vr.failed.count) failed", color: .orange, systemImage: "xmark.circle.fill")
+                StatusPill(text: "\(vr.failed.count) failed", color: Theme.warning, systemImage: "xmark.circle.fill")
             }
             Spacer()
             Text(vr.tag).font(.caption2).foregroundStyle(.secondary)
@@ -348,9 +532,9 @@ struct PluginUpdatesDetailView: View {
             HStack(spacing: 10) {
                 Button { setSelected(sel < items.count, inCategory: category) } label: {
                     Image(systemName: box)
-                        .font(.body)
-                        .foregroundStyle(sel == 0 ? Color.secondary : Theme.accent)
-                        .frame(width: 26, height: 30)
+                        .font(.caption)
+                        .foregroundStyle(sel == 0 ? Color.primary.opacity(0.55) : Theme.accent)
+                        .frame(width: 22, height: 26)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -359,7 +543,7 @@ struct PluginUpdatesDetailView: View {
                 } label: {
                     HStack(spacing: 6) {
                         Text(category.isEmpty ? "Other" : category)
-                            .font(.subheadline).fontWeight(.medium)
+                            .font(.caption).fontWeight(.medium)
                         Text("\(sel)/\(items.count)")
                             .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
                         Spacer()
@@ -403,7 +587,7 @@ struct PluginUpdatesDetailView: View {
                 withAnimation(.snappy) { incompatibleExpanded.toggle() }
             } label: {
                 HStack(spacing: 8) {
-                    Image(systemName: "exclamationmark.octagon.fill").foregroundStyle(.red)
+                    Image(systemName: "exclamationmark.octagon.fill").foregroundStyle(Theme.danger)
                     Text("Incompatible").font(.subheadline).fontWeight(.medium)
                     Text("\(updater.blockedUpdates.count)")
                         .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
@@ -419,11 +603,11 @@ struct PluginUpdatesDetailView: View {
                 ForEach(updater.blockedUpdates) { update in
                     HStack(alignment: .top, spacing: 8) {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.caption).foregroundStyle(.red).frame(width: 18)
+                            .font(.caption).foregroundStyle(Theme.danger).frame(width: 18)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(update.name).font(.subheadline)
                             Text(updater.reason(update) ?? FapCompatibility.unknownDeviceReason)
-                                .font(.caption2).foregroundStyle(.red)
+                                .font(.caption2).foregroundStyle(Theme.danger)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                         Spacer()
@@ -441,7 +625,8 @@ struct PluginUpdatesDetailView: View {
         switch updater.phase {
         case .idle:
             if updater.updates.isEmpty {
-                Label("Tap to check for updates", systemImage: "shippingbox").foregroundStyle(.secondary)
+                Label("Pull down to check for updates", systemImage: "arrow.down")
+                    .foregroundStyle(.secondary)
             }
         case .needsBaseline: EmptyView()
         case .fetching:    progress("Checking GitHub…")
@@ -451,7 +636,7 @@ struct PluginUpdatesDetailView: View {
         case .installing(let i, let n): installingRow(i, n)
         case .cleaning(let i, let n): progress("Cleaning old routes… \(i)/\(n)")
         case .done(let m):
-            Label(m, systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+            Label(m, systemImage: "checkmark.circle.fill").foregroundStyle(Theme.success)
                 .fixedSize(horizontal: false, vertical: true)
         case .failed(let m):
             ActionableErrorView(
@@ -483,7 +668,7 @@ struct PluginUpdatesDetailView: View {
                         ? "retry \(d.attempt) · \(byteStr(d.sent)) / \(byteStr(d.total))"
                         : "\(byteStr(d.sent)) / \(byteStr(d.total))",
                     fraction: Double(d.sent) / Double(max(d.total, 1)),
-                    tint: .orange
+                    tint: Theme.warning
                 )
             }
         }
@@ -515,7 +700,7 @@ struct PluginUpdatesDetailView: View {
                 VStack(alignment: .trailing, spacing: 1) {
                     Text(u.isNew ? "NEW" : "UPD")
                         .font(.caption2).bold()
-                        .foregroundStyle(u.isNew ? .green : .orange)
+                        .foregroundStyle(u.isNew ? Theme.success : Theme.warning)
                     Text(byteStr(u.size))
                         .font(.caption2).foregroundStyle(.secondary)
                 }
@@ -624,7 +809,7 @@ struct PluginReleasePickerView: View {
                             }
                             Spacer()
                             if !release.hasPacks {
-                                Text("no packs").font(.caption2).foregroundStyle(.orange)
+                                Text("no packs").font(.caption2).foregroundStyle(Theme.warning)
                             } else if updater.manualReleaseTag == release.tag {
                                 Image(systemName: "checkmark").foregroundStyle(Theme.accent)
                             }

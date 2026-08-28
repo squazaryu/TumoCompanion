@@ -41,7 +41,7 @@ struct FieldServicesView: View {
             if let error = deviceServices.lastError {
                 Text("Last error: \(error)")
                     .font(.system(.caption2, design: .monospaced))
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(Theme.accent)
             }
         }
         .accessibilityIdentifier("field-services-bridge")
@@ -129,7 +129,7 @@ struct FieldServicesView: View {
                             Spacer()
                             Text(entry.delivery.label)
                                 .font(.caption2)
-                                .foregroundStyle(entry.delivery == .failed ? .orange : .secondary)
+                                .foregroundStyle(entry.delivery == .failed ? Theme.accent : .secondary)
                         }
                         Text(entry.note).font(.caption).lineLimit(2)
                         Text("\(entry.location.coordinateText) · \(entry.createdAt.formatted(date: .numeric, time: .shortened))")
@@ -207,9 +207,9 @@ struct FieldServicesView: View {
 
     private func stateColor(_ state: DeviceServiceState) -> Color {
         switch state {
-        case .available: return .green
-        case .inUse: return .blue
-        case .denied, .foregroundOnly: return .orange
+        case .available: return Theme.success
+        case .inUse: return Theme.info
+        case .denied, .foregroundOnly: return Theme.accent
         default: return .secondary
         }
     }

@@ -54,7 +54,7 @@ private func marauderAPRow(_ ap: MarauderAP, clients: [MarauderStation]) -> some
                     Label("\(rssi) dBm", systemImage: rssi < -85 ? "wifi.slash" : "wifi")
                         .labelStyle(.titleAndIcon)
                         .font(.caption2)
-                        .foregroundStyle(rssi >= -67 ? Color.green : rssi >= -80 ? Color.secondary : Color.orange)
+                        .foregroundStyle(rssi >= -67 ? Theme.success : rssi >= -80 ? Color.secondary : Theme.accent)
                 }
             }
             if !clients.isEmpty {
@@ -69,7 +69,7 @@ private func marauderAPRow(_ ap: MarauderAP, clients: [MarauderStation]) -> some
 private func marauderLock(_ auth: String) -> (symbol: String, color: Color)? {
     let a = auth.uppercased()
     if a.isEmpty { return nil }
-    if a.contains("OPEN") { return ("lock.open.fill", .orange) }
+    if a.contains("OPEN") { return ("lock.open.fill", Theme.accent) }
     return ("lock.fill", .secondary)
 }
 

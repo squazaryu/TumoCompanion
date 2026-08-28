@@ -220,11 +220,11 @@ struct TumoFabricView: View {
         if ble.state != .ready {
             StatusPill(text: "Offline", color: .secondary)
         } else if !ble.appBridgeV2 {
-            StatusPill(text: "FAB2 unavailable", color: .orange)
+            StatusPill(text: "FAB2 unavailable", color: Theme.accent)
         } else if !fabricAdvertised {
-            StatusPill(text: "Fabric unavailable", color: .orange)
+            StatusPill(text: "Fabric unavailable", color: Theme.accent)
         } else {
-            StatusPill(text: "Ready", color: .green, systemImage: "checkmark.circle.fill")
+            StatusPill(text: "Ready", color: Theme.success, systemImage: "checkmark.circle.fill")
         }
     }
 
@@ -236,10 +236,10 @@ struct TumoFabricView: View {
                 .frame(maxWidth: .infinity, minHeight: 72)
 
             HStack(spacing: 10) {
-                PillButton(title: "Decrease", systemImage: "minus", tint: .blue) {
+                PillButton(title: "Decrease", systemImage: "minus", tint: Theme.info) {
                     Task { await vm.step(.decrement, ble: ble) }
                 }
-                PillButton(title: "Increase", systemImage: "plus", tint: .green) {
+                PillButton(title: "Increase", systemImage: "plus", tint: Theme.success) {
                     Task { await vm.step(.increment, ble: ble) }
                 }
             }
@@ -262,13 +262,13 @@ struct TumoFabricView: View {
                     PillButton(title: "Refresh", systemImage: "arrow.clockwise") {
                         Task { await vm.refresh(ble) }
                     }
-                    PillButton(title: "Cancel", systemImage: "xmark", role: .destructive, tint: .red) {
+                    PillButton(title: "Cancel", systemImage: "xmark", role: .destructive, tint: Theme.danger) {
                         Task { await vm.cancel(ble) }
                     }
                 }
                 .disabled(!linkReady || vm.busy)
                 .opacity(linkReady && !vm.busy ? 1 : 0.4)
-                PillButton(title: "Replay last sequence", systemImage: "arrow.uturn.backward", tint: .orange) {
+                PillButton(title: "Replay last sequence", systemImage: "arrow.uturn.backward", tint: Theme.accent) {
                     Task { await vm.replayLast(ble) }
                 }
                 .disabled(vm.lastAttempt == nil || vm.busy || !linkReady)
@@ -280,7 +280,7 @@ struct TumoFabricView: View {
                 PillButton(
                     title: vm.hasSavedSession ? "Resume" : "Start",
                     systemImage: vm.hasSavedSession ? "arrow.clockwise" : "play.fill",
-                    tint: .green) {
+                    tint: Theme.success) {
                     Task { await vm.startOrResume(ble) }
                 }
                 .disabled(!linkReady || vm.busy)
@@ -301,11 +301,11 @@ struct TumoFabricView: View {
 
     private func errorCard(_ text: String) -> some View {
         HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.red)
+            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.danger)
             Text(text).font(.footnote).fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .card(tint: .red)
+        .card(tint: Theme.danger)
     }
 
     private func infoRow(_ label: String, value: String) -> some View {

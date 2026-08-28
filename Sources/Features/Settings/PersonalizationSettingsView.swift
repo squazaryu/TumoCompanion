@@ -53,7 +53,7 @@ struct PersonalizationSettingsView: View {
                     if let iconError {
                         Text(iconError)
                             .font(.caption)
-                            .foregroundStyle(.red)
+                            .foregroundStyle(Theme.danger)
                     }
                 }
             }
