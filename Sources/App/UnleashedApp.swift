@@ -88,6 +88,15 @@ struct RootView: View {
             FWPackagesActionBarQAView()
         } else if ProcessInfo.processInfo.arguments.contains("-community-route-cleanup-qa") {
             CommunityRouteCleanupQAView()
+        } else if ProcessInfo.processInfo.arguments.contains("-firmware-library-error-qa") {
+            FirmwareLibraryLayoutQAView(
+                phase: .failed(FirmwareLibraryError.stopped.localizedDescription)
+            )
+        } else if ProcessInfo.processInfo.arguments.contains("-firmware-library-preparing-qa") {
+            FirmwareLibraryLayoutQAView(
+                phase: .preparing(version: "t-dev-008-003"),
+                selectedChannel: .dev
+            )
         } else if ProcessInfo.processInfo.arguments.contains("-firmware-library-layout-qa") {
             FirmwareLibraryLayoutQAView()
         } else if ProcessInfo.processInfo.arguments.contains("-community-apps-layout-qa") {
@@ -176,7 +185,19 @@ private struct CommunityRouteCleanupQAView: View {
 }
 
 private struct FirmwareLibraryLayoutQAView: View {
-    @StateObject private var library = FirmwareLibrary.layoutQAFixture()
+    @StateObject private var library: FirmwareLibrary
+
+    init(
+        phase: FirmwareLibrary.Phase = .ready,
+        selectedChannel: TumoflipFirmwareChannel = .stable
+    ) {
+        _library = StateObject(
+            wrappedValue: FirmwareLibrary.layoutQAFixture(
+                phase: phase,
+                selectedChannel: selectedChannel
+            )
+        )
+    }
 
     var body: some View {
         NavigationStack {

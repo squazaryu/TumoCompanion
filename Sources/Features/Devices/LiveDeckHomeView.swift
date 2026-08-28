@@ -459,7 +459,7 @@ private struct LiveDeckSourcesCard: View {
         }
 
         switch updates.firmware.phase {
-        case .loading, .verifying:
+        case .loading, .preparing, .verifying:
             return .loading(.init(kind: .checking))
         case .downloading(_, let fraction):
             return .loading(.init(kind: .downloading, progress: fraction))
