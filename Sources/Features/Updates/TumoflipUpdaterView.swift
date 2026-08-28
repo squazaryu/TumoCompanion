@@ -471,7 +471,7 @@ struct TumoflipUpdaterView: View {
             updater.status(file: $0.target) != .upToDate
         }.count
         VStack(alignment: .leading, spacing: 5) {
-            HStack(spacing: 7) {
+            HStack(alignment: .firstTextBaseline, spacing: 7) {
                 if n > 0 {
                     // Tri-state selection is limited to standalone overlays. The
                     // firmware-owned baseline is visible, but cannot be overwritten
