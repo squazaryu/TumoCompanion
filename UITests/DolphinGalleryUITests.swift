@@ -163,6 +163,19 @@ final class FWPackagesActionBarUITests: XCTestCase {
         selectScenario("Cleanup only")
         XCTAssertFalse(install.exists)
         XCTAssertTrue(cleanup.waitForExistence(timeout: 2))
+        cleanup.tap()
+        XCTAssertTrue(app.buttons["Confirm FW Packages cleanup"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["Cancel FW Packages cleanup"].exists)
+        XCTAssertFalse(app.alerts.firstMatch.exists)
+        XCTAssertFalse(app.sheets.firstMatch.exists)
+
+        let cleanupConfirmation = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        cleanupConfirmation.name = "FW Packages inline cleanup confirmation"
+        cleanupConfirmation.lifetime = .keepAlways
+        add(cleanupConfirmation)
+
+        app.buttons["Cancel FW Packages cleanup"].tap()
+        XCTAssertFalse(app.buttons["Confirm FW Packages cleanup"].waitForExistence(timeout: 1))
 
         selectScenario("Cleaning")
         XCTAssertFalse(install.exists)
@@ -192,10 +205,19 @@ final class FWPackagesActionBarUITests: XCTestCase {
 }
 
 final class CommunityRouteCleanupUITests: XCTestCase {
-    func testCleanupReportSeparatesRemovedPackRoutesFromPreservedCustomFiles() {
+    func testCleanupStaysInlineAndPreservesCustomFilesInDarkMode() {
+        verifyCleanup(appearance: "dark")
+    }
+
+    func testCleanupStaysInlineAndPreservesCustomFilesInLightMode() {
+        verifyCleanup(appearance: "light")
+    }
+
+    private func verifyCleanup(appearance: String) {
         let app = XCUIApplication()
         app.launchArguments = [
             "-onboardingDone", "YES",
+            "-appearanceMode", appearance,
             "-community-route-cleanup-qa",
         ]
         app.launch()
@@ -206,8 +228,27 @@ final class CommunityRouteCleanupUITests: XCTestCase {
         )
         XCTAssertTrue(app.buttons["community-cleanup-action"].label.contains("Clean Up 1"))
 
+        app.buttons["community-cleanup-action"].tap()
+        XCTAssertTrue(app.buttons["Confirm Community apps cleanup"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["Cancel Community apps cleanup"].exists)
+        XCTAssertFalse(app.alerts.firstMatch.exists)
+        XCTAssertFalse(app.sheets.firstMatch.exists)
+
+        let confirmation = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        confirmation.name = "Community cleanup inline confirmation - \(appearance)"
+        confirmation.lifetime = .keepAlways
+        add(confirmation)
+
+        app.buttons["Cancel Community apps cleanup"].tap()
+        XCTAssertFalse(app.buttons["Confirm Community apps cleanup"].waitForExistence(timeout: 1))
+
         let details = app.buttons["community-apps-details-drawer-toggle"]
         XCTAssertTrue(details.waitForExistence(timeout: 3))
+        XCTAssertGreaterThan(
+            details.frame.midY,
+            app.windows.firstMatch.frame.height * 0.65,
+            "The collapsed Community drawer tab must stay anchored near the bottom"
+        )
         details.tap()
         XCTAssertTrue(app.staticTexts["community-cleanup-removed"].waitForExistence(timeout: 3))
         XCTAssertTrue(
@@ -242,6 +283,13 @@ final class ESP32ArchivedRedownloadUITests: XCTestCase {
         overviewScreenshot.lifetime = .keepAlways
         add(overviewScreenshot)
         drawer.tap()
+        let panel = app.descendants(matching: .any)["esp32-packages-drawer-toggle-panel"]
+        XCTAssertTrue(panel.waitForExistence(timeout: 3))
+        XCTAssertLessThan(
+            panel.frame.height,
+            500,
+            "Two ESP32 package cards should size the drawer to their content instead of filling the screen"
+        )
         XCTAssertTrue(
             app.staticTexts.matching(
                 NSPredicate(format: "label CONTAINS[c] %@", "Archived")
@@ -279,6 +327,9 @@ final class UpdateSourceLayoutUITests: XCTestCase {
     }
 
     private func attach(_ name: String) {
+        // Let the shared drawer's short slide/height animation settle so the
+        // attachment represents the stable UI rather than an intermediate frame.
+        Thread.sleep(forTimeInterval: 0.4)
         let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         screenshot.name = name
         screenshot.lifetime = .keepAlways
@@ -301,10 +352,15 @@ final class UpdateSourceLayoutUITests: XCTestCase {
         attach("Firmware release drawer - dark")
 
         app.buttons["Prepare t-flppr-fw-008"].tap()
-        XCTAssertTrue(app.alerts["Prepare t-flppr-fw-008?"].waitForExistence(timeout: 3))
-        XCTAssertFalse(app.segmentedControls["firmware-channel-picker"].exists)
-        XCTAssertFalse(app.buttons["firmware-releases-drawer-toggle"].exists)
-        attach("Firmware preparation confirmation - dark")
+        XCTAssertTrue(app.buttons["Confirm prepare t-flppr-fw-008"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["Cancel preparation"].exists)
+        XCTAssertTrue(app.segmentedControls["firmware-channel-picker"].exists)
+        XCTAssertTrue(app.buttons["firmware-releases-drawer-toggle"].exists)
+        XCTAssertFalse(app.alerts.firstMatch.exists)
+        attach("Firmware inline preparation confirmation - dark")
+
+        app.buttons["Cancel preparation"].tap()
+        XCTAssertFalse(app.buttons["Confirm prepare t-flppr-fw-008"].waitForExistence(timeout: 1))
     }
 
     func testFirmwareOverviewAndDrawerRenderInLightMode() {
@@ -317,10 +373,15 @@ final class UpdateSourceLayoutUITests: XCTestCase {
         attach("Firmware release drawer - light")
 
         app.buttons["Prepare t-flppr-fw-008"].tap()
-        XCTAssertTrue(app.alerts["Prepare t-flppr-fw-008?"].waitForExistence(timeout: 3))
-        XCTAssertFalse(app.segmentedControls["firmware-channel-picker"].exists)
-        XCTAssertFalse(app.buttons["firmware-releases-drawer-toggle"].exists)
-        attach("Firmware preparation confirmation - light")
+        XCTAssertTrue(app.buttons["Confirm prepare t-flppr-fw-008"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["Cancel preparation"].exists)
+        XCTAssertTrue(app.segmentedControls["firmware-channel-picker"].exists)
+        XCTAssertTrue(app.buttons["firmware-releases-drawer-toggle"].exists)
+        XCTAssertFalse(app.alerts.firstMatch.exists)
+        attach("Firmware inline preparation confirmation - light")
+
+        app.buttons["Cancel preparation"].tap()
+        XCTAssertFalse(app.buttons["Confirm prepare t-flppr-fw-008"].waitForExistence(timeout: 1))
     }
 
     func testFirmwareFailureReplacesDrawerInDarkMode() {
@@ -330,6 +391,35 @@ final class UpdateSourceLayoutUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["Error"].exists)
         XCTAssertFalse(app.buttons["firmware-releases-drawer-toggle"].exists)
         attach("Firmware transfer failure - dark")
+    }
+
+    func testFWPackagesChannelConfirmationRendersInlineInDarkMode() {
+        verifyFWPackagesChannelConfirmation(appearance: "dark")
+    }
+
+    func testFWPackagesChannelConfirmationRendersInlineInLightMode() {
+        verifyFWPackagesChannelConfirmation(appearance: "light")
+    }
+
+    private func verifyFWPackagesChannelConfirmation(appearance: String) {
+        let app = launch("-fw-packages-action-bar-qa", appearance: appearance)
+        let drawer = app.buttons["fw-packages-details-drawer-toggle"]
+        XCTAssertTrue(drawer.waitForExistence(timeout: 3))
+        drawer.tap()
+        XCTAssertTrue(app.staticTexts["fw-packages-revision"].waitForExistence(timeout: 3))
+
+        let dev = app.buttons["Dev"]
+        XCTAssertTrue(dev.waitForExistence(timeout: 3))
+        dev.tap()
+        XCTAssertTrue(app.buttons["Confirm switch to Dev packages"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["Cancel package channel switch"].exists)
+        XCTAssertFalse(app.alerts.firstMatch.exists)
+        XCTAssertFalse(app.sheets.firstMatch.exists)
+        attach("FW Packages inline channel confirmation - \(appearance)")
+
+        app.buttons["Cancel package channel switch"].tap()
+        XCTAssertFalse(app.buttons["Confirm switch to Dev packages"].waitForExistence(timeout: 1))
+        XCTAssertTrue(app.staticTexts["fw-packages-revision"].exists)
     }
 
     func testFirmwareFailureReplacesDrawerInLightMode() {
@@ -361,6 +451,7 @@ final class UpdateSourceLayoutUITests: XCTestCase {
         let app = launch("-community-apps-layout-qa", appearance: "dark")
         let drawer = app.buttons["community-apps-details-drawer-toggle"]
         XCTAssertTrue(drawer.waitForExistence(timeout: 3))
+        XCTAssertGreaterThan(drawer.frame.midY, app.windows.firstMatch.frame.height * 0.65)
         XCTAssertTrue(app.staticTexts["COMMUNITY CATALOG"].exists)
         XCTAssertTrue(app.buttons["community-install-action"].exists)
         attach("Community apps compact overview - dark")
@@ -377,6 +468,7 @@ final class UpdateSourceLayoutUITests: XCTestCase {
         let app = launch("-community-apps-layout-qa", appearance: "light")
         let drawer = app.buttons["community-apps-details-drawer-toggle"]
         XCTAssertTrue(drawer.waitForExistence(timeout: 3))
+        XCTAssertGreaterThan(drawer.frame.midY, app.windows.firstMatch.frame.height * 0.65)
         attach("Community apps compact overview - light")
         drawer.tap()
         XCTAssertTrue(app.buttons["community-release-picker-action"].waitForExistence(timeout: 3))

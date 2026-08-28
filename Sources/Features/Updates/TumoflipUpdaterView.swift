@@ -8,6 +8,7 @@ import SwiftUI
 struct TumoflipUpdaterView: View {
     @EnvironmentObject var ble: FlipperBLE
     @EnvironmentObject var transfer: TransferChannelStore
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject var updater: TumoflipUpdater
     @State private var expanded: Set<String> = []
     @State private var pendingOverride: TumoflipFirmwareChannel?
@@ -28,29 +29,29 @@ struct TumoflipUpdaterView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            CardScroll(refreshAction: refreshPackages) {
-                SectionCard(title: "Firmware packages", systemImage: "cpu.fill",
-                            accessory: AnyView(StatusPill(
-                                text: transfer.activeChannel.label,
-                                color: transfer.activeChannel == .usb ? Theme.info : .secondary,
-                                systemImage: transfer.activeChannel.systemImage))) {
-                    statusRow
-                    syncCatalogRow
-                    verifyRow
-                }
-
-                packageOverviewCard
-                actionBar
-
-                // The folder tab is fixed above the app tab bar, matching Home
-                // → Tools. Reserve only its collapsed height in the page flow.
-                Color.clear.frame(height: 58)
+        CardScroll(refreshAction: refreshPackages) {
+            SectionCard(title: "Firmware packages", systemImage: "cpu.fill",
+                        accessory: AnyView(StatusPill(
+                            text: transfer.activeChannel.label,
+                            color: transfer.activeChannel == .usb ? Theme.info : .secondary,
+                            systemImage: transfer.activeChannel.systemImage))) {
+                statusRow
+                syncCatalogRow
+                verifyRow
             }
 
+            packageOverviewCard
+            actionBar
+
+            // The folder tab is fixed above the app tab bar, matching Home
+            // → Tools. Reserve only its collapsed height in the page flow.
+            Color.clear.frame(height: 58)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .overlay(alignment: .bottom) {
             if updater.manifest != nil {
                 BottomFolderDrawer(
-                    isExpanded: $packageDrawerExpanded,
+                    isExpanded: packageDrawerBinding,
                     title: "PACKAGE DETAILS",
                     summary: packageDetailsSummary,
                     systemImage: "shippingbox.fill",
@@ -84,43 +85,16 @@ struct TumoflipUpdaterView: View {
             }
         }
         .sheet(isPresented: $showHelp) { TumoflipPackagesHelpView() }
-        .confirmationDialog(
-            "Switch package channel?",
-            isPresented: Binding(
-                get: { pendingOverride != nil },
-                set: { if !$0 { pendingOverride = nil } }
-            ),
-            presenting: pendingOverride
-        ) { channel in
-            Button("Use \(channel.label) packages", role: channel == .dev ? .destructive : nil) {
-                Task {
-                    updater.setManualChannelOverride(channel)
-                    await updater.reload(recover: false)
-                }
+    }
+
+    private var packageDrawerBinding: Binding<Bool> {
+        Binding(
+            get: { packageDrawerExpanded },
+            set: { expanded in
+                packageDrawerExpanded = expanded
+                if !expanded { pendingOverride = nil }
             }
-            Button("Cancel", role: .cancel) {}
-        } message: { channel in
-            Text("This overrides the channel inferred from the installed firmware and will reload \(channel.packageLabel). Install only if the connected Flipper is compatible.")
-        }
-        .confirmationDialog(
-            "Remove legacy package files?",
-            isPresented: Binding(
-                get: { pendingCleanupCount != nil },
-                set: { if !$0 { pendingCleanupCount = nil } }
-            ),
-            presenting: pendingCleanupCount
-        ) { count in
-            Button(
-                "Clean Up \(count) file\(count == 1 ? "" : "s")",
-                role: .destructive
-            ) {
-                pendingCleanupCount = nil
-                Task { await updater.cleanUpPending() }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: { count in
-            Text("\(count) obsolete file\(count == 1 ? "" : "s") will be removed. Current apps are verified against the manifest first, and any failure rolls the cleanup back.")
-        }
+        )
     }
 
     private var hasFileChannel: Bool {
@@ -299,15 +273,32 @@ struct TumoflipUpdaterView: View {
                 channelChoiceButton(
                     "Stable",
                     enabled: !updater.busy && updater.manualChannelOverride != .stable,
-                    action: { pendingOverride = .stable }
+                    action: { requestChannelOverride(.stable) }
                 )
                 channelChoiceButton(
                     "Dev",
                     enabled: !updater.busy && updater.manualChannelOverride != .dev,
-                    action: { pendingOverride = .dev }
+                    action: { requestChannelOverride(.dev) }
                 )
                 Spacer(minLength: 2)
                 catalogRevisionPicker
+            }
+
+            if let channel = pendingOverride {
+                InlineActionConfirmationRow(
+                    title: "Use \(channel.label) packages",
+                    detail: "Manual override · checked again before install",
+                    systemImage: channelIcon(channel),
+                    iconColor: channelColor(channel),
+                    tint: channelColor(channel),
+                    confirmTitle: "Switch",
+                    accessibilityIdentifier: "fw-packages-channel-confirmation",
+                    cancelAccessibilityLabel: "Cancel package channel switch",
+                    confirmAccessibilityLabel: "Confirm switch to \(channel.label) packages",
+                    onCancel: cancelChannelOverride,
+                    onConfirm: confirmChannelOverride
+                )
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
             if let manifest = updater.manifest {
@@ -614,20 +605,40 @@ struct TumoflipUpdaterView: View {
     }
 
     private var actionBar: some View {
-        FWPackagesActionBar(
-            phase: updater.phase,
-            installCount: installActionCount,
-            cleanupCount: updater.cleanupFileCount,
-            // install() repeats the complete identity/API/target gate before any SD
-            // mutation. A failed proactive check must not deadlock a connected user.
-            canInstall: hasFileChannel && !updater.busy,
-            canCleanUp: hasFileChannel && !updater.busy,
-            stopRequested: updater.stopRequested,
-            identityNotice: identityNotice,
-            install: { Task { await updater.install() } },
-            cleanUp: { pendingCleanupCount = updater.cleanupFileCount },
-            stop: updater.requestStop
-        )
+        VStack(spacing: 7) {
+            FWPackagesActionBar(
+                phase: updater.phase,
+                installCount: installActionCount,
+                cleanupCount: pendingCleanupCount == nil ? updater.cleanupFileCount : 0,
+                // install() repeats the complete identity/API/target gate before any SD
+                // mutation. A failed proactive check must not deadlock a connected user.
+                canInstall: hasFileChannel && !updater.busy,
+                canCleanUp: hasFileChannel && !updater.busy,
+                stopRequested: updater.stopRequested,
+                identityNotice: identityNotice,
+                install: { Task { await updater.install() } },
+                cleanUp: requestCleanup,
+                stop: updater.requestStop
+            )
+
+            if let count = pendingCleanupCount {
+                InlineActionConfirmationRow(
+                    title: "\(count) obsolete file\(count == 1 ? "" : "s")",
+                    detail: "Manifest verified · rollback on failure",
+                    systemImage: "trash.slash.fill",
+                    iconColor: Theme.warning,
+                    tint: Theme.warning,
+                    confirmTitle: "Clean Up",
+                    confirmRole: .destructive,
+                    accessibilityIdentifier: "fw-packages-cleanup-confirmation",
+                    cancelAccessibilityLabel: "Cancel FW Packages cleanup",
+                    confirmAccessibilityLabel: "Confirm FW Packages cleanup",
+                    onCancel: cancelCleanup,
+                    onConfirm: confirmCleanup
+                )
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
     }
 
     @ViewBuilder private var statusRow: some View {
@@ -773,6 +784,49 @@ struct TumoflipUpdaterView: View {
             updater.clearManualChannelOverride()
             await updater.reload(recover: false)
         }
+    }
+
+    private func requestChannelOverride(_ channel: TumoflipFirmwareChannel) {
+        withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) {
+            pendingOverride = channel
+        }
+    }
+
+    private func cancelChannelOverride() {
+        withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) {
+            pendingOverride = nil
+        }
+    }
+
+    private func confirmChannelOverride() {
+        guard let channel = pendingOverride else { return }
+        withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) {
+            pendingOverride = nil
+            packageDrawerExpanded = false
+        }
+        Task {
+            updater.setManualChannelOverride(channel)
+            await updater.reload(recover: false)
+        }
+    }
+
+    private func requestCleanup() {
+        guard updater.cleanupFileCount > 0 else { return }
+        withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) {
+            pendingCleanupCount = updater.cleanupFileCount
+        }
+    }
+
+    private func cancelCleanup() {
+        withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) {
+            pendingCleanupCount = nil
+        }
+    }
+
+    private func confirmCleanup() {
+        guard pendingCleanupCount != nil else { return }
+        pendingCleanupCount = nil
+        Task { await updater.cleanUpPending() }
     }
 
     private func selectLatestCatalogRevision() {
