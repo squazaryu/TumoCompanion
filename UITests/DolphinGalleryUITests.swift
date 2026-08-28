@@ -194,6 +194,10 @@ final class CommunityRouteCleanupUITests: XCTestCase {
             "cleanup-only must stay available when there are no app updates to reinstall"
         )
         XCTAssertTrue(app.buttons["community-cleanup-action"].label.contains("Clean Up 1"))
+
+        let details = app.buttons["community-apps-details-drawer-toggle"]
+        XCTAssertTrue(details.waitForExistence(timeout: 3))
+        details.tap()
         XCTAssertTrue(app.staticTexts["community-cleanup-removed"].waitForExistence(timeout: 3))
         XCTAssertTrue(
             app.staticTexts["community-cleanup-removed-paths"].label.contains(
@@ -248,6 +252,78 @@ final class ESP32ArchivedRedownloadUITests: XCTestCase {
         screenshot.name = "ESP32 archived package redownload"
         screenshot.lifetime = .keepAlways
         add(screenshot)
+    }
+}
+
+final class UpdateSourceLayoutUITests: XCTestCase {
+    private func launch(_ route: String, appearance: String) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-onboardingDone", "YES",
+            "-appearanceMode", appearance,
+            route,
+        ]
+        app.launch()
+        return app
+    }
+
+    private func attach(_ name: String) {
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = name
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+
+    func testFirmwareOverviewAndDrawerRenderInDarkMode() {
+        let app = launch("-firmware-library-layout-qa", appearance: "dark")
+        let drawer = app.buttons["firmware-releases-drawer-toggle"]
+        XCTAssertTrue(drawer.waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["RELEASE CATALOG"].exists)
+        XCTAssertFalse(app.segmentedControls["firmware-channel-picker"].exists)
+        attach("Firmware compact overview - dark")
+
+        drawer.tap()
+        XCTAssertTrue(app.segmentedControls["firmware-channel-picker"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["t-flppr-fw-008"].exists)
+        XCTAssertTrue(app.staticTexts["t-flppr-fw-007"].exists)
+        XCTAssertTrue(app.staticTexts["Installed"].isHittable)
+        attach("Firmware release drawer - dark")
+    }
+
+    func testFirmwareOverviewAndDrawerRenderInLightMode() {
+        let app = launch("-firmware-library-layout-qa", appearance: "light")
+        let drawer = app.buttons["firmware-releases-drawer-toggle"]
+        XCTAssertTrue(drawer.waitForExistence(timeout: 3))
+        attach("Firmware compact overview - light")
+        drawer.tap()
+        XCTAssertTrue(app.segmentedControls["firmware-channel-picker"].waitForExistence(timeout: 3))
+        attach("Firmware release drawer - light")
+    }
+
+    func testCommunityOverviewAndDrawerRenderInDarkMode() {
+        let app = launch("-community-apps-layout-qa", appearance: "dark")
+        let drawer = app.buttons["community-apps-details-drawer-toggle"]
+        XCTAssertTrue(drawer.waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["COMMUNITY CATALOG"].exists)
+        XCTAssertTrue(app.buttons["community-install-action"].exists)
+        attach("Community apps compact overview - dark")
+
+        drawer.tap()
+        XCTAssertTrue(app.buttons["community-release-picker-action"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["GPIO"].exists)
+        XCTAssertTrue(app.staticTexts["Tools"].exists)
+        XCTAssertTrue(app.staticTexts["Games"].exists)
+        attach("Community app details drawer - dark")
+    }
+
+    func testCommunityOverviewAndDrawerRenderInLightMode() {
+        let app = launch("-community-apps-layout-qa", appearance: "light")
+        let drawer = app.buttons["community-apps-details-drawer-toggle"]
+        XCTAssertTrue(drawer.waitForExistence(timeout: 3))
+        attach("Community apps compact overview - light")
+        drawer.tap()
+        XCTAssertTrue(app.buttons["community-release-picker-action"].waitForExistence(timeout: 3))
+        attach("Community app details drawer - light")
     }
 }
 

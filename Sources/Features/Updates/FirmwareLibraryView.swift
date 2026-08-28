@@ -7,16 +7,34 @@ struct FirmwareLibraryView: View {
     @State private var showHelp = false
     @State private var pendingRelease: FirmwareRelease?
     @State private var detailsRelease: FirmwareRelease?
+    @State private var releaseDrawerExpanded = false
 
     var body: some View {
-        CardScroll(refreshAction: refreshLibrary) {
-            connectionCard
-            channelPicker
-            if library.visibleGroups.isEmpty {
-                emptyCard
-            } else {
-                ForEach(Array(library.visibleGroups.enumerated()), id: \.element.id) { index, group in
-                    versionGroupCard(group, startExpanded: index == 0)
+        ZStack(alignment: .bottom) {
+            CardScroll(refreshAction: refreshLibrary) {
+                connectionCard
+                if library.visibleGroups.isEmpty {
+                    emptyCard
+                } else {
+                    catalogOverviewCard
+                }
+
+                // Match ESP32 and FW Packages: only the folder tab participates
+                // in the page layout. Release history slides over the overview.
+                Color.clear.frame(height: 58)
+            }
+
+            if !library.visibleGroups.isEmpty, !library.busy {
+                BottomFolderDrawer(
+                    isExpanded: $releaseDrawerExpanded,
+                    title: "FIRMWARE RELEASES",
+                    summary: releaseDrawerSummary,
+                    systemImage: "memorychip.fill",
+                    accessibilityIdentifier: "firmware-releases-drawer-toggle",
+                    panelHeight: releaseDrawerHeight,
+                    maxPanelHeight: 420
+                ) {
+                    releaseDetailsPanel
                 }
             }
         }
@@ -28,11 +46,7 @@ struct FirmwareLibraryView: View {
                     Image(systemName: "questionmark.circle")
                 }
                 .accessibilityLabel("Firmware help")
-                Button { library.refresh() } label: {
-                    Image(systemName: "arrow.clockwise")
-                }
-                .disabled(library.busy)
-                .accessibilityLabel("Refresh firmware releases")
+                if library.busy { ProgressView() }
             }
         }
         .safeAreaInset(edge: .bottom) { progressBar }
@@ -94,6 +108,7 @@ struct FirmwareLibraryView: View {
         }
         .pickerStyle(.segmented)
         .disabled(library.busy)
+        .accessibilityIdentifier("firmware-channel-picker")
     }
 
     private var emptyCard: some View {
@@ -117,28 +132,133 @@ struct FirmwareLibraryView: View {
         return "No Main firmware releases found."
     }
 
-    private func versionGroupCard(
-        _ group: FirmwareVersionGroup,
-        startExpanded: Bool
+    private var catalogOverviewCard: some View {
+        SectionCard(
+            title: "Release catalog",
+            systemImage: "memorychip.fill",
+            accessory: AnyView(StatusPill(
+                text: library.selectedChannel == .stable ? "Main" : "Dev",
+                color: library.selectedChannel == .stable ? .green : .purple,
+                systemImage: library.selectedChannel == .stable
+                    ? "checkmark.seal.fill" : "hammer.fill"
+            ))
+        ) {
+            if let latest = library.visibleReleases.first {
+                firmwareOverviewRow(
+                    title: "Latest build",
+                    detail: latest.version,
+                    systemImage: "sparkles"
+                )
+                firmwareOverviewRow(
+                    title: "Published",
+                    detail: releaseMetadata(latest),
+                    systemImage: "calendar"
+                )
+            }
+            firmwareOverviewRow(
+                title: "Available",
+                detail: releaseDrawerSummary,
+                systemImage: "square.stack.3d.up.fill"
+            )
+            Text("Open the folder tab below to switch channels, inspect builds, and prepare an updater.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func firmwareOverviewRow(
+        title: String,
+        detail: String,
+        systemImage: String
     ) -> some View {
-        CollapsibleCard(
-            title: "Version \(group.line)",
-            systemImage: library.selectedChannel == .dev ? "hammer.fill" : "checkmark.seal.fill",
-            accessory: AnyView(
+        HStack(spacing: 10) {
+            Image(systemName: systemImage)
+                .font(.subheadline)
+                .foregroundStyle(Theme.accent)
+                .frame(width: 22)
+            Text(title)
+                .font(.subheadline.weight(.medium))
+            Spacer(minLength: 8)
+            Text(detail)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+    }
+
+    private var releaseDrawerSummary: String {
+        let count = library.visibleReleases.count
+        return "\(count) \(count == 1 ? "build" : "builds")"
+    }
+
+    private var releaseDrawerHeight: CGFloat {
+        // Include the drawer handle/padding and the real action-row footprint.
+        // The old estimate was smaller than the rendered content, so the last
+        // release could sit underneath the folder tab even with only two builds.
+        let drawerChromeAndSections: CGFloat = 132
+        let groupHeaders = CGFloat(library.visibleGroups.count) * 30
+        let releaseRows = CGFloat(min(library.visibleReleases.count, 5)) * 56
+        return min(420, max(280, drawerChromeAndSections + groupHeaders + releaseRows))
+    }
+
+    private var releaseDetailsPanel: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 7) {
+                Label("RELEASE CHANNEL", systemImage: "point.3.connected.trianglepath.dotted")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(Color.primary.opacity(0.62))
+                    .tracking(0.8)
+                Spacer(minLength: 8)
+                Text(library.selectedChannel == .stable ? "Main" : "Dev")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+            channelPicker
+
+            Divider().opacity(0.45)
+
+            HStack(spacing: 7) {
+                Label("AVAILABLE BUILDS", systemImage: "square.stack.3d.up")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(Color.primary.opacity(0.62))
+                    .tracking(0.8)
+                Spacer(minLength: 8)
+                Text(releaseDrawerSummary)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                ForEach(library.visibleGroups) { group in
+                    releaseGroupSection(group)
+                }
+            }
+        }
+    }
+
+    private func releaseGroupSection(_ group: FirmwareVersionGroup) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .firstTextBaseline, spacing: 7) {
+                Image(systemName: library.selectedChannel == .dev ? "hammer.fill" : "checkmark.seal.fill")
+                    .font(.caption)
+                    .foregroundStyle(Theme.accent)
+                Text("Version \(group.line)")
+                    .font(.caption.weight(.semibold))
+                Spacer(minLength: 8)
                 Text("\(group.releases.count) \(group.releases.count == 1 ? "build" : "builds")")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
-            ),
-            contentSpacing: 7,
-            cardPadding: 12,
-            startExpanded: startExpanded
-        ) {
-            VStack(spacing: 0) {
-                ForEach(Array(group.releases.enumerated()), id: \.element.id) { index, release in
-                    compactReleaseRow(release, isLatest: index == 0 && group.id == library.visibleGroups.first?.id)
-                    if index < group.releases.count - 1 {
-                        Divider().padding(.leading, 4)
-                    }
+            }
+
+            ForEach(Array(group.releases.enumerated()), id: \.element.id) { index, release in
+                compactReleaseRow(
+                    release,
+                    isLatest: index == 0 && group.id == library.visibleGroups.first?.id
+                )
+                if index < group.releases.count - 1 {
+                    Divider().padding(.leading, 4)
                 }
             }
         }
@@ -148,7 +268,7 @@ struct FirmwareLibraryView: View {
         HStack(spacing: 6) {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
-                    Text(release.buildLabel)
+                    Text(library.selectedChannel == .stable ? release.version : release.buildLabel)
                         .font(.subheadline)
                         .fontWeight(.semibold)
                     if library.installedVersion == release.version {
@@ -220,7 +340,12 @@ struct FirmwareLibraryView: View {
     }
 
     private var hasTransferChannel: Bool {
-        transfer.activeChannel == .usb || ble.state == .ready || ble.state == .connected
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-firmware-library-layout-qa") {
+            return true
+        }
+        #endif
+        return transfer.activeChannel == .usb || ble.state == .ready || ble.state == .connected
     }
 
     @ViewBuilder private var phasePill: some View {

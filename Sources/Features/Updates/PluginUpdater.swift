@@ -3007,5 +3007,56 @@ extension PluginUpdater {
         )]
         return updater
     }
+
+    static func communityAppsLayoutQAFixture() -> PluginUpdater {
+        let updater = PluginUpdater()
+        let metadata = FapMetadata(apiMajor: 88, apiMinor: 4, hardwareTarget: 7)
+        let updates = [
+            PluginUpdate(
+                remotePath: "/ext/apps/GPIO/battery_reader.fap",
+                name: "battery_reader",
+                category: "GPIO",
+                pack: "base",
+                newMD5: String(repeating: "1", count: 32),
+                oldMD5: nil,
+                size: 18_432,
+                selected: true
+            ),
+            PluginUpdate(
+                remotePath: "/ext/apps/Tools/morse_decoder.fap",
+                name: "morse_decoder",
+                category: "Tools",
+                pack: "extra",
+                newMD5: String(repeating: "2", count: 32),
+                oldMD5: String(repeating: "3", count: 32),
+                size: 32_768,
+                selected: true
+            ),
+            PluginUpdate(
+                remotePath: "/ext/apps/Games/updated_game.fap",
+                name: "updated_game",
+                category: "Games",
+                pack: "extra",
+                newMD5: String(repeating: "4", count: 32),
+                oldMD5: String(repeating: "5", count: 32),
+                size: 65_536,
+                selected: false
+            ),
+        ]
+        updater.tag = "28aug2026"
+        updater.phase = .done("3 Community app changes found.")
+        updater.updates = updates
+        updater.allManifest = Dictionary(uniqueKeysWithValues: updates.map { ($0.remotePath, $0) })
+        updater.classifications = Dictionary(
+            uniqueKeysWithValues: updates.map { ($0.remotePath, .compatible(metadata)) }
+        )
+        updater.verifyResult = VerifyResult(
+            kind: .onDevice,
+            tag: "28aug2026",
+            verified: 54,
+            failed: []
+        )
+        return updater
+    }
 }
 #endif
