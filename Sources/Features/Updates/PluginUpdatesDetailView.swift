@@ -7,6 +7,7 @@ import SwiftUI
 struct PluginUpdatesDetailView: View {
     @EnvironmentObject var ble: FlipperBLE
     @EnvironmentObject var transfer: TransferChannelStore
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject var updater: PluginUpdater
     @State private var showReleasePicker = false
     @State private var expandedCategories: Set<String> = []   // collapsed by default
@@ -16,17 +17,17 @@ struct PluginUpdatesDetailView: View {
     @State private var detailsDrawerExpanded = false
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            CardScroll(refreshAction: refreshCommunityApps) {
-                communityStatusCard
-                communityOverviewCard
-                communityActionBar
+        CardScroll(refreshAction: refreshCommunityApps) {
+            communityStatusCard
+            communityOverviewCard
+            communityActionBar
 
-                // Keep only the folder tab's collapsed footprint in the page.
-                // Release selection and long app lists slide over the overview.
-                Color.clear.frame(height: 58)
-            }
-
+            // Keep only the folder tab's collapsed footprint in the page.
+            // Release selection and long app lists slide over the overview.
+            Color.clear.frame(height: 58)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .overlay(alignment: .bottom) {
             BottomFolderDrawer(
                 isExpanded: $detailsDrawerExpanded,
                 title: "APP DETAILS",
@@ -70,17 +71,6 @@ struct PluginUpdatesDetailView: View {
             NavigationStack { PluginReleasePickerView(updater: updater) }
         }
         .sheet(isPresented: $showHelp) { CommunityAppsHelpView() }
-        .alert("Clean up old Community app routes?", isPresented: $showCleanupConfirmation) {
-            Button("Cancel", role: .cancel) {}
-            Button("Clean Up \(updater.pendingCleanupCount)", role: .destructive) {
-                Task { await updater.cleanUpPendingRoutes() }
-            }
-        } message: {
-            Text(
-                "Only exact files recorded from an older Community Pack are eligible. "
-                + "Tumoflip-protected, custom, modified, or unverified files are kept."
-            )
-        }
     }
 
     private var communityStatusCard: some View {
@@ -197,32 +187,74 @@ struct PluginUpdatesDetailView: View {
             .disabled(updater.stopRequested)
         } else if !busy,
                   updater.selectedCount > 0 || updater.pendingCleanupCount > 0 {
-            HStack(spacing: 10) {
-                if updater.selectedCount > 0 {
-                    compactCommunityAction(
-                        title: "Install \(updater.selectedCount)",
-                        systemImage: "square.and.arrow.down.on.square",
-                        tint: Theme.accent,
-                        action: { Task { await updater.install() } }
-                    )
-                    .disabled(!hasFileChannel || updater.validating)
-                    .accessibilityIdentifier("community-install-action")
+            VStack(spacing: 7) {
+                HStack(spacing: 10) {
+                    if updater.selectedCount > 0 {
+                        compactCommunityAction(
+                            title: "Install \(updater.selectedCount)",
+                            systemImage: "square.and.arrow.down.on.square",
+                            tint: Theme.accent,
+                            action: { Task { await updater.install() } }
+                        )
+                        .disabled(!hasFileChannel || updater.validating)
+                        .accessibilityIdentifier("community-install-action")
+                    }
+                    if updater.pendingCleanupCount > 0, !showCleanupConfirmation {
+                        compactCommunityAction(
+                            title: "Clean Up \(updater.pendingCleanupCount)",
+                            systemImage: "trash",
+                            tint: Theme.warning,
+                            role: .destructive,
+                            action: requestCleanup
+                        )
+                        .disabled(!hasFileChannel)
+                        .accessibilityIdentifier("community-cleanup-action")
+                    }
                 }
-                if updater.pendingCleanupCount > 0 {
-                    compactCommunityAction(
-                        title: "Clean Up \(updater.pendingCleanupCount)",
-                        systemImage: "trash",
+                .padding(.horizontal, 2)
+                .padding(.vertical, 2)
+
+                if showCleanupConfirmation {
+                    InlineActionConfirmationRow(
+                        title: "\(updater.pendingCleanupCount) old route\(updater.pendingCleanupCount == 1 ? "" : "s")",
+                        detail: "Custom, modified and protected files stay untouched",
+                        systemImage: "trash.slash.fill",
+                        iconColor: Theme.warning,
                         tint: Theme.warning,
-                        role: .destructive,
-                        action: { showCleanupConfirmation = true }
+                        confirmTitle: "Clean Up",
+                        confirmRole: .destructive,
+                        accessibilityIdentifier: "community-cleanup-confirmation",
+                        cancelAccessibilityLabel: "Cancel Community apps cleanup",
+                        confirmAccessibilityLabel: "Confirm Community apps cleanup",
+                        onCancel: cancelCleanup,
+                        onConfirm: confirmCleanup
                     )
-                    .disabled(!hasFileChannel)
-                    .accessibilityIdentifier("community-cleanup-action")
+                    .transition(.opacity.combined(with: .move(edge: .top)))
                 }
             }
-            .padding(.horizontal, 2)
-            .padding(.vertical, 2)
         }
+    }
+
+    private func requestCleanup() {
+        guard updater.pendingCleanupCount > 0 else { return }
+        withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) {
+            showCleanupConfirmation = true
+        }
+    }
+
+    private func cancelCleanup() {
+        withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) {
+            showCleanupConfirmation = false
+        }
+    }
+
+    private func confirmCleanup() {
+        guard updater.pendingCleanupCount > 0 else {
+            showCleanupConfirmation = false
+            return
+        }
+        showCleanupConfirmation = false
+        Task { await updater.cleanUpPendingRoutes() }
     }
 
     private func compactCommunityAction(
@@ -416,7 +448,8 @@ struct PluginUpdatesDetailView: View {
 
     private var hasFileChannel: Bool {
         #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("-community-apps-layout-qa") {
+        if ProcessInfo.processInfo.arguments.contains("-community-apps-layout-qa")
+            || ProcessInfo.processInfo.arguments.contains("-community-route-cleanup-qa") {
             return true
         }
         #endif

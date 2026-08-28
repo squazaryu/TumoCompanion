@@ -18,26 +18,26 @@ struct ESP32FirmwareView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            CardScroll(refreshAction: { await up.refresh() }) {
-                statusCard
-                if up.stagingBoards.isEmpty && !up.busy {
-                    switch up.deviceScanState {
-                    case .loaded:
-                        emptyCard
-                    case .failed:
-                        EmptyView()
-                    case .idle, .scanning:
-                        EmptyView()
-                    }
+        CardScroll(refreshAction: { await up.refresh() }) {
+            statusCard
+            if up.stagingBoards.isEmpty && !up.busy {
+                switch up.deviceScanState {
+                case .loaded:
+                    emptyCard
+                case .failed:
+                    EmptyView()
+                case .idle, .scanning:
+                    EmptyView()
                 }
-
-                // The folder tab is fixed above the app tab bar, just like
-                // Home → Sources. Keep only its collapsed footprint in the page
-                // content so the overview remains one screen tall.
-                Color.clear.frame(height: 58)
             }
 
+            // The folder tab is fixed above the app tab bar, just like
+            // Home → Sources. Keep only its collapsed footprint in the page
+            // content so the overview remains one screen tall.
+            Color.clear.frame(height: 58)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .overlay(alignment: .bottom) {
             if hasStagedPackages {
                 BottomFolderDrawer(
                     isExpanded: $packageDrawerExpanded,

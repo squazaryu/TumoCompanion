@@ -171,6 +171,81 @@ struct PillButton: View {
     }
 }
 
+/// Compact, in-context confirmation for routine actions that do not warrant a
+/// blocking system alert. Destructive file deletion and data restoration should
+/// continue to use explicit system confirmation.
+struct InlineActionConfirmationRow: View {
+    let title: String
+    var detail: String? = nil
+    var systemImage: String = "checkmark.shield.fill"
+    var iconColor: Color = Theme.success
+    var tint: Color = Theme.accent
+    var confirmTitle: String
+    var confirmSystemImage: String? = nil
+    var confirmRole: ButtonRole? = nil
+    var accessibilityIdentifier: String
+    var cancelAccessibilityLabel: String = "Cancel action"
+    var confirmAccessibilityLabel: String
+    let onCancel: () -> Void
+    let onConfirm: () -> Void
+
+    var body: some View {
+        HStack(spacing: 7) {
+            Image(systemName: systemImage)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(iconColor)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(Color.primary.opacity(0.78))
+                if let detail {
+                    Text(detail)
+                        .font(.caption2)
+                        .foregroundStyle(Color.primary.opacity(0.58))
+                }
+            }
+            .lineLimit(2)
+            .minimumScaleFactor(0.82)
+
+            Spacer(minLength: 2)
+
+            Button("Cancel", action: onCancel)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(Color.primary.opacity(0.72))
+                .buttonStyle(.plain)
+                .accessibilityLabel(cancelAccessibilityLabel)
+
+            Button(role: confirmRole, action: onConfirm) {
+                Group {
+                    if let confirmSystemImage {
+                        Label(confirmTitle, systemImage: confirmSystemImage)
+                    } else {
+                        Text(confirmTitle)
+                    }
+                }
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 6)
+                .background(tint, in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(confirmAccessibilityLabel)
+        }
+        .padding(.leading, 7)
+        .padding(.trailing, 5)
+        .padding(.vertical, 5)
+        .background(Color.primary.opacity(0.055), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(tint.opacity(0.24), lineWidth: 1)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(accessibilityIdentifier)
+    }
+}
+
 /// Scrollable container with consistent card spacing and grouped background.
 struct CardScroll<Content: View>: View {
     private let refreshAction: (() async -> Void)?
@@ -242,74 +317,78 @@ struct BottomFolderDrawer<Panel: View>: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            if isExpanded {
-                Color.black.opacity(0.16)
-                    .ignoresSafeArea()
-                    .onTapGesture { close() }
-                    .transition(.opacity)
+        GeometryReader { proxy in
+            ZStack(alignment: .bottom) {
+                if isExpanded {
+                    Color.black.opacity(0.16)
+                        .ignoresSafeArea()
+                        .onTapGesture { close() }
+                        .transition(.opacity)
+                        .zIndex(0)
 
-                ScrollView {
-                    drawerPanelContent
-                }
-                .scrollIndicators(.hidden)
-                .scrollBounceBehavior(.basedOnSize)
-                .frame(maxWidth: .infinity)
-                .frame(height: resolvedPanelHeight)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
-                }
-                .shadow(color: .black.opacity(0.18), radius: 18, y: 8)
-                .padding(.horizontal, Theme.pagePadding)
-                .padding(.bottom, 54)
-                .accessibilityIdentifier("\(accessibilityIdentifier)-panel")
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-                .onPreferenceChange(BottomFolderDrawerHeightKey.self) { height in
-                    guard height.isFinite, height > 0 else { return }
-                    let rounded = ceil(height)
-                    if abs(measuredPanelHeight - rounded) > 0.5 {
-                        measuredPanelHeight = rounded
+                    ScrollView {
+                        drawerPanelContent
                     }
+                    .scrollIndicators(.hidden)
+                    .scrollBounceBehavior(.basedOnSize)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: resolvedPanelHeight(availableHeight: proxy.size.height))
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 24, style: .continuous)
+                            .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
+                    }
+                    .shadow(color: .black.opacity(0.18), radius: 18, y: 8)
+                    .padding(.horizontal, Theme.pagePadding)
+                    .padding(.bottom, 54)
+                    .accessibilityIdentifier("\(accessibilityIdentifier)-panel")
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .zIndex(1)
                 }
-            }
 
-            Button(action: toggle) {
-                HStack(spacing: 7) {
-                    Image(systemName: systemImage)
-                        .font(.caption2.weight(.bold))
-                    Text(title)
-                        .font(.caption2.weight(.bold))
-                        .tracking(0.8)
-                    Spacer(minLength: 8)
-                    if let summary, !summary.isEmpty {
-                        Text(summary)
-                            .font(.caption2.weight(.medium))
+                Button(action: toggle) {
+                    HStack(spacing: 7) {
+                        Image(systemName: systemImage)
+                            .font(.caption2.weight(.bold))
+                        Text(title)
+                            .font(.caption2.weight(.bold))
+                            .tracking(0.8)
+                        Spacer(minLength: 8)
+                        if let summary, !summary.isEmpty {
+                            Text(summary)
+                                .font(.caption2.weight(.medium))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.75)
+                        }
+                        Image(systemName: isExpanded ? "chevron.down" : "chevron.up")
+                            .font(.caption.weight(.bold))
                             .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.75)
                     }
-                    Image(systemName: isExpanded ? "chevron.down" : "chevron.up")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.accent)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(.regularMaterial, in: Capsule())
+                    .overlay {
+                        Capsule().strokeBorder(Theme.accent.opacity(0.25), lineWidth: 1)
+                    }
+                    .shadow(color: .black.opacity(0.16), radius: 12, y: 5)
                 }
-                .foregroundStyle(Theme.accent)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background(.regularMaterial, in: Capsule())
-                .overlay {
-                    Capsule().strokeBorder(Theme.accent.opacity(0.25), lineWidth: 1)
-                }
-                .shadow(color: .black.opacity(0.16), radius: 12, y: 5)
+                .buttonStyle(.plain)
+                .accessibilityIdentifier(accessibilityIdentifier)
+                .accessibilityLabel(title)
+                .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, Theme.pagePadding)
+                .padding(.bottom, 8)
+                .zIndex(2)
             }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier(accessibilityIdentifier)
-            .accessibilityLabel(title)
-            .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, Theme.pagePadding)
-            .padding(.bottom, 8)
+            .frame(
+                width: proxy.size.width,
+                height: proxy.size.height,
+                alignment: .bottom
+            )
+            .onPreferenceChange(BottomFolderDrawerHeightKey.self, perform: updateMeasuredHeight)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
         .animation(reduceMotion ? nil : .snappy(duration: 0.3), value: isExpanded)
@@ -338,15 +417,29 @@ struct BottomFolderDrawer<Panel: View>: View {
         }
     }
 
-    private var resolvedPanelHeight: CGFloat {
+    private func resolvedPanelHeight(availableHeight: CGFloat) -> CGFloat {
         // `panelHeight` is only the first-frame estimate. Once rendered, use
         // the content's actual intrinsic height. This keeps short drawers
-        // compact, lets medium drawers grow, and caps long lists so only the
-        // drawer content scrolls.
+        // compact, lets medium drawers grow, and caps long lists against both
+        // the caller's limit and the current viewport.
         let target = measuredPanelHeight > 0
             ? measuredPanelHeight
             : (panelHeight ?? maxPanelHeight)
-        return min(max(target, 96), maxPanelHeight)
+        let viewportLimit = max(96, availableHeight - 76)
+        return min(max(target, 96), min(maxPanelHeight, viewportLimit))
+    }
+
+    private func updateMeasuredHeight(_ height: CGFloat) {
+        guard height.isFinite, height > 0 else {
+            if !isExpanded {
+                measuredPanelHeight = 0
+            }
+            return
+        }
+        let rounded = ceil(height)
+        if abs(measuredPanelHeight - rounded) > 0.5 {
+            measuredPanelHeight = rounded
+        }
     }
 
     private func toggle() {

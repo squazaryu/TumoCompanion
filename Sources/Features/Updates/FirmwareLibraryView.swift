@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct FirmwareLibraryView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @EnvironmentObject private var ble: FlipperBLE
     @EnvironmentObject private var transfer: TransferChannelStore
     @ObservedObject var library: FirmwareLibrary
@@ -9,24 +10,36 @@ struct FirmwareLibraryView: View {
     @State private var detailsRelease: FirmwareRelease?
     @State private var releaseDrawerExpanded = false
 
-    var body: some View {
-        ZStack(alignment: .bottom) {
-            CardScroll(refreshAction: refreshLibrary) {
-                connectionCard
-                if library.visibleGroups.isEmpty {
-                    emptyCard
-                } else {
-                    catalogOverviewCard
+    private var releaseDrawerBinding: Binding<Bool> {
+        Binding(
+            get: { releaseDrawerExpanded },
+            set: { isExpanded in
+                releaseDrawerExpanded = isExpanded
+                if !isExpanded {
+                    pendingRelease = nil
                 }
+            }
+        )
+    }
 
-                // Match ESP32 and FW Packages: only the folder tab participates
-                // in the page layout. Release history slides over the overview.
-                Color.clear.frame(height: 58)
+    var body: some View {
+        CardScroll(refreshAction: refreshLibrary) {
+            connectionCard
+            if library.visibleGroups.isEmpty {
+                emptyCard
+            } else {
+                catalogOverviewCard
             }
 
+            // Match ESP32 and FW Packages: only the folder tab participates
+            // in the page layout. Release history slides over the overview.
+            Color.clear.frame(height: 58)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .overlay(alignment: .bottom) {
             if canShowReleaseDrawer {
                 BottomFolderDrawer(
-                    isExpanded: $releaseDrawerExpanded,
+                    isExpanded: releaseDrawerBinding,
                     title: "FIRMWARE RELEASES",
                     summary: releaseDrawerSummary,
                     systemImage: "memorychip.fill",
@@ -51,22 +64,6 @@ struct FirmwareLibraryView: View {
         .safeAreaInset(edge: .bottom) { progressBar }
         .sheet(isPresented: $showHelp) { FirmwareHelpView() }
         .sheet(item: $detailsRelease) { FirmwareReleaseDetailsView(release: $0) }
-        .alert(
-            pendingRelease.map { "Prepare \($0.version)?" } ?? "Prepare firmware?",
-            isPresented: Binding(
-                get: { pendingRelease != nil },
-                set: { if !$0 { pendingRelease = nil } }
-            ),
-            presenting: pendingRelease
-        ) { release in
-            Button("Prepare \(release.version)") {
-                pendingRelease = nil
-                Task { await library.stage(release) }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: { release in
-            Text("The verified updater will be copied to Archive > update. Start installation on the Flipper.")
-        }
     }
 
     private var connectionCard: some View {
@@ -197,7 +194,6 @@ struct FirmwareLibraryView: View {
     private var canShowReleaseDrawer: Bool {
         !library.visibleGroups.isEmpty
             && !library.busy
-            && pendingRelease == nil
             && !library.hasTerminalFeedback
     }
 
@@ -270,6 +266,22 @@ struct FirmwareLibraryView: View {
                         : release.buildLabel,
                     isLatest: index == 0 && group.id == library.visibleGroups.first?.id
                 )
+                if pendingRelease?.id == release.id {
+                    InlineActionConfirmationRow(
+                        title: "Archive › update",
+                        systemImage: "checkmark.shield.fill",
+                        iconColor: Theme.success,
+                        tint: Theme.accent,
+                        confirmTitle: "Prepare",
+                        confirmSystemImage: "arrow.down.to.line.compact",
+                        accessibilityIdentifier: "firmware-preparation-confirmation",
+                        cancelAccessibilityLabel: "Cancel preparation",
+                        confirmAccessibilityLabel: "Confirm prepare \(release.version)",
+                        onCancel: cancelPreparation,
+                        onConfirm: { confirmPreparation(of: release) }
+                    )
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                }
                 if index < group.releases.count - 1 {
                     Divider().padding(.leading, 4)
                 }
@@ -368,8 +380,21 @@ struct FirmwareLibraryView: View {
 
     private func requestPreparation(of release: FirmwareRelease) {
         library.clearTerminalFeedback()
+        withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) {
+            pendingRelease = release
+        }
+    }
+
+    private func cancelPreparation() {
+        withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) {
+            pendingRelease = nil
+        }
+    }
+
+    private func confirmPreparation(of release: FirmwareRelease) {
+        pendingRelease = nil
         releaseDrawerExpanded = false
-        pendingRelease = release
+        Task { await library.stage(release) }
     }
 
     private func retryLastTransfer() {
