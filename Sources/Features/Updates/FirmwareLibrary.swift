@@ -168,6 +168,7 @@ final class FirmwareLibrary: ObservableObject {
         case idle
         case loading
         case ready
+        case preparing(version: String)
         case downloading(version: String, fraction: Double?)
         case verifying(version: String)
         case staging(version: String, file: String, doneBytes: Int64, totalBytes: Int64)
@@ -182,6 +183,7 @@ final class FirmwareLibrary: ObservableObject {
     @Published private(set) var installedAPI: String?
     @Published private(set) var transferChannel: TransferChannel = .ble
     @Published private(set) var stopRequested = false
+    @Published private(set) var lastAttemptedRelease: FirmwareRelease?
 
     private let repo = "squazaryu/tumoflip"
     private var loadTask: Task<Void, Never>?
@@ -189,7 +191,14 @@ final class FirmwareLibrary: ObservableObject {
 
     var busy: Bool {
         switch phase {
-        case .loading, .downloading, .verifying, .staging: return true
+        case .loading, .preparing, .downloading, .verifying, .staging: return true
+        default: return false
+        }
+    }
+
+    var hasTerminalFeedback: Bool {
+        switch phase {
+        case .done, .failed: return true
         default: return false
         }
     }
@@ -234,13 +243,27 @@ final class FirmwareLibrary: ObservableObject {
 
     func requestStop() { stopRequested = true }
 
+    /// Clears stale completion feedback before presenting a new transfer intent.
+    /// Active operations are never interrupted or reset by this helper.
+    func clearTerminalFeedback() {
+        guard !busy else { return }
+        switch phase {
+        case .done, .failed:
+            phase = .ready
+        default:
+            break
+        }
+    }
+
     func stage(_ release: FirmwareRelease) async {
         guard !operationRunning else {
             phase = .failed(FirmwareLibraryError.alreadyBusy.localizedDescription)
             return
         }
         operationRunning = true
+        lastAttemptedRelease = release
         stopRequested = false
+        phase = .preparing(version: release.version)
         defer { operationRunning = false }
 
         let store = TransferChannelStore.shared.activeStore
@@ -484,7 +507,10 @@ final class FirmwareLibrary: ObservableObject {
 
 #if DEBUG
 extension FirmwareLibrary {
-    static func layoutQAFixture() -> FirmwareLibrary {
+    static func layoutQAFixture(
+        phase: Phase = .ready,
+        selectedChannel: TumoflipFirmwareChannel = .stable
+    ) -> FirmwareLibrary {
         let library = FirmwareLibrary()
         let baseDate = Date(timeIntervalSince1970: 1_787_875_200)
 
@@ -518,8 +544,8 @@ extension FirmwareLibrary {
         ]
         library.installedVersion = "t-flppr-fw-007"
         library.installedAPI = "88.4"
-        library.selectedChannel = .stable
-        library.phase = .ready
+        library.selectedChannel = selectedChannel
+        library.phase = phase
         return library
     }
 }

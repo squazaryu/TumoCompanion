@@ -299,6 +299,12 @@ final class UpdateSourceLayoutUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Version 007"].exists)
         XCTAssertTrue(app.staticTexts["Installed"].isHittable)
         attach("Firmware release drawer - dark")
+
+        app.buttons["Prepare t-flppr-fw-008"].tap()
+        XCTAssertTrue(app.alerts["Prepare t-flppr-fw-008?"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.segmentedControls["firmware-channel-picker"].exists)
+        XCTAssertFalse(app.buttons["firmware-releases-drawer-toggle"].exists)
+        attach("Firmware preparation confirmation - dark")
     }
 
     func testFirmwareOverviewAndDrawerRenderInLightMode() {
@@ -309,6 +315,46 @@ final class UpdateSourceLayoutUITests: XCTestCase {
         drawer.tap()
         XCTAssertTrue(app.segmentedControls["firmware-channel-picker"].waitForExistence(timeout: 3))
         attach("Firmware release drawer - light")
+
+        app.buttons["Prepare t-flppr-fw-008"].tap()
+        XCTAssertTrue(app.alerts["Prepare t-flppr-fw-008?"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.segmentedControls["firmware-channel-picker"].exists)
+        XCTAssertFalse(app.buttons["firmware-releases-drawer-toggle"].exists)
+        attach("Firmware preparation confirmation - light")
+    }
+
+    func testFirmwareFailureReplacesDrawerInDarkMode() {
+        let app = launch("-firmware-library-error-qa", appearance: "dark")
+        XCTAssertTrue(app.staticTexts["Firmware transfer failed"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["Retry"].exists)
+        XCTAssertFalse(app.staticTexts["Error"].exists)
+        XCTAssertFalse(app.buttons["firmware-releases-drawer-toggle"].exists)
+        attach("Firmware transfer failure - dark")
+    }
+
+    func testFirmwareFailureReplacesDrawerInLightMode() {
+        let app = launch("-firmware-library-error-qa", appearance: "light")
+        XCTAssertTrue(app.staticTexts["Firmware transfer failed"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["Retry"].exists)
+        XCTAssertFalse(app.staticTexts["Error"].exists)
+        XCTAssertFalse(app.buttons["firmware-releases-drawer-toggle"].exists)
+        attach("Firmware transfer failure - light")
+    }
+
+    func testFirmwarePreparingReplacesDrawerInDarkMode() {
+        let app = launch("-firmware-library-preparing-qa", appearance: "dark")
+        XCTAssertTrue(app.staticTexts["Preparing t-dev-008-003"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.buttons["firmware-releases-drawer-toggle"].exists)
+        XCTAssertFalse(app.alerts.firstMatch.exists)
+        attach("Firmware transfer preparing - dark")
+    }
+
+    func testFirmwarePreparingReplacesDrawerInLightMode() {
+        let app = launch("-firmware-library-preparing-qa", appearance: "light")
+        XCTAssertTrue(app.staticTexts["Preparing t-dev-008-003"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.buttons["firmware-releases-drawer-toggle"].exists)
+        XCTAssertFalse(app.alerts.firstMatch.exists)
+        attach("Firmware transfer preparing - light")
     }
 
     func testCommunityOverviewAndDrawerRenderInDarkMode() {

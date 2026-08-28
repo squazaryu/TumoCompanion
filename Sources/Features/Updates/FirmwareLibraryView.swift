@@ -24,7 +24,7 @@ struct FirmwareLibraryView: View {
                 Color.clear.frame(height: 58)
             }
 
-            if !library.visibleGroups.isEmpty, !library.busy {
+            if canShowReleaseDrawer {
                 BottomFolderDrawer(
                     isExpanded: $releaseDrawerExpanded,
                     title: "FIRMWARE RELEASES",
@@ -46,14 +46,13 @@ struct FirmwareLibraryView: View {
                     Image(systemName: "questionmark.circle")
                 }
                 .accessibilityLabel("Firmware help")
-                if library.busy { ProgressView() }
             }
         }
         .safeAreaInset(edge: .bottom) { progressBar }
         .sheet(isPresented: $showHelp) { FirmwareHelpView() }
         .sheet(item: $detailsRelease) { FirmwareReleaseDetailsView(release: $0) }
-        .confirmationDialog(
-            "Prepare this firmware?",
+        .alert(
+            pendingRelease.map { "Prepare \($0.version)?" } ?? "Prepare firmware?",
             isPresented: Binding(
                 get: { pendingRelease != nil },
                 set: { if !$0 { pendingRelease = nil } }
@@ -61,11 +60,12 @@ struct FirmwareLibraryView: View {
             presenting: pendingRelease
         ) { release in
             Button("Prepare \(release.version)") {
+                pendingRelease = nil
                 Task { await library.stage(release) }
             }
             Button("Cancel", role: .cancel) {}
         } message: { release in
-            Text("The verified updater will be copied to Archive > update. Installation still starts on the Flipper.")
+            Text("The verified updater will be copied to Archive > update. Start installation on the Flipper.")
         }
     }
 
@@ -194,6 +194,13 @@ struct FirmwareLibraryView: View {
         return "\(count) \(count == 1 ? "build" : "builds")"
     }
 
+    private var canShowReleaseDrawer: Bool {
+        !library.visibleGroups.isEmpty
+            && !library.busy
+            && pendingRelease == nil
+            && !library.hasTerminalFeedback
+    }
+
     private var releaseDrawerHeight: CGFloat {
         // A group with one release is already identified by its release row;
         // only multi-build Dev groups need an extra heading.
@@ -308,7 +315,7 @@ struct FirmwareLibraryView: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("Details for \(release.version)")
 
-                Button { pendingRelease = release } label: {
+                Button { requestPreparation(of: release) } label: {
                     compactActionIcon(
                         "arrow.down.to.line.compact",
                         foreground: .white,
@@ -359,21 +366,33 @@ struct FirmwareLibraryView: View {
         return transfer.activeChannel == .usb || ble.state == .ready || ble.state == .connected
     }
 
+    private func requestPreparation(of release: FirmwareRelease) {
+        library.clearTerminalFeedback()
+        releaseDrawerExpanded = false
+        pendingRelease = release
+    }
+
+    private func retryLastTransfer() {
+        guard let release = library.lastAttemptedRelease else {
+            library.refresh()
+            return
+        }
+        requestPreparation(of: release)
+    }
+
     @ViewBuilder private var phasePill: some View {
         switch library.phase {
-        case .done:
-            StatusPill(text: "Prepared", color: Theme.success, systemImage: "checkmark.circle.fill")
-        case .failed:
-            StatusPill(text: "Error", color: Theme.danger, systemImage: "exclamationmark.triangle.fill")
-        case .loading, .downloading, .verifying, .staging:
-            ProgressView().scaleEffect(0.85)
         case .idle, .ready:
             StatusPill(text: "Ready", color: .secondary, systemImage: "circle")
+        case .loading, .preparing, .downloading, .verifying, .staging, .done, .failed:
+            EmptyView()
         }
     }
 
     @ViewBuilder private var progressBar: some View {
         switch library.phase {
+        case .preparing(let version):
+            transferProgress(title: "Preparing \(version)", fraction: nil)
         case .downloading(let version, let fraction):
             transferProgress(title: "Downloading \(version)", fraction: fraction)
         case .verifying(let version):
@@ -391,7 +410,7 @@ struct FirmwareLibraryView: View {
                 color: Theme.danger,
                 icon: "exclamationmark.triangle.fill",
                 actionTitle: "Retry",
-                action: { library.refresh() }
+                action: retryLastTransfer
             )
         default:
             EmptyView()
