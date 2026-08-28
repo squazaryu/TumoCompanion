@@ -384,6 +384,66 @@ final class UpdateSourceLayoutUITests: XCTestCase {
     }
 }
 
+final class ESP32DeviceInventoryUITests: XCTestCase {
+    func testStagedPackagesShow150AsUpdateInLightMode() {
+        verifyStagedPackages(appearance: "light")
+    }
+
+    func testStagedPackagesShow150AsUpdateInDarkMode() {
+        verifyStagedPackages(appearance: "dark")
+    }
+
+    func testDeviceReadFailureIsActionableInLightMode() {
+        verifyReadFailure(appearance: "light")
+    }
+
+    func testDeviceReadFailureIsActionableInDarkMode() {
+        verifyReadFailure(appearance: "dark")
+    }
+
+    private func verifyStagedPackages(appearance: String) {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-onboardingDone", "YES",
+            "-appearanceMode", appearance,
+            "-esp32-staged-update-qa",
+        ]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Update available: v1.15.1"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["esp32-board-summary-v6_1"].exists)
+        XCTAssertTrue(app.staticTexts["v1.15.0"].exists)
+        XCTAssertFalse(app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS[c] %@", "No Marauder flash folders")
+        ).firstMatch.exists)
+        attach("ESP32 staged 1.15.0 update - \(appearance)")
+    }
+
+    private func verifyReadFailure(appearance: String) {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-onboardingDone", "YES",
+            "-appearanceMode", appearance,
+            "-esp32-device-scan-failure-qa",
+        ]
+        app.launch()
+
+        XCTAssertTrue(app.buttons["esp32-retry-device-scan"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS[c] %@", "Couldn't read Flipper packages")
+        ).firstMatch.exists)
+        XCTAssertFalse(app.staticTexts["Latest"].exists)
+        attach("ESP32 device scan failure - \(appearance)")
+    }
+
+    private func attach(_ name: String) {
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = name
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+}
+
 final class ProtectedAppsAuditUITests: XCTestCase {
     func testAuditedDifferencesDoNotAppearAsDiff() {
         let app = XCUIApplication()

@@ -70,6 +70,7 @@ final class UpdatesCoordinator: ObservableObject {
             guard let self, !Task.isCancelled else { return }
             await self.plugins.validateCompatibility()
             await self.packages.validateCompatibility()
+            await self.esp32.refreshDevicePackages()
             self.revalidationTask = nil
         }
     }

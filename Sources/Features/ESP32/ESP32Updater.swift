@@ -92,6 +92,22 @@ enum ESP32ManifestError: LocalizedError, Equatable {
 /// effect of an application update. Older releases retain the guarded app-only fallback.
 @MainActor
 final class ESP32Updater: ObservableObject {
+    enum DeviceScanState: Equatable {
+        case idle
+        case scanning
+        case loaded
+        case failed(String)
+    }
+
+    enum OverviewState: Equatable {
+        case checking
+        case deviceUnavailable
+        case noPackages
+        case releaseUnavailable
+        case update(String)
+        case latest(String)
+    }
+
     struct Board: Identifiable, Equatable {
         let id = UUID()
         let folder: String        // existing manual folder path on SD
@@ -124,6 +140,8 @@ final class ESP32Updater: ObservableObject {
     /// driven by both the WiFi download and the on-device write phases.
     @Published var progressText: String?
     @Published private(set) var transferChannel: TransferChannel = .ble
+    @Published private(set) var deviceScanState: DeviceScanState = .idle
+    @Published private(set) var releaseCheckFailed = false
 
     /// True only while the GitHub download is streaming. Gates the download
     /// progress callback so a late `didWriteData` Task (queued during the
@@ -131,7 +149,10 @@ final class ESP32Updater: ObservableObject {
     /// status once the on-device write phase has taken over. Main-actor isolated.
     private var downloadPhase = false
 
-    private var storage: any DeviceFileStore { TransferChannelStore.shared.activeStore }
+    private let storageOverride: (any DeviceFileStore)?
+    private var storage: any DeviceFileStore {
+        storageOverride ?? TransferChannelStore.shared.activeStore
+    }
     nonisolated static let repo = "justcallmekoko/ESP32Marauder"
     static let flasherDir = "/ext/apps_data/esp_flasher"
     static let archiveDir = "\(flasherDir)/_archive"
@@ -139,6 +160,10 @@ final class ESP32Updater: ObservableObject {
     private(set) var latestManifest: ESP32InstallerManifest?
     private(set) var manifestError: String?
     private var releaseHasManifest = false
+
+    init(storage: (any DeviceFileStore)? = nil) {
+        storageOverride = storage
+    }
 
 #if DEBUG
     static func archivedRedownloadQA() -> ESP32Updater {
@@ -163,7 +188,42 @@ final class ESP32Updater: ObservableObject {
             currentVersion: "v1.14.1",
             appName: "esp32_marauder_v1_14_1_v6_1_0x10000.bin",
             bootFiles: ["bootloader_0x1000.bin", "partitions_0x8000.bin"])]
+        updater.deviceScanState = .loaded
         updater.status = "Up to date (v1.14.1)"
+        return updater
+    }
+
+    static func stagedUpdateQA() -> ESP32Updater {
+        let updater = ESP32Updater()
+        updater.latestTag = "v1.15.1"
+        updater.boards = [
+            Board(
+                folder: "\(flasherDir)/c5_v1_14_1_manual",
+                base: "c5_v1_14_1",
+                display: "C5",
+                key: "esp32c5devkitc1",
+                currentVersion: "v1.14.1",
+                appName: "esp32_marauder_v1_14_1_esp32c5devkitc1_0x10000.bin",
+                bootFiles: ["bootloader_0x2000.bin", "partitions_0x8000.bin"]),
+            Board(
+                folder: "\(flasherDir)/module_one_v6_1_v1_15_0_manual",
+                base: "module_one_v6_1_v1_15_0",
+                display: "Module One v6.1",
+                key: "v6_1",
+                currentVersion: "v1.15.0",
+                appName: "esp32_marauder_v1_15_0_v6_1_0x10000.bin",
+                bootFiles: ["bootloader_0x1000.bin", "partitions_0x8000.bin", "boot_app0_0xe000.bin"]),
+        ]
+        updater.deviceScanState = .loaded
+        updater.updateSummaryStatus()
+        return updater
+    }
+
+    static func scanFailureQA() -> ESP32Updater {
+        let updater = ESP32Updater()
+        updater.latestTag = "v1.15.1"
+        updater.deviceScanState = .failed("Another Flipper command interrupted the scan.")
+        updater.updateSummaryStatus()
         return updater
     }
 #endif
@@ -429,6 +489,39 @@ final class ESP32Updater: ObservableObject {
         return stagingBoards.contains { Self.norm($0.currentVersion) != Self.norm(latest) }
     }
 
+    var overviewState: OverviewState {
+        Self.resolveOverviewState(
+            deviceScanState: deviceScanState,
+            hasPackages: !stagingBoards.isEmpty,
+            latestTag: latestTag,
+            updateAvailable: updateAvailable,
+            manifestError: manifestError,
+            releaseCheckFailed: releaseCheckFailed)
+    }
+
+    nonisolated static func resolveOverviewState(
+        deviceScanState: DeviceScanState,
+        hasPackages: Bool,
+        latestTag: String?,
+        updateAvailable: Bool,
+        manifestError: String?,
+        releaseCheckFailed: Bool
+    ) -> OverviewState {
+        switch deviceScanState {
+        case .idle, .scanning:
+            return .checking
+        case .failed:
+            return .deviceUnavailable
+        case .loaded:
+            break
+        }
+        guard hasPackages else { return .noPackages }
+        guard manifestError == nil, !releaseCheckFailed, let latestTag else {
+            return .releaseUnavailable
+        }
+        return updateAvailable ? .update(latestTag) : .latest(latestTag)
+    }
+
     func newVersion(for board: Board) -> Bool {
         guard let latest = latestTag else { return false }
         return Self.norm(board.currentVersion) != Self.norm(latest)
@@ -581,45 +674,82 @@ final class ESP32Updater: ObservableObject {
     // MARK: - Scan + check
 
     func refresh() async {
+        guard !busy else { return }
         transferChannel = storage.channel
         busy = true; defer { busy = false }
         status = "Checking via \(transferChannel.label)…"
         await scanBoards()
         await checkLatest()
-        if let manifestError {
-            status = "Release manifest rejected: \(manifestError)"
-        } else if let t = latestTag {
-            status = updateAvailable ? "Update available: \(t)" : "Up to date (\(t))"
-        } else {
-            status = "Couldn't reach GitHub."
-        }
+        updateSummaryStatus()
     }
 
-    private func scanBoards() async {
-        guard let dirs = try? await storage.list(Self.flasherDir) else {
-            boards = []
-            archivedBoards = []
-            return
+    /// Re-read only the device-side package inventory. This is used when BLE becomes
+    /// ready after the GitHub release check has already completed.
+    func refreshDevicePackages() async {
+        guard !busy else { return }
+        transferChannel = storage.channel
+        busy = true; defer { busy = false }
+        status = "Reading Flipper packages via \(transferChannel.label)…"
+        await scanBoards()
+        updateSummaryStatus()
+    }
+
+    @discardableResult
+    private func scanBoards() async -> Bool {
+        deviceScanState = .scanning
+        let store = storage
+        for attempt in 0...1 {
+            do {
+                let snapshot = try await scanSnapshot(using: store)
+                boards = snapshot.active
+                archivedBoards = snapshot.archived
+                deviceScanState = .loaded
+                return true
+            } catch {
+                if attempt == 0, Self.shouldRetryScan(after: error) {
+                    try? await Task.sleep(nanoseconds: 300_000_000)
+                    continue
+                }
+                let message = error.localizedDescription
+                deviceScanState = .failed(message)
+                elog.error("device package scan: \(message, privacy: .public)")
+                return false
+            }
         }
+        return false
+    }
+
+    private func scanSnapshot(
+        using store: any DeviceFileStore
+    ) async throws -> (active: [Board], archived: [Board]) {
+        let dirs: [FlipperFile]
+        do {
+            dirs = try await store.list(Self.flasherDir)
+        } catch where Self.isMissingDirectoryError(error) {
+            return ([], [])
+        }
+
         var found: [Board] = []
         for d in dirs where Self.isManualFolder(d.name) {
-            if let board = await board(from: d) {
+            if let board = try await board(from: d, using: store) {
                 found.append(board)
             }
         }
-        boards = found
 
-        let archiveDirs = (try? await storage.list(Self.archiveDir)) ?? []
+        let archiveExists = dirs.contains {
+            $0.isDirectory && $0.name == Self.folderName(from: Self.archiveDir)
+        }
+        let archiveDirs = archiveExists ? try await store.list(Self.archiveDir) : []
         var archived: [Board] = []
         for d in archiveDirs where Self.isManualFolder(d.name) {
-            if let board = await board(from: d) {
+            if let board = try await board(from: d, using: store) {
                 archived.append(board)
             }
         }
-        archivedBoards = archived.sorted {
+        return (found, archived.sorted {
             $0.display == $1.display ? Self.isNewer($0.currentVersion, than: $1.currentVersion)
                                      : $0.display < $1.display
-        }
+        })
     }
 
     nonisolated static func isManualFolder(_ name: String) -> Bool {
@@ -630,9 +760,12 @@ final class ESP32Updater: ObservableObject {
         path.split(separator: "/").last.map(String.init) ?? path
     }
 
-    private func board(from directory: FlipperFile) async -> Board? {
-        guard directory.isDirectory, Self.isManualFolder(directory.name),
-              let files = try? await storage.list(directory.path) else { return nil }
+    private func board(
+        from directory: FlipperFile,
+        using store: any DeviceFileStore
+    ) async throws -> Board? {
+        guard directory.isDirectory, Self.isManualFolder(directory.name) else { return nil }
+        let files = try await store.list(directory.path)
         // The app image is the `esp32_marauder_*` .bin (boot files are named
         // bootloader_*/partitions_*/boot_app0_*). Prefer the one at offset 0x10000.
         let marauder = files.filter { $0.name.hasPrefix("esp32_marauder_") && $0.name.hasSuffix(".bin") }
@@ -643,6 +776,43 @@ final class ESP32Updater: ObservableObject {
         return Board(folder: directory.path, base: base, display: Self.cleanBase(base),
                      key: parsed.key, currentVersion: parsed.version,
                      appName: app.name, bootFiles: boot)
+    }
+
+    nonisolated private static func shouldRetryScan(after error: Error) -> Bool {
+        guard let rpcError = error as? FlipperRPCError else { return false }
+        switch rpcError {
+        case .timeout, .status(.errorBusy), .status(.errorContinuousCommandInterrupted):
+            return true
+        default:
+            return false
+        }
+    }
+
+    nonisolated private static func isMissingDirectoryError(_ error: Error) -> Bool {
+        if case FlipperRPCError.status(.errorStorageNotExist) = error { return true }
+        let cocoa = error as NSError
+        return cocoa.domain == NSCocoaErrorDomain && cocoa.code == CocoaError.fileNoSuchFile.rawValue
+    }
+
+    private func updateSummaryStatus() {
+        switch overviewState {
+        case .checking:
+            status = "Checking Flipper packages…"
+        case .deviceUnavailable:
+            status = "Couldn't read Flipper packages. Reconnect or retry."
+        case .noPackages:
+            status = "No Marauder packages are staged on this Flipper."
+        case .releaseUnavailable:
+            if let manifestError {
+                status = "Release manifest rejected: \(manifestError)"
+            } else {
+                status = "Couldn't refresh the latest Marauder release."
+            }
+        case .update(let tag):
+            status = "Update available: \(tag)"
+        case .latest(let tag):
+            status = "Up to date (\(tag))"
+        }
     }
 
     private func uniqueArchivePath(for board: Board) async -> String {
@@ -672,24 +842,27 @@ final class ESP32Updater: ObservableObject {
         guard let url = URL(string: "https://api.github.com/repos/\(Self.repo)/releases/latest") else { return }
         do {
             let result = try await GitHubAPIClient.shared.data(from: url)
-            if let obj = try? JSONSerialization.jsonObject(with: result.data) as? [String: Any],
-               let tag = obj["tag_name"] as? String {
-                latestTag = tag
-                latestAssets = [:]; latestAssetSizes = [:]; latestAssetSHA256 = [:]
-                for a in (obj["assets"] as? [[String: Any]]) ?? [] {
-                    guard let n = a["name"] as? String,
-                          let u = a["browser_download_url"] as? String,
-                          let url = URL(string: u) else { continue }
-                    latestAssets[n] = url
-                    latestAssetSizes[n] = (a["size"] as? Int) ?? 0
-                    if let digest = a["digest"] as? String,
-                       digest.lowercased().hasPrefix("sha256:") {
-                        latestAssetSHA256[n] = String(digest.dropFirst("sha256:".count))
-                    }
-                }
-                await loadInstallerManifest(for: tag)
+            guard let obj = try JSONSerialization.jsonObject(with: result.data) as? [String: Any],
+                  let tag = obj["tag_name"] as? String else {
+                throw URLError(.cannotParseResponse)
             }
+            releaseCheckFailed = false
+            latestTag = tag
+            latestAssets = [:]; latestAssetSizes = [:]; latestAssetSHA256 = [:]
+            for a in (obj["assets"] as? [[String: Any]]) ?? [] {
+                guard let n = a["name"] as? String,
+                      let u = a["browser_download_url"] as? String,
+                      let url = URL(string: u) else { continue }
+                latestAssets[n] = url
+                latestAssetSizes[n] = (a["size"] as? Int) ?? 0
+                if let digest = a["digest"] as? String,
+                   digest.lowercased().hasPrefix("sha256:") {
+                    latestAssetSHA256[n] = String(digest.dropFirst("sha256:".count))
+                }
+            }
+            await loadInstallerManifest(for: tag)
         } catch {
+            releaseCheckFailed = true
             latestManifest = nil
             manifestError = nil
             releaseHasManifest = false

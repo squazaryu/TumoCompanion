@@ -69,6 +69,72 @@ final class ESP32UpdaterTests: XCTestCase {
         XCTAssertEqual(ESP32Updater.folderName(from: "plain_manual"), "plain_manual")
     }
 
+    func testOverviewNeverCallsRemoteReleaseLatestWhenDeviceScanFailed() {
+        XCTAssertEqual(
+            ESP32Updater.resolveOverviewState(
+                deviceScanState: .failed("Command interrupted"),
+                hasPackages: false,
+                latestTag: "v1.15.1",
+                updateAvailable: false,
+                manifestError: nil,
+                releaseCheckFailed: false),
+            .deviceUnavailable)
+        XCTAssertEqual(
+            ESP32Updater.resolveOverviewState(
+                deviceScanState: .loaded,
+                hasPackages: false,
+                latestTag: "v1.15.1",
+                updateAvailable: false,
+                manifestError: nil,
+                releaseCheckFailed: false),
+            .noPackages)
+    }
+
+    func testLoadedOlderPackageReportsUpdateAgainstLatestRelease() {
+        XCTAssertEqual(
+            ESP32Updater.resolveOverviewState(
+                deviceScanState: .loaded,
+                hasPackages: true,
+                latestTag: "v1.15.1",
+                updateAvailable: true,
+                manifestError: nil,
+                releaseCheckFailed: false),
+            .update("v1.15.1"))
+    }
+
+    @MainActor
+    func testDeviceScanFindsStagedModuleOne150AndC5() async throws {
+        let fixture = try makeDeviceScanFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let updater = ESP32Updater(storage: fixture.storage)
+
+        await updater.refreshDevicePackages()
+
+        XCTAssertEqual(updater.deviceScanState, .loaded)
+        XCTAssertEqual(
+            Dictionary(uniqueKeysWithValues: updater.currentBoards.map { ($0.key, $0.currentVersion) }),
+            ["esp32c5devkitc1": "v1.14.1", "v6_1": "v1.15.0"])
+    }
+
+    @MainActor
+    func testTransientScanFailurePreservesLastConfirmedPackages() async throws {
+        let fixture = try makeDeviceScanFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let store = InterruptingESP32Store(base: fixture.storage)
+        let updater = ESP32Updater(storage: store)
+        await updater.refreshDevicePackages()
+        let confirmed = updater.currentBoards
+
+        store.interruptListing = true
+        await updater.refreshDevicePackages()
+
+        guard case .failed = updater.deviceScanState else {
+            return XCTFail("Expected a visible device scan failure")
+        }
+        XCTAssertEqual(updater.currentBoards, confirmed)
+        XCTAssertEqual(store.interruptedRootScans, 2, "Transient RPC failures get one bounded retry")
+    }
+
     func testArchivedOnlyBoardRemainsAvailableForRedownload() {
         let archived = board(
             folder: "/ext/apps_data/esp_flasher/_archive/module_one_v6_1_v1_14_1_manual",
@@ -411,4 +477,68 @@ final class ESP32UpdaterTests: XCTestCase {
             appName: "esp32_marauder_\(version)_\(key)_0x10000.bin",
             bootFiles: ["bootloader_0x1000.bin", "partitions_0x8000.bin"])
     }
+
+    private func makeDeviceScanFixture() throws -> (root: URL, storage: USBSDStorage) {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("tumocompanion-esp32-scan-\(UUID().uuidString)")
+        let flasher = root.appendingPathComponent("apps_data/esp_flasher")
+        let moduleOne = flasher.appendingPathComponent("module_one_v6_1_v1_15_0_manual")
+        let c5 = flasher.appendingPathComponent("c5_v1_14_1_manual")
+        try FileManager.default.createDirectory(at: moduleOne, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: c5, withIntermediateDirectories: true)
+        for name in [
+            "boot_app0_0xe000.bin",
+            "bootloader_0x1000.bin",
+            "partitions_0x8000.bin",
+            "esp32_marauder_v1_15_0_v6_1_0x10000.bin",
+        ] {
+            try Data([0]).write(to: moduleOne.appendingPathComponent(name))
+        }
+        for name in [
+            "bootloader_0x2000.bin",
+            "partitions_0x8000.bin",
+            "esp32_marauder_v1_14_1_esp32c5devkitc1_0x10000.bin",
+        ] {
+            try Data([0]).write(to: c5.appendingPathComponent(name))
+        }
+        return (root, USBSDStorage(rootURL: root))
+    }
+}
+
+private final class InterruptingESP32Store: DeviceFileStore {
+    let base: USBSDStorage
+    var interruptListing = false
+    private(set) var interruptedRootScans = 0
+    var channel: TransferChannel { base.channel }
+
+    init(base: USBSDStorage) {
+        self.base = base
+    }
+
+    func list(_ path: String) async throws -> [FlipperFile] {
+        if interruptListing, path == ESP32Updater.flasherDir {
+            interruptedRootScans += 1
+            throw FlipperRPCError.status(.errorContinuousCommandInterrupted)
+        }
+        return try await base.list(path)
+    }
+
+    func read(_ path: String) async throws -> Data { try await base.read(path) }
+    func write(
+        _ path: String,
+        data: Data,
+        progress: (@Sendable (Int) -> Void)?
+    ) async throws {
+        try await base.write(path, data: data, progress: progress)
+    }
+    func makeDirectory(_ path: String) async throws { try await base.makeDirectory(path) }
+    func delete(_ path: String, recursive: Bool) async throws {
+        try await base.delete(path, recursive: recursive)
+    }
+    func move(_ from: String, to newPath: String) async throws {
+        try await base.move(from, to: newPath)
+    }
+    func md5(_ path: String) async -> String? { await base.md5(path) }
+    func checkedMD5(_ path: String) async throws -> String? { try await base.checkedMD5(path) }
+    func exists(_ path: String) async -> Bool { await base.exists(path) }
 }
