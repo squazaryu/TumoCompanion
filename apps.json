@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.11.8",
+      "version": "1.11.9",
       "versionDate": "2026-08-28",
-      "versionDescription": "TumoCompanion 1.11.8 \u2014 clean firmware transfer states\n\n- Firmware preparation now uses a centered confirmation alert instead of an anchored popover.\n- The release drawer closes before confirmation and remains hidden during preparation, transfer, completion, and failure.\n- Preparing, progress, and error feedback are mutually exclusive; duplicate busy/error indicators were removed.\n- Retry now restarts the exact firmware release that failed instead of only refreshing the catalog.\n\nValidation: 570 unit tests and 6 focused light/dark UI tests passed. Confirmation, preparing, and failure renders were manually inspected.\n\nBreaking changes: none. No Flipper firmware, FAP, or FW Packages changes.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.8/TumoCompanion-unsigned.ipa",
-      "size": 25607740,
+      "versionDescription": "TumoCompanion 1.11.9 \u2014 reliable ESP32 package discovery\n\n- A transient BLE/RPC read error no longer clears the confirmed C5 and Module One package inventory.\n- Device-side package state is now independent from the remote Marauder release state, so a failed scan cannot appear as Latest or as an empty folder.\n- Transient scans get one bounded retry and automatically run again when BLE becomes ready.\n- Read failures are shown as a compact actionable state while the last confirmed inventory stays visible.\n\nValidation: 574 unit tests and 4 focused light/dark UI tests passed. Update and failure renders were exported and manually inspected. The connected Flipper was checked read-only and contains C5 v1.14.1 and Module One v1.15.0.\n\nBreaking changes: none. No Flipper firmware, ESP32 firmware, FAP, FW Packages, or SD files are changed by this release.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.9/TumoCompanion-unsigned.ipa",
+      "size": 25624189,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.11.9",
+          "date": "2026-08-28",
+          "localizedDescription": "TumoCompanion 1.11.9 \u2014 reliable ESP32 package discovery\n\n- A transient BLE/RPC read error no longer clears the confirmed C5 and Module One package inventory.\n- Device-side package state is now independent from the remote Marauder release state, so a failed scan cannot appear as Latest or as an empty folder.\n- Transient scans get one bounded retry and automatically run again when BLE becomes ready.\n- Read failures are shown as a compact actionable state while the last confirmed inventory stays visible.\n\nValidation: 574 unit tests and 4 focused light/dark UI tests passed. Update and failure renders were exported and manually inspected. The connected Flipper was checked read-only and contains C5 v1.14.1 and Module One v1.15.0.\n\nBreaking changes: none. No Flipper firmware, ESP32 firmware, FAP, FW Packages, or SD files are changed by this release.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.9/TumoCompanion-unsigned.ipa",
+          "size": 25624189,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.11.8",
           "date": "2026-08-28",
