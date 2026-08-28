@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.11.9",
+      "version": "1.11.10",
       "versionDate": "2026-08-28",
-      "versionDescription": "TumoCompanion 1.11.9 \u2014 reliable ESP32 package discovery\n\n- A transient BLE/RPC read error no longer clears the confirmed C5 and Module One package inventory.\n- Device-side package state is now independent from the remote Marauder release state, so a failed scan cannot appear as Latest or as an empty folder.\n- Transient scans get one bounded retry and automatically run again when BLE becomes ready.\n- Read failures are shown as a compact actionable state while the last confirmed inventory stays visible.\n\nValidation: 574 unit tests and 4 focused light/dark UI tests passed. Update and failure renders were exported and manually inspected. The connected Flipper was checked read-only and contains C5 v1.14.1 and Module One v1.15.0.\n\nBreaking changes: none. No Flipper firmware, ESP32 firmware, FAP, FW Packages, or SD files are changed by this release.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.9/TumoCompanion-unsigned.ipa",
-      "size": 25624189,
+      "versionDescription": "Adaptive update drawers now size themselves to their content across Firmware, FW Packages, Community Apps, and ESP32, while long catalogs remain internally scrollable. Routine firmware preparation, package-channel switching, and verified cleanup use compact inline confirmations instead of blocking pop-ups. Destructive deletion, overwrite, restore, and text-entry flows retain explicit system confirmation.\n\nValidated with 574 unit tests, 14 focused UI tests, and manual light/dark screenshot review.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.10/TumoCompanion-unsigned.ipa",
+      "size": 25628707,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.11.10",
+          "date": "2026-08-28",
+          "localizedDescription": "Adaptive update drawers now size themselves to their content across Firmware, FW Packages, Community Apps, and ESP32, while long catalogs remain internally scrollable. Routine firmware preparation, package-channel switching, and verified cleanup use compact inline confirmations instead of blocking pop-ups. Destructive deletion, overwrite, restore, and text-entry flows retain explicit system confirmation.\n\nValidated with 574 unit tests, 14 focused UI tests, and manual light/dark screenshot review.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.10/TumoCompanion-unsigned.ipa",
+          "size": 25628707,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.11.9",
           "date": "2026-08-28",
