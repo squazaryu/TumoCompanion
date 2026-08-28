@@ -77,20 +77,20 @@ final class FWPackagesActionBarUITests: XCTestCase {
     }
 
     func testActionsFillBottomBarAndTransactionsReplaceThemWithProgress() throws {
-        let channel = app.buttons["fw-packages-channel-drawer-toggle"]
-        XCTAssertTrue(channel.waitForExistence(timeout: 2))
+        let drawer = app.buttons["fw-packages-details-drawer-toggle"]
+        XCTAssertTrue(drawer.waitForExistence(timeout: 2))
         XCTAssertFalse(
             app.staticTexts["Installed"].exists,
-            "Package channel must start collapsed"
+            "Package details must start collapsed"
         )
         let collapsedScreenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         collapsedScreenshot.name = "FW Packages compact overview"
         collapsedScreenshot.lifetime = .keepAlways
         add(collapsedScreenshot)
-        channel.tap()
+        drawer.tap()
         XCTAssertTrue(
             app.staticTexts["Installed"].waitForExistence(timeout: 2),
-            "Package channel metadata must remain available after expansion"
+            "Package metadata must remain available in the bottom drawer"
         )
         XCTAssertEqual(
             app.staticTexts["fw-packages-compatible-firmware"].label,
@@ -106,15 +106,6 @@ final class FWPackagesActionBarUITests: XCTestCase {
         revisionScreenshot.name = "FW Packages compatibility and revision"
         revisionScreenshot.lifetime = .keepAlways
         add(revisionScreenshot)
-        channel.tap()
-
-        let groupsDrawer = app.buttons["fw-packages-groups-drawer-toggle"]
-        XCTAssertTrue(
-            groupsDrawer.waitForExistence(timeout: 2),
-            "Package groups should be available from the compact drawer"
-        )
-        groupsDrawer.tap()
-
         let groupsScreenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         groupsScreenshot.name = "FW Packages groups drawer"
         groupsScreenshot.lifetime = .keepAlways
@@ -145,19 +136,24 @@ final class FWPackagesActionBarUITests: XCTestCase {
             "Expanded categories must retain their per-file selection toggles"
         )
 
+        drawer.tap()
+
         let install = app.buttons["fw-packages-install-action"]
         let cleanup = app.buttons["fw-packages-cleanup-action"]
         XCTAssertTrue(install.waitForExistence(timeout: 5))
         XCTAssertTrue(cleanup.exists)
-        let splitInstallWidth = install.frame.width
-
+        XCTAssertLessThanOrEqual(
+            install.frame.height,
+            52,
+            "Install must remain a compact action, not a full-width bottom sheet button"
+        )
         selectScenario("Install only")
         XCTAssertTrue(install.waitForExistence(timeout: 2))
         XCTAssertFalse(cleanup.exists)
-        XCTAssertGreaterThan(
+        XCTAssertLessThan(
             install.frame.width,
-            splitInstallWidth * 1.7,
-            "A single action should fill the pinned bar"
+            220,
+            "A single action should remain an intrinsic compact capsule"
         )
 
         selectScenario("Cleanup only")

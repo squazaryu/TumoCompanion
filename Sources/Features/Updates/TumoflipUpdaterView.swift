@@ -13,8 +13,7 @@ struct TumoflipUpdaterView: View {
     @State private var pendingOverride: TumoflipFirmwareChannel?
     @State private var pendingCleanupCount: Int?
     @State private var showHelp = false
-    @State private var packageChannelExpanded = false
-    @State private var packageGroupsExpanded = false
+    @State private var packageDrawerExpanded = false
 
     private let groupLabels: [(key: String, title: String, icon: String)] = [
         ("base", "Base", "shippingbox.fill"),
@@ -29,27 +28,37 @@ struct TumoflipUpdaterView: View {
     }
 
     var body: some View {
-        CardScroll(refreshAction: refreshPackages) {
-            SectionCard(title: "Firmware packages", systemImage: "cpu.fill",
-                        accessory: AnyView(StatusPill(
-                            text: transfer.activeChannel.label,
-                            color: transfer.activeChannel == .usb ? .blue : .secondary,
-                            systemImage: transfer.activeChannel.systemImage))) {
-                statusRow
-                syncCatalogRow
-                verifyRow
+        ZStack(alignment: .bottom) {
+            CardScroll(refreshAction: refreshPackages) {
+                SectionCard(title: "Firmware packages", systemImage: "cpu.fill",
+                            accessory: AnyView(StatusPill(
+                                text: transfer.activeChannel.label,
+                                color: transfer.activeChannel == .usb ? .blue : .secondary,
+                                systemImage: transfer.activeChannel.systemImage))) {
+                    statusRow
+                    syncCatalogRow
+                    verifyRow
+                }
+
+                packageOverviewCard
+                actionBar
+
+                // The folder tab is fixed above the app tab bar, matching Home
+                // → Tools. Reserve only its collapsed height in the page flow.
+                Color.clear.frame(height: 58)
             }
 
-            // Channel and package details stay behind compact folder tabs. The
-            // expanded drawer is still part of the page flow, so it can never
-            // cover the install actions or float over the next section.
-            Color.clear.frame(height: (packageChannelExpanded || packageGroupsExpanded) ? 8 : 2)
-
-            packageChannelDrawer
             if updater.manifest != nil {
-                packageGroupsDrawer
+                BottomFolderDrawer(
+                    isExpanded: $packageDrawerExpanded,
+                    title: "PACKAGE DETAILS",
+                    summary: packageDetailsSummary,
+                    systemImage: "shippingbox.fill",
+                    accessibilityIdentifier: "fw-packages-details-drawer-toggle"
+                ) {
+                    packageDetailsPanel
+                }
             }
-            actionBar
         }
         .navigationTitle("Firmware packages")
         .navigationBarTitleDisplayMode(.inline)
@@ -127,61 +136,78 @@ struct TumoflipUpdaterView: View {
         await updater.validateCompatibility()
     }
 
-    /// Compact folder tab which replaces the old always-expanded groups card.
-    /// The collapsed state is deliberately small enough to coexist with the
-    /// install action bar; expanding it reveals the same complete group/file
-    /// controls in a height derived from the actual catalog.
-    @ViewBuilder
-    private var packageGroupsDrawer: some View {
-        if packageGroupsExpanded {
-            VStack(spacing: 0) {
-                packageGroupsPanel
-                packageGroupsTab(expanded: true)
-            }
-        } else {
-            packageGroupsTab(expanded: false)
+    private var packageOverviewCard: some View {
+        SectionCard(
+            title: "Package catalog",
+            systemImage: "shippingbox.fill",
+            accessory: AnyView(StatusPill(
+                text: updater.firmwareRoute.channel.label,
+                color: channelColor(updater.firmwareRoute.channel),
+                systemImage: channelIcon(updater.firmwareRoute.channel)
+            ))
+        ) {
+            packageOverviewRow(
+                title: "Channel",
+                detail: channelDrawerSummary,
+                systemImage: "point.3.connected.trianglepath.dotted"
+            )
+            packageOverviewRow(
+                title: "Groups",
+                detail: packageGroupsSummary,
+                systemImage: "shippingbox"
+            )
+            Text("Open the folder tab below for channel controls, revisions, and per-file selection.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
-    private func packageGroupsTab(expanded: Bool) -> some View {
-        Button(action: togglePackageGroups) {
-            HStack(spacing: 8) {
-                Image(systemName: "shippingbox.fill")
-                    .font(.caption.weight(.bold))
-                Text("PACKAGE GROUPS")
-                    .font(.caption.weight(.bold))
-                    .tracking(0.8)
-                Spacer(minLength: 8)
-                Text(packageGroupsSummary)
-                    .font(.caption2.weight(.medium))
+    private func packageOverviewRow(title: String, detail: String, systemImage: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: systemImage)
+                .font(.subheadline)
+                .foregroundStyle(Theme.accent)
+                .frame(width: 22)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.subheadline.weight(.medium))
+                Text(detail)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
-                Image(systemName: expanded ? "chevron.down" : "chevron.up")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(.secondary)
             }
-            .foregroundStyle(Theme.accent)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 11)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(.systemGroupedBackground), in: Capsule())
-            .overlay {
-                Capsule().strokeBorder(Theme.accent.opacity(0.25), lineWidth: 1)
-            }
+            Spacer(minLength: 0)
         }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("fw-packages-groups-drawer-toggle")
-        .accessibilityLabel("Package groups")
-        .accessibilityValue(expanded ? "Expanded" : "Collapsed")
     }
 
-    private var packageGroupsPanel: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Capsule()
-                .fill(Color.secondary.opacity(0.35))
-                .frame(width: 38, height: 4)
-                .frame(maxWidth: .infinity)
+    private var packageDetailsSummary: String {
+        let pending = groupLabels.reduce(0) { total, group in
+            total + updater.files(group.key).filter { updater.status(file: $0.target) != .upToDate }.count
+        }
+        if pending > 0 { return "\(pending) update\(pending == 1 ? "" : "s")" }
+        return updater.firmwareRoute.channel.label
+    }
+
+    private var packageDetailsPanel: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 7) {
+                Label("PACKAGE CHANNEL", systemImage: "point.3.connected.trianglepath.dotted")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.secondary)
+                    .tracking(0.7)
+                Spacer()
+                StatusPill(
+                    text: updater.firmwareRoute.channel.label,
+                    color: channelColor(updater.firmwareRoute.channel),
+                    systemImage: channelIcon(updater.firmwareRoute.channel)
+                )
+            }
+
+            channelDetails
+
+            Divider().opacity(0.45)
 
             HStack(spacing: 7) {
                 Label("PACKAGE GROUPS", systemImage: "shippingbox")
@@ -194,10 +220,6 @@ struct TumoflipUpdaterView: View {
                     .foregroundStyle(.secondary)
             }
 
-            // Keep the drawer in the parent CardScroll. A nested, fixed-height
-            // ScrollView lets long rows escape their bounds on iOS and makes the
-            // folder tab paint over the file list. Natural height is both simpler
-            // and safer; the page-level scroll handles large catalogs.
             VStack(spacing: 8) {
                 ForEach(groupLabels, id: \.key) { g in
                     groupRow(g)
@@ -228,15 +250,6 @@ struct TumoflipUpdaterView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 9)
-        .padding(.bottom, 12)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
-        }
-        .shadow(color: .black.opacity(0.14), radius: 14, y: 6)
     }
 
     private var packageGroupsSummary: String {
@@ -251,90 +264,6 @@ struct TumoflipUpdaterView: View {
             return "\(standalone) standalone"
         }
         return "Reference only"
-    }
-
-    /// Compact channel tab. The full routing and revision controls live in the
-    /// panel so the package summary never grows when metadata is verbose.
-    @ViewBuilder
-    private var packageChannelDrawer: some View {
-        if packageChannelExpanded {
-            VStack(spacing: 0) {
-                packageChannelPanel
-                packageChannelTab(expanded: true)
-            }
-        } else {
-            packageChannelTab(expanded: false)
-        }
-    }
-
-    private func packageChannelTab(expanded: Bool) -> some View {
-        Button(action: togglePackageChannel) {
-            HStack(spacing: 8) {
-                Image(systemName: "point.3.connected.trianglepath.dotted")
-                    .font(.caption.weight(.bold))
-                Text("PACKAGE CHANNEL")
-                    .font(.caption.weight(.bold))
-                    .tracking(0.8)
-                Spacer(minLength: 8)
-                Text(channelDrawerSummary)
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-                Image(systemName: expanded ? "chevron.down" : "chevron.up")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(.secondary)
-            }
-            .foregroundStyle(Theme.accent)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 11)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(.systemGroupedBackground), in: Capsule())
-            .overlay {
-                Capsule().strokeBorder(Theme.accent.opacity(0.25), lineWidth: 1)
-            }
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("fw-packages-channel-drawer-toggle")
-        .accessibilityLabel("Package channel")
-        .accessibilityValue(expanded ? "Expanded" : "Collapsed")
-    }
-
-    private var packageChannelPanel: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Capsule()
-                .fill(Color.secondary.opacity(0.35))
-                .frame(width: 38, height: 4)
-                .frame(maxWidth: .infinity)
-
-            HStack(spacing: 7) {
-                Label("PACKAGE CHANNEL", systemImage: "point.3.connected.trianglepath.dotted")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(.secondary)
-                    .tracking(0.7)
-                Spacer()
-                StatusPill(
-                    text: updater.firmwareRoute.channel.label,
-                    color: channelColor(updater.firmwareRoute.channel),
-                    systemImage: channelIcon(updater.firmwareRoute.channel)
-                )
-            }
-
-            // This panel is part of the screen's CardScroll. Avoid a nested
-            // fixed-height scroller: verbose metadata must grow the panel,
-            // never render underneath its folder tab.
-            channelDetails
-                .padding(.bottom, 2)
-        }
-        .padding(.horizontal, 16)
-        .padding(.top, 9)
-        .padding(.bottom, 12)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
-        }
-        .shadow(color: .black.opacity(0.14), radius: 14, y: 6)
     }
 
     @ViewBuilder
@@ -387,15 +316,15 @@ struct TumoflipUpdaterView: View {
             }
 
             Divider().opacity(0.4)
-            LazyVGrid(
-                columns: [GridItem(.flexible(), alignment: .leading), GridItem(.flexible(), alignment: .leading)],
-                alignment: .leading,
-                spacing: 8
-            ) {
-                metadataRow("Installed", updater.deviceIdentity?.firmwareVersion ?? "Unknown")
-                metadataRow("Origin", updater.deviceIdentity?.originFork ?? "Unknown")
-                metadataRow("Detected", updater.firmwareRoute.detectedChannel?.packageLabel ?? "Unknown")
-                metadataRow("Selected", updater.firmwareRoute.channel.packageLabel)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .top, spacing: 16) {
+                    metadataRow("Installed", updater.deviceIdentity?.firmwareVersion ?? "Unknown")
+                    metadataRow("Origin", updater.deviceIdentity?.originFork ?? "Unknown")
+                }
+                HStack(alignment: .top, spacing: 16) {
+                    metadataRow("Detected", updater.firmwareRoute.detectedChannel?.packageLabel ?? "Unknown")
+                    metadataRow("Selected", updater.firmwareRoute.channel.packageLabel)
+                }
             }
             Label(
                 "Catalog history is independent of the firmware release. Compatibility is checked by channel, API major and hardware target.",
@@ -443,17 +372,15 @@ struct TumoflipUpdaterView: View {
                     .accessibilityIdentifier("fw-packages-apps-only")
                 }
             }
-            LazyVGrid(
-                columns: [GridItem(.flexible(), alignment: .leading), GridItem(.flexible(), alignment: .leading)],
-                alignment: .leading,
-                spacing: 8
-            ) {
-                if let api = updater.deviceIdentity?.firmwareAPI {
+            if let api = updater.deviceIdentity?.firmwareAPI {
+                HStack(alignment: .top, spacing: 16) {
                     metadataRow("Installed API", api)
+                    if let commit = updater.deviceIdentity?.firmwareCommit, !commit.isEmpty {
+                        metadataRow("Commit", commit)
+                    }
                 }
-                if let commit = updater.deviceIdentity?.firmwareCommit, !commit.isEmpty {
-                    metadataRow("Commit", commit)
-                }
+            } else if let commit = updater.deviceIdentity?.firmwareCommit, !commit.isEmpty {
+                metadataRow("Commit", commit)
             }
         }
     }
@@ -828,16 +755,6 @@ struct TumoflipUpdaterView: View {
         if expanded.contains(key) { expanded.remove(key) } else { expanded.insert(key) }
     }
 
-    private func togglePackageChannel() {
-        packageChannelExpanded.toggle()
-        if packageChannelExpanded { packageGroupsExpanded = false }
-    }
-
-    private func togglePackageGroups() {
-        packageGroupsExpanded.toggle()
-        if packageGroupsExpanded { packageChannelExpanded = false }
-    }
-
     private func clearManualChannelOverride() {
         Task {
             updater.clearManualChannelOverride()
@@ -978,15 +895,12 @@ struct FWPackagesActionBar: View {
             }
             HStack(spacing: 10) {
                 if installCount > 0 {
-                    Button(action: install) {
-                        Label(
-                            "Install \(installCount)",
-                            systemImage: "square.and.arrow.down.on.square"
-                        )
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(Theme.accent)
+                    compactAction(
+                        title: "Install \(installCount)",
+                        systemImage: "square.and.arrow.down.on.square",
+                        tint: Theme.accent,
+                        action: install
+                    )
                     .disabled(!canInstall)
                     .accessibilityIdentifier("fw-packages-install-action")
                     .accessibilityLabel(
@@ -994,12 +908,13 @@ struct FWPackagesActionBar: View {
                     )
                 }
                 if cleanupCount > 0 {
-                    Button(role: .destructive, action: cleanUp) {
-                        Label("Clean Up \(cleanupCount)", systemImage: "trash")
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.orange)
+                    compactAction(
+                        title: "Clean Up \(cleanupCount)",
+                        systemImage: "trash",
+                        tint: .orange,
+                        role: .destructive,
+                        action: cleanUp
+                    )
                     .disabled(!canCleanUp)
                     .accessibilityIdentifier("fw-packages-cleanup-action")
                     .accessibilityLabel(
@@ -1008,12 +923,30 @@ struct FWPackagesActionBar: View {
                 }
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(.bar, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .padding(.horizontal, 2)
+        .padding(.vertical, 2)
+    }
+
+    private func compactAction(
+        title: String,
+        systemImage: String,
+        tint: Color,
+        role: ButtonRole? = nil,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(role: role, action: action) {
+            Label(title, systemImage: systemImage)
+                .font(.caption2.weight(.semibold))
+                .labelStyle(.titleAndIcon)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(tint)
+        .background(tint.opacity(0.14), in: Capsule())
         .overlay {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+            Capsule()
+                .strokeBorder(tint.opacity(0.18), lineWidth: 1)
         }
     }
 
@@ -1033,25 +966,18 @@ struct FWPackagesActionBar: View {
             )
             .accessibilityIdentifier("fw-packages-progress")
 
-            Button(role: .destructive, action: stop) {
-                Label(
-                    stopRequested ? "Stopping safely…" : stopTitle,
-                    systemImage: "stop.circle.fill"
-                )
-                .frame(maxWidth: .infinity, minHeight: 44)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.red)
+            compactAction(
+                title: stopRequested ? "Stopping safely…" : stopTitle,
+                systemImage: "stop.circle.fill",
+                tint: .red,
+                role: .destructive,
+                action: stop
+            )
             .disabled(stopRequested)
             .accessibilityIdentifier("fw-packages-stop-action")
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(.bar, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
-        }
+        .padding(.horizontal, 2)
+        .padding(.vertical, 2)
     }
 }
 

@@ -7,7 +7,6 @@ struct ESP32FirmwareView: View {
     @StateObject private var up: ESP32Updater
     @State private var expandedVersionGroups: Set<String> = []
     @State private var packageDrawerExpanded = false
-    @State private var versionHistoryExpanded = false
     @State private var deleteTarget: ESP32Updater.Board?
     @State private var deleteAll = false
     @State private var deleteArchived = false
@@ -21,20 +20,28 @@ struct ESP32FirmwareView: View {
     }
 
     var body: some View {
-        CardScroll(refreshAction: { await up.refresh() }) {
-            statusCard
-            if up.boards.isEmpty && up.archivedBoards.isEmpty && !up.busy { emptyCard }
+        ZStack(alignment: .bottom) {
+            CardScroll(refreshAction: { await up.refresh() }) {
+                statusCard
+                if up.boards.isEmpty && up.archivedBoards.isEmpty && !up.busy { emptyCard }
 
-            // Keep the normal state on one page. Board controls and version
-            // history live in the adaptive drawer below, while this compact
-            // summary remains visible next to the release status.
-            Color.clear.frame(height: packageDrawerExpanded ? 8 : 2)
+                // The folder tab is fixed above the app tab bar, just like
+                // Home → Tools. Keep only its collapsed footprint in the page
+                // content so the overview remains one screen tall.
+                Color.clear.frame(height: 58)
+            }
 
             if hasStagedPackages {
-                packageDrawer
-            }
-            if !up.versionGroups.isEmpty {
-                versionHistoryDrawer
+                BottomFolderDrawer(
+                    isExpanded: $packageDrawerExpanded,
+                    title: "ESP32 PACKAGES",
+                    summary: drawerSummary,
+                    systemImage: "folder.fill",
+                    accessibilityIdentifier: "esp32-packages-drawer-toggle",
+                    panelHeight: packageDrawerHeight
+                ) {
+                    esp32DetailsPanel
+                }
             }
         }
         .navigationTitle("ESP32 Firmware")
@@ -166,177 +173,42 @@ struct ESP32FirmwareView: View {
         !up.stagingBoards.isEmpty || !up.versionGroups.isEmpty
     }
 
-    /// Folder-tab drawer matching the Home Tools interaction. The collapsed tab
-    /// is always visible; the full board controls and version history only take
-    /// space after the user asks for them.
-    @ViewBuilder
-    private var packageDrawer: some View {
-        if packageDrawerExpanded {
-            VStack(spacing: 0) {
-                packageDrawerPanel
-                packageDrawerTab(expanded: true)
-            }
-        } else {
-            packageDrawerTab(expanded: false)
-        }
-    }
-
-    private func packageDrawerTab(expanded: Bool) -> some View {
-        Button {
-            packageDrawerExpanded.toggle()
-            if packageDrawerExpanded { versionHistoryExpanded = false }
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "folder.fill")
-                    .font(.caption.weight(.bold))
-                Text("ESP32 PACKAGES")
-                    .font(.caption.weight(.bold))
-                    .tracking(0.8)
-                Spacer(minLength: 8)
-                Text(drawerSummary)
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-                Image(systemName: expanded ? "chevron.down" : "chevron.up")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(.secondary)
-            }
-            .foregroundStyle(Theme.accent)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 11)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(.systemGroupedBackground), in: Capsule())
-            .overlay {
-                Capsule().strokeBorder(Theme.accent.opacity(0.25), lineWidth: 1)
-            }
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("esp32-packages-drawer-toggle")
-        .accessibilityLabel("ESP32 packages")
-        .accessibilityValue(expanded ? "Expanded" : "Collapsed")
-    }
-
-    /// Version history is intentionally a separate drawer. The board overview
-    /// should never end with a partially visible archive card when two boards
-    /// are present, while archive/restore/delete controls remain discoverable.
-    @ViewBuilder
-    private var versionHistoryDrawer: some View {
-        if versionHistoryExpanded {
-            VStack(spacing: 0) {
-                versionHistoryPanel
-                versionHistoryTab(expanded: true)
-            }
-        } else {
-            versionHistoryTab(expanded: false)
-        }
-    }
-
-    private func versionHistoryTab(expanded: Bool) -> some View {
-        Button {
-            versionHistoryExpanded.toggle()
-            if versionHistoryExpanded { packageDrawerExpanded = false }
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "clock.arrow.circlepath")
-                    .font(.caption.weight(.bold))
-                Text("VERSION HISTORY")
-                    .font(.caption.weight(.bold))
-                    .tracking(0.8)
-                Spacer(minLength: 8)
-                Text("\(up.versionGroups.count) board\(up.versionGroups.count == 1 ? "" : "s")")
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(.secondary)
-                Image(systemName: expanded ? "chevron.down" : "chevron.up")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(.secondary)
-            }
-            .foregroundStyle(Theme.accent)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 11)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(.systemGroupedBackground), in: Capsule())
-            .overlay {
-                Capsule().strokeBorder(Theme.accent.opacity(0.25), lineWidth: 1)
-            }
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("esp32-version-history-toggle")
-        .accessibilityLabel("ESP32 version history")
-        .accessibilityValue(expanded ? "Expanded" : "Collapsed")
-    }
-
-    private var versionHistoryPanel: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Capsule()
-                .fill(Color.secondary.opacity(0.35))
-                .frame(width: 38, height: 4)
-                .frame(maxWidth: .infinity)
-
-            HStack(spacing: 7) {
-                Label("VERSION HISTORY", systemImage: "clock.arrow.circlepath")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(.secondary)
-                    .tracking(0.7)
-                Spacer()
-                Text("\(up.versionGroups.count) board\(up.versionGroups.count == 1 ? "" : "s")")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.secondary)
-            }
-
-            // The parent CardScroll is the single scrolling surface for this
-            // screen. Let the history drawer size itself instead of nesting a
-            // capped ScrollView that can clip archive controls.
-            versionManagerCard
-                .padding(.bottom, 2)
-        }
-        .padding(.horizontal, 16)
-        .padding(.top, 9)
-        .padding(.bottom, 12)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
-        }
-        .shadow(color: .black.opacity(0.14), radius: 14, y: 6)
-    }
-
-    private var packageDrawerPanel: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Capsule()
-                .fill(Color.secondary.opacity(0.35))
-                .frame(width: 38, height: 4)
-                .frame(maxWidth: .infinity)
-
+    private var esp32DetailsPanel: some View {
+        VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 7) {
                 Label("ESP32 PACKAGES", systemImage: "folder")
                     .font(.caption.weight(.bold))
                     .foregroundStyle(.secondary)
-                    .tracking(0.7)
+                    .tracking(0.8)
                 Spacer()
                 Text(drawerSummary)
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(.secondary)
             }
 
-            // Keep one page-level scrolling surface. The drawer grows to the
-            // number of board cards, so C5 and Module One can never be clipped
-            // or painted behind the folder tab.
-            VStack(spacing: 12) {
-                ForEach(up.stagingBoards) { board in
-                    packageBoardRow(board)
+            if !up.stagingBoards.isEmpty {
+                VStack(spacing: 10) {
+                    ForEach(up.stagingBoards) { board in
+                        packageBoardRow(board)
+                    }
                 }
             }
+
+            if !up.versionGroups.isEmpty {
+                Divider().opacity(0.45)
+                HStack(spacing: 7) {
+                    Label("VERSION HISTORY", systemImage: "clock.arrow.circlepath")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.secondary)
+                        .tracking(0.8)
+                    Spacer()
+                    Text("\(up.versionGroups.count) board\(up.versionGroups.count == 1 ? "" : "s")")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+                versionManagerCard
+            }
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 9)
-        .padding(.bottom, 12)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
-        }
-        .shadow(color: .black.opacity(0.14), radius: 14, y: 6)
     }
 
     private var drawerSummary: String {
@@ -344,6 +216,17 @@ struct ESP32FirmwareView: View {
         let updates = up.stagingBoards.filter { up.newVersion(for: $0) }.count
         if updates > 0 { return "\(updates) update\(updates == 1 ? "" : "s")" }
         return "\(boards) board\(boards == 1 ? "" : "s")"
+    }
+
+    private var packageDrawerHeight: CGFloat {
+        // Match Home → Tools: the drawer grows with the number of visible
+        // cards, while a longer history remains scrollable inside the drawer.
+        let boardRows = CGFloat(max(up.stagingBoards.count, 1)) * 90
+        // Version history is intentionally a compact preview. Its rows remain
+        // scrollable inside the drawer, so the tab never grows a large empty
+        // tail just because an archive exists on disk.
+        let history = up.versionGroups.isEmpty ? 0 : min(80, up.versionGroups.count * 40)
+        return min(500, max(180, CGFloat(44) + boardRows + CGFloat(history)))
     }
 
     /// A compact board row for the drawer. The release summary already exposes
@@ -407,8 +290,18 @@ struct ESP32FirmwareView: View {
     }
 
     private var versionManagerCard: some View {
-        CollapsibleCard(title: "Firmware versions", systemImage: "clock.arrow.circlepath",
-                        accessory: AnyView(StatusPill(text: "\(up.versionGroups.count)", color: .secondary))) {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 7) {
+                Label("FIRMWARE VERSIONS", systemImage: "clock.arrow.circlepath")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.secondary)
+                    .tracking(0.8)
+                Spacer()
+                Text("\(up.versionGroups.count)")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+
             Text("Choose a staged Marauder version per board key. Active folders are visible to esp_flasher; archived folders are hidden until restored.")
                 .font(.caption2).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
