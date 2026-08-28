@@ -191,11 +191,11 @@ struct TumoflipUpdaterView: View {
     }
 
     private var packageDetailsPanel: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 7) {
                 Label("PACKAGE CHANNEL", systemImage: "point.3.connected.trianglepath.dotted")
                     .font(.caption.weight(.bold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.primary.opacity(0.62))
                     .tracking(0.7)
                 Spacer()
                 StatusPill(
@@ -212,15 +212,15 @@ struct TumoflipUpdaterView: View {
             HStack(spacing: 7) {
                 Label("PACKAGE GROUPS", systemImage: "shippingbox")
                     .font(.caption.weight(.bold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.primary.opacity(0.62))
                     .tracking(0.7)
                 Spacer()
                 Text(packageGroupsSummary)
                     .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.primary.opacity(0.62))
             }
 
-            VStack(spacing: 8) {
+            VStack(spacing: 6) {
                 ForEach(groupLabels, id: \.key) { g in
                     groupRow(g)
                 }
@@ -268,7 +268,7 @@ struct TumoflipUpdaterView: View {
 
     @ViewBuilder
     private var channelDetails: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
             if updater.deviceIdentity?.firmwareCommitDirty == true {
                 Label("Installed firmware reports a dirty commit; package compatibility should be treated as higher risk.",
                       systemImage: "exclamationmark.triangle.fill")
@@ -282,16 +282,23 @@ struct TumoflipUpdaterView: View {
                     .foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            HStack(spacing: 8) {
-                Button("Auto", action: clearManualChannelOverride)
-                    .disabled(updater.manualChannelOverride == nil || updater.busy)
-                Button("Stable") { pendingOverride = .stable }
-                    .disabled(updater.busy || updater.manualChannelOverride == .stable)
-                Button("Dev") { pendingOverride = .dev }
-                    .disabled(updater.busy || updater.manualChannelOverride == .dev)
+            HStack(spacing: 6) {
+                channelChoiceButton(
+                    "Auto",
+                    enabled: updater.manualChannelOverride != nil && !updater.busy,
+                    action: clearManualChannelOverride
+                )
+                channelChoiceButton(
+                    "Stable",
+                    enabled: !updater.busy && updater.manualChannelOverride != .stable,
+                    action: { pendingOverride = .stable }
+                )
+                channelChoiceButton(
+                    "Dev",
+                    enabled: !updater.busy && updater.manualChannelOverride != .dev,
+                    action: { pendingOverride = .dev }
+                )
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
 
             if !updater.availableCatalogOptions.isEmpty {
                 Menu {
@@ -316,34 +323,34 @@ struct TumoflipUpdaterView: View {
             }
 
             Divider().opacity(0.4)
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .top, spacing: 16) {
-                    metadataRow("Installed", updater.deviceIdentity?.firmwareVersion ?? "Unknown")
-                    metadataRow("Origin", updater.deviceIdentity?.originFork ?? "Unknown")
-                }
-                HStack(alignment: .top, spacing: 16) {
-                    metadataRow("Detected", updater.firmwareRoute.detectedChannel?.packageLabel ?? "Unknown")
-                    metadataRow("Selected", updater.firmwareRoute.channel.packageLabel)
-                }
+            VStack(alignment: .leading, spacing: 5) {
+                compactMetadataRow("Installed", updater.deviceIdentity?.firmwareVersion ?? "Unknown")
+                compactMetadataRow("Origin", updater.deviceIdentity?.originFork ?? "Unknown")
+                compactMetadataRow("Detected", updater.firmwareRoute.detectedChannel?.packageLabel ?? "Unknown")
+                compactMetadataRow("Selected", updater.firmwareRoute.channel.packageLabel)
             }
-            Label(
-                "Catalog history is independent of the firmware release. Compatibility is checked by channel, API major and hardware target.",
-                systemImage: "link.badge.plus"
-            )
-            .font(.caption2)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Image(systemName: "link.badge.plus")
+                    .font(.caption2)
+                Text("Catalog is independent of firmware; compatibility uses channel, API major and target.")
+                    .font(.caption2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .foregroundStyle(Color.primary.opacity(0.62))
             if let manifest = updater.manifest {
-                metadataRow(
-                    "Compatible FW",
-                    firmwareCompatibilityDisplay(manifest),
-                    identifier: "fw-packages-compatible-firmware"
-                )
-                metadataRow(
-                    "FW Packages",
-                    packageRevisionDisplay,
-                    identifier: "fw-packages-revision"
-                )
+                VStack(alignment: .leading, spacing: 5) {
+                    compactMetadataRow(
+                        "Compatible FW",
+                        firmwareCompatibilityDisplay(manifest),
+                        identifier: "fw-packages-compatible-firmware"
+                    )
+                    compactMetadataRow(
+                        "FW Packages",
+                        packageRevisionDisplay,
+                        identifier: "fw-packages-revision"
+                    )
+                    compactMetadataRow("Package API", manifest.firmware.api)
+                }
                 if let selected = updater.selectedCatalogRevision,
                    let current = updater.availableCatalogOptions.compactMap(\.revision).max(),
                    selected < current {
@@ -356,7 +363,6 @@ struct TumoflipUpdaterView: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("fw-packages-rollback-selected")
                 }
-                metadataRow("Package API", manifest.firmware.api)
                 if updater.firmwareFlashUnchanged {
                     Label(
                         manifest.isFirmwareSnapshotCatalog
@@ -373,14 +379,14 @@ struct TumoflipUpdaterView: View {
                 }
             }
             if let api = updater.deviceIdentity?.firmwareAPI {
-                HStack(alignment: .top, spacing: 16) {
-                    metadataRow("Installed API", api)
+                VStack(alignment: .leading, spacing: 5) {
+                    compactMetadataRow("Installed API", api)
                     if let commit = updater.deviceIdentity?.firmwareCommit, !commit.isEmpty {
-                        metadataRow("Commit", commit)
+                        compactMetadataRow("Commit", commit)
                     }
                 }
             } else if let commit = updater.deviceIdentity?.firmwareCommit, !commit.isEmpty {
-                metadataRow("Commit", commit)
+                compactMetadataRow("Commit", commit)
             }
         }
     }
@@ -391,18 +397,58 @@ struct TumoflipUpdaterView: View {
         return "\(channel) · \(revision)"
     }
 
-    private func metadataRow(
+    private func compactMetadataRow(
         _ title: String,
         _ value: String,
         identifier: String? = nil
     ) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(title)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                .font(.caption2.weight(.medium))
+                // Use an explicit color instead of the inherited secondary
+                // style. The drawer is presented over a material surface and
+                // the relative style can collapse to a near-black value in
+                // the dark accessibility theme.
+                .foregroundStyle(Color.primary.opacity(0.62))
+                .frame(width: 92, alignment: .leading)
             metadataValue(value, identifier: identifier)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .multilineTextAlignment(.leading)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+                .truncationMode(.middle)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func channelChoiceButton(
+        _ title: String,
+        enabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .lineLimit(1)
+                .padding(.horizontal, 11)
+                .padding(.vertical, 6)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(enabled ? Theme.accent : Color.primary.opacity(0.68))
+        .background(
+            (enabled ? Theme.accent : Color.primary).opacity(enabled ? 0.16 : 0.10),
+            in: Capsule()
+        )
+        .overlay {
+            Capsule()
+                .strokeBorder(
+                    (enabled ? Theme.accent : Color.primary).opacity(0.22),
+                    lineWidth: 1
+                )
+        }
+        .disabled(!enabled)
+        .accessibilityLabel(title)
+        .accessibilityValue(enabled ? "Available" : "Unavailable")
     }
 
     @ViewBuilder
@@ -410,14 +456,12 @@ struct TumoflipUpdaterView: View {
         if let identifier {
             Text(value)
                 .font(.caption2)
-                .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
+                .foregroundStyle(Color.primary)
                 .accessibilityIdentifier(identifier)
         } else {
             Text(value)
                 .font(.caption2)
-                .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
+                .foregroundStyle(Color.primary)
         }
     }
 

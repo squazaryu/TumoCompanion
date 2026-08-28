@@ -199,12 +199,12 @@ struct ESP32FirmwareView: View {
                 HStack(spacing: 7) {
                     Label("VERSION HISTORY", systemImage: "clock.arrow.circlepath")
                         .font(.caption.weight(.bold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.primary.opacity(0.62))
                         .tracking(0.8)
                     Spacer()
                     Text("\(up.versionGroups.count) board\(up.versionGroups.count == 1 ? "" : "s")")
                         .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.primary.opacity(0.62))
                 }
                 versionManagerCard
             }
@@ -261,17 +261,19 @@ struct ESP32FirmwareView: View {
                     .foregroundStyle(newer ? .orange : .secondary)
                 Spacer(minLength: 8)
                 if newer, let tag = up.latestTag {
-                    Button("Update to \(tag)") { Task { await up.install(board) } }
-                        .font(.caption.weight(.semibold))
-                        .buttonStyle(.borderedProminent)
-                        .tint(Theme.accent)
-                        .disabled(up.busy || !hasFileChannel)
+                    packageActionButton(
+                        title: "Update to \(tag)",
+                        enabled: !up.busy && hasFileChannel
+                    ) {
+                        Task { await up.install(board) }
+                    }
                 } else {
-                    Button("Download again") { Task { await up.install(board) } }
-                        .font(.caption.weight(.semibold))
-                        .buttonStyle(.bordered)
-                        .tint(Theme.accent)
-                        .disabled(up.busy || !hasFileChannel || !up.canStageLatest)
+                    packageActionButton(
+                        title: "Download again",
+                        enabled: !up.busy && hasFileChannel && up.canStageLatest
+                    ) {
+                        Task { await up.install(board) }
+                    }
                 }
             }
             if archivedSource {
@@ -287,6 +289,36 @@ struct ESP32FirmwareView: View {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
         }
+    }
+
+    private func packageActionButton(
+        title: String,
+        enabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: "arrow.down.circle")
+                .font(.caption.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(enabled ? Theme.accent : Color.secondary)
+        .background(
+            (enabled ? Theme.accent : Color.secondary).opacity(enabled ? 0.16 : 0.12),
+            in: Capsule()
+        )
+        .overlay {
+            Capsule()
+                .strokeBorder(
+                    (enabled ? Theme.accent : Color.secondary).opacity(0.26),
+                    lineWidth: 1
+                )
+        }
+        .disabled(!enabled)
+        .accessibilityLabel(title)
     }
 
     private var versionManagerCard: some View {
