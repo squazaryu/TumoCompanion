@@ -123,11 +123,7 @@ final class FWPackagesActionBarUITests: XCTestCase {
         )
         XCTAssertEqual(
             app.staticTexts["fw-packages-status-module_one"].label,
-            "1 update"
-        )
-        XCTAssertEqual(
-            app.staticTexts["fw-packages-cleanup-status-module_one"].label,
-            "1 cleanup"
+            "1 update · 1 cleanup"
         )
 
         app.buttons["fw-packages-expand-module_one"].tap()

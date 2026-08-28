@@ -467,6 +467,9 @@ struct TumoflipUpdaterView: View {
         let selectable = updater.selectableCount(g.key)
         let firmwareOwned = updater.firmwareOwnedCount(g.key)
         let cleanupEntries = updater.cleanupEntries(g.key)
+        let pendingUpdates = updater.files(g.key).lazy.filter {
+            updater.status(file: $0.target) != .upToDate
+        }.count
         VStack(alignment: .leading, spacing: 5) {
             HStack(spacing: 7) {
                 if n > 0 {
@@ -508,27 +511,11 @@ struct TumoflipUpdaterView: View {
                     }
                 }
                 Spacer(minLength: 4)
-                VStack(alignment: .trailing, spacing: 1) {
-                    if let info = groupSummaryInfo(g.key) {
-                        Label(compactGroupStatus(g.key), systemImage: info.icon)
-                            .font(.caption2)
-                            .foregroundStyle(info.color)
-                            .labelStyle(.titleAndIcon)
-                            .lineLimit(1)
-                            .accessibilityIdentifier("fw-packages-status-\(g.key)")
-                    }
-                    if !cleanupEntries.isEmpty {
-                        Label(
-                            "\(cleanupEntries.count) cleanup",
-                            systemImage: "trash.circle.fill"
-                        )
-                        .font(.caption2)
-                        .foregroundStyle(.orange)
-                        .labelStyle(.titleAndIcon)
-                        .lineLimit(1)
-                        .accessibilityIdentifier("fw-packages-cleanup-status-\(g.key)")
-                    }
-                }
+                PackageGroupStatusBadge(
+                    pendingUpdates: pendingUpdates,
+                    cleanupCount: cleanupEntries.count,
+                    accessibilityIdentifier: "fw-packages-status-\(g.key)"
+                )
                 if n > 0 {
                     Button {
                         withAnimation { toggleExpanded(g.key) }
@@ -602,13 +589,6 @@ struct TumoflipUpdaterView: View {
             if g.key != groupLabels.last?.key { Divider().opacity(0.45) }
         }
         .padding(.vertical, 4)
-    }
-
-    private func compactGroupStatus(_ group: String) -> String {
-        let files = updater.files(group)
-        let pending = files.lazy.filter { updater.status(file: $0.target) != .upToDate }.count
-        if pending == 0 { return "Current" }
-        return "\(pending) update\(pending == 1 ? "" : "s")"
     }
 
     private func fileBinding(_ target: String) -> Binding<Bool> {
@@ -839,22 +819,6 @@ struct TumoflipUpdaterView: View {
         }
     }
 
-    /// Group summaries use the same per-target truth as the expanded FAP rows. Unknown,
-    /// missing, changed, and validation-error targets remain fail-closed as updates.
-    private func groupSummaryInfo(
-        _ group: String
-    ) -> (text: String, color: Color, icon: String)? {
-        let files = updater.files(group)
-        guard !files.isEmpty else { return nil }
-        let needsUpdate = files.lazy.filter {
-            updater.status(file: $0.target) != .upToDate
-        }.count
-        let badge: SourceBadge = needsUpdate == 0
-            ? .upToDate
-            : .updatesAvailable(needsUpdate, of: files.count)
-        return (badge.text, badge.color, badge.systemImage)
-    }
-
     /// Display mapping for a group/overall status. `nil` for `.empty` (no badge).
     private func statusInfo(_ s: TumoflipInstaller.GroupStatus) -> (text: String, color: Color, icon: String)? {
         switch s {
@@ -863,6 +827,42 @@ struct TumoflipUpdaterView: View {
         case .notInstalled:    return ("Not installed", .secondary, "circle.dashed")
         case .empty:           return nil
         }
+    }
+}
+
+private struct PackageGroupStatusBadge: View {
+    let pendingUpdates: Int
+    let cleanupCount: Int
+    let accessibilityIdentifier: String
+
+    var body: some View {
+        Group {
+            if pendingUpdates == 0 && cleanupCount == 0 {
+                Label("Current", systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+            } else {
+                Text(actionSummary)
+                    .foregroundStyle(.orange)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 4)
+                    .background(Color.orange.opacity(0.12), in: Capsule())
+            }
+        }
+        .font(.caption2.weight(.medium))
+        .lineLimit(1)
+        .minimumScaleFactor(0.72)
+        .accessibilityIdentifier(accessibilityIdentifier)
+    }
+
+    private var actionSummary: String {
+        var parts: [String] = []
+        if pendingUpdates > 0 {
+            parts.append("\(pendingUpdates) update\(pendingUpdates == 1 ? "" : "s")")
+        }
+        if cleanupCount > 0 {
+            parts.append("\(cleanupCount) cleanup")
+        }
+        return parts.joined(separator: " · ")
     }
 }
 
