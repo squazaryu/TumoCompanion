@@ -12,6 +12,12 @@ struct DevicesView: View {
                 LiveDeckHomeView(path: $path, refreshAction: refreshConnection)
                     .navigationTitle("Home")
                     .navigationBarTitleDisplayMode(.inline)
+                    // Home is a compact dashboard, so changing from the
+                    // transparent scroll-edge appearance to an opaque bar
+                    // after the first scroll creates a distracting header.
+                    // Keep the bar background hidden for this root surface;
+                    // pushed destinations retain their own system appearance.
+                    .toolbarBackground(.hidden, for: .navigationBar)
                     .toolbar {
                         ToolbarItem(placement: .topBarTrailing) {
                             if ble.state == .connected || ble.state == .ready {
