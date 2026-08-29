@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.11.10",
-      "versionDate": "2026-08-28",
-      "versionDescription": "Adaptive update drawers now size themselves to their content across Firmware, FW Packages, Community Apps, and ESP32, while long catalogs remain internally scrollable. Routine firmware preparation, package-channel switching, and verified cleanup use compact inline confirmations instead of blocking pop-ups. Destructive deletion, overwrite, restore, and text-entry flows retain explicit system confirmation.\n\nValidated with 574 unit tests, 14 focused UI tests, and manual light/dark screenshot review.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.10/TumoCompanion-unsigned.ipa",
-      "size": 25628707,
+      "version": "1.11.11",
+      "versionDate": "2026-08-29",
+      "versionDescription": "Protected Community Apps now require a fresh authoritative audit before reporting VERIFIED or DIFF; historical evidence is shown as UNVERIFIED.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.11/TumoCompanion-unsigned.ipa",
+      "size": 25632070,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.11.11",
+          "date": "2026-08-29",
+          "localizedDescription": "Protected Community Apps now require a fresh authoritative audit before reporting VERIFIED or DIFF; historical evidence is shown as UNVERIFIED.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.11/TumoCompanion-unsigned.ipa",
+          "size": 25632070,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.11.10",
           "date": "2026-08-28",
