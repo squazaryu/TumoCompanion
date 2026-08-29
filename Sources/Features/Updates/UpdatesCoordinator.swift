@@ -48,7 +48,10 @@ final class UpdatesCoordinator: ObservableObject {
     /// BLE state can flap through connected/disconnected while a transfer is active.
     /// Coalesce those events and only refresh compatibility after the link settles at ready.
     func revalidateAfterReady(_ state: FlipperConnectionState) {
-        guard state == .ready else { return }
+        guard state == .ready else {
+            plugins.invalidateProtectedDeviceContext()
+            return
+        }
         scheduleRevalidation()
     }
 
@@ -68,7 +71,7 @@ final class UpdatesCoordinator: ObservableObject {
                 return
             }
             guard let self, !Task.isCancelled else { return }
-            await self.plugins.validateCompatibility()
+            await self.plugins.revalidateProtectedStateAfterConnection()
             await self.packages.validateCompatibility()
             await self.esp32.refreshDevicePackages()
             self.revalidationTask = nil

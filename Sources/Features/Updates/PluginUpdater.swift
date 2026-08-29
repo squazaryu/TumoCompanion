@@ -1382,6 +1382,10 @@ final class PluginUpdater: ObservableObject {
     /// A missing decision is surfaced once as a global audit failure; individual rows
     /// remain UNVERIFIED until an authoritative comparison is available.
     @Published private(set) var protectedAuditResolution: ProtectedPluginAuditResolution?
+    /// Exact installed Tumoflip release against which cumulative target provenance
+    /// is filtered. Nil means the device identity could not be read or is not a
+    /// recognised Tumoflip build, so every protected row remains UNVERIFIED.
+    @Published private(set) var protectedAuditTargetContext: ProtectedPluginAuditTargetContext?
     private let protectedAuditService: ProtectedPluginAuditService
     private let cleanupJournalStore: PluginRouteCleanupJournalStore
     private let persistenceDefaults: UserDefaults
@@ -1395,6 +1399,9 @@ final class PluginUpdater: ObservableObject {
     /// newer resolution, both across catalog switches and for the same exact pack.
     private var protectedAuditGeneration: UInt64 = 0
     private var protectedAuditResolutionTask: Task<ProtectedPluginAuditResolution, Never>?
+    /// Covers the complete identity → ledger → device-MD5 transaction. A reconnect,
+    /// device switch, or newer refresh invalidates every older observation pass.
+    private var protectedDeviceReviewGeneration: UInt64 = 0
     /// Protected items that genuinely need a look: device state unknown yet, or the
     /// upstream bytes/route are not covered by the exact automation-owned audit ledger.
     /// Shared by the Updates "More" subtitle and the Protected Apps screen.
@@ -1421,9 +1428,25 @@ final class PluginUpdater: ObservableObject {
         return protectedReviews.filter { protectedReviewStatus($0) == .unverified }
     }
     var protectedAuditFailure: ProtectedPluginAuditResolution? {
-        guard let resolution = protectedAuditResolution,
-              !resolution.allowsCurrentVerdicts else { return nil }
-        return resolution
+        guard let resolution = protectedAuditResolution else { return nil }
+        guard resolution.allowsCurrentVerdicts else { return resolution }
+        guard let audit = resolution.audit,
+              let origin = resolution.origin else { return resolution }
+        guard let targetContext = protectedAuditTargetContext else {
+            return .accepted(
+                audit,
+                origin: origin,
+                allowsCurrentVerdicts: false,
+                warning: "The connected Tumoflip firmware identity is unavailable. Protected apps remain unverified; no file changes are recommended.")
+        }
+        guard audit.covers(targetContext) else {
+            return .accepted(
+                audit,
+                origin: origin,
+                allowsCurrentVerdicts: false,
+                warning: "The authoritative audit has not yet covered installed firmware \(targetContext.firmwareVersion). Automation is still catching up; no file changes are recommended.")
+        }
+        return nil
     }
     /// Expected Tumoflip differences covered by the exact current pack audit. They stay
     /// visible for provenance, but no longer create a false Needs review / DIFF alert.
@@ -1468,6 +1491,7 @@ final class PluginUpdater: ObservableObject {
             review,
             compatibility: classification(review.remotePath),
             audit: protectedAuditResolution?.audit,
+            targetContext: protectedAuditTargetContext,
             allowsCurrentVerdicts: protectedAuditResolution?.allowsCurrentVerdicts ?? false)
     }
 
@@ -1584,7 +1608,7 @@ final class PluginUpdater: ObservableObject {
     // run, so production keeps using the active transfer channel and RPC identity.
     private var testingStorage: (any DeviceFileStore)?
     private var testingChannel: TransferChannel?
-    private var testingDeviceIdentity: (api: Int?, target: Int?)?
+    private var testingDeviceIdentity: TumoflipDeviceIdentity?
     private var testingRelease: (tag: String, assets: [String: URL])?
     private var testingDownloads: [URL: URL] = [:]
 #endif
@@ -1647,7 +1671,7 @@ final class PluginUpdater: ObservableObject {
     /// Fresh device firmware API major + hardware target (both nil when unreachable). A
     /// stale cached identity is NEVER used as the install-time identity — this always
     /// reads device_info over a BLE-ready link.
-    private func deviceApiTarget() async throws -> (api: Int?, target: Int?) {
+    private func freshDeviceIdentity() async throws -> TumoflipDeviceIdentity {
 #if DEBUG
         if let testingDeviceIdentity { return testingDeviceIdentity }
 #endif
@@ -1658,8 +1682,16 @@ final class PluginUpdater: ObservableObject {
             throw FlipperRPCError.serialOwnedByClaudeBuddy
         }
         let info = try await FlipperSystem().deviceInfo()
-        let dict = Dictionary(info, uniquingKeysWith: { a, _ in a })
-        return (dict["firmware_api_major"].flatMap(Int.init), dict["hardware_target"].flatMap(Int.init))
+        return TumoflipDeviceIdentity(deviceInfo: info)
+    }
+
+    private func deviceApiTarget() async throws -> (api: Int?, target: Int?) {
+        let identity = try await freshDeviceIdentity()
+        protectedAuditTargetContext = ProtectedPluginAuditTargetContext(
+            deviceIdentity: identity)
+        return (
+            identity.compatibilityIdentity?.apiMajor,
+            identity.compatibilityIdentity?.hardwareTarget)
     }
 
     private func fapCandidates(_ entries: [PluginUpdate]) -> [PackageCompatibilityGate.Candidate] {
@@ -1698,6 +1730,9 @@ final class PluginUpdater: ObservableObject {
         } catch {
             // Keep the last known classification during a transient reconnect.
             // Install performs the same read again and remains fail-closed.
+            // The release-bound audit context is stricter: retaining it could apply
+            // one Flipper's MD5 observations to another device after reconnect.
+            protectedAuditTargetContext = nil
             return
         }
         deviceApiMajor = api
@@ -1952,11 +1987,61 @@ final class PluginUpdater: ObservableObject {
     /// a cache-bypassing primary ledger read followed by current on-device MD5s.
     /// This is the normal catalog-refresh path, not an opt-in repair action.
     func refreshProtectedAudit() async {
+        protectedDeviceReviewGeneration &+= 1
+        let generation = protectedDeviceReviewGeneration
+        do {
+            _ = try await deviceApiTarget()
+        } catch {
+            // Audit verdicts are release-bound. If the current identity cannot be
+            // re-read, retaining a previous device's version would be less safe than
+            // temporarily classifying every protected row as UNVERIFIED.
+            protectedAuditTargetContext = nil
+        }
+        let targetContext = protectedAuditTargetContext
         await refreshProtectedAuditResolution(forceRemote: true)
-        await refreshProtectedReviews()
+        guard generation == protectedDeviceReviewGeneration,
+              targetContext == protectedAuditTargetContext else { return }
+        await refreshProtectedReviews(
+            generation: generation,
+            targetContext: targetContext)
     }
 
-    private func refreshProtectedReviews() async {
+    /// Drops release-bound authority as soon as the transport disconnects. Cached
+    /// rows may remain visible, but they cannot emit VERIFIED or DIFF until the next
+    /// coherent identity + ledger + on-device MD5 pass completes.
+    func invalidateProtectedDeviceContext() {
+        protectedDeviceReviewGeneration &+= 1
+        protectedAuditTargetContext = nil
+    }
+
+    /// Rebuilds the complete protected-app decision after a connection becomes
+    /// usable. This prevents hashes observed on one Flipper from surviving a device
+    /// switch under a newly detected firmware identity.
+    func revalidateProtectedStateAfterConnection() async {
+        switch phase {
+        case .installing, .cleaning: return
+        default: break
+        }
+        protectedDeviceReviewGeneration &+= 1
+        let generation = protectedDeviceReviewGeneration
+        await validateCompatibility()
+        guard generation == protectedDeviceReviewGeneration,
+              let targetContext = protectedAuditTargetContext,
+              !protectedManifest.isEmpty else { return }
+        await refreshProtectedAuditResolution(forceRemote: true)
+        guard generation == protectedDeviceReviewGeneration,
+              targetContext == protectedAuditTargetContext else { return }
+        await refreshProtectedReviews(
+            generation: generation,
+            targetContext: targetContext)
+    }
+
+    private func refreshProtectedReviews(
+        generation: UInt64,
+        targetContext: ProtectedPluginAuditTargetContext?
+    ) async {
+        guard generation == protectedDeviceReviewGeneration,
+              targetContext == protectedAuditTargetContext else { return }
         guard !protectedManifest.isEmpty else {
             protectedReviews = []
             return
@@ -1965,6 +2050,8 @@ final class PluginUpdater: ObservableObject {
         let items = protectedManifest
         let channel = activeChannel
         guard await fileChannelReady(channel, timeout: 2) else {
+            guard generation == protectedDeviceReviewGeneration,
+                  targetContext == protectedAuditTargetContext else { return }
             protectedReviews = sortProtected(items.map {
                 ProtectedPluginReview(
                     remotePath: $0.remotePath,
@@ -1989,6 +2076,8 @@ final class PluginUpdater: ObservableObject {
                 observation = try await deviceObservation(
                     for: f, storage: storage, cache: cache)
             } catch {
+                guard generation == protectedDeviceReviewGeneration,
+                      targetContext == protectedAuditTargetContext else { return }
                 protectedReviews = sortProtected(items.map {
                     ProtectedPluginReview(
                         remotePath: $0.remotePath,
@@ -2003,6 +2092,8 @@ final class PluginUpdater: ObservableObject {
                 })
                 return
             }
+            guard generation == protectedDeviceReviewGeneration,
+                  targetContext == protectedAuditTargetContext else { return }
             result.append(ProtectedPluginReview(
                 remotePath: f.remotePath,
                 targetPath: f.targetPath,
@@ -2018,6 +2109,8 @@ final class PluginUpdater: ObservableObject {
                 deviceKnown: true,
                 size: f.size))
         }
+        guard generation == protectedDeviceReviewGeneration,
+              targetContext == protectedAuditTargetContext else { return }
         protectedReviews = sortProtected(result)
     }
 
@@ -2539,8 +2632,7 @@ final class PluginUpdater: ObservableObject {
         verifyResult = VerifyResult(kind: .onDevice, tag: tag, verified: verified, failed: failures)
         // Explicit Verify must bypass GitHub/raw CDN caching: automation may have
         // published the exact audit after this pack was checked a few minutes ago.
-        await refreshProtectedAuditResolution(forceRemote: true)
-        await refreshProtectedReviews()
+        await refreshProtectedAudit()
         if bad.isEmpty {
             phase = .done("Verified \(verified) app\(verified == 1 ? "" : "s") on device · all match \(tag)")
         } else {
@@ -2855,13 +2947,21 @@ extension PluginUpdater {
         downloads: [URL: URL],
         storage: any DeviceFileStore,
         deviceAPI: Int? = 88,
-        deviceTarget: Int? = 7
+        deviceTarget: Int? = 7,
+        firmwareVersion: String? = "t-dev-008-005",
+        originFork: String? = "tumoflip"
     ) {
         testingRelease = (tag, assets)
         testingDownloads = downloads
         testingStorage = storage
         testingChannel = storage.channel
-        testingDeviceIdentity = (deviceAPI, deviceTarget)
+        testingDeviceIdentity = TumoflipDeviceIdentity(
+            firmwareVersion: firmwareVersion,
+            originFork: originFork,
+            firmwareCommit: nil,
+            firmwareCommitDirty: nil,
+            firmwareAPI: deviceAPI.map { "\($0).0" },
+            hardwareTarget: deviceTarget)
     }
 
     func seedCacheForTesting(_ cache: PluginCatalogCache) {
@@ -2888,6 +2988,25 @@ extension PluginUpdater {
         _ provenance: ProtectedPluginPackProvenance
     ) {
         setProtectedAuditProvenance(provenance)
+    }
+
+    func configureDeviceIdentityForTesting(
+        firmwareVersion: String? = "t-dev-008-005",
+        originFork: String? = "tumoflip",
+        deviceAPI: Int? = 88,
+        deviceTarget: Int? = 7
+    ) {
+        testingDeviceIdentity = TumoflipDeviceIdentity(
+            firmwareVersion: firmwareVersion,
+            originFork: originFork,
+            firmwareCommit: nil,
+            firmwareCommitDirty: nil,
+            firmwareAPI: deviceAPI.map { "\($0).0" },
+            hardwareTarget: deviceTarget)
+        if let testingDeviceIdentity {
+            protectedAuditTargetContext = ProtectedPluginAuditTargetContext(
+                deviceIdentity: testingDeviceIdentity)
+        }
     }
 
     func refreshProtectedAuditResolutionForTesting(forceRemote: Bool = false) async {
@@ -2928,8 +3047,14 @@ extension PluginUpdater {
                     targetProvenance: [ProtectedPluginTargetProvenance(
                         targetMD5: String(repeating: "a", count: 32),
                         channel: .dev,
-                        releaseTag: "fw-packages-dev-003",
-                        manifestSHA256: String(repeating: "c", count: 64))],
+                        releaseTag: "t-dev-008-005",
+                        manifestSHA256: String(repeating: "c", count: 64),
+                        containerKind: .firmwareUpdaterBundle,
+                        containerSHA256: String(repeating: "d", count: 64),
+                        targetReleaseTag: "t-dev-008-005",
+                        targetSourceCommit: String(repeating: "e", count: 40),
+                        firmwareVersion: "t-dev-008-005",
+                        resourcesSHA256: String(repeating: "f", count: 64))],
                     disposition: .auditedDifference,
                     note: nil),
                 ProtectedPluginAuditEntry(
@@ -2946,6 +3071,14 @@ extension PluginUpdater {
             audit,
             origin: .remote,
             allowsCurrentVerdicts: true)
+        updater.protectedAuditTargetContext = ProtectedPluginAuditTargetContext(
+            deviceIdentity: TumoflipDeviceIdentity(
+                firmwareVersion: "t-dev-008-005",
+                originFork: "tumoflip",
+                firmwareCommit: nil,
+                firmwareCommitDirty: nil,
+                firmwareAPI: "88.2",
+                hardwareTarget: 7))
         updater.protectedReviews = [
             ProtectedPluginReview(
                 remotePath: "/ext/apps/GPIO/esp_flasher.fap",
@@ -3001,13 +3134,9 @@ extension PluginUpdater {
 
     static func protectedAuditNotCurrentQAFixture() -> PluginUpdater {
         let updater = protectedAuditQAFixture()
-        if let audit = updater.protectedAuditResolution?.audit {
-            updater.protectedAuditResolution = .accepted(
-                audit,
-                origin: .cache,
-                allowsCurrentVerdicts: false,
-                warning: "A fresh primary audit could not be loaded. Cached audit data is shown only as historical evidence; no device change decision was made.")
-        }
+        // The primary response itself is fresh, but it covers the prior firmware.
+        // This models the short release-to-audit window that must remain fail-closed.
+        updater.configureDeviceIdentityForTesting(firmwareVersion: "t-dev-008-006")
         return updater
     }
 
