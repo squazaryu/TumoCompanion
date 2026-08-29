@@ -177,6 +177,7 @@ final class ProtectedPluginAuditTests: XCTestCase {
             bundledData: { nil })
         let updater = PluginUpdater(protectedAuditService: service)
         updater.configureProtectedAuditProvenanceForTesting(provenance)
+        updater.configureDeviceIdentityForTesting()
 
         await updater.refreshProtectedAuditForTesting()
 
@@ -184,6 +185,7 @@ final class ProtectedPluginAuditTests: XCTestCase {
         XCTAssertEqual(counts.regular, 0)
         XCTAssertEqual(counts.fresh, 1)
         XCTAssertTrue(updater.protectedAuditResolution?.allowsCurrentVerdicts == true)
+        XCTAssertEqual(updater.protectedAuditTargetContext, makeTargetContext())
         XCTAssertNil(updater.protectedAuditFailure)
     }
 
@@ -494,7 +496,8 @@ final class ProtectedPluginAuditTests: XCTestCase {
                 makeReview(),
                 compatibility: .compatible(
                     FapMetadata(apiMajor: 88, apiMinor: 2, hardwareTarget: 7)),
-                audit: stillRejected.audit),
+                audit: stillRejected.audit,
+                targetContext: makeTargetContext()),
             .unverified)
         XCTAssertTrue(cache.isRevoked(for: provenance, by: .primary))
 
@@ -573,6 +576,36 @@ final class ProtectedPluginAuditTests: XCTestCase {
         XCTAssertTrue(updater.unverifiedProtectedReviews.allSatisfy {
             updater.protectedReviewStatus($0) == .unverified
         })
+    }
+
+    @MainActor
+    func testFreshLedgerStillWaitsForExactInstalledFirmwareCoverage() {
+        let updater = PluginUpdater.protectedAuditQAFixture()
+        updater.configureDeviceIdentityForTesting(firmwareVersion: "t-dev-008-006")
+
+        XCTAssertEqual(updater.protectedAuditResolution?.origin, .remote)
+        XCTAssertTrue(updater.protectedAuditResolution?.allowsCurrentVerdicts == true)
+        XCTAssertEqual(updater.protectedAuditFailure?.failureKind, .notCurrent)
+        XCTAssertTrue(
+            updater.protectedAuditFailure?.failure?.contains("t-dev-008-006") == true)
+        XCTAssertTrue(updater.pendingProtectedReview.isEmpty)
+        XCTAssertEqual(
+            updater.unverifiedProtectedReviews.count,
+            updater.protectedReviews.count,
+            "A fresh HTTP response that predates the installed release must not emit DIFF")
+    }
+
+    @MainActor
+    func testDisconnectRevokesDeviceBoundVerdictsUntilRevalidation() {
+        let updater = PluginUpdater.protectedAuditQAFixture()
+        XCTAssertFalse(updater.auditedProtectedReviews.isEmpty)
+
+        updater.invalidateProtectedDeviceContext()
+
+        XCTAssertNil(updater.protectedAuditTargetContext)
+        XCTAssertEqual(updater.protectedAuditFailure?.failureKind, .notCurrent)
+        XCTAssertTrue(updater.pendingProtectedReview.isEmpty)
+        XCTAssertEqual(updater.unverifiedProtectedReviews.count, updater.protectedReviews.count)
     }
 
     @MainActor
@@ -702,7 +735,8 @@ final class ProtectedPluginAuditTests: XCTestCase {
                 makeReview(),
                 compatibility: .compatible(
                     FapMetadata(apiMajor: 88, apiMinor: 2, hardwareTarget: 7)),
-                audit: updater.protectedAuditResolution?.audit),
+                audit: updater.protectedAuditResolution?.audit,
+                targetContext: makeTargetContext()),
             .unverified)
 
         // Verify on device reuses the retained exact pack provenance. Once the
@@ -721,7 +755,8 @@ final class ProtectedPluginAuditTests: XCTestCase {
                 makeReview(),
                 compatibility: .compatible(
                     FapMetadata(apiMajor: 88, apiMinor: 2, hardwareTarget: 7)),
-                audit: updater.protectedAuditResolution?.audit),
+                audit: updater.protectedAuditResolution?.audit,
+                targetContext: makeTargetContext()),
             .verified)
     }
 
@@ -978,13 +1013,15 @@ final class ProtectedPluginAuditTests: XCTestCase {
 
         XCTAssertEqual(
             ProtectedPluginReviewPolicy.status(
-                makeReview(), compatibility: compatible, audit: audit),
+                makeReview(), compatibility: compatible, audit: audit,
+                targetContext: makeTargetContext()),
             .verified)
         XCTAssertEqual(
             ProtectedPluginReviewPolicy.status(
                 makeReview(),
                 compatibility: compatible,
                 audit: audit,
+                targetContext: makeTargetContext(),
                 allowsCurrentVerdicts: false),
             .unverified,
             "Historical audit data must not claim that even a formerly accepted MD5 is current")
@@ -993,6 +1030,7 @@ final class ProtectedPluginAuditTests: XCTestCase {
                 makeReview(deviceMD5: String(repeating: "b", count: 32)),
                 compatibility: compatible,
                 audit: audit,
+                targetContext: makeTargetContext(),
                 allowsCurrentVerdicts: false),
             .unverified,
             "A stale target set must never manufacture a current DIFF")
@@ -1000,12 +1038,14 @@ final class ProtectedPluginAuditTests: XCTestCase {
             ProtectedPluginReviewPolicy.status(
                 makeReview(deviceMD5: String(repeating: "b", count: 32)),
                 compatibility: compatible,
-                audit: audit),
+                audit: audit,
+                targetContext: makeTargetContext()),
             .needsReview,
             "Any present but unattested target hash must remain a DIFF")
         XCTAssertEqual(
             ProtectedPluginReviewPolicy.status(
-                makeReview(deviceMD5: nil), compatibility: compatible, audit: audit),
+                makeReview(deviceMD5: nil), compatibility: compatible, audit: audit,
+                targetContext: makeTargetContext()),
             .needsReview,
             "Ordinary audited differences must not hide a missing protected app")
 
@@ -1017,7 +1057,8 @@ final class ProtectedPluginAuditTests: XCTestCase {
             deviceMD5: nil, deviceKnown: true, size: 1)
         XCTAssertEqual(
             ProtectedPluginReviewPolicy.status(
-                replacement, compatibility: compatible, audit: audit),
+                replacement, compatibility: compatible, audit: audit,
+                targetContext: makeTargetContext()),
             .intentionallyReplaced)
         let unexpectedDuplicate = ProtectedPluginReview(
             remotePath: replacement.remotePath,
@@ -1031,27 +1072,31 @@ final class ProtectedPluginAuditTests: XCTestCase {
             size: replacement.size)
         XCTAssertEqual(
             ProtectedPluginReviewPolicy.status(
-                unexpectedDuplicate, compatibility: compatible, audit: audit),
+                unexpectedDuplicate, compatibility: compatible, audit: audit,
+                targetContext: makeTargetContext()),
             .needsReview,
             "An intentionally replaced app must not silently reappear as a duplicate")
 
         let unknown = makeReview(deviceKnown: false)
         XCTAssertEqual(
             ProtectedPluginReviewPolicy.status(
-                unknown, compatibility: compatible, audit: audit),
+                unknown, compatibility: compatible, audit: audit,
+                targetContext: makeTargetContext()),
             .needsReview)
         XCTAssertEqual(
             ProtectedPluginReviewPolicy.status(
                 makeReview(),
                 compatibility: .incompatible(reason: "wrong target"),
-                audit: audit),
+                audit: audit,
+                targetContext: makeTargetContext()),
             .needsReview)
 
         let sourceBytesWithoutAudit = makeReview(
             deviceMD5: String(repeating: "1", count: 32))
         XCTAssertEqual(
             ProtectedPluginReviewPolicy.status(
-                sourceBytesWithoutAudit, compatibility: compatible, audit: nil),
+                sourceBytesWithoutAudit, compatibility: compatible, audit: nil,
+                targetContext: makeTargetContext()),
             .unverified,
             "A ledger outage is global and must not manufacture a per-file DIFF")
 
@@ -1063,8 +1108,14 @@ final class ProtectedPluginAuditTests: XCTestCase {
             targetProvenance: [ProtectedPluginTargetProvenance(
                 targetMD5: sourceBytesWithoutAudit.newMD5,
                 channel: .dev,
-                releaseTag: "fw-packages-dev-004",
-                manifestSHA256: String(repeating: "e", count: 64))],
+                releaseTag: "t-dev-008-005",
+                manifestSHA256: String(repeating: "e", count: 64),
+                containerKind: .firmwareUpdaterBundle,
+                containerSHA256: String(repeating: "d", count: 64),
+                targetReleaseTag: "t-dev-008-005",
+                targetSourceCommit: String(repeating: "c", count: 40),
+                firmwareVersion: "t-dev-008-005",
+                resourcesSHA256: String(repeating: "b", count: 64))],
             disposition: .sourceMatches,
             note: nil)
         let sourceAudit = ProtectedPluginAudit(
@@ -1075,8 +1126,115 @@ final class ProtectedPluginAuditTests: XCTestCase {
             entries: [sourceEntry])
         XCTAssertEqual(
             ProtectedPluginReviewPolicy.status(
-                sourceBytesWithoutAudit, compatibility: compatible, audit: sourceAudit),
+                sourceBytesWithoutAudit, compatibility: compatible, audit: sourceAudit,
+                targetContext: makeTargetContext()),
             .sourceMatches)
+    }
+
+    func testHistoricalFirmwareHashCannotVerifyOnNewerFirmware() throws {
+        let baseAudit = try XCTUnwrap(
+            ProtectedPluginAuditValidator.decode(makeDocumentData()).audits.first)
+        let original = try XCTUnwrap(baseAudit.entries.first)
+        let historicalMD5 = String(repeating: "b", count: 32)
+        let historical = ProtectedPluginTargetProvenance(
+            targetMD5: historicalMD5,
+            channel: .dev,
+            releaseTag: "t-dev-008-004",
+            manifestSHA256: String(repeating: "1", count: 64),
+            containerKind: .firmwareUpdaterBundle,
+            containerSHA256: String(repeating: "2", count: 64),
+            targetReleaseTag: "t-dev-008-004",
+            targetSourceCommit: String(repeating: "3", count: 40),
+            firmwareVersion: "t-dev-008-004",
+            resourcesSHA256: String(repeating: "4", count: 64))
+        let entry = ProtectedPluginAuditEntry(
+            remotePath: original.remotePath,
+            targetPath: original.targetPath,
+            sourceMD5: original.sourceMD5,
+            targetMD5s: original.targetMD5s + [historicalMD5],
+            targetProvenance: original.targetProvenance + [historical],
+            disposition: original.disposition,
+            note: original.note)
+        let audit = ProtectedPluginAudit(
+            sourceTag: baseAudit.sourceTag,
+            sourceCommit: baseAudit.sourceCommit,
+            auditIssue: baseAudit.auditIssue,
+            archives: baseAudit.archives,
+            entries: [entry])
+        let compatible = FapCompatibilityState.compatible(
+            FapMetadata(apiMajor: 88, apiMinor: 2, hardwareTarget: 7))
+
+        XCTAssertEqual(
+            ProtectedPluginReviewPolicy.status(
+                makeReview(deviceMD5: historicalMD5),
+                compatibility: compatible,
+                audit: audit,
+                targetContext: makeTargetContext()),
+            .needsReview,
+            "A hash attested only for an older firmware must not verify on the current release")
+        XCTAssertEqual(
+            ProtectedPluginReviewPolicy.status(
+                makeReview(),
+                compatibility: compatible,
+                audit: audit,
+                targetContext: makeTargetContext()),
+            .verified)
+    }
+
+    func testIndependentFWPackageRequiresCurrentFirmwareAuditGate() throws {
+        let baseAudit = try XCTUnwrap(
+            ProtectedPluginAuditValidator.decode(makeDocumentData()).audits.first)
+        let original = try XCTUnwrap(baseAudit.entries.first)
+        let packageMD5 = String(repeating: "9", count: 32)
+        let packageEntry = ProtectedPluginAuditEntry(
+            remotePath: original.remotePath,
+            targetPath: original.targetPath,
+            sourceMD5: original.sourceMD5,
+            targetMD5s: [packageMD5],
+            targetProvenance: [ProtectedPluginTargetProvenance(
+                targetMD5: packageMD5,
+                channel: .dev,
+                releaseTag: "fw-packages-dev-012",
+                manifestSHA256: String(repeating: "5", count: 64),
+                containerKind: .fwPackagesZip,
+                containerSHA256: String(repeating: "6", count: 64),
+                targetReleaseTag: "t-dev-008-005",
+                targetSourceCommit: String(repeating: "7", count: 40))],
+            disposition: .auditedDifference,
+            note: nil)
+        let compatible = FapCompatibilityState.compatible(
+            FapMetadata(apiMajor: 88, apiMinor: 2, hardwareTarget: 7))
+        let review = makeReview(deviceMD5: packageMD5)
+        let packageOnly = ProtectedPluginAudit(
+            sourceTag: baseAudit.sourceTag,
+            sourceCommit: baseAudit.sourceCommit,
+            auditIssue: baseAudit.auditIssue,
+            archives: baseAudit.archives,
+            entries: [packageEntry])
+
+        XCTAssertEqual(
+            ProtectedPluginReviewPolicy.status(
+                review,
+                compatibility: compatible,
+                audit: packageOnly,
+                targetContext: makeTargetContext()),
+            .unverified,
+            "An independent package must not bypass the release-level catch-up gate")
+
+        let withFirmwareCoverage = ProtectedPluginAudit(
+            sourceTag: baseAudit.sourceTag,
+            sourceCommit: baseAudit.sourceCommit,
+            auditIssue: baseAudit.auditIssue,
+            archives: baseAudit.archives,
+            entries: [packageEntry] + baseAudit.entries)
+        XCTAssertEqual(
+            ProtectedPluginReviewPolicy.status(
+                review,
+                compatibility: compatible,
+                audit: withFirmwareCoverage,
+                targetContext: makeTargetContext()),
+            .verified,
+            "Exact FW Package bytes may verify after the installed firmware was audited")
     }
 
     func testMovedTotpSourceMatchesItsAuditedTumoflipTarget() {
@@ -1103,7 +1261,13 @@ final class ProtectedPluginAuditTests: XCTestCase {
                 targetMD5: targetMD5,
                 channel: .stable,
                 releaseTag: "v1.0.6",
-                manifestSHA256: "d887e3aabfff457dc9b4a3e8b53c2ad51a97d7da251892325dfbac1d0c914258")],
+                manifestSHA256: "d887e3aabfff457dc9b4a3e8b53c2ad51a97d7da251892325dfbac1d0c914258",
+                containerKind: .firmwareUpdaterBundle,
+                containerSHA256: String(repeating: "d", count: 64),
+                targetReleaseTag: "v1.0.6",
+                targetSourceCommit: String(repeating: "c", count: 40),
+                firmwareVersion: "t-flppr-fw-006",
+                resourcesSHA256: String(repeating: "b", count: 64))],
             disposition: .auditedDifference,
             note: nil)
         let audit = ProtectedPluginAudit(
@@ -1120,7 +1284,8 @@ final class ProtectedPluginAuditTests: XCTestCase {
             ProtectedPluginReviewPolicy.status(
                 review,
                 compatibility: compatible,
-                audit: audit),
+                audit: audit,
+                targetContext: makeTargetContext(firmwareVersion: "t-flppr-fw-006")),
             .verified)
     }
 
@@ -1161,8 +1326,14 @@ final class ProtectedPluginAuditTests: XCTestCase {
                         targetProvenance: [ProtectedPluginTargetProvenance(
                             targetMD5: targetMD5,
                             channel: .dev,
-                            releaseTag: "fw-packages-dev-003",
-                            manifestSHA256: String(repeating: "c", count: 64))],
+                            releaseTag: "t-dev-008-005",
+                            manifestSHA256: String(repeating: "c", count: 64),
+                            containerKind: .firmwareUpdaterBundle,
+                            containerSHA256: String(repeating: "d", count: 64),
+                            targetReleaseTag: "t-dev-008-005",
+                            targetSourceCommit: String(repeating: "e", count: 40),
+                            firmwareVersion: "t-dev-008-005",
+                            resourcesSHA256: String(repeating: "f", count: 64))],
                         disposition: .auditedDifference,
                         note: nil),
                     ProtectedPluginAuditEntry(
@@ -1191,6 +1362,18 @@ final class ProtectedPluginAuditTests: XCTestCase {
             deviceMD5: deviceMD5,
             deviceKnown: deviceKnown,
             size: 6_000_000)
+    }
+
+    private func makeTargetContext(
+        firmwareVersion: String = "t-dev-008-005"
+    ) -> ProtectedPluginAuditTargetContext? {
+        ProtectedPluginAuditTargetContext(deviceIdentity: TumoflipDeviceIdentity(
+            firmwareVersion: firmwareVersion,
+            originFork: "tumoflip",
+            firmwareCommit: nil,
+            firmwareCommitDirty: nil,
+            firmwareAPI: "88.2",
+            hardwareTarget: 7))
     }
 
     private func temporaryDirectory() -> URL {

@@ -453,7 +453,7 @@ struct ProtectedAppsView: View {
             statusSection(
                 title: "Unverified",
                 items: unverifiedDetails,
-                footer: "A fresh primary audit is required before TumoCompanion can decide whether these files match. No install, replacement, or removal is recommended from this state."
+                footer: "These rows cannot be classified for the connected firmware yet. No install, replacement, or removal is recommended from this state."
             )
 
             Section {

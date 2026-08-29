@@ -52,11 +52,74 @@ enum ProtectedPluginTargetChannel: String, Codable, Equatable {
     case dev
 }
 
+enum ProtectedPluginTargetContainerKind: String, Codable, Equatable {
+    /// File extracted from a complete firmware updater archive. Its hash is valid
+    /// only for the exact firmware_version attested by the same provenance record.
+    case firmwareUpdaterBundle
+    /// Independently installable FW Packages payload. Compatibility metadata and
+    /// the detected firmware channel remain part of the acceptance boundary.
+    case fwPackagesZip
+    case fwPackagesCompatibleBuild
+}
+
 struct ProtectedPluginTargetProvenance: Codable, Equatable {
     let targetMD5: String
     let channel: ProtectedPluginTargetChannel
     let releaseTag: String
     let manifestSHA256: String
+    let containerKind: ProtectedPluginTargetContainerKind?
+    let containerSHA256: String?
+    let targetReleaseTag: String?
+    let targetSourceCommit: String?
+    let firmwareVersion: String?
+    let resourcesSHA256: String?
+    let compatibilityCatalogTag: String?
+
+    init(
+        targetMD5: String,
+        channel: ProtectedPluginTargetChannel,
+        releaseTag: String,
+        manifestSHA256: String,
+        containerKind: ProtectedPluginTargetContainerKind? = nil,
+        containerSHA256: String? = nil,
+        targetReleaseTag: String? = nil,
+        targetSourceCommit: String? = nil,
+        firmwareVersion: String? = nil,
+        resourcesSHA256: String? = nil,
+        compatibilityCatalogTag: String? = nil
+    ) {
+        self.targetMD5 = targetMD5
+        self.channel = channel
+        self.releaseTag = releaseTag
+        self.manifestSHA256 = manifestSHA256
+        self.containerKind = containerKind
+        self.containerSHA256 = containerSHA256
+        self.targetReleaseTag = targetReleaseTag
+        self.targetSourceCommit = targetSourceCommit
+        self.firmwareVersion = firmwareVersion
+        self.resourcesSHA256 = resourcesSHA256
+        self.compatibilityCatalogTag = compatibilityCatalogTag
+    }
+}
+
+/// Exact connected-firmware identity used to decide whether a cumulative audit
+/// ledger is current for this device. API compatibility alone is insufficient:
+/// historical firmware builds may contain different protected binaries while
+/// remaining ABI-compatible.
+struct ProtectedPluginAuditTargetContext: Equatable {
+    let firmwareVersion: String
+    let channel: ProtectedPluginTargetChannel
+
+    init?(deviceIdentity: TumoflipDeviceIdentity) {
+        guard deviceIdentity.isTumoflip,
+              let firmwareVersion = deviceIdentity.firmwareVersion,
+              let inferredChannel = deviceIdentity.inferredChannel else { return nil }
+        self.firmwareVersion = firmwareVersion
+        switch inferredChannel {
+        case .stable: channel = .stable
+        case .dev: channel = .dev
+        }
+    }
 }
 
 struct ProtectedPluginAuditEntry: Codable, Equatable {
@@ -102,6 +165,18 @@ struct ProtectedPluginAudit: Codable, Equatable {
             ($0.pack.lowercased(), $0.sha256.lowercased())
         })
         return hashes == provenance.archiveSHA256
+    }
+
+    /// At least one firmware-owned protected artifact must attest the exact
+    /// firmware installed on the connected Flipper. Without this release-level
+    /// coverage a freshly fetched ledger is still historical, for example while
+    /// automation is catching up immediately after a firmware publication.
+    func covers(_ context: ProtectedPluginAuditTargetContext) -> Bool {
+        entries.lazy.flatMap(\.targetProvenance).contains {
+            $0.containerKind == .firmwareUpdaterBundle
+                && $0.channel == context.channel
+                && $0.firmwareVersion?.caseInsensitiveCompare(context.firmwareVersion) == .orderedSame
+        }
     }
 }
 
@@ -202,6 +277,13 @@ enum ProtectedPluginAuditValidator {
                         $0.channel.rawValue,
                         $0.releaseTag,
                         $0.manifestSHA256,
+                        $0.containerKind?.rawValue ?? "",
+                        $0.containerSHA256 ?? "",
+                        $0.targetReleaseTag ?? "",
+                        $0.targetSourceCommit ?? "",
+                        $0.firmwareVersion ?? "",
+                        $0.resourcesSHA256 ?? "",
+                        $0.compatibilityCatalogTag ?? "",
                     ].joined(separator: "\u{001F}")
                 })
                 guard targetSet.count == entry.targetMD5s.count,
@@ -217,6 +299,41 @@ enum ProtectedPluginAuditValidator {
                           isLowercaseSHA256(provenance.manifestSHA256) else {
                         throw ProtectedPluginAuditValidationError.malformedAudit(
                             "invalid target release provenance")
+                    }
+                    if let containerKind = provenance.containerKind {
+                        guard let containerSHA256 = provenance.containerSHA256,
+                              isLowercaseSHA256(containerSHA256),
+                              let targetReleaseTag = provenance.targetReleaseTag,
+                              isReleaseTag(targetReleaseTag),
+                              let targetSourceCommit = provenance.targetSourceCommit,
+                              isLowercaseCommit(targetSourceCommit) else {
+                            throw ProtectedPluginAuditValidationError.malformedAudit(
+                                "incomplete target container provenance")
+                        }
+                        switch containerKind {
+                        case .firmwareUpdaterBundle:
+                            guard let firmwareVersion = provenance.firmwareVersion,
+                                  isReleaseTag(firmwareVersion),
+                                  let resourcesSHA256 = provenance.resourcesSHA256,
+                                  isLowercaseSHA256(resourcesSHA256) else {
+                                throw ProtectedPluginAuditValidationError.malformedAudit(
+                                    "incomplete firmware target provenance")
+                            }
+                        case .fwPackagesZip, .fwPackagesCompatibleBuild:
+                            if let compatibilityCatalogTag = provenance.compatibilityCatalogTag,
+                               !isReleaseTag(compatibilityCatalogTag) {
+                                throw ProtectedPluginAuditValidationError.malformedAudit(
+                                    "invalid compatibility catalog provenance")
+                            }
+                        }
+                    } else if provenance.containerSHA256 != nil
+                                || provenance.targetReleaseTag != nil
+                                || provenance.targetSourceCommit != nil
+                                || provenance.firmwareVersion != nil
+                                || provenance.resourcesSHA256 != nil
+                                || provenance.compatibilityCatalogTag != nil {
+                        throw ProtectedPluginAuditValidationError.malformedAudit(
+                            "target container kind is missing")
                     }
                 }
                 switch entry.disposition {
@@ -248,6 +365,12 @@ enum ProtectedPluginAuditValidator {
 
     private static func isLowercaseSHA256(_ value: String) -> Bool {
         value == value.lowercased() && ProtectedPluginPackProvenance.isSHA256(value)
+    }
+
+    private static func isLowercaseCommit(_ value: String) -> Bool {
+        value == value.lowercased()
+            && value.count == 40
+            && value.allSatisfy(\.isHexDigit)
     }
 
     private static func isReleaseTag(_ value: String) -> Bool {
@@ -817,9 +940,13 @@ enum ProtectedPluginReviewPolicy {
         _ review: ProtectedPluginReview,
         compatibility: FapCompatibilityState,
         audit: ProtectedPluginAudit?,
+        targetContext: ProtectedPluginAuditTargetContext?,
         allowsCurrentVerdicts: Bool = true
     ) -> ProtectedPluginReviewAuditStatus {
-        guard let audit, allowsCurrentVerdicts else { return .unverified }
+        guard let audit,
+              let targetContext,
+              allowsCurrentVerdicts,
+              audit.covers(targetContext) else { return .unverified }
         guard compatibility.isCompatible, review.deviceKnown else { return .needsReview }
         guard let entry = audit.entry(matching: review) else {
             // Even a byte-for-byte source match is not accepted until the automation
@@ -833,8 +960,27 @@ enum ProtectedPluginReviewPolicy {
             // duplicate alongside the Tumoflip replacement.
             return review.deviceMD5 == nil ? .intentionallyReplaced : .needsReview
         }
+        let applicableProvenance = entry.targetProvenance.filter { provenance in
+            guard provenance.channel == targetContext.channel else { return false }
+            switch provenance.containerKind {
+            case .firmwareUpdaterBundle:
+                return provenance.firmwareVersion?.caseInsensitiveCompare(
+                    targetContext.firmwareVersion) == .orderedSame
+            case .fwPackagesZip, .fwPackagesCompatibleBuild:
+                // FW Packages are independent overlays. Their exact attested bytes
+                // remain valid within the detected channel when FAP compatibility
+                // above also succeeds.
+                return true
+            case nil:
+                // Pre-provenance ledger records are retained as history only.
+                return false
+            }
+        }
+        guard !applicableProvenance.isEmpty else { return .unverified }
         guard let deviceMD5 = review.deviceMD5?.lowercased(),
-              entry.targetMD5s.contains(deviceMD5) else {
+              applicableProvenance.contains(where: {
+                  $0.targetMD5.caseInsensitiveCompare(deviceMD5) == .orderedSame
+              }) else {
             return .needsReview
         }
         switch entry.disposition {
