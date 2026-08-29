@@ -1422,7 +1422,7 @@ final class PluginUpdater: ObservableObject {
     }
     var protectedAuditFailure: ProtectedPluginAuditResolution? {
         guard let resolution = protectedAuditResolution,
-              resolution.audit == nil else { return nil }
+              !resolution.allowsCurrentVerdicts else { return nil }
         return resolution
     }
     /// Expected Tumoflip differences covered by the exact current pack audit. They stay
@@ -1467,7 +1467,8 @@ final class PluginUpdater: ObservableObject {
         ProtectedPluginReviewPolicy.status(
             review,
             compatibility: classification(review.remotePath),
-            audit: protectedAuditResolution?.audit)
+            audit: protectedAuditResolution?.audit,
+            allowsCurrentVerdicts: protectedAuditResolution?.allowsCurrentVerdicts ?? false)
     }
 
     var shouldLoadCatalog: Bool {
@@ -1748,8 +1749,7 @@ final class PluginUpdater: ObservableObject {
             setProtectedAuditProvenance(ProtectedPluginPackProvenance(
                 sourceTag: nextTag,
                 archiveSHA256: archiveSHA256))
-            await refreshProtectedAuditResolution()
-            await refreshProtectedReviews()
+            await refreshProtectedAudit()
 
             var cache = loadCache()
             if var reconciled = cache {
@@ -1946,6 +1946,14 @@ final class PluginUpdater: ObservableObject {
               provenance == protectedAuditProvenance else { return }
         protectedAuditResolutionTask = nil
         protectedAuditResolution = resolution
+    }
+
+    /// Refreshes both halves of the protected-app decision using one coherent pass:
+    /// a cache-bypassing primary ledger read followed by current on-device MD5s.
+    /// This is the normal catalog-refresh path, not an opt-in repair action.
+    func refreshProtectedAudit() async {
+        await refreshProtectedAuditResolution(forceRemote: true)
+        await refreshProtectedReviews()
     }
 
     private func refreshProtectedReviews() async {
@@ -2886,6 +2894,10 @@ extension PluginUpdater {
         await refreshProtectedAuditResolution(forceRemote: forceRemote)
     }
 
+    func refreshProtectedAuditForTesting() async {
+        await refreshProtectedAudit()
+    }
+
     static func protectedAuditQAFixture() -> PluginUpdater {
         let temp = FileManager.default.temporaryDirectory
             .appendingPathComponent("protected-audit-ui-\(UUID().uuidString)")
@@ -2930,7 +2942,10 @@ extension PluginUpdater {
                     note: nil),
             ])
         updater.tag = "qa-pack"
-        updater.protectedAuditResolution = .accepted(audit, origin: .remote)
+        updater.protectedAuditResolution = .accepted(
+            audit,
+            origin: .remote,
+            allowsCurrentVerdicts: true)
         updater.protectedReviews = [
             ProtectedPluginReview(
                 remotePath: "/ext/apps/GPIO/esp_flasher.fap",
@@ -2981,6 +2996,18 @@ extension PluginUpdater {
         updater.protectedAuditResolution = .rejected(
             "The authoritative protected-app audit document is malformed.",
             kind: .invalid)
+        return updater
+    }
+
+    static func protectedAuditNotCurrentQAFixture() -> PluginUpdater {
+        let updater = protectedAuditQAFixture()
+        if let audit = updater.protectedAuditResolution?.audit {
+            updater.protectedAuditResolution = .accepted(
+                audit,
+                origin: .cache,
+                allowsCurrentVerdicts: false,
+                warning: "A fresh primary audit could not be loaded. Cached audit data is shown only as historical evidence; no device change decision was made.")
+        }
         return updater
     }
 

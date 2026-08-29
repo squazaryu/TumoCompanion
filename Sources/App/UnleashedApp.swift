@@ -84,6 +84,8 @@ struct RootView: View {
             ProtectedAppsAuditQAView(failureKind: .unavailable)
         } else if ProcessInfo.processInfo.arguments.contains("-protected-apps-audit-invalid-qa") {
             ProtectedAppsAuditQAView(failureKind: .invalid)
+        } else if ProcessInfo.processInfo.arguments.contains("-protected-apps-audit-not-current-qa") {
+            ProtectedAppsAuditQAView(failureKind: .notCurrent)
         } else if ProcessInfo.processInfo.arguments.contains("-fw-packages-action-bar-qa") {
             FWPackagesActionBarQAView()
         } else if ProcessInfo.processInfo.arguments.contains("-community-route-cleanup-qa") {

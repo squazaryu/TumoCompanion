@@ -427,6 +427,9 @@ struct ProtectedAppsView: View {
                         message: failure.failure ?? "Protected-app audit could not be loaded.",
                         actionTitle: "Retry audit",
                         accessibilityIdentifier: "protected-app-audit-global-status",
+                        tint: failure.failureKind == .notCurrent ? Theme.warning : Theme.danger,
+                        systemImage: failure.failureKind == .notCurrent
+                            ? "clock.badge.exclamationmark" : "exclamationmark.triangle.fill",
                         action: retryAudit
                     )
                 }
@@ -446,6 +449,11 @@ struct ProtectedAppsView: View {
                 title: "Missing",
                 items: missingDetails,
                 footer: "The protected Community Pack path is absent on this Flipper. Open a row for the expected path and choose Verify on device or install the matching protected package."
+            )
+            statusSection(
+                title: "Unverified",
+                items: unverifiedDetails,
+                footer: "A fresh primary audit is required before TumoCompanion can decide whether these files match. No install, replacement, or removal is recommended from this state."
             )
 
             Section {
@@ -541,8 +549,13 @@ struct ProtectedAppsView: View {
 
     private var needsReviewDetails: [ProtectedReviewDetail] {
         details {
-            !$0.status.isAudited && !($0.status == .needsReview && $0.item.deviceKnown && $0.item.deviceMD5 == nil)
+            $0.status == .needsReview
+                && !($0.item.deviceKnown && $0.item.deviceMD5 == nil)
         }
+    }
+
+    private var unverifiedDetails: [ProtectedReviewDetail] {
+        details { $0.status == .unverified }
     }
 
     private func details(where predicate: (ProtectedReviewDetail) -> Bool) -> [ProtectedReviewDetail] {
@@ -566,9 +579,6 @@ struct ProtectedAppsView: View {
     }
 
     private var needsReviewFooter: String {
-        if updater.protectedAuditFailure != nil {
-            return "The authoritative audit is unavailable, so these files are unverified rather than DIFF. Retry the audit before making a provenance decision."
-        }
         return "These protected apps need a device check or a provenance review. Open a row for the exact path, API, target and MD5 values."
     }
 
@@ -598,7 +608,7 @@ struct ProtectedAppsView: View {
     }
 
     private func retryAudit() {
-        Task { await updater.check() }
+        Task { await updater.refreshProtectedAudit() }
     }
 
     private func addCurrent() {
@@ -692,7 +702,7 @@ struct ProtectedAppDetailSheet: View {
         case .verified: return "Verified"
         case .sourceMatches: return "Source matches"
         case .intentionallyReplaced: return "Intentionally replaced"
-        case .unverified: return "Needs review"
+        case .unverified: return "Unverified"
         case .needsReview:
             return detail.item.deviceKnown && detail.item.deviceMD5 == nil ? "Missing" : "Needs review"
         }
@@ -705,7 +715,7 @@ struct ProtectedAppDetailSheet: View {
         case .intentionallyReplaced:
             return "The upstream app is intentionally replaced by the Tumoflip route."
         case .unverified:
-            return "The authoritative audit is unavailable, so no byte-level verdict was produced."
+            return "A fresh primary audit is unavailable, so no current byte-level verdict was produced and no file change is recommended."
         case .needsReview:
             return detail.item.deviceKnown && detail.item.deviceMD5 == nil
                 ? "The expected protected path is not present on the device."
@@ -862,6 +872,8 @@ struct ProtectedAppsAuditQAView: View {
             fixture = PluginUpdater.protectedAuditUnavailableQAFixture()
         case .invalid:
             fixture = PluginUpdater.protectedAuditInvalidQAFixture()
+        case .notCurrent:
+            fixture = PluginUpdater.protectedAuditNotCurrentQAFixture()
         case nil:
             fixture = PluginUpdater.protectedAuditQAFixture()
         }

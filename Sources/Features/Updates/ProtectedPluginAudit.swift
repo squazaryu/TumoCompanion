@@ -268,11 +268,13 @@ enum ProtectedPluginAuditOrigin: String, Equatable {
 enum ProtectedPluginAuditFailureKind: Equatable {
     case unavailable
     case invalid
+    case notCurrent
 
     var label: String {
         switch self {
         case .unavailable: return "AUDIT UNAVAILABLE"
         case .invalid: return "AUDIT INVALID"
+        case .notCurrent: return "AUDIT NOT CURRENT"
         }
     }
 }
@@ -282,16 +284,36 @@ struct ProtectedPluginAuditResolution: Equatable {
     let origin: ProtectedPluginAuditOrigin?
     let failure: String?
     let failureKind: ProtectedPluginAuditFailureKind?
+    /// A historical exact-pack audit is useful diagnostic evidence, but it cannot
+    /// prove that the current Tumoflip target set still accepts (or rejects) an MD5.
+    /// Only a cache-bypassing response from the primary ledger may classify the
+    /// current device as VERIFIED or DIFF.
+    let allowsCurrentVerdicts: Bool
 
-    static func accepted(_ audit: ProtectedPluginAudit, origin: ProtectedPluginAuditOrigin) -> Self {
-        Self(audit: audit, origin: origin, failure: nil, failureKind: nil)
+    static func accepted(
+        _ audit: ProtectedPluginAudit,
+        origin: ProtectedPluginAuditOrigin,
+        allowsCurrentVerdicts: Bool = true,
+        warning: String? = nil
+    ) -> Self {
+        Self(
+            audit: audit,
+            origin: origin,
+            failure: warning,
+            failureKind: allowsCurrentVerdicts ? nil : .notCurrent,
+            allowsCurrentVerdicts: allowsCurrentVerdicts)
     }
 
     static func rejected(
         _ failure: String,
         kind: ProtectedPluginAuditFailureKind = .unavailable
     ) -> Self {
-        Self(audit: nil, origin: nil, failure: failure, failureKind: kind)
+        Self(
+            audit: nil,
+            origin: nil,
+            failure: failure,
+            failureKind: kind,
+            allowsCurrentVerdicts: false)
     }
 }
 
@@ -580,7 +602,10 @@ struct ProtectedPluginAuditService {
     }
 
     private static func fetchData(from url: URL, forceRemote: Bool) async throws -> Data {
-        var request = URLRequest(url: url)
+        let requestURL = forceRemote
+            ? cacheBypassingURL(for: url, nonce: UUID().uuidString)
+            : url
+        var request = URLRequest(url: requestURL)
         request.cachePolicy = forceRemote
             ? .reloadIgnoringLocalAndRemoteCacheData
             : .reloadIgnoringLocalCacheData
@@ -599,6 +624,16 @@ struct ProtectedPluginAuditService {
         return data
     }
 
+    static func cacheBypassingURL(for url: URL, nonce: String) -> URL {
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            return url
+        }
+        var queryItems = components.queryItems ?? []
+        queryItems.append(URLQueryItem(name: "tumoflip_audit_refresh", value: nonce))
+        components.queryItems = queryItems
+        return components.url ?? url
+    }
+
     func resolve(
         for provenance: ProtectedPluginPackProvenance,
         forceRemote: Bool = false
@@ -609,7 +644,8 @@ struct ProtectedPluginAuditService {
             return resolveAuthoritative(
                 data,
                 for: provenance,
-                origin: .remote)
+                origin: .remote,
+                allowsCurrentVerdicts: forceRemote)
         } catch {
             guard !Task.isCancelled else {
                 return .rejected("Protected-app audit refresh was cancelled.")
@@ -627,7 +663,8 @@ struct ProtectedPluginAuditService {
                     return resolveAuthoritative(
                         data,
                         for: provenance,
-                        origin: .legacy)
+                        origin: .legacy,
+                        allowsCurrentVerdicts: false)
                 } catch {
                     guard !Task.isCancelled else {
                         return .rejected("Protected-app audit refresh was cancelled.")
@@ -642,7 +679,8 @@ struct ProtectedPluginAuditService {
     private func resolveAuthoritative(
         _ data: Data,
         for provenance: ProtectedPluginPackProvenance,
-        origin: ProtectedPluginAuditOrigin
+        origin: ProtectedPluginAuditOrigin,
+        allowsCurrentVerdicts: Bool
     ) -> ProtectedPluginAuditResolution {
         guard !Task.isCancelled else {
             return .rejected("Protected-app audit refresh was cancelled.")
@@ -683,7 +721,19 @@ struct ProtectedPluginAuditService {
             // A valid live response remains usable for this process even if the
             // optional offline cache cannot be updated (for example, storage full).
         }
-        return .accepted(audit, origin: origin)
+        let warning: String?
+        if allowsCurrentVerdicts {
+            warning = nil
+        } else if origin == .legacy {
+            warning = "Only the legacy protected-app audit endpoint was reachable. A fresh primary audit is required before deciding whether device files differ."
+        } else {
+            warning = "The protected-app audit was not refreshed directly from the primary ledger. Current device verdicts are withheld until a fresh audit succeeds."
+        }
+        return .accepted(
+            audit,
+            origin: origin,
+            allowsCurrentVerdicts: allowsCurrentVerdicts,
+            warning: warning)
     }
 
     private func authority(
@@ -700,12 +750,20 @@ struct ProtectedPluginAuditService {
                 "This Community Pack revision was revoked by the protected-app audit ledger.")
         }
         if let cached = cache.load(for: provenance) {
-            return .accepted(cached, origin: .cache)
+            return .accepted(
+                cached,
+                origin: .cache,
+                allowsCurrentVerdicts: false,
+                warning: "The primary protected-app audit could not be refreshed. Cached audit data is retained only as historical evidence; no device change decision was made.")
         }
         if let data = bundledData(),
            let document = try? ProtectedPluginAuditValidator.decode(data),
            let audit = document.audits.first(where: { $0.matches(provenance) }) {
-            return .accepted(audit, origin: .bundled)
+            return .accepted(
+                audit,
+                origin: .bundled,
+                allowsCurrentVerdicts: false,
+                warning: "The primary protected-app audit could not be refreshed. Bundled audit data is retained only as historical evidence; no device change decision was made.")
         }
         return .rejected(
             "Protected-app audit ledger is unavailable for this exact Community Pack revision.")
@@ -758,9 +816,10 @@ enum ProtectedPluginReviewPolicy {
     static func status(
         _ review: ProtectedPluginReview,
         compatibility: FapCompatibilityState,
-        audit: ProtectedPluginAudit?
+        audit: ProtectedPluginAudit?,
+        allowsCurrentVerdicts: Bool = true
     ) -> ProtectedPluginReviewAuditStatus {
-        guard let audit else { return .unverified }
+        guard let audit, allowsCurrentVerdicts else { return .unverified }
         guard compatibility.isCompatible, review.deviceKnown else { return .needsReview }
         guard let entry = audit.entry(matching: review) else {
             // Even a byte-for-byte source match is not accepted until the automation

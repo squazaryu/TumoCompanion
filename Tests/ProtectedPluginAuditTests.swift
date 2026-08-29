@@ -99,6 +99,9 @@ final class ProtectedPluginAuditTests: XCTestCase {
         let first = await remote.resolve(for: provenance)
         XCTAssertEqual(first.origin, .remote)
         XCTAssertEqual(first.audit?.sourceTag, "9aug2026")
+        XCTAssertFalse(
+            first.allowsCurrentVerdicts,
+            "A non-bypassing ledger read may seed history but must not assert current device state")
 
         let offline = ProtectedPluginAuditService(
             url: remote.url,
@@ -107,6 +110,7 @@ final class ProtectedPluginAuditTests: XCTestCase {
             bundledData: { nil })
         let cached = await offline.resolve(for: provenance)
         XCTAssertEqual(cached.origin, .cache)
+        XCTAssertFalse(cached.allowsCurrentVerdicts)
 
         let unseen = try XCTUnwrap(ProtectedPluginPackProvenance(
             sourceTag: "10aug2026",
@@ -114,6 +118,73 @@ final class ProtectedPluginAuditTests: XCTestCase {
         let rejected = await offline.resolve(for: unseen)
         XCTAssertNil(rejected.audit)
         XCTAssertNotNil(rejected.failure)
+    }
+
+    func testOnlyCacheBypassingPrimaryReadAllowsCurrentVerdicts() async throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let provenance = try XCTUnwrap(makeProvenance())
+        let remote = MutableLedger(try makeDocumentData())
+        let service = ProtectedPluginAuditService(
+            url: URL(string: "https://example.test/latest.json")!,
+            cache: ProtectedPluginAuditCache(directory: directory),
+            fetch: { _ in await remote.read(fresh: false) },
+            fetchFresh: { _ in await remote.read(fresh: true) },
+            bundledData: { nil })
+
+        let ordinary = await service.resolve(for: provenance)
+        XCTAssertEqual(ordinary.origin, .remote)
+        XCTAssertFalse(ordinary.allowsCurrentVerdicts)
+        XCTAssertEqual(ordinary.failureKind, .notCurrent)
+
+        let fresh = await service.resolve(for: provenance, forceRemote: true)
+        XCTAssertEqual(fresh.origin, .remote)
+        XCTAssertTrue(fresh.allowsCurrentVerdicts)
+        XCTAssertNil(fresh.failureKind)
+
+        let counts = await remote.counts()
+        XCTAssertEqual(counts.regular, 1)
+        XCTAssertEqual(counts.fresh, 1)
+    }
+
+    func testCacheBypassingURLUsesUniqueEdgeCacheKeyWithoutDroppingExistingQuery() throws {
+        let original = try XCTUnwrap(URL(string: "https://example.test/latest.json?channel=dev"))
+        let refreshed = ProtectedPluginAuditService.cacheBypassingURL(
+            for: original,
+            nonce: "audit-run-42")
+        let components = try XCTUnwrap(URLComponents(
+            url: refreshed,
+            resolvingAgainstBaseURL: false))
+        let values = Dictionary(uniqueKeysWithValues: (components.queryItems ?? []).map {
+            ($0.name, $0.value)
+        })
+
+        XCTAssertEqual(values["channel"], "dev")
+        XCTAssertEqual(values["tumoflip_audit_refresh"], "audit-run-42")
+    }
+
+    @MainActor
+    func testNormalCatalogAuditRefreshAlwaysUsesFreshPrimaryPath() async throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let provenance = try XCTUnwrap(makeProvenance())
+        let remote = MutableLedger(try makeDocumentData())
+        let service = ProtectedPluginAuditService(
+            url: URL(string: "https://example.test/latest.json")!,
+            cache: ProtectedPluginAuditCache(directory: directory),
+            fetch: { _ in await remote.read(fresh: false) },
+            fetchFresh: { _ in await remote.read(fresh: true) },
+            bundledData: { nil })
+        let updater = PluginUpdater(protectedAuditService: service)
+        updater.configureProtectedAuditProvenanceForTesting(provenance)
+
+        await updater.refreshProtectedAuditForTesting()
+
+        let counts = await remote.counts()
+        XCTAssertEqual(counts.regular, 0)
+        XCTAssertEqual(counts.fresh, 1)
+        XCTAssertTrue(updater.protectedAuditResolution?.allowsCurrentVerdicts == true)
+        XCTAssertNil(updater.protectedAuditFailure)
     }
 
     func testMalformedAuthoritativeLedgerDoesNotFallBackToCache() async throws {
@@ -909,6 +980,22 @@ final class ProtectedPluginAuditTests: XCTestCase {
             ProtectedPluginReviewPolicy.status(
                 makeReview(), compatibility: compatible, audit: audit),
             .verified)
+        XCTAssertEqual(
+            ProtectedPluginReviewPolicy.status(
+                makeReview(),
+                compatibility: compatible,
+                audit: audit,
+                allowsCurrentVerdicts: false),
+            .unverified,
+            "Historical audit data must not claim that even a formerly accepted MD5 is current")
+        XCTAssertEqual(
+            ProtectedPluginReviewPolicy.status(
+                makeReview(deviceMD5: String(repeating: "b", count: 32)),
+                compatibility: compatible,
+                audit: audit,
+                allowsCurrentVerdicts: false),
+            .unverified,
+            "A stale target set must never manufacture a current DIFF")
         XCTAssertEqual(
             ProtectedPluginReviewPolicy.status(
                 makeReview(deviceMD5: String(repeating: "b", count: 32)),

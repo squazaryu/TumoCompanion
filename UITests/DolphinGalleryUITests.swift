@@ -593,7 +593,7 @@ final class ProtectedAppsAuditUITests: XCTestCase {
         let global = app.staticTexts["protected-app-audit-global-status"]
         XCTAssertTrue(global.waitForExistence(timeout: 3))
         XCTAssertEqual(global.label, "AUDIT UNAVAILABLE")
-        XCTAssertTrue(app.staticTexts["Needs review"].exists)
+        XCTAssertTrue(app.staticTexts["Unverified"].exists)
         XCTAssertEqual(
             app.staticTexts["protected-app-review-status-esp_flasher"].label,
             "UNVERIFIED")
@@ -602,6 +602,40 @@ final class ProtectedAppsAuditUITests: XCTestCase {
             "UNVERIFIED")
         XCTAssertFalse(app.staticTexts["DIFF"].exists)
         XCTAssertFalse(app.staticTexts["Verified"].exists)
+    }
+
+    func testHistoricalAuditNeverRendersAsCurrentDiff() {
+        verifyHistoricalAudit(appearance: "light")
+        verifyHistoricalAudit(appearance: "dark")
+    }
+
+    private func verifyHistoricalAudit(appearance: String) {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-onboardingDone", "YES",
+            "-appearanceMode", appearance,
+            "-protected-apps-audit-not-current-qa",
+        ]
+        app.launch()
+
+        let global = app.staticTexts["protected-app-audit-global-status"]
+        XCTAssertTrue(global.waitForExistence(timeout: 3))
+        XCTAssertEqual(global.label, "AUDIT NOT CURRENT")
+        XCTAssertTrue(app.staticTexts["Unverified"].exists)
+        XCTAssertEqual(
+            app.staticTexts["protected-app-review-status-esp_flasher"].label,
+            "UNVERIFIED")
+        XCTAssertEqual(
+            app.staticTexts["protected-app-review-status-subghz_raw_edit"].label,
+            "UNVERIFIED")
+        XCTAssertFalse(app.staticTexts["DIFF"].exists)
+        XCTAssertFalse(app.staticTexts["Verified"].exists)
+
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = "Protected apps historical audit - \(appearance)"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+        app.terminate()
     }
 
     func testMalformedAuditIsGlobalInvalidInsteadOfPerFileDiff() {

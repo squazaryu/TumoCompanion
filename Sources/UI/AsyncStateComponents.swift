@@ -86,29 +86,35 @@ struct ActionableErrorView: View {
     let actionTitle: String
     let action: () -> Void
     var accessibilityIdentifier: String?
+    var tint: Color
+    var systemImage: String
 
     init(
         title: String,
         message: String,
         actionTitle: String,
         accessibilityIdentifier: String? = nil,
+        tint: Color = Theme.danger,
+        systemImage: String = "exclamationmark.triangle.fill",
         action: @escaping () -> Void
     ) {
         self.title = title
         self.message = message
         self.actionTitle = actionTitle
         self.accessibilityIdentifier = accessibilityIdentifier
+        self.tint = tint
+        self.systemImage = systemImage
         self.action = action
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 7) {
-                Image(systemName: "exclamationmark.triangle.fill")
+                Image(systemName: systemImage)
                 titleText
             }
             .font(.subheadline.weight(.semibold))
-            .foregroundStyle(Theme.danger)
+            .foregroundStyle(tint)
             Text(message)
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -119,10 +125,10 @@ struct ActionableErrorView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
-        .background(Theme.danger.opacity(0.07), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(tint.opacity(0.07), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Theme.danger.opacity(0.16), lineWidth: 1)
+                .strokeBorder(tint.opacity(0.16), lineWidth: 1)
         }
         .accessibilityElement(children: .contain)
     }
