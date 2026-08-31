@@ -1,5 +1,5 @@
 {
-  "release_tag": "27aug2026p2",
+  "release_tag": "30aug2026p2",
   "stems": {
     "24cxxprog": "Programmers",
     "4inrow": "Board",
@@ -23,6 +23,7 @@
     "barcode_app": "Tools",
     "battery_reader": "GPIO",
     "bc_scanner": "GPIO",
+    "bettermouse": "USB",
     "blackjack": "Board",
     "ble_spam": "Bluetooth",
     "bomberduck": "Arcade",
