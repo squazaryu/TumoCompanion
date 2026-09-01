@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.11.12",
-      "versionDate": "2026-08-30",
-      "versionDescription": "Protected-app audit verdicts now bind to the exact installed Tumoflip firmware. Audit catch-up, missing identity, and reconnects remain UNVERIFIED instead of producing false DIFF or VERIFIED results.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.12/TumoCompanion-unsigned.ipa",
-      "size": 25643924,
+      "version": "1.11.13",
+      "versionDate": "2026-09-01",
+      "versionDescription": "Add ESP32 Marauder firmware to the unified Updates source list, refresh it with the other sources, and show its current update status.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.13/TumoCompanion-unsigned.ipa",
+      "size": 25647143,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.11.13",
+          "date": "2026-09-01",
+          "localizedDescription": "Add ESP32 Marauder firmware to the unified Updates source list, refresh it with the other sources, and show its current update status.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.13/TumoCompanion-unsigned.ipa",
+          "size": 25647143,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.11.12",
           "date": "2026-08-30",
