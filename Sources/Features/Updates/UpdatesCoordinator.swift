@@ -12,6 +12,7 @@ final class UpdatesCoordinator: ObservableObject {
 
     private var pluginLoadTask: Task<Void, Never>?
     private var packageLoadTask: Task<Void, Never>?
+    private var esp32LoadTask: Task<Void, Never>?
     private var revalidationTask: Task<Void, Never>?
     private var observations = Set<AnyCancellable>()
 
@@ -41,6 +42,16 @@ final class UpdatesCoordinator: ObservableObject {
                 guard let self else { return }
                 await self.packages.reload(recover: recoverPackages)
                 self.packageLoadTask = nil
+            }
+        }
+
+        if esp32LoadTask == nil,
+           esp32.deviceScanState == .idle,
+           esp32.latestTag == nil {
+            esp32LoadTask = Task { [weak self] in
+                guard let self else { return }
+                await self.esp32.refresh()
+                self.esp32LoadTask = nil
             }
         }
     }

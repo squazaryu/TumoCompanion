@@ -561,6 +561,7 @@ struct UpdatesHelpView: View {
                 Label("Firmware prepares a full Main or Dev updater.", systemImage: "memorychip")
                 Label("FW Packages refresh Tumoflip apps and resources.", systemImage: "shippingbox")
                 Label("Community apps installs compatible All The Plugins apps.", systemImage: "puzzlepiece.extension")
+                Label("ESP32 stages verified Marauder packages for ESP Flasher.", systemImage: "memorychip")
                 Label("Keep the app open during BLE transfers.", systemImage: "iphone.radiowaves.left.and.right")
             }
             .navigationTitle("Updates help")

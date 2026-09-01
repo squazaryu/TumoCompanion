@@ -6,7 +6,7 @@ import SwiftUI
 /// produced the state. Deliberately has NO "needs attention" case — exceptional states
 /// (first sync, protected review, failed verify) live in the screen's separate
 /// "Needs attention" card instead, so a row's badge always reads as one of these six
-/// plain, comparable states and the two rows stay visually symmetric.
+/// plain, comparable states and all source rows stay visually symmetric.
 enum SourceBadge: Equatable {
     case notChecked
     case checking
@@ -51,8 +51,8 @@ enum SourceBadge: Equatable {
 
 /// One row in the "Sources" card — identical geometry for every update source
 /// regardless of how many groups/files it represents internally, which is the actual
-/// mechanism that makes firmware packages and community apps read as two comparable
-/// peers in ONE list instead of two differently-shaped features.
+/// mechanism that makes every updater read as a comparable peer in one list instead
+/// of a collection of differently-shaped features.
 struct SourceRow: View {
     let icon: String
     let tint: Color

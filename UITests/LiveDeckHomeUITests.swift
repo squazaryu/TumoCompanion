@@ -91,6 +91,40 @@ final class LiveDeckHomeUITests: XCTestCase {
         XCTAssertTrue(app.buttons["updates-open-center"].waitForExistence(timeout: 5))
         app.buttons["updates-open-center"].tap()
         XCTAssertTrue(app.navigationBars["Updates"].waitForExistence(timeout: 3))
+        let community = app.buttons["updates-center-source-community"]
+        let esp32 = app.buttons["updates-center-source-esp32"]
+        XCTAssertTrue(community.waitForExistence(timeout: 3))
+        XCTAssertTrue(esp32.waitForExistence(timeout: 3))
+        XCTAssertGreaterThan(esp32.frame.minY, community.frame.maxY)
+
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = "Updates center with ESP32 source - light"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+
+        esp32.tap()
+        XCTAssertTrue(app.navigationBars["ESP32 Firmware"].waitForExistence(timeout: 3))
+    }
+
+    func testUpdatesCenterIncludesESP32SourceInDarkMode() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-onboardingDone", "YES", "-appearanceMode", "dark"]
+        app.launch()
+
+        XCTAssertTrue(app.buttons["updates-open-center"].waitForExistence(timeout: 5))
+        app.buttons["updates-open-center"].tap()
+        XCTAssertTrue(app.navigationBars["Updates"].waitForExistence(timeout: 3))
+
+        let community = app.buttons["updates-center-source-community"]
+        let esp32 = app.buttons["updates-center-source-esp32"]
+        XCTAssertTrue(community.waitForExistence(timeout: 3))
+        XCTAssertTrue(esp32.waitForExistence(timeout: 3))
+        XCTAssertGreaterThan(esp32.frame.minY, community.frame.maxY)
+
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = "Updates center with ESP32 source - dark"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
     }
 
     func testConnectedConsoleUsesCompactStatusRail() {

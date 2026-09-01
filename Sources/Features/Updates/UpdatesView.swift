@@ -49,12 +49,10 @@ struct CollapsibleCard<Content: View>: View {
     }
 }
 
-/// Unified "App Updates" hub. Owns BOTH update sources — tumoflip firmware packages and
-/// all-the-plugins community apps — as a single screen with one combined verdict header
-/// and a single "Sources" card listing the two as comparable peer rows. Each row collapses
-/// its entire backend (a 4-group dashboard, or a 50-300 row file diff) into one verdict
-/// badge; all browsing/selection detail lives one tap away on that source's own screen, so
-/// this dashboard's height never grows regardless of how much is pending underneath.
+/// Unified update hub. Firmware releases, FW Packages, Community apps, and ESP32
+/// Marauder releases share one combined verdict header and one Sources card. Each row
+/// collapses its backend into a single badge; browsing and installation remain on the
+/// dedicated source screen, so this dashboard never expands with catalog contents.
 struct UpdatesView: View {
     @EnvironmentObject var ble: FlipperBLE
     @EnvironmentObject var transfer: TransferChannelStore
@@ -64,6 +62,7 @@ struct UpdatesView: View {
     private var updater: PluginUpdater { updates.plugins }
     private var packages: TumoflipUpdater { updates.packages }
     private var firmware: FirmwareLibrary { updates.firmware }
+    private var esp32: ESP32Updater { updates.esp32 }
 
     var body: some View {
         CardScroll(refreshAction: refreshSources) {
@@ -95,14 +94,15 @@ struct UpdatesView: View {
         transfer.activeChannel == .usb || ble.state == .ready || ble.state == .connected
     }
 
-    /// Pull-to-refresh is deliberately a read-only operation. It refreshes all three
+    /// Pull-to-refresh is deliberately a read-only operation. It refreshes all four
     /// catalogs and re-runs compatibility checks, but never stages, installs, cleans,
     /// or changes a file on the Flipper.
     private func refreshSources() async {
-        guard !pluginBusy, !packages.busy, !firmware.busy else { return }
+        guard !pluginBusy, !packages.busy, !firmware.busy, !esp32.busy else { return }
         await updater.check()
         await packages.reload(recover: hasFileChannel)
         await firmware.refreshAndWait()
+        await esp32.refresh()
         await updater.validateCompatibility()
         await packages.validateCompatibility()
     }
@@ -125,11 +125,17 @@ struct UpdatesView: View {
         }
     }
 
-    private var firmwareChecking: Bool {
+    private var packagesChecking: Bool {
         switch packages.phase {
         case .checking, .syncingCatalog, .downloading: return true
         default: return false
         }
+    }
+
+    private var esp32Checking: Bool {
+        guard esp32.busy else { return false }
+        let status = esp32.status?.lowercased() ?? ""
+        return status.contains("checking") || status.contains("reading")
     }
 
     private var hasAttentionItems: Bool {
@@ -148,7 +154,7 @@ struct UpdatesView: View {
     /// install. Mirrors `firmwareBadge`'s own up-to-date/not-installed split so the header
     /// sentence can never contradict the Sources row (e.g. row says "Not installed" while
     /// the header says "Everything is up to date").
-    private var firmwareNeedsAction: Bool {
+    private var packagesNeedAction: Bool {
         guard packages.manifest != nil else { return false }
         // An independent baseline is a valid catalog with no package-owned FAPs.
         // It is reference metadata for firmware-owned files, not an install job.
@@ -159,15 +165,33 @@ struct UpdatesView: View {
         }
     }
 
+    private var firmwareNeedsUpdate: Bool {
+        guard let installed = firmware.installedVersion,
+              let latest = firmware.visibleReleases.first?.version else { return false }
+        return latest != installed
+    }
+
+    private var updateSourceNames: [String] {
+        var result: [String] = []
+        if firmwareNeedsUpdate { result.append("Firmware") }
+        if packagesNeedAction { result.append("FW Packages") }
+        if !updater.updates.isEmpty { result.append("Community apps") }
+        if esp32.updateAvailable { result.append("ESP32") }
+        return result
+    }
+
     private var headerVerdict: (text: String, color: Color, showSpinner: Bool) {
-        if pluginChecking || firmwareChecking { return ("Checking for updates…", .secondary, true) }
+        if pluginChecking || packagesChecking || firmware.busy || esp32Checking {
+            return ("Checking for updates…", .secondary, true)
+        }
         if hasAttentionItems { return ("Needs your attention", Theme.accent, false) }
-        let pluginNeedsAction = !updater.updates.isEmpty
-        let firmwareAction = firmwareNeedsAction
-        if pluginNeedsAction && firmwareAction { return ("FW Package and app updates available", Theme.accent, false) }
-        if firmwareAction { return ("FW Package updates available", Theme.accent, false) }
-        if pluginNeedsAction { return ("Community app updates available", Theme.accent, false) }
-        if updater.tag.isEmpty && packages.manifest == nil && firmware.releases.isEmpty {
+        if updateSourceNames.count == 1, let source = updateSourceNames.first {
+            return ("\(source) update available", Theme.accent, false)
+        }
+        if updateSourceNames.count > 1 {
+            return ("Updates available from \(updateSourceNames.count) sources", Theme.accent, false)
+        }
+        if updater.tag.isEmpty && packages.manifest == nil && firmware.releases.isEmpty && esp32.latestTag == nil {
             return ("Choose a source", .secondary, false)
         }
         return ("Everything is up to date", Theme.success, false)
@@ -219,6 +243,22 @@ struct UpdatesView: View {
         return .updatesAvailable(firmware.visibleReleases.count)
     }
 
+    private var esp32Badge: SourceBadge {
+        switch esp32.overviewState {
+        case .checking:
+            return .checking
+        case .deviceUnavailable, .releaseUnavailable:
+            return .notChecked
+        case .noPackages:
+            return .notInstalled
+        case .update:
+            let count = esp32.stagingBoards.filter { esp32.newVersion(for: $0) }.count
+            return .updatesAvailable(count)
+        case .latest:
+            return .upToDate
+        }
+    }
+
     private var sourcesCard: some View {
         SectionCard(title: "Sources", systemImage: "shippingbox") {
             VStack(spacing: 14) {
@@ -227,12 +267,14 @@ struct UpdatesView: View {
                               subtitle: "Main and Dev releases",
                               badge: firmwareLibraryBadge, busy: firmware.busy)
                 }
+                .accessibilityIdentifier("updates-center-source-firmware")
                 Divider()
                 NavigationLink { TumoflipUpdaterView(updater: packages) } label: {
                     SourceRow(icon: "shippingbox.fill", tint: Theme.info, title: "FW Packages",
                               subtitle: packages.firmwareRoute.channel.packageLabel,
-                              badge: packagesBadge, busy: firmwareChecking)
+                              badge: packagesBadge, busy: packagesChecking)
                 }
+                .accessibilityIdentifier("updates-center-source-packages")
                 Divider()
                 NavigationLink { PluginUpdatesDetailView(updater: updater) } label: {
                     SourceRow(icon: "puzzlepiece.extension.fill", tint: Theme.indigo, title: "Community apps",
@@ -241,6 +283,14 @@ struct UpdatesView: View {
                                 : "all-the-plugins",
                               badge: pluginBadge, busy: pluginChecking)
                 }
+                .accessibilityIdentifier("updates-center-source-community")
+                Divider()
+                NavigationLink { ESP32FirmwareView(updater: esp32) } label: {
+                    SourceRow(icon: "memorychip", tint: Theme.teal, title: "ESP32",
+                              subtitle: "Marauder board firmware",
+                              badge: esp32Badge, busy: esp32.busy)
+                }
+                .accessibilityIdentifier("updates-center-source-esp32")
             }
         }
     }
