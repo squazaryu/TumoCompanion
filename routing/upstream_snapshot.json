@@ -1,5 +1,5 @@
 {
-  "release_tag": "30aug2026p2",
+  "release_tag": "1sep2026",
   "stems": {
     "24cxxprog": "Programmers",
     "4inrow": "Board",
@@ -122,6 +122,7 @@
     "gameoflife": "Simulation",
     "genie_record": "Sub-GHz",
     "ghost_esp": "ESP32",
+    "goodweather_ac_remote": "ACs",
     "gpio_7segment_output": "GPIO",
     "gpio_controller": "GPIO",
     "gpio_reader": "GPIO",
