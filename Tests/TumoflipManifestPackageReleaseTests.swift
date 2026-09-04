@@ -201,6 +201,47 @@ final class TumoflipManifestPackageReleaseTests: XCTestCase {
         XCTAssertTrue(surface.firmwareOwnedFiles(in: "base").isEmpty)
         XCTAssertTrue(surface.managed.cleanup.isEmpty)
         XCTAssertFalse(manifest.isReferenceOnlyCatalog)
+
+        let plan = try TumoflipInstallPlan.make(
+            manifest: surface.managed,
+            groups: ["base"]
+        ).installationOnly
+        XCTAssertEqual(plan.files.map(\.target), ["/ext/apps/Tools/quac.fap"])
+        XCTAssertTrue(plan.cleanup.isEmpty)
+
+        let protectedDataRoot = "/ext/apps_data/quac"
+        let packageFiles = manifest.packages.values.flatMap { $0 }
+        XCTAssertFalse(packageFiles.contains {
+            $0.source == "apps_data/quac" || $0.source.hasPrefix("apps_data/quac/")
+        })
+        XCTAssertFalse(packageFiles.contains {
+            $0.target == protectedDataRoot || $0.target.hasPrefix(protectedDataRoot + "/")
+        })
+        XCTAssertFalse(manifest.cleanup.contains {
+            [$0.canonical, $0.legacy].contains {
+                $0 == protectedDataRoot || $0.hasPrefix(protectedDataRoot + "/")
+            }
+        })
+    }
+
+    func testQuacDevDeltaRejectsCaseChangedManagedSource() throws {
+        var object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: quacMigrationFixture()) as? [String: Any]
+        )
+        var packageRelease = try XCTUnwrap(object["package_release"] as? [String: Any])
+        packageRelease["catalog_modified_targets"] = ["apps/tools/quac.fap"]
+        packageRelease["overlay_targets"] = ["apps/tools/quac.fap"]
+        object["package_release"] = packageRelease
+        let manifest = try TumoflipManifest.decode(
+            JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
+        )
+
+        XCTAssertThrowsError(try manifest.validate()) { error in
+            XCTAssertEqual(
+                error as? TumoflipManifestError,
+                .invalidPackageRelease("quac-fw-package-migration")
+            )
+        }
     }
 
     func testIndependentDeltaRejectsOverlayOutsideCumulativeTargets() throws {

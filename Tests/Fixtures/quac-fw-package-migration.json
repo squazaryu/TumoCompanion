@@ -1,0 +1,46 @@
+{
+  "schema": 2,
+  "release_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "firmware": {
+    "api": "88.4",
+    "name": "tumoflip",
+    "version": "t-dev-008-015",
+    "target": 7
+  },
+  "artifacts": {},
+  "packages": {
+    "base": [
+      {
+        "bytes": 10,
+        "sha256": "1c3a4d2e9db9a8ed8b4b5bf5c728accde6d2d6cbf9390cb73baef4d97ba374b0",
+        "md5": "d0bd0644b00d6bd49dd97b8d08e1321a",
+        "source": "apps/Tools/quac.fap",
+        "target": "/ext/apps/Tools/quac.fap"
+      }
+    ],
+    "arf": [],
+    "module_one": [],
+    "protocol_packs": []
+  },
+  "cleanup": [],
+  "package_release": {
+    "id": "quac-fw-package-migration",
+    "type": "package-only",
+    "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "source_dirty": false,
+    "source_firmware_version": "t-dev-008-015",
+    "target_release_tag": "t-dev-008-015",
+    "firmware_flash_unchanged": true,
+    "catalog_channel": "dev",
+    "catalog_revision": 15,
+    "catalog_release_tag": "fw-packages-dev-015",
+    "catalog_install_scope": "delta",
+    "catalog_modified_targets": [
+      "apps/Tools/quac.fap"
+    ],
+    "overlay_targets": [
+      "apps/Tools/quac.fap"
+    ],
+    "compatible_releases": []
+  }
+}

@@ -1,3 +1,4 @@
+import Foundation
 import XCTest
 @testable import UnleashedCompanion
 
@@ -32,8 +33,14 @@ final class TumoflipInstallerTests: XCTestCase {
         var afterMove: ((String, String) -> Void)?
         var cancellableWriteChunkSize: Int?
         var onWriteProgress: ((Int) -> Void)?
+        private(set) var accessedPaths: [String] = []
+
+        private func recordAccess(_ paths: String...) {
+            accessedPaths.append(contentsOf: paths)
+        }
 
         func write(_ data: Data, to path: String) async throws {
+            recordAccess(path)
             if failWrite?(path) == true { throw Err.injected }
             writeCount += 1
             mutationCount += 1
@@ -58,6 +65,7 @@ final class TumoflipInstallerTests: XCTestCase {
                 if isStopRequested() { throw CancellationError() }
                 return
             }
+            recordAccess(path)
             if isStopRequested() { throw CancellationError() }
             let isStaging = path.contains("/staging/") || path.hasSuffix(".ucnew")
             if isStaging { stagingWriteCount += 1 }
@@ -78,8 +86,12 @@ final class TumoflipInstallerTests: XCTestCase {
             }
             if isStopRequested() { throw CancellationError() }
         }
-        func read(_ path: String) async -> Data? { files[path] }
+        func read(_ path: String) async -> Data? {
+            recordAccess(path)
+            return files[path]
+        }
         func deviceMD5(_ path: String) async -> String? {
+            recordAccess(path)
             if let remaining = uncheckedMD5FailuresByPath[path], remaining > 0 {
                 uncheckedMD5FailuresByPath[path] = remaining - 1
                 return nil
@@ -92,6 +104,7 @@ final class TumoflipInstallerTests: XCTestCase {
             return files[path].map { TumoflipHash.md5($0) }
         }
         func checkedDeviceMD5(_ path: String) async throws -> String? {
+            recordAccess(path)
             checkedMD5CallsByPath[path, default: 0] += 1
             onCheckedMD5?()
             if let remaining = checkedMD5FailuresByPath[path], remaining > 0 {
@@ -110,6 +123,7 @@ final class TumoflipInstallerTests: XCTestCase {
             return files[path].map { TumoflipHash.md5($0) }
         }
         func move(_ from: String, to: String) async throws {
+            recordAccess(from, to)
             mutationCount += 1
             if failMove?(from, to) == true { throw Err.injected }
             guard let d = files[from] else { throw Err.notFound }
@@ -120,19 +134,25 @@ final class TumoflipInstallerTests: XCTestCase {
             afterMove?(from, to)
         }
         func delete(_ path: String) async throws {
+            recordAccess(path)
             mutationCount += 1
             files[path] = nil
         }
         func deleteTree(_ path: String) async throws {
+            recordAccess(path)
             mutationCount += 1
             files = files.filter { $0.key != path && !$0.key.hasPrefix(path + "/") }
             dirs = dirs.filter { $0 != path && !$0.hasPrefix(path + "/") }
         }
         func makeDirectory(_ path: String) async throws {
+            recordAccess(path)
             mutationCount += 1
             dirs.insert(path)
         }
-        func exists(_ path: String) async -> Bool { files[path] != nil }
+        func exists(_ path: String) async -> Bool {
+            recordAccess(path)
+            return files[path] != nil
+        }
         func readState() async -> TumoflipState? {
             [TumoflipInstaller.stateSlotA, TumoflipInstaller.stateSlotB]
                 .compactMap { files[$0].flatMap(TumoflipInstaller.decodeStateSlot) }
@@ -369,6 +389,43 @@ final class TumoflipInstallerTests: XCTestCase {
     }
 
     private let rid = String(repeating: "c", count: 64)
+    private let quacSource = "apps/Tools/quac.fap"
+    private let quacTarget = "/ext/apps/Tools/quac.fap"
+    private let quacDataRoot = "/ext/apps_data/quac"
+    private let quac092 = Data("quac-0.9.2".utf8)
+    private let quac093 = Data("quac-0.9.3".utf8)
+
+    private func quacMigrationManifest() throws -> TumoflipManifest {
+        let fixtureURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .appendingPathComponent("Fixtures/quac-fw-package-migration.json")
+        let manifest = try TumoflipManifest.decode(Data(contentsOf: fixtureURL))
+        try manifest.validate()
+        return manifest.packageManagedManifest()
+    }
+
+    private func quacPlan(_ manifest: TumoflipManifest) throws -> TumoflipInstallPlan {
+        try TumoflipInstallPlan.make(
+            manifest: manifest,
+            groups: ["base"]
+        ).installationOnly
+    }
+
+    private func assertNoQuacDataAccess(
+        _ fs: FakeFS,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let unexpected = fs.accessedPaths.filter {
+            $0 == quacDataRoot || $0.hasPrefix(quacDataRoot + "/")
+        }
+        XCTAssertTrue(
+            unexpected.isEmpty,
+            "FW Packages accessed protected Quac user data: \(unexpected)",
+            file: file,
+            line: line
+        )
+    }
 
     private func file(_ source: String, _ target: String, _ bytes: Data) -> TumoflipManifest.PackageFile {
         .init(bytes: bytes.count, sha256: TumoflipHash.sha256(bytes), source: source, target: target)
@@ -1570,6 +1627,147 @@ final class TumoflipInstallerTests: XCTestCase {
         let inst = TumoflipInstaller(fs: fs, source: FakeSource(data: [:]))
         let status = await inst.verifyGroupOnDevice("base", manifest: baseManifest([f]), ledger: [:])
         XCTAssertEqual(status, .notInstalled)
+    }
+
+    // MARK: - Quac firmware-to-overlay migration
+
+    func testQuacOverlayInstallsAfterFirmwareRemovesFAPWithoutTouchingUserData() async throws {
+        let manifest = try quacMigrationManifest()
+        let plan = try quacPlan(manifest)
+        let userPlaylist = Data("user-playlist".utf8)
+        let userPlaylistPath = quacDataRoot + "/living-room.qpl"
+        let fs = FakeFS()
+        fs.files[userPlaylistPath] = userPlaylist
+        let installer = TumoflipInstaller(
+            fs: fs,
+            source: FakeSource(data: [quacSource: quac093])
+        )
+
+        let before = try await installer.reconcilePackageStatus(manifest: manifest)
+
+        XCTAssertEqual(before.groups["base"], .updateAvailable)
+        XCTAssertEqual(before.files[quacTarget], .missing)
+        XCTAssertEqual(
+            TumoflipUpdater.pendingInstallTargets(
+                selected: [quacTarget],
+                statuses: before.files
+            ),
+            [quacTarget]
+        )
+
+        let outcome = try await installer.install(plan)
+
+        XCTAssertEqual(outcome, .installed(files: 1, legacyMovedAside: 0))
+        XCTAssertEqual(fs.files[quacTarget], quac093)
+        XCTAssertEqual(fs.files[userPlaylistPath], userPlaylist)
+        let cleaned = try await installer.cleanupLegacy(plan)
+        XCTAssertEqual(cleaned, 0)
+        assertNoQuacDataAccess(fs)
+    }
+
+    func testQuacOverlayReplacesBundled092With093AndRefreshIsIdempotent() async throws {
+        let manifest = try quacMigrationManifest()
+        let plan = try quacPlan(manifest)
+        let userSettings = Data("user-settings".utf8)
+        let userSettingsPath = quacDataRoot + "/.settings"
+        let fs = FakeFS()
+        fs.files[quacTarget] = quac092
+        fs.files[userSettingsPath] = userSettings
+        let installer = TumoflipInstaller(
+            fs: fs,
+            source: FakeSource(data: [quacSource: quac093])
+        )
+
+        let before = try await installer.reconcilePackageStatus(manifest: manifest)
+        XCTAssertEqual(before.groups["base"], .updateAvailable)
+        XCTAssertEqual(before.files[quacTarget], .needsUpdate)
+
+        let outcome = try await installer.install(plan)
+        XCTAssertEqual(outcome, .installed(files: 1, legacyMovedAside: 0))
+        XCTAssertEqual(fs.files[quacTarget], quac093)
+        XCTAssertEqual(fs.files[userSettingsPath], userSettings)
+
+        let firstRefresh = try await installer.reconcilePackageStatus(manifest: manifest)
+        XCTAssertEqual(firstRefresh.groups["base"], .upToDate)
+        XCTAssertEqual(firstRefresh.files[quacTarget], .upToDate)
+        let writesAfterFirstRefresh = fs.writeCount
+
+        let repeatedRefresh = try await installer.reconcilePackageStatus(manifest: manifest)
+        XCTAssertEqual(repeatedRefresh, firstRefresh)
+        XCTAssertEqual(fs.writeCount, writesAfterFirstRefresh)
+        assertNoQuacDataAccess(fs)
+    }
+
+    func testQuacOverlayAdoptsIdenticalFirmwareFAPWithoutStaging() async throws {
+        let manifest = try quacMigrationManifest()
+        let fs = FakeFS()
+        let userPlaylistPath = quacDataRoot + "/existing.qpl"
+        let userPlaylist = Data("existing-user-playlist".utf8)
+        fs.files[quacTarget] = quac093
+        fs.files[userPlaylistPath] = userPlaylist
+        let installer = TumoflipInstaller(fs: fs, source: FakeSource(data: [:]))
+
+        let adopted = try await installer.reconcilePackageStatus(manifest: manifest)
+
+        XCTAssertEqual(adopted.groups["base"], .upToDate)
+        XCTAssertEqual(adopted.files[quacTarget], .upToDate)
+        XCTAssertEqual(fs.stagingWriteCount, 0)
+        XCTAssertEqual(fs.files[quacTarget], quac093)
+        XCTAssertEqual(fs.files[userPlaylistPath], userPlaylist)
+        let loadedState = await fs.readState()
+        let state = try XCTUnwrap(loadedState)
+        XCTAssertEqual(state.ledger[quacTarget]?.md5, TumoflipHash.md5(quac093))
+
+        let writesAfterAdoption = fs.writeCount
+        let repeated = try await installer.reconcilePackageStatus(manifest: manifest)
+        XCTAssertEqual(repeated, adopted)
+        XCTAssertEqual(fs.writeCount, writesAfterAdoption)
+        assertNoQuacDataAccess(fs)
+    }
+
+    func testQuacOverlayFailedActivationRestores092AndCanRetry() async throws {
+        let manifest = try quacMigrationManifest()
+        let plan = try quacPlan(manifest)
+        let userPlaylistPath = quacDataRoot + "/critical.qpl"
+        let userPlaylist = Data("critical-user-playlist".utf8)
+        let fs = FakeFS()
+        fs.files[quacTarget] = quac092
+        fs.files[userPlaylistPath] = userPlaylist
+        fs.failMove = { from, to in
+            from.hasSuffix(".ucnew") && to == self.quacTarget
+        }
+        let installer = TumoflipInstaller(
+            fs: fs,
+            source: FakeSource(data: [quacSource: quac093])
+        )
+
+        do {
+            _ = try await installer.install(plan)
+            XCTFail("Expected activation failure")
+        } catch FakeFS.Err.injected {
+            // Expected: rollback restores the firmware-bundled 0.9.2 FAP.
+        }
+
+        XCTAssertEqual(fs.files[quacTarget], quac092)
+        XCTAssertNil(fs.files[quacTarget + ".ucnew"])
+        XCTAssertEqual(fs.files[userPlaylistPath], userPlaylist)
+        let rolledBackState = await fs.readState()
+        XCTAssertNil(rolledBackState?.txn)
+
+        let afterRollback = try await installer.reconcilePackageStatus(manifest: manifest)
+        XCTAssertEqual(afterRollback.groups["base"], .updateAvailable)
+        XCTAssertEqual(afterRollback.files[quacTarget], .needsUpdate)
+        let writesAfterFirstRefresh = fs.writeCount
+        let repeatedRefresh = try await installer.reconcilePackageStatus(manifest: manifest)
+        XCTAssertEqual(repeatedRefresh, afterRollback)
+        XCTAssertEqual(fs.writeCount, writesAfterFirstRefresh)
+
+        fs.failMove = nil
+        let retry = try await installer.install(plan)
+        XCTAssertEqual(retry, .installed(files: 1, legacyMovedAside: 0))
+        XCTAssertEqual(fs.files[quacTarget], quac093)
+        XCTAssertEqual(fs.files[userPlaylistPath], userPlaylist)
+        assertNoQuacDataAccess(fs)
     }
 
     // MARK: - Firmware-resource adoption (#39)
