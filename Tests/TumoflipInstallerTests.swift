@@ -392,8 +392,10 @@ final class TumoflipInstallerTests: XCTestCase {
     private let quacSource = "apps/Tools/quac.fap"
     private let quacTarget = "/ext/apps/Tools/quac.fap"
     private let quacDataRoot = "/ext/apps_data/quac"
-    private let quac092 = Data("quac-0.9.2".utf8)
-    private let quac093 = Data("quac-0.9.3".utf8)
+    // Tiny synthetic sentinels exercise lifecycle semantics only. They are not the
+    // real 70,624-byte Quac 0.9.3 release binary or evidence of its published digest.
+    private let quac092 = Data("synthetic-quac-0.9.2-unit-payload".utf8)
+    private let quac093 = Data("synthetic-quac-0.9.3-unit-payload".utf8)
 
     private func quacMigrationManifest() throws -> TumoflipManifest {
         let fixtureURL = URL(fileURLWithPath: #filePath)

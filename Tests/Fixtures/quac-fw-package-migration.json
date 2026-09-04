@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "release_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "release_id": "b9ab1e74f659b2ca93fe32840c070325d19192bcc1a8723fd85c40ff6e62ac60",
   "firmware": {
     "api": "88.4",
     "name": "tumoflip",
@@ -11,9 +11,9 @@
   "packages": {
     "base": [
       {
-        "bytes": 10,
-        "sha256": "1c3a4d2e9db9a8ed8b4b5bf5c728accde6d2d6cbf9390cb73baef4d97ba374b0",
-        "md5": "d0bd0644b00d6bd49dd97b8d08e1321a",
+        "bytes": 33,
+        "sha256": "1e8d77b4df69b3ff4fbc1161b911bb331e3ecdd79f0d865d91e9c74e50ede711",
+        "md5": "0b8f7058c0231b5a2ac5e2eeb42f4413",
         "source": "apps/Tools/quac.fap",
         "target": "/ext/apps/Tools/quac.fap"
       }
@@ -24,9 +24,9 @@
   },
   "cleanup": [],
   "package_release": {
-    "id": "quac-fw-package-migration",
+    "id": "synthetic-quac-fw-package-migration-test",
     "type": "package-only",
-    "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "source_commit": "9598136346b8b691dd3eefa85623e53dcf1eacb2",
     "source_dirty": false,
     "source_firmware_version": "t-dev-008-015",
     "target_release_tag": "t-dev-008-015",

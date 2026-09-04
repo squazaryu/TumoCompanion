@@ -190,6 +190,7 @@ final class TumoflipManifestPackageReleaseTests: XCTestCase {
         XCTAssertEqual(quac.source, "apps/Tools/quac.fap")
         XCTAssertEqual(quac.target, "/ext/apps/Tools/quac.fap")
         XCTAssertFalse(quac.preserveExisting)
+        XCTAssertEqual(manifest.packageRelease?.id, "synthetic-quac-fw-package-migration-test")
         XCTAssertEqual(
             manifest.packageRelease?.catalogModifiedTargets,
             ["apps/Tools/quac.fap"]
@@ -305,7 +306,7 @@ final class TumoflipManifestPackageReleaseTests: XCTestCase {
         XCTAssertThrowsError(try manifest.validate()) { error in
             XCTAssertEqual(
                 error as? TumoflipManifestError,
-                .invalidPackageRelease("quac-fw-package-migration")
+                .invalidPackageRelease("synthetic-quac-fw-package-migration-test")
             )
         }
     }
