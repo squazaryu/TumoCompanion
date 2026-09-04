@@ -180,6 +180,29 @@ final class TumoflipManifestPackageReleaseTests: XCTestCase {
         )
     }
 
+    func testQuacDevDeltaPromotesCanonicalTargetToManagedSurface() throws {
+        let manifest = try TumoflipManifest.decode(quacMigrationFixture())
+
+        try manifest.validate()
+
+        let surface = manifest.packageSurface()
+        let quac = try XCTUnwrap(surface.managed.packages["base"]?.only)
+        XCTAssertEqual(quac.source, "apps/Tools/quac.fap")
+        XCTAssertEqual(quac.target, "/ext/apps/Tools/quac.fap")
+        XCTAssertFalse(quac.preserveExisting)
+        XCTAssertEqual(
+            manifest.packageRelease?.catalogModifiedTargets,
+            ["apps/Tools/quac.fap"]
+        )
+        XCTAssertEqual(
+            manifest.packageRelease?.overlayTargets,
+            ["apps/Tools/quac.fap"]
+        )
+        XCTAssertTrue(surface.firmwareOwnedFiles(in: "base").isEmpty)
+        XCTAssertTrue(surface.managed.cleanup.isEmpty)
+        XCTAssertFalse(manifest.isReferenceOnlyCatalog)
+    }
+
     func testIndependentDeltaRejectsOverlayOutsideCumulativeTargets() throws {
         let invalid = packageRelease.replacingOccurrences(
             of: "\"firmware_flash_unchanged\": true",
@@ -426,4 +449,15 @@ final class TumoflipManifestPackageReleaseTests: XCTestCase {
             """.utf8
         )
     }
+
+    private func quacMigrationFixture() throws -> Data {
+        let fixtureURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .appendingPathComponent("Fixtures/quac-fw-package-migration.json")
+        return try Data(contentsOf: fixtureURL)
+    }
+}
+
+private extension Array {
+    var only: Element? { count == 1 ? first : nil }
 }
