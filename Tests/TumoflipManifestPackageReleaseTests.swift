@@ -227,6 +227,69 @@ final class TumoflipManifestPackageReleaseTests: XCTestCase {
         })
     }
 
+    func testQuacFixtureUsesProducerContentAddressedIdentity() throws {
+        let data = try quacMigrationFixture()
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+        let manifest = try TumoflipManifest.decode(data)
+
+        XCTAssertEqual(
+            manifest.packageRelease?.sourceCommit,
+            "9598136346b8b691dd3eefa85623e53dcf1eacb2"
+        )
+        XCTAssertEqual(manifest.releaseId, try producerManifestReleaseID(object))
+    }
+
+    func testQuacContractRejectsCaseVariedAppsDataSource() throws {
+        let protectedSource = "apps_data/QuAc/private.qpl"
+        let manifest = try mutatedQuacManifest { object in
+            var packages = try XCTUnwrap(object["packages"] as? [String: Any])
+            var base = try XCTUnwrap(packages["base"] as? [[String: Any]])
+            base[0]["source"] = protectedSource
+            packages["base"] = base
+            object["packages"] = packages
+
+            var packageRelease = try XCTUnwrap(object["package_release"] as? [String: Any])
+            packageRelease["catalog_modified_targets"] = [protectedSource]
+            packageRelease["overlay_targets"] = [protectedSource]
+            object["package_release"] = packageRelease
+        }
+
+        XCTAssertThrowsError(try manifest.validate()) { error in
+            XCTAssertEqual(error as? TumoflipManifestError, .invalidEntry(protectedSource))
+        }
+    }
+
+    func testQuacContractRejectsCaseVariedAppsDataTarget() throws {
+        let protectedTarget = "/ext/APPS_DATA/QuAc/private.qpl"
+        let manifest = try mutatedQuacManifest { object in
+            var packages = try XCTUnwrap(object["packages"] as? [String: Any])
+            var base = try XCTUnwrap(packages["base"] as? [[String: Any]])
+            base[0]["target"] = protectedTarget
+            packages["base"] = base
+            object["packages"] = packages
+        }
+
+        XCTAssertThrowsError(try manifest.validate()) { error in
+            XCTAssertEqual(error as? TumoflipManifestError, .unsafeTarget(protectedTarget))
+        }
+    }
+
+    func testQuacContractRejectsCaseVariedAppsDataCleanup() throws {
+        let protectedLegacy = "/ext/apps_data/QUAC/private.qpl"
+        let manifest = try mutatedQuacManifest { object in
+            object["cleanup"] = [[
+                "canonical": "/ext/apps/Tools/quac.fap",
+                "legacy": protectedLegacy,
+            ]]
+        }
+
+        XCTAssertThrowsError(try manifest.validate()) { error in
+            XCTAssertEqual(error as? TumoflipManifestError, .unsafeTarget(protectedLegacy))
+        }
+    }
+
     func testQuacDevDeltaRejectsCaseChangedManagedSource() throws {
         var object = try XCTUnwrap(
             JSONSerialization.jsonObject(with: quacMigrationFixture()) as? [String: Any]
@@ -499,6 +562,32 @@ final class TumoflipManifestPackageReleaseTests: XCTestCase {
             .deletingLastPathComponent()
             .appendingPathComponent("Fixtures/quac-fw-package-migration.json")
         return try Data(contentsOf: fixtureURL)
+    }
+
+    private func producerManifestReleaseID(_ object: [String: Any]) throws -> String {
+        var unsigned = object
+        unsigned.removeValue(forKey: "release_id")
+        let canonical = try JSONSerialization.data(
+            withJSONObject: unsigned,
+            options: [.sortedKeys, .withoutEscapingSlashes]
+        )
+        return TumoflipHash.sha256(canonical)
+    }
+
+    private func mutatedQuacManifest(
+        _ mutate: (inout [String: Any]) throws -> Void
+    ) throws -> TumoflipManifest {
+        var object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: quacMigrationFixture()) as? [String: Any]
+        )
+        try mutate(&object)
+        object["release_id"] = try producerManifestReleaseID(object)
+        return try TumoflipManifest.decode(
+            JSONSerialization.data(
+                withJSONObject: object,
+                options: [.sortedKeys, .withoutEscapingSlashes]
+            )
+        )
     }
 }
 

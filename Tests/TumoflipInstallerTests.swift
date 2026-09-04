@@ -416,15 +416,17 @@ final class TumoflipInstallerTests: XCTestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
-        let unexpected = fs.accessedPaths.filter {
-            $0 == quacDataRoot || $0.hasPrefix(quacDataRoot + "/")
-        }
+        let unexpected = fs.accessedPaths.filter(isQuacDataPath)
         XCTAssertTrue(
             unexpected.isEmpty,
             "FW Packages accessed protected Quac user data: \(unexpected)",
             file: file,
             line: line
         )
+    }
+
+    private func isQuacDataPath(_ path: String) -> Bool {
+        path == quacDataRoot || path.hasPrefix(quacDataRoot + "/")
     }
 
     private func file(_ source: String, _ target: String, _ bytes: Data) -> TumoflipManifest.PackageFile {
@@ -1630,6 +1632,12 @@ final class TumoflipInstallerTests: XCTestCase {
     }
 
     // MARK: - Quac firmware-to-overlay migration
+
+    func testQuacDataGuardUsesCaseInsensitiveFATPathIdentity() {
+        XCTAssertTrue(isQuacDataPath("/EXT/APPS_DATA/QuAc"))
+        XCTAssertTrue(isQuacDataPath("/ext/apps_data/QUAC/private.qpl"))
+        XCTAssertFalse(isQuacDataPath("/ext/apps_data/quacking/private.qpl"))
+    }
 
     func testQuacOverlayInstallsAfterFirmwareRemovesFAPWithoutTouchingUserData() async throws {
         let manifest = try quacMigrationManifest()
