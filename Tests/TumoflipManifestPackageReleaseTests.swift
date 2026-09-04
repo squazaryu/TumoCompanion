@@ -198,6 +198,9 @@ final class TumoflipManifestPackageReleaseTests: XCTestCase {
             manifest.packageRelease?.overlayTargets,
             ["apps/Tools/quac.fap"]
         )
+        XCTAssertEqual(manifest.packageRelease?.catalogRevision, 13)
+        XCTAssertEqual(manifest.packageRelease?.catalogReleaseTag, "fw-packages-dev-013")
+        XCTAssertEqual(manifest.firmware.version, "t-dev-008-015")
         XCTAssertTrue(surface.firmwareOwnedFiles(in: "base").isEmpty)
         XCTAssertTrue(surface.managed.cleanup.isEmpty)
         XCTAssertFalse(manifest.isReferenceOnlyCatalog)

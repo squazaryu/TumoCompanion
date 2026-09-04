@@ -32,8 +32,8 @@
     "target_release_tag": "t-dev-008-015",
     "firmware_flash_unchanged": true,
     "catalog_channel": "dev",
-    "catalog_revision": 15,
-    "catalog_release_tag": "fw-packages-dev-015",
+    "catalog_revision": 13,
+    "catalog_release_tag": "fw-packages-dev-013",
     "catalog_install_scope": "delta",
     "catalog_modified_targets": [
       "apps/Tools/quac.fap"
