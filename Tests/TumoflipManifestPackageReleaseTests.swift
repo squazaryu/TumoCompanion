@@ -180,6 +180,236 @@ final class TumoflipManifestPackageReleaseTests: XCTestCase {
         )
     }
 
+    func testQuacDevDeltaPromotesCanonicalTargetToManagedSurface() throws {
+        let manifest = try TumoflipManifest.decode(quacMigrationFixture())
+
+        try manifest.validate()
+
+        let surface = manifest.packageSurface()
+        let quac = try XCTUnwrap(surface.managed.packages["base"]?.only)
+        XCTAssertEqual(quac.source, "apps/Tools/quac.fap")
+        XCTAssertEqual(quac.target, "/ext/apps/Tools/quac.fap")
+        XCTAssertFalse(quac.preserveExisting)
+        XCTAssertEqual(manifest.packageRelease?.id, "synthetic-quac-fw-package-migration-test")
+        XCTAssertEqual(
+            manifest.packageRelease?.catalogModifiedTargets,
+            ["apps/Tools/quac.fap"]
+        )
+        XCTAssertEqual(
+            manifest.packageRelease?.overlayTargets,
+            ["apps/Tools/quac.fap"]
+        )
+        XCTAssertEqual(manifest.packageRelease?.catalogRevision, 13)
+        XCTAssertEqual(manifest.packageRelease?.catalogReleaseTag, "fw-packages-dev-013")
+        XCTAssertEqual(manifest.firmware.version, "t-dev-008-015")
+        XCTAssertTrue(surface.firmwareOwnedFiles(in: "base").isEmpty)
+        XCTAssertTrue(surface.managed.cleanup.isEmpty)
+        XCTAssertFalse(manifest.isReferenceOnlyCatalog)
+
+        let plan = try TumoflipInstallPlan.make(
+            manifest: surface.managed,
+            groups: ["base"]
+        ).installationOnly
+        XCTAssertEqual(plan.files.map(\.target), ["/ext/apps/Tools/quac.fap"])
+        XCTAssertTrue(plan.cleanup.isEmpty)
+
+        let protectedDataRoot = "/ext/apps_data/quac"
+        let packageFiles = manifest.packages.values.flatMap { $0 }
+        XCTAssertFalse(packageFiles.contains {
+            $0.source == "apps_data/quac" || $0.source.hasPrefix("apps_data/quac/")
+        })
+        XCTAssertFalse(packageFiles.contains {
+            $0.target == protectedDataRoot || $0.target.hasPrefix(protectedDataRoot + "/")
+        })
+        XCTAssertFalse(manifest.cleanup.contains {
+            [$0.canonical, $0.legacy].contains {
+                $0 == protectedDataRoot || $0.hasPrefix(protectedDataRoot + "/")
+            }
+        })
+    }
+
+    func testQuacFixtureUsesProducerContentAddressedIdentity() throws {
+        let data = try quacMigrationFixture()
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+        let manifest = try TumoflipManifest.decode(data)
+
+        XCTAssertEqual(
+            manifest.packageRelease?.sourceCommit,
+            "9598136346b8b691dd3eefa85623e53dcf1eacb2"
+        )
+        XCTAssertEqual(manifest.releaseId, try producerManifestReleaseID(object))
+    }
+
+    func testDev013EnvelopeInstallsOnDev008015ByChannelAndAPIMajor() throws {
+        // The published catalog is an overlay on the immutable dev-012 base, so its
+        // producer identity remains t-dev-004-015 / API 88.0. This compact fixture
+        // mirrors the real dev-013 routing and cumulative ownership surface without
+        // copying the complete 49 KB release manifest into the app test bundle.
+        let manifest = try mutatedQuacManifest { object in
+            object["firmware"] = [
+                "api": "88.0",
+                "name": "tumoflip",
+                "version": "t-dev-004-015",
+                "target": 7,
+            ]
+
+            var packages = try XCTUnwrap(object["packages"] as? [String: Any])
+            var base = try XCTUnwrap(packages["base"] as? [[String: Any]])
+            base.append(contentsOf: [
+                [
+                    "bytes": 17_324,
+                    "sha256": "320e3622a53b2cefa7df3aa29eaea88d728cbcb6fb1e9e6889a534a0f9adae87",
+                    "md5": "69e22bc6cfaa9ae69deafb86f4e111df",
+                    "source": "apps/Tools/morse_player.fap",
+                    "target": "/ext/apps/Tools/morse_player.fap",
+                ],
+                [
+                    "bytes": 1_846,
+                    "sha256": "2f309129aa9bc1d8acc02186422164bb364fe5bef408423d5e7925488c898f69",
+                    "md5": "b72bc0ce6283eb5db4a43d3cfdcc3017",
+                    "source": "ibtnfuzzer/tumoflip_utergrooll_ds1990_v1.txt",
+                    "target": "/ext/ibtnfuzzer/tumoflip_utergrooll_ds1990_v1.txt",
+                ],
+                [
+                    "bytes": 709,
+                    "sha256": "cc9aa5424b691c2586499e3bf9b6483b3d5f75ae84d3f30c78303b92fc36f4d7",
+                    "md5": "50654d51bfb4901a8aa7c5a139fb6e51",
+                    "source": "rfidfuzzer/tumoflip_utergrooll_em4100_v1.txt",
+                    "target": "/ext/rfidfuzzer/tumoflip_utergrooll_em4100_v1.txt",
+                ],
+            ])
+            packages["base"] = base
+            packages["module_one"] = [[
+                "bytes": 6_303_576,
+                "sha256": "f6fa4f0e36fbd9cd068632804c93c9c50eb313bf073e074fd596be32b41809a4",
+                "md5": "75b144d45cc6c3c0bce329e14367a5a4",
+                "source": "apps/Module One/ESP32 Wi-Fi/esp_flasher.fap",
+                "target": "/ext/apps/Module One/ESP32 Wi-Fi/esp_flasher.fap",
+            ]]
+            object["packages"] = packages
+
+            var release = try XCTUnwrap(object["package_release"] as? [String: Any])
+            release["source_firmware_version"] = "t-dev-004-015"
+            release["target_release_tag"] = "t-dev-004-015"
+            release["catalog_modified_targets"] = [
+                "apps/Module One/ESP32 Wi-Fi/esp_flasher.fap",
+                "apps/Tools/morse_player.fap",
+                "apps/Tools/quac.fap",
+                "ibtnfuzzer/tumoflip_utergrooll_ds1990_v1.txt",
+                "rfidfuzzer/tumoflip_utergrooll_em4100_v1.txt",
+            ]
+            release["overlay_targets"] = ["apps/Tools/quac.fap"]
+            object["package_release"] = release
+        }
+
+        try manifest.validate()
+        XCTAssertTrue(TumoflipPackageReleaseMatcher.matches(
+            manifestVersion: manifest.firmware.version,
+            packageRelease: manifest.packageRelease,
+            channel: .dev,
+            installedVersion: "t-dev-008-015"
+        ))
+        XCTAssertNoThrow(try TumoflipCompat.check(
+            deviceTarget: 7,
+            deviceAPI: "88.4",
+            deviceVersion: "t-dev-008-015",
+            deviceOriginFork: "tumoflip",
+            manifest: manifest
+        ))
+
+        let surface = manifest.packageSurface()
+        XCTAssertEqual(surface.managedFileCount, 5)
+        XCTAssertEqual(
+            Set(surface.managed.packages.values.flatMap { $0.map(\.source) }),
+            Set(manifest.packageRelease?.catalogModifiedTargets ?? [])
+        )
+        XCTAssertEqual(
+            manifest.packageRelease?.overlayTargets,
+            ["apps/Tools/quac.fap"]
+        )
+        let plan = try TumoflipInstallPlan.make(
+            manifest: surface.managed,
+            groups: ["base", "module_one"]
+        ).installationOnly
+        XCTAssertEqual(Set(plan.files.map(\.source)), Set(
+            manifest.packageRelease?.catalogModifiedTargets ?? []
+        ))
+        XCTAssertFalse(plan.files.contains {
+            $0.target.lowercased().hasPrefix("/ext/apps_data/quac")
+        })
+    }
+
+    func testQuacContractRejectsCaseVariedAppsDataSource() throws {
+        let protectedSource = "apps_data/QuAc/private.qpl"
+        let manifest = try mutatedQuacManifest { object in
+            var packages = try XCTUnwrap(object["packages"] as? [String: Any])
+            var base = try XCTUnwrap(packages["base"] as? [[String: Any]])
+            base[0]["source"] = protectedSource
+            packages["base"] = base
+            object["packages"] = packages
+
+            var packageRelease = try XCTUnwrap(object["package_release"] as? [String: Any])
+            packageRelease["catalog_modified_targets"] = [protectedSource]
+            packageRelease["overlay_targets"] = [protectedSource]
+            object["package_release"] = packageRelease
+        }
+
+        XCTAssertThrowsError(try manifest.validate()) { error in
+            XCTAssertEqual(error as? TumoflipManifestError, .invalidEntry(protectedSource))
+        }
+    }
+
+    func testQuacContractRejectsCaseVariedAppsDataTarget() throws {
+        let protectedTarget = "/ext/APPS_DATA/QuAc/private.qpl"
+        let manifest = try mutatedQuacManifest { object in
+            var packages = try XCTUnwrap(object["packages"] as? [String: Any])
+            var base = try XCTUnwrap(packages["base"] as? [[String: Any]])
+            base[0]["target"] = protectedTarget
+            packages["base"] = base
+            object["packages"] = packages
+        }
+
+        XCTAssertThrowsError(try manifest.validate()) { error in
+            XCTAssertEqual(error as? TumoflipManifestError, .unsafeTarget(protectedTarget))
+        }
+    }
+
+    func testQuacContractRejectsCaseVariedAppsDataCleanup() throws {
+        let protectedLegacy = "/ext/apps_data/QUAC/private.qpl"
+        let manifest = try mutatedQuacManifest { object in
+            object["cleanup"] = [[
+                "canonical": "/ext/apps/Tools/quac.fap",
+                "legacy": protectedLegacy,
+            ]]
+        }
+
+        XCTAssertThrowsError(try manifest.validate()) { error in
+            XCTAssertEqual(error as? TumoflipManifestError, .unsafeTarget(protectedLegacy))
+        }
+    }
+
+    func testQuacDevDeltaRejectsCaseChangedManagedSource() throws {
+        var object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: quacMigrationFixture()) as? [String: Any]
+        )
+        var packageRelease = try XCTUnwrap(object["package_release"] as? [String: Any])
+        packageRelease["catalog_modified_targets"] = ["apps/tools/quac.fap"]
+        packageRelease["overlay_targets"] = ["apps/tools/quac.fap"]
+        object["package_release"] = packageRelease
+        let manifest = try TumoflipManifest.decode(
+            JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
+        )
+
+        XCTAssertThrowsError(try manifest.validate()) { error in
+            XCTAssertEqual(
+                error as? TumoflipManifestError,
+                .invalidPackageRelease("synthetic-quac-fw-package-migration-test")
+            )
+        }
+    }
+
     func testIndependentDeltaRejectsOverlayOutsideCumulativeTargets() throws {
         let invalid = packageRelease.replacingOccurrences(
             of: "\"firmware_flash_unchanged\": true",
@@ -426,4 +656,41 @@ final class TumoflipManifestPackageReleaseTests: XCTestCase {
             """.utf8
         )
     }
+
+    private func quacMigrationFixture() throws -> Data {
+        let fixtureURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .appendingPathComponent("Fixtures/quac-fw-package-migration.json")
+        return try Data(contentsOf: fixtureURL)
+    }
+
+    private func producerManifestReleaseID(_ object: [String: Any]) throws -> String {
+        var unsigned = object
+        unsigned.removeValue(forKey: "release_id")
+        let canonical = try JSONSerialization.data(
+            withJSONObject: unsigned,
+            options: [.sortedKeys, .withoutEscapingSlashes]
+        )
+        return TumoflipHash.sha256(canonical)
+    }
+
+    private func mutatedQuacManifest(
+        _ mutate: (inout [String: Any]) throws -> Void
+    ) throws -> TumoflipManifest {
+        var object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: quacMigrationFixture()) as? [String: Any]
+        )
+        try mutate(&object)
+        object["release_id"] = try producerManifestReleaseID(object)
+        return try TumoflipManifest.decode(
+            JSONSerialization.data(
+                withJSONObject: object,
+                options: [.sortedKeys, .withoutEscapingSlashes]
+            )
+        )
+    }
+}
+
+private extension Array {
+    var only: Element? { count == 1 ? first : nil }
 }
