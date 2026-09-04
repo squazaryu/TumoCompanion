@@ -428,7 +428,9 @@ final class TumoflipInstallerTests: XCTestCase {
     }
 
     private func isQuacDataPath(_ path: String) -> Bool {
-        path == quacDataRoot || path.hasPrefix(quacDataRoot + "/")
+        let foldedPath = path.lowercased()
+        let foldedRoot = quacDataRoot.lowercased()
+        return foldedPath == foldedRoot || foldedPath.hasPrefix(foldedRoot + "/")
     }
 
     private func file(_ source: String, _ target: String, _ bytes: Data) -> TumoflipManifest.PackageFile {

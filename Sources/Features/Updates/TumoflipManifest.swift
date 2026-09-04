@@ -492,6 +492,28 @@ enum TumoflipManifestError: Error, Equatable {
     case invalidPackageRelease(String)
 }
 
+/// Package manifests may carry app binaries and explicitly additive resources, but
+/// Quac's runtime tree contains user-authored playlists/settings. Flipper SD storage
+/// is FAT-backed, so every protected-root comparison must be case-insensitive.
+private enum TumoflipPackagePathPolicy {
+    private static let protectedSourceRoots = ["apps_data/quac"]
+    private static let protectedTargetRoots = ["/ext/apps_data/quac"]
+
+    static func isProtectedSource(_ path: String) -> Bool {
+        protectedSourceRoots.contains { contains(path, root: $0) }
+    }
+
+    static func isProtectedTarget(_ path: String) -> Bool {
+        protectedTargetRoots.contains { contains(path, root: $0) }
+    }
+
+    private static func contains(_ path: String, root: String) -> Bool {
+        let foldedPath = path.lowercased()
+        let foldedRoot = root.lowercased()
+        return foldedPath == foldedRoot || foldedPath.hasPrefix(foldedRoot + "/")
+    }
+}
+
 extension TumoflipManifest {
     /// Validate the manifest's own integrity (schema, target, ids, group presence,
     /// per-entry fields). Does not yet sanitise paths — that happens when a concrete
@@ -518,6 +540,12 @@ extension TumoflipManifest {
                       !f.target.isEmpty else {
                     throw TumoflipManifestError.invalidEntry(f.source.isEmpty ? f.target : f.source)
                 }
+                guard !TumoflipPackagePathPolicy.isProtectedSource(f.source) else {
+                    throw TumoflipManifestError.invalidEntry(f.source)
+                }
+                guard !TumoflipPackagePathPolicy.isProtectedTarget(f.target) else {
+                    throw TumoflipManifestError.unsafeTarget(f.target)
+                }
                 if let builds = f.compatibleBuilds {
                     guard !builds.isEmpty, builds.count <= 8, f.md5 != nil else {
                         throw TumoflipManifestError.invalidEntry(f.source)
@@ -539,6 +567,12 @@ extension TumoflipManifest {
                         referencedCompatibleReleaseIDs.insert(build.releaseId)
                     }
                 }
+            }
+        }
+        for entry in cleanup {
+            for path in [entry.canonical, entry.legacy]
+            where TumoflipPackagePathPolicy.isProtectedTarget(path) {
+                throw TumoflipManifestError.unsafeTarget(path)
             }
         }
         if let packageRelease {
@@ -701,6 +735,9 @@ struct TumoflipInstallPlan: Equatable {
     static func sanitize(_ raw: String) throws -> String {
         let p = raw.trimmingCharacters(in: .whitespaces)
         guard p.hasPrefix("/ext/"), !p.contains("\0") else {
+            throw TumoflipManifestError.unsafeTarget(raw)
+        }
+        guard !TumoflipPackagePathPolicy.isProtectedTarget(p) else {
             throw TumoflipManifestError.unsafeTarget(raw)
         }
         let comps = p.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
