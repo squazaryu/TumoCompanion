@@ -95,6 +95,13 @@ final class PluginProtectionPolicyTests: XCTestCase {
         return Data(bytes)
     }
 
+    private func makeLargeFAP(seed: UInt8, size: Int) -> Data {
+        var data = makeFAP(seed: seed)
+        precondition(size >= data.count)
+        data.append(Data(repeating: seed, count: size - data.count))
+        return data
+    }
+
     private func makePluginArchive(entries: [String: Data]) throws -> URL {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("PluginUpdaterTests-\(UUID().uuidString)")
@@ -116,7 +123,8 @@ final class PluginProtectionPolicyTests: XCTestCase {
     @MainActor
     private func makeCacheReconciliationFixture(
         storage: PluginInstallMemoryStore,
-        defaults: UserDefaults
+        defaults: UserDefaults,
+        chessPayload: Data? = nil
     ) async throws -> (
         updater: PluginUpdater,
         chessPath: String,
@@ -130,7 +138,7 @@ final class PluginProtectionPolicyTests: XCTestCase {
     ) {
         let chessPath = "/ext/apps/Games/Board/chess.fap"
         let checkersPath = "/ext/apps/Games/Board/checkers.fap"
-        let chess = makeFAP(seed: 0xC1)
+        let chess = chessPayload ?? makeFAP(seed: 0xC1)
         let checkers = makeFAP(seed: 0xC2)
         let base = try makePluginArchive(entries: [
             "base_pack_build/artifacts-base/Games/Board/chess.fap": chess,
@@ -1172,6 +1180,77 @@ final class PluginProtectionPolicyTests: XCTestCase {
     }
 
     @MainActor
+    func testLargeFAPVerificationTimeoutRetriesHashWithoutReupload() async throws {
+        let suite = "PluginLargeFAPVerificationRetryTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let chessPath = "/ext/apps/Games/Board/chess.fap"
+        let largeFAP = makeLargeFAP(seed: 0xC1, size: 3_856_912)
+        let storage = PluginInstallMemoryStore(
+            initialFiles: [chessPath: Data("previous".utf8)],
+            legacyMD5MissesRemaining: 2,
+            checkedMD5FailuresRemaining: 1
+        )
+        let fixture = try await makeCacheReconciliationFixture(
+            storage: storage,
+            defaults: defaults,
+            chessPayload: largeFAP
+        )
+        defer {
+            fixture.archives.forEach { try? FileManager.default.removeItem(at: $0) }
+            try? FileManager.default.removeItem(at: fixture.auditDirectory)
+        }
+
+        fixture.updater.selectOnly { $0.remotePath == fixture.chessPath }
+        await fixture.updater.install()
+
+        let writes = await storage.writeCount(at: chessPath + ".ucnew")
+        let timeouts = await storage.recordedVerificationTimeouts()
+        let installed = await storage.data(at: chessPath)
+        XCTAssertEqual(writes, 1, "A completed multi-megabyte upload must not be sent again only because its first MD5 request timed out.")
+        XCTAssertGreaterThanOrEqual(timeouts.first ?? 0, 120)
+        XCTAssertEqual(installed, largeFAP)
+        XCTAssertEqual(fixture.updater.cacheForTesting()?.map[chessPath], fixture.newChessMD5)
+    }
+
+    @MainActor
+    func testPersistentVerificationTimeoutKeepsLiveAppAndDoesNotReupload() async throws {
+        let suite = "PluginLargeFAPVerificationFailureTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let chessPath = "/ext/apps/Games/Board/chess.fap"
+        let previous = Data("previous".utf8)
+        let storage = PluginInstallMemoryStore(
+            initialFiles: [chessPath: previous],
+            legacyMD5MissesRemaining: 10,
+            checkedMD5FailuresRemaining: 10
+        )
+        let fixture = try await makeCacheReconciliationFixture(
+            storage: storage,
+            defaults: defaults
+        )
+        defer {
+            fixture.archives.forEach { try? FileManager.default.removeItem(at: $0) }
+            try? FileManager.default.removeItem(at: fixture.auditDirectory)
+        }
+
+        fixture.updater.selectOnly { $0.remotePath == fixture.chessPath }
+        await fixture.updater.install()
+
+        let writes = await storage.writeCount(at: chessPath + ".ucnew")
+        let live = await storage.data(at: chessPath)
+        let staged = await storage.data(at: chessPath + ".ucnew")
+        XCTAssertEqual(writes, 1)
+        XCTAssertEqual(live, previous, "An unverified staged file must never replace the working app.")
+        XCTAssertNil(staged, "A failed verification must not leave a stale staging file.")
+        guard case let .failed(message) = fixture.updater.phase else {
+            return XCTFail("Persistent verification timeout must remain visible")
+        }
+        XCTAssertTrue(message.localizedCaseInsensitiveContains("verification timed out"), message)
+        XCTAssertEqual(fixture.updater.cacheForTesting()?.map[chessPath], fixture.oldChessMD5)
+    }
+
+    @MainActor
     func testPreProtectedCatalogEntryStaysPendingWhileAnotherAppInstalls() async throws {
         let suite = "PluginInstallCachePreProtectedTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
@@ -1634,11 +1713,27 @@ private enum PluginInstallTestStoreError: Error {
 /// to submit protection changes before the irreversible live-target commit.
 private actor PluginInstallMemoryStore: DeviceFileStore {
     nonisolated let channel: TransferChannel = .usb
-    private var files: [String: Data] = [:]
+    private var files: [String: Data]
     private let stagingLatch: PluginInstallTestLatch?
+    private var legacyMD5MissesRemaining: Int
+    private var checkedMD5FailuresRemaining: Int
+    private var writes: [String: Int] = [:]
+    private var verificationTimeouts: [TimeInterval] = []
 
-    init(stagingLatch: PluginInstallTestLatch? = nil) {
+    init(
+        stagingLatch: PluginInstallTestLatch? = nil,
+        initialFiles: [String: Data] = [:],
+        legacyMD5MissesRemaining: Int = 0,
+        checkedMD5FailuresRemaining: Int = 0
+    ) {
         self.stagingLatch = stagingLatch
+        self.files = Dictionary(
+            uniqueKeysWithValues: initialFiles.map {
+                (PluginRouteReconciliation.pathIdentity($0.key), $0.value)
+            }
+        )
+        self.legacyMD5MissesRemaining = legacyMD5MissesRemaining
+        self.checkedMD5FailuresRemaining = checkedMD5FailuresRemaining
     }
 
     private func identity(_ path: String) -> String {
@@ -1665,7 +1760,9 @@ private actor PluginInstallMemoryStore: DeviceFileStore {
         data: Data,
         progress: (@Sendable (Int) -> Void)?
     ) async throws {
-        files[identity(path)] = data
+        let path = identity(path)
+        files[path] = data
+        writes[path, default: 0] += 1
         progress?(data.count)
         if path.hasSuffix(".ucnew") {
             await stagingLatch?.stageAndWaitForRelease()
@@ -1686,15 +1783,40 @@ private actor PluginInstallMemoryStore: DeviceFileStore {
     }
 
     func md5(_ path: String) async -> String? {
-        files[identity(path)].map(md5)
+        if legacyMD5MissesRemaining > 0 {
+            legacyMD5MissesRemaining -= 1
+            return nil
+        }
+        return files[identity(path)].map(md5)
     }
 
     func checkedMD5(_ path: String) async throws -> String? {
-        files[identity(path)].map(md5)
+        if checkedMD5FailuresRemaining > 0 {
+            checkedMD5FailuresRemaining -= 1
+            throw FlipperRPCError.timeout
+        }
+        return files[identity(path)].map(md5)
+    }
+
+    func checkedMD5(_ path: String, timeout: TimeInterval) async throws -> String? {
+        verificationTimeouts.append(timeout)
+        return try await checkedMD5(path)
     }
 
     func exists(_ path: String) async -> Bool {
         files[identity(path)] != nil
+    }
+
+    func writeCount(at path: String) -> Int {
+        writes[identity(path), default: 0]
+    }
+
+    func recordedVerificationTimeouts() -> [TimeInterval] {
+        verificationTimeouts
+    }
+
+    func data(at path: String) -> Data? {
+        files[identity(path)]
     }
 
     func uploadFolder(

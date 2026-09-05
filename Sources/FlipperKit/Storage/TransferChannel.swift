@@ -38,6 +38,9 @@ protocol DeviceFileStore {
     /// MD5 with transport failures preserved. A missing file is nil; a dead BLE/USB
     /// channel throws so reconciliation never turns a disconnect into a fake update.
     func checkedMD5(_ path: String) async throws -> String?
+    /// Size-aware callers can give slow on-device hashes a larger response window.
+    /// Local USB stores use the default implementation because they do not depend on RPC.
+    func checkedMD5(_ path: String, timeout: TimeInterval) async throws -> String?
     func exists(_ path: String) async -> Bool
     func uploadFolder(
         localURL: URL,
@@ -47,6 +50,10 @@ protocol DeviceFileStore {
 }
 
 extension DeviceFileStore {
+    func checkedMD5(_ path: String, timeout: TimeInterval) async throws -> String? {
+        try await checkedMD5(path)
+    }
+
     func write(_ path: String, data: Data) async throws {
         try await write(path, data: data, progress: nil)
     }

@@ -290,6 +290,12 @@ struct VerifyResult: Equatable {
     var ok: Bool { failed.isEmpty }
 }
 
+private enum PluginWriteVerification {
+    case verified
+    case contentMismatch(String)
+    case unavailable(String)
+}
+
 /// Outcome of an explicit legacy-route cleanup. A path is removed only after both its
 /// canonical replacement and its own historical pack identity are verified.
 struct CleanupResult: Equatable {
@@ -2315,7 +2321,7 @@ final class PluginUpdater: ObservableObject {
             var ok = false
             var stoppedMidFile = false
             var lastReason = "unknown error"
-            for attempt in 1...maxAttempts {
+            uploadAttempts: for attempt in 1...maxAttempts {
                 phase = .installing(i + 1, selected.count)
                 transferReporter.progress(u.name, force: attempt == 1)
                 installDetail = InstallDetail(
@@ -2352,8 +2358,23 @@ final class PluginUpdater: ObservableObject {
                     // device-side rename (no BLE transfer), so the commit is quick and the
                     // long, interruptible part (the BLE write) already went to the temp.
                     let staged = await verifyWrite(
-                        path: tempPath, expectedMD5: u.newMD5, expectedSize: data.count, storage: storage)
-                    guard staged.ok else { lastReason = staged.reason; try? await storage.delete(tempPath); continue }
+                        path: tempPath,
+                        expectedMD5: u.newMD5,
+                        expectedSize: data.count,
+                        storage: storage
+                    )
+                    switch staged {
+                    case .verified:
+                        break
+                    case .contentMismatch(let reason):
+                        lastReason = reason
+                        try? await storage.delete(tempPath)
+                        continue uploadAttempts
+                    case .unavailable(let reason):
+                        lastReason = reason
+                        try? await storage.delete(tempPath)
+                        break uploadAttempts
+                    }
                     guard try await commitStagedInstall(
                         u,
                         tempPath: tempPath,
@@ -2364,9 +2385,22 @@ final class PluginUpdater: ObservableObject {
                         break
                     }
                     let landed = await verifyWrite(
-                        path: u.targetPath, expectedMD5: u.newMD5, expectedSize: data.count, storage: storage)
-                    if landed.ok { ok = true; break }
-                    lastReason = landed.reason
+                        path: u.targetPath,
+                        expectedMD5: u.newMD5,
+                        expectedSize: data.count,
+                        storage: storage
+                    )
+                    switch landed {
+                    case .verified:
+                        ok = true
+                        break uploadAttempts
+                    case .contentMismatch(let reason):
+                        lastReason = reason
+                        continue uploadAttempts
+                    case .unavailable(let reason):
+                        lastReason = reason
+                        break uploadAttempts
+                    }
                 } catch {
                     lastReason = error.localizedDescription
                     ulog.error("install \(u.name, privacy: .public) attempt \(attempt) failed: \(error.localizedDescription, privacy: .public)")
@@ -2642,24 +2676,55 @@ final class PluginUpdater: ObservableObject {
         await validateCompatibility()
     }
 
-    /// Verify a freshly-written file. Retries the md5 once after a short pause
-    /// (slow SD flush), then — if still wrong — reports device vs source size so
-    /// a truncated write (dropped chunk) is distinguishable from byte corruption.
+    /// Verify a freshly-written file without confusing an unavailable hash with
+    /// corrupt bytes. Large FAPs can take substantially longer than ordinary apps
+    /// to hash on the Flipper, so the timeout scales with size. Transport failures
+    /// retry this same path only; callers must not resend an already-complete upload.
     private func verifyWrite(
         path: String,
         expectedMD5: String,
         expectedSize: Int,
         storage: any DeviceFileStore
-    ) async -> (ok: Bool, reason: String) {
+    ) async -> PluginWriteVerification {
+        let timeout = Self.verificationTimeout(for: expectedSize)
+        var lastError: Error?
         for attempt in 0..<2 {
-            if attempt > 0 { try? await Task.sleep(nanoseconds: 500_000_000) }
-            if let dev = await storage.md5(path), dev == expectedMD5 { return (true, "") }
+            if attempt > 0 {
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                if storage.channel == .ble {
+                    _ = await fileChannelReady(.ble, timeout: 12)
+                }
+            }
+            do {
+                let deviceMD5 = try await storage.checkedMD5(path, timeout: timeout)
+                lastError = nil
+                if deviceMD5 == expectedMD5 { return .verified }
+            } catch {
+                lastError = error
+            }
+        }
+        if let lastError {
+            if case FlipperRPCError.timeout = lastError {
+                return .unavailable(
+                    "verification timed out; the completed upload was not repeated"
+                )
+            }
+            return .unavailable(
+                "verification unavailable: \(lastError.localizedDescription); the completed upload was not repeated"
+            )
         }
         let dir = (path as NSString).deletingLastPathComponent
         let name = (path as NSString).lastPathComponent
         let devSize = (try? await storage.list(dir))?.first { $0.name == name }?.size
         let sizeStr = devSize.map { "\($0)" } ?? "missing"
-        return (false, "md5 mismatch (device \(sizeStr)B vs source \(expectedSize)B)")
+        return .contentMismatch(
+            "md5 mismatch (device \(sizeStr)B vs source \(expectedSize)B)"
+        )
+    }
+
+    private static func verificationTimeout(for expectedSize: Int) -> TimeInterval {
+        let estimatedSeconds = Double(max(0, expectedSize)) / 32_768 + 15
+        return min(300, max(60, estimatedSeconds))
     }
 
     /// Commit a fully verified `.ucnew` only while the protection policy is fenced.
