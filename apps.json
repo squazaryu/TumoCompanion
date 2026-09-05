@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.11.13",
-      "versionDate": "2026-09-01",
-      "versionDescription": "Add ESP32 Marauder firmware to the unified Updates source list, refresh it with the other sources, and show its current update status.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.13/TumoCompanion-unsigned.ipa",
-      "size": 25647143,
+      "version": "1.11.14",
+      "versionDate": "2026-09-05",
+      "versionDescription": "TumoCompanion 1.11.14 fixes large Community Apps such as Hotspot Arcade: slow on-device MD5 now uses a size-aware timeout and retries verification on the existing staged file instead of resending a completed multi-megabyte BLE upload. Persistent verification failure preserves the previous working app, removes staging, and reports the real timeout. No firmware, FW Packages, Community Pack payload, or user-data changes.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.14/TumoCompanion-unsigned.ipa",
+      "size": 25654770,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.11.14",
+          "date": "2026-09-05",
+          "localizedDescription": "TumoCompanion 1.11.14 fixes large Community Apps such as Hotspot Arcade: slow on-device MD5 now uses a size-aware timeout and retries verification on the existing staged file instead of resending a completed multi-megabyte BLE upload. Persistent verification failure preserves the previous working app, removes staging, and reports the real timeout. No firmware, FW Packages, Community Pack payload, or user-data changes.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.14/TumoCompanion-unsigned.ipa",
+          "size": 25654770,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.11.13",
           "date": "2026-09-01",
