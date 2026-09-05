@@ -111,6 +111,7 @@
 		8368D7C7F909F8FCC3A2BEB6 /* property.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E7FA44A3E6DC5FED65AC3A5 /* property.pb.swift */; };
 		878B98A78707C356A520BCA7 /* PluginUpdateMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBA5FCA0F80809900471F32E /* PluginUpdateMonitor.swift */; };
 		88411C55162E96E16569C398 /* AIRadarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6F24142729978361986A6C2 /* AIRadarView.swift */; };
+		8A0595A5EF674BC7E233228B /* quac-fw-package-migration.json in Resources */ = {isa = PBXBuildFile; fileRef = B1BDE37AAB9C7938FA910453 /* quac-fw-package-migration.json */; };
 		8A3D3C8FB0D3E6169E243B15 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9183EF8E1FF8617A2B48EA8 /* Theme.swift */; };
 		8AAAFB628D23BAFFA836BE80 /* ESP32UpdaterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B87192747729E361050D9378 /* ESP32UpdaterTests.swift */; };
 		8FF4B486963DB3CDAFD33039 /* TumoCardNFCSmoke.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57114D9F2BB2FDEAB835D4D2 /* TumoCardNFCSmoke.swift */; };
@@ -369,6 +370,7 @@
 		AD3F4BFB7A552AD0967C934C /* AppBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBridge.swift; sourceTree = "<group>"; };
 		AEE7477890A66103E159EB15 /* gpio.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = gpio.pb.swift; sourceTree = "<group>"; };
 		B04D2FFBE41EED4A3482CEFA /* AppBridgeRequestTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBridgeRequestTests.swift; sourceTree = "<group>"; };
+		B1BDE37AAB9C7938FA910453 /* quac-fw-package-migration.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "quac-fw-package-migration.json"; sourceTree = "<group>"; };
 		B269822737BE205267576415 /* UnleashedShared.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = UnleashedShared.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		B33D8A4DF0DF2880CD4231FB /* storage.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = storage.pb.swift; sourceTree = "<group>"; };
 		B3D4263C468870ABFDEB8589 /* PluginProtectionPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginProtectionPolicyTests.swift; sourceTree = "<group>"; };
@@ -455,6 +457,7 @@
 			isa = PBXGroup;
 			children = (
 				D1BE57BD502CE825C04EACF7 /* fw-packages-stable-003-contract.json */,
+				B1BDE37AAB9C7938FA910453 /* quac-fw-package-migration.json */,
 			);
 			path = Fixtures;
 			sourceTree = "<group>";
@@ -1114,6 +1117,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				6533954C72F9FBB4D7C9458D /* fw-packages-stable-003-contract.json in Resources */,
+				8A0595A5EF674BC7E233228B /* quac-fw-package-migration.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1398,7 +1402,7 @@
 				CODE_SIGNING_REQUIRED = NO;
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 266;
+				CURRENT_PROJECT_VERSION = 267;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -1419,7 +1423,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GITHUB_OAUTH_CLIENT_ID = Ov23liKmKXYcliMvoCgL;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 1.11.13;
+				MARKETING_VERSION = 1.11.14;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -1624,7 +1628,7 @@
 				CODE_SIGNING_REQUIRED = NO;
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 266;
+				CURRENT_PROJECT_VERSION = 267;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = "";
 				ENABLE_NS_ASSERTIONS = NO;
@@ -1639,7 +1643,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GITHUB_OAUTH_CLIENT_ID = Ov23liKmKXYcliMvoCgL;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 1.11.13;
+				MARKETING_VERSION = 1.11.14;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
