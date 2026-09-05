@@ -1214,6 +1214,36 @@ final class PluginProtectionPolicyTests: XCTestCase {
     }
 
     @MainActor
+    func testVerifyOnDeviceUsesSizeAwareMD5TimeoutForLargeFAP() async throws {
+        let suite = "PluginLargeFAPOnDeviceVerifyTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let chessPath = "/ext/apps/Games/Board/chess.fap"
+        let checkersPath = "/ext/apps/Games/Board/checkers.fap"
+        let largeFAP = makeLargeFAP(seed: 0xC1, size: 3_856_912)
+        let checkers = makeFAP(seed: 0xC2)
+        let storage = PluginInstallMemoryStore(
+            initialFiles: [chessPath: largeFAP, checkersPath: checkers]
+        )
+        let fixture = try await makeCacheReconciliationFixture(
+            storage: storage,
+            defaults: defaults,
+            chessPayload: largeFAP
+        )
+        defer {
+            fixture.archives.forEach { try? FileManager.default.removeItem(at: $0) }
+            try? FileManager.default.removeItem(at: fixture.auditDirectory)
+        }
+
+        await fixture.updater.verifyInstalled()
+
+        let timeouts = await storage.recordedVerificationTimeouts()
+        XCTAssertGreaterThanOrEqual(timeouts.max() ?? 0, 120)
+        XCTAssertEqual(fixture.updater.verifyResult?.verified, 2)
+        XCTAssertTrue(fixture.updater.verifyResult?.ok == true)
+    }
+
+    @MainActor
     func testPersistentVerificationTimeoutKeepsLiveAppAndDoesNotReupload() async throws {
         let suite = "PluginLargeFAPVerificationFailureTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
