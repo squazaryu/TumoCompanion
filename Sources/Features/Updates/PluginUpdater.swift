@@ -1936,10 +1936,11 @@ final class PluginUpdater: ObservableObject {
         var candidates = PluginInstallRouting.candidatePaths(for: update.remotePath)
         candidates.append(contentsOf: cache?.retiredAliases(for: update) ?? [])
         var seen = Set<String>()
+        let timeout = Self.verificationTimeout(for: update.size)
         for path in candidates where seen.insert(
             PluginRouteReconciliation.pathIdentity(path)
         ).inserted {
-            guard let md5 = try await storage.checkedMD5(path) else { continue }
+            guard let md5 = try await storage.checkedMD5(path, timeout: timeout) else { continue }
             if firstFound == nil { firstFound = (path, md5) }
             if PluginRouteReconciliation.pathIdentity(path) == targetIdentity {
                 return (path, md5)
