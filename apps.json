@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.11.16",
+      "version": "1.11.17",
       "versionDate": "2026-09-05",
-      "versionDescription": "TumoCompanion 1.11.16 \u2014 Community Apps Verify on device now uses a state-aware button: actionable accent color, in-button verified/total count, and determinate progress during device verification. Top duplicate numeric summary removed. No firmware, FW Packages, Community Pack payload, or user-data changes.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.16/TumoCompanion-unsigned.ipa",
-      "size": 25664719,
+      "versionDescription": "TumoCompanion 1.11.17 \u2014 Firmware now refreshes the connected device identity after BLE reaches RPC-ready state, so Firmware shows the current version/API without requiring a manual catalog refresh. No firmware, FW Packages, Community Pack payload, or user-data changes.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.17/TumoCompanion-unsigned.ipa",
+      "size": 25672122,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.11.17",
+          "date": "2026-09-05",
+          "localizedDescription": "TumoCompanion 1.11.17 \u2014 Firmware now refreshes the connected device identity after BLE reaches RPC-ready state, so Firmware shows the current version/API without requiring a manual catalog refresh. No firmware, FW Packages, Community Pack payload, or user-data changes.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.17/TumoCompanion-unsigned.ipa",
+          "size": 25672122,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.11.16",
           "date": "2026-09-05",
