@@ -186,8 +186,21 @@ final class FirmwareLibrary: ObservableObject {
     @Published private(set) var lastAttemptedRelease: FirmwareRelease?
 
     private let repo = "squazaryu/tumoflip"
+    private let isDeviceReady: () -> Bool
+    private let deviceInfoReader: () async throws -> [(String, String)]
     private var loadTask: Task<Void, Never>?
+    private var identityTask: Task<Void, Never>?
     private var operationRunning = false
+
+    init(
+        isDeviceReady: @escaping () -> Bool = { FlipperBLE.shared.state == .ready },
+        deviceInfoReader: @escaping () async throws -> [(String, String)] = {
+            try await FlipperSystem().deviceInfo()
+        }
+    ) {
+        self.isDeviceReady = isDeviceReady
+        self.deviceInfoReader = deviceInfoReader
+    }
 
     var busy: Bool {
         switch phase {
@@ -426,10 +439,28 @@ final class FirmwareLibrary: ObservableObject {
         }
     }
 
-    private func refreshInstalledIdentity() async {
-        guard FlipperBLE.shared.state == .ready,
-              let info = try? await FlipperSystem().deviceInfo() else { return }
-        let identity = TumoflipDeviceIdentity(deviceInfo: info)
+    /// Re-read the installed firmware identity once the BLE link is genuinely RPC-ready.
+    /// Catalog loading can begin while Home already shows a connected/ready rail; keeping
+    /// this retry independent means an early device_info miss cannot leave Firmware stuck
+    /// on "Flipper not identified" until the user manually refreshes the catalog.
+    func refreshInstalledIdentity() async {
+        guard isDeviceReady() else { return }
+        if let identityTask {
+            await identityTask.value
+            return
+        }
+
+        let task = Task { @MainActor [weak self] in
+            guard let self else { return }
+            guard let info = try? await self.deviceInfoReader() else { return }
+            self.applyInstalledIdentity(TumoflipDeviceIdentity(deviceInfo: info))
+        }
+        identityTask = task
+        await task.value
+        identityTask = nil
+    }
+
+    func applyInstalledIdentity(_ identity: TumoflipDeviceIdentity) {
         installedVersion = identity.firmwareVersion
         installedAPI = identity.firmwareAPI
         if let channel = identity.inferredChannel { selectedChannel = channel }

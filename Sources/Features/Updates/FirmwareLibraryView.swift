@@ -64,6 +64,10 @@ struct FirmwareLibraryView: View {
         .safeAreaInset(edge: .bottom) { progressBar }
         .sheet(isPresented: $showHelp) { FirmwareHelpView() }
         .sheet(item: $detailsRelease) { FirmwareReleaseDetailsView(release: $0) }
+        .task(id: ble.state) {
+            guard ble.state == .ready else { return }
+            await library.refreshInstalledIdentity()
+        }
     }
 
     private var connectionCard: some View {

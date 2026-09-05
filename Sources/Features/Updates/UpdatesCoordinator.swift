@@ -82,6 +82,7 @@ final class UpdatesCoordinator: ObservableObject {
                 return
             }
             guard let self, !Task.isCancelled else { return }
+            await self.firmware.refreshInstalledIdentity()
             await self.plugins.revalidateProtectedStateAfterConnection()
             await self.packages.validateCompatibility()
             await self.esp32.refreshDevicePackages()

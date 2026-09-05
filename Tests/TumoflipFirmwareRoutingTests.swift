@@ -119,6 +119,44 @@ final class TumoflipFirmwareRoutingTests: XCTestCase {
         )
     }
 
+    @MainActor
+    func testFirmwareLibraryRefreshesIdentityAfterTheLinkIsReady() async {
+        let library = FirmwareLibrary(
+            isDeviceReady: { true },
+            deviceInfoReader: {
+                [
+                    ("firmware_version", "t-dev-008-017"),
+                    ("firmware_origin_fork", "tumoflip"),
+                    ("firmware_api_major", "88"),
+                    ("firmware_api_minor", "4"),
+                    ("hardware_target", "7"),
+                ]
+            }
+        )
+
+        await library.refreshInstalledIdentity()
+
+        XCTAssertEqual(library.installedVersion, "t-dev-008-017")
+        XCTAssertEqual(library.installedAPI, "88.4")
+        XCTAssertEqual(library.selectedChannel, .dev)
+    }
+
+    @MainActor
+    func testFirmwareLibraryDoesNotReadIdentityBeforeTheLinkIsReady() async {
+        let library = FirmwareLibrary(
+            isDeviceReady: { false },
+            deviceInfoReader: {
+                XCTFail("device_info must not be sent before BLE reaches ready")
+                return []
+            }
+        )
+
+        await library.refreshInstalledIdentity()
+
+        XCTAssertNil(library.installedVersion)
+        XCTAssertNil(library.installedAPI)
+    }
+
     func testIncompleteDeviceInfoDoesNotCreateCompatibilityIdentity() {
         let missingAPI = TumoflipDeviceIdentity(deviceInfo: [
             ("firmware_version", "t-dev-004-013"),
