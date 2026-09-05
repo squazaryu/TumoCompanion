@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.11.18",
+      "version": "1.11.19",
       "versionDate": "2026-09-05",
-      "versionDescription": "TumoCompanion 1.11.18 \u2014 Firmware now loads the release catalog on entry, retries device identity after BLE reaches RPC-ready state, and shows Checking instead of a misleading Ready until catalog and current firmware identity are available. No firmware, FW Packages, Community Pack payload, or user-data changes.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.18/TumoCompanion-unsigned.ipa",
-      "size": 25675258,
+      "versionDescription": "TumoCompanion 1.11.19 \u2014 Firmware sources remain On demand until the Firmware section is opened. Opening the section loads the release catalog and device identity; Ready is shown only after both are available. No firmware, FW Packages, Community Pack payload, or user-data changes.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.19/TumoCompanion-unsigned.ipa",
+      "size": 25675768,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.11.19",
+          "date": "2026-09-05",
+          "localizedDescription": "TumoCompanion 1.11.19 \u2014 Firmware sources remain On demand until the Firmware section is opened. Opening the section loads the release catalog and device identity; Ready is shown only after both are available. No firmware, FW Packages, Community Pack payload, or user-data changes.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.19/TumoCompanion-unsigned.ipa",
+          "size": 25675768,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.11.18",
           "date": "2026-09-05",
