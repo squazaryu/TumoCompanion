@@ -384,6 +384,20 @@ final class UpdateSourceLayoutUITests: XCTestCase {
         XCTAssertFalse(app.buttons["Confirm prepare t-flppr-fw-008"].waitForExistence(timeout: 1))
     }
 
+    func testFirmwareIdentityPendingDoesNotClaimReadyInLightMode() {
+        let app = launch("-firmware-library-identity-pending-qa", appearance: "light")
+        XCTAssertTrue(app.staticTexts["Checking…"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.staticTexts["Ready"].exists)
+        attach("Firmware identity pending - light")
+    }
+
+    func testFirmwareIdentityPendingDoesNotClaimReadyInDarkMode() {
+        let app = launch("-firmware-library-identity-pending-qa", appearance: "dark")
+        XCTAssertTrue(app.staticTexts["Checking…"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.staticTexts["Ready"].exists)
+        attach("Firmware identity pending - dark")
+    }
+
     func testFirmwareFailureReplacesDrawerInDarkMode() {
         let app = launch("-firmware-library-error-qa", appearance: "dark")
         XCTAssertTrue(app.staticTexts["Firmware transfer failed"].waitForExistence(timeout: 3))

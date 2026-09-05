@@ -224,6 +224,13 @@ final class FirmwareLibrary: ObservableObject {
         FirmwareReleaseGrouping.group(visibleReleases)
     }
 
+    /// The connection card is only "Ready" when both sides of the screen's data
+    /// contract are present: a loaded firmware catalog and a current device identity.
+    /// BLE readiness alone is not enough to claim that the Firmware screen is ready.
+    var canShowReadyStatus: Bool {
+        !releases.isEmpty && installedVersion != nil
+    }
+
     func setChannel(_ channel: TumoflipFirmwareChannel) {
         selectedChannel = channel
     }
@@ -577,6 +584,13 @@ extension FirmwareLibrary {
         library.installedAPI = "88.4"
         library.selectedChannel = selectedChannel
         library.phase = phase
+        return library
+    }
+
+    static func identityPendingQAFixture() -> FirmwareLibrary {
+        let library = layoutQAFixture()
+        library.installedVersion = nil
+        library.installedAPI = nil
         return library
     }
 }

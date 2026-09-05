@@ -101,6 +101,8 @@ struct RootView: View {
             )
         } else if ProcessInfo.processInfo.arguments.contains("-firmware-library-layout-qa") {
             FirmwareLibraryLayoutQAView()
+        } else if ProcessInfo.processInfo.arguments.contains("-firmware-library-identity-pending-qa") {
+            FirmwareIdentityPendingQAView()
         } else if ProcessInfo.processInfo.arguments.contains("-community-apps-layout-qa") {
             CommunityAppsLayoutQAView()
         } else if ProcessInfo.processInfo.arguments.contains("-community-apps-verify-qa") {
@@ -210,6 +212,16 @@ private struct FirmwareLibraryLayoutQAView: View {
             )
         )
     }
+
+    var body: some View {
+        NavigationStack {
+            FirmwareLibraryView(library: library)
+        }
+    }
+}
+
+private struct FirmwareIdentityPendingQAView: View {
+    @StateObject private var library = FirmwareLibrary.identityPendingQAFixture()
 
     var body: some View {
         NavigationStack {
