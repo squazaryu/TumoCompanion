@@ -236,6 +236,7 @@ struct UpdatesView: View {
     }
 
     private var firmwareLibraryBadge: SourceBadge {
+        guard firmware.hasBeenOpened else { return .onDemand }
         if firmware.busy { return .checking }
         guard !firmware.releases.isEmpty else { return .notChecked }
         guard let installed = firmware.installedVersion else { return .notInstalled }

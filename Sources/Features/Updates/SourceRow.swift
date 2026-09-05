@@ -9,6 +9,7 @@ import SwiftUI
 /// plain, comparable states and all source rows stay visually symmetric.
 enum SourceBadge: Equatable {
     case notChecked
+    case onDemand
     case checking
     case upToDate
     case catalogReady
@@ -18,6 +19,7 @@ enum SourceBadge: Equatable {
     var text: String {
         switch self {
         case .notChecked: return "Tap to check"
+        case .onDemand: return "On demand"
         case .checking: return "Checking…"
         case .upToDate: return "Up to date"
         case .catalogReady: return "Catalog ready"
@@ -30,7 +32,7 @@ enum SourceBadge: Equatable {
 
     var color: Color {
         switch self {
-        case .notChecked, .notInstalled: return .secondary
+        case .notChecked, .onDemand, .notInstalled: return .secondary
         case .checking: return .secondary
         case .upToDate, .catalogReady: return Theme.success
         case .updatesAvailable: return Theme.accent
@@ -40,6 +42,7 @@ enum SourceBadge: Equatable {
     var systemImage: String {
         switch self {
         case .notChecked: return "questionmark.circle"
+        case .onDemand: return "clock.arrow.circlepath"
         case .checking: return "ellipsis.circle"
         case .upToDate: return "checkmark.circle.fill"
         case .catalogReady: return "checkmark.seal.fill"

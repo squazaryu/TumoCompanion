@@ -166,6 +166,18 @@ final class TumoflipFirmwareRoutingTests: XCTestCase {
         XCTAssertTrue(fixture.canShowReadyStatus)
     }
 
+    @MainActor
+    func testFirmwareSourceRemainsOnDemandUntilTheScreenIsOpened() {
+        let library = FirmwareLibrary()
+
+        XCTAssertFalse(library.hasBeenOpened)
+        XCTAssertEqual(SourceBadge.onDemand.text, "On demand")
+
+        library.markOpened()
+
+        XCTAssertTrue(library.hasBeenOpened)
+    }
+
     func testIncompleteDeviceInfoDoesNotCreateCompatibilityIdentity() {
         let missingAPI = TumoflipDeviceIdentity(deviceInfo: [
             ("firmware_version", "t-dev-004-013"),
