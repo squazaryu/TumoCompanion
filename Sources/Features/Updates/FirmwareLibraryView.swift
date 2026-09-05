@@ -64,6 +64,7 @@ struct FirmwareLibraryView: View {
         .safeAreaInset(edge: .bottom) { progressBar }
         .sheet(isPresented: $showHelp) { FirmwareHelpView() }
         .sheet(item: $detailsRelease) { FirmwareReleaseDetailsView(release: $0) }
+        .onAppear { library.loadIfNeeded() }
         .task(id: ble.state) {
             guard ble.state == .ready else { return }
             await library.refreshInstalledIdentity()
@@ -72,7 +73,7 @@ struct FirmwareLibraryView: View {
 
     private var connectionCard: some View {
         SectionCard(
-            title: "Ready to transfer",
+            title: library.canShowReadyStatus ? "Ready to transfer" : "Firmware status",
             systemImage: "arrow.down.to.line.compact",
             accessory: AnyView(StatusPill(
                 text: transfer.activeChannel.label,
@@ -412,8 +413,22 @@ struct FirmwareLibraryView: View {
     @ViewBuilder private var phasePill: some View {
         switch library.phase {
         case .idle, .ready:
-            StatusPill(text: "Ready", color: .secondary, systemImage: "circle")
-        case .loading, .preparing, .downloading, .verifying, .staging, .done, .failed:
+            if library.canShowReadyStatus {
+                StatusPill(text: "Ready", color: .secondary, systemImage: "circle")
+            } else {
+                StatusPill(
+                    text: "Checking…",
+                    color: Theme.accent,
+                    systemImage: "arrow.triangle.2.circlepath"
+                )
+            }
+        case .loading:
+            StatusPill(
+                text: "Checking…",
+                color: Theme.accent,
+                systemImage: "arrow.triangle.2.circlepath"
+            )
+        case .preparing, .downloading, .verifying, .staging, .done, .failed:
             EmptyView()
         }
     }
