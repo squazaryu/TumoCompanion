@@ -85,14 +85,11 @@ struct PluginUpdatesDetailView: View {
         ) {
             statusRow
             if updater.canVerifyOnDevice {
-                PillButton(
-                    title: "Verify on device",
-                    systemImage: "checkmark.seal",
-                    tint: .secondary
-                ) {
-                    Task { await updater.verifyInstalled() }
-                }
-                .disabled(busy || !hasFileChannel)
+                CommunityVerifyButton(
+                    updater: updater,
+                    isAvailable: !busy && hasFileChannel,
+                    action: startVerification
+                )
             }
         }
     }
@@ -162,9 +159,7 @@ struct PluginUpdatesDetailView: View {
 
     private var communityLastRunSummary: String {
         if let result = updater.verifyResult {
-            return result.ok
-                ? "\(result.verified) verified"
-                : "\(result.failed.count) need review"
+            return result.ok ? "Device check complete" : "Review required"
         }
         if let cleanup = updater.lastCleanup {
             return cleanup.kept.isEmpty
@@ -449,6 +444,7 @@ struct PluginUpdatesDetailView: View {
     private var hasFileChannel: Bool {
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("-community-apps-layout-qa")
+            || ProcessInfo.processInfo.arguments.contains("-community-apps-verify-qa")
             || ProcessInfo.processInfo.arguments.contains("-community-route-cleanup-qa") {
             return true
         }
@@ -460,6 +456,10 @@ struct PluginUpdatesDetailView: View {
         guard !busy else { return }
         await updater.check()
         if hasFileChannel { await updater.validateCompatibility() }
+    }
+
+    private func startVerification() {
+        Task { await updater.verifyInstalled() }
     }
 
     private var busy: Bool {
@@ -665,7 +665,7 @@ struct PluginUpdatesDetailView: View {
         case .fetching:    progress("Checking GitHub…")
         case .downloading: progress("Downloading packs…")
         case .scanning(let i, let n): progress("Scanning via \(transfer.activeChannel.label)… \(i)/\(n)")
-        case .verifying(let i, let n): progress("Verifying on device… \(i)/\(n)")
+        case .verifying: EmptyView()
         case .installing(let i, let n): installingRow(i, n)
         case .cleaning(let i, let n): progress("Cleaning old routes… \(i)/\(n)")
         case .done(let m):
@@ -760,6 +760,99 @@ struct PluginUpdatesDetailView: View {
     /// Set each row's selection to whether it matches the predicate.
     private func select(_ match: (PluginUpdate) -> Bool) {
         updater.selectOnly(where: match)
+    }
+}
+
+/// Primary control for the explicit Community Apps device verification. Keeping the
+/// progress and result inside one button makes its availability and current outcome
+/// legible without duplicating a second progress surface above it.
+private struct CommunityVerifyButton: View {
+    @ObservedObject var updater: PluginUpdater
+    let isAvailable: Bool
+    let action: () -> Void
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var progress: PluginVerificationProgress? {
+        updater.verificationProgress
+    }
+
+    private var tint: Color {
+        if progress != nil { return Theme.accent }
+        if !isAvailable { return .secondary }
+        if let result = updater.verifyResult {
+            return result.ok ? Theme.success : Theme.warning
+        }
+        return Theme.accent
+    }
+
+    private var title: String {
+        if progress != nil { return "Verifying on device" }
+        if let result = updater.verifyResult {
+            return result.ok ? "Verified on device" : "Verification needs review"
+        }
+        return "Verify on device"
+    }
+
+    private var count: String? {
+        if let progress { return "\(progress.current)/\(progress.total)" }
+        if updater.verifyResult != nil {
+            return "\(updater.verifyResult?.verified ?? 0)/\(updater.verificationTotalCount)"
+        }
+        return nil
+    }
+
+    private var systemImage: String {
+        if progress != nil { return "arrow.triangle.2.circlepath" }
+        if let result = updater.verifyResult {
+            return result.ok ? "checkmark.seal.fill" : "exclamationmark.triangle.fill"
+        }
+        return "checkmark.shield"
+    }
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    Image(systemName: systemImage)
+                        .font(.subheadline.weight(.semibold))
+                    Text(title)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                    Spacer(minLength: 4)
+                    if let count {
+                        Text(count)
+                            .font(.caption.weight(.semibold))
+                            .monospacedDigit()
+                    }
+                }
+
+                if let progress {
+                    ProgressView(value: progress.fraction)
+                        .tint(tint)
+                        .accessibilityIdentifier("community-verify-progress")
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .foregroundStyle(tint)
+            .background(
+                tint.opacity(colorScheme == .light ? 0.18 : 0.14),
+                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(
+                        tint.opacity(colorScheme == .light ? 0.26 : 0.14),
+                        lineWidth: 1
+                    )
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(!isAvailable)
+        .accessibilityIdentifier("community-verify-on-device")
+        .accessibilityLabel(title)
+        .accessibilityValue(count.map { "\($0) apps" } ?? "Ready")
     }
 }
 

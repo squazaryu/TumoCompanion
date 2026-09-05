@@ -290,6 +290,19 @@ struct VerifyResult: Equatable {
     var ok: Bool { failed.isEmpty }
 }
 
+/// Determinate progress for the explicit Community Apps device verification.
+/// `current` is the file currently being checked, so the UI can show honest
+/// progress without treating the in-flight file as already verified.
+struct PluginVerificationProgress: Equatable {
+    let current: Int
+    let total: Int
+
+    var fraction: Double {
+        guard total > 0 else { return 0 }
+        return min(max(Double(current) / Double(total), 0), 1)
+    }
+}
+
 private enum PluginWriteVerification {
     case verified
     case contentMismatch(String)
@@ -1509,6 +1522,25 @@ final class PluginUpdater: ObservableObject {
     /// Whether an on-device "Verify on device" pass can run — needs the pack manifest
     /// loaded by a prior check (so we know expected md5s and have data to reinstall).
     var canVerifyOnDevice: Bool { !allManifest.isEmpty }
+
+    /// Total number of Community Apps files covered by the current verification.
+    /// A completed result is authoritative because layout fixtures and older cached
+    /// manifests may not retain the full catalog in `allManifest`.
+    var verificationTotalCount: Int {
+        if let result = verifyResult {
+            return result.verified + result.failed.count
+        }
+        if case let .verifying(_, total) = phase {
+            return total
+        }
+        return allManifest.count
+    }
+
+    /// Live progress is available only while the explicit device pass is running.
+    var verificationProgress: PluginVerificationProgress? {
+        guard case let .verifying(current, total) = phase else { return nil }
+        return PluginVerificationProgress(current: current, total: total)
+    }
 
     private let repo = "xMasterX/all-the-plugins"
     private static let excludedKey = "pluginExcluded"
@@ -3278,6 +3310,13 @@ extension PluginUpdater {
             verified: 54,
             failed: []
         )
+        return updater
+    }
+
+    static func communityAppsVerifyingQAFixture() -> PluginUpdater {
+        let updater = communityAppsLayoutQAFixture()
+        updater.verifyResult = nil
+        updater.phase = .verifying(12, 54)
         return updater
     }
 }
