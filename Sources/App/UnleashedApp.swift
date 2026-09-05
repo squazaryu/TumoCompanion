@@ -103,6 +103,8 @@ struct RootView: View {
             FirmwareLibraryLayoutQAView()
         } else if ProcessInfo.processInfo.arguments.contains("-community-apps-layout-qa") {
             CommunityAppsLayoutQAView()
+        } else if ProcessInfo.processInfo.arguments.contains("-community-apps-verify-qa") {
+            CommunityAppsVerifyingQAView()
         } else if ProcessInfo.processInfo.arguments.contains("-esp32-archived-redownload-qa") {
             NavigationStack {
                 ESP32FirmwareView(updater: .archivedRedownloadQA(), autoRefresh: false)
@@ -218,6 +220,16 @@ private struct FirmwareLibraryLayoutQAView: View {
 
 private struct CommunityAppsLayoutQAView: View {
     @StateObject private var updater = PluginUpdater.communityAppsLayoutQAFixture()
+
+    var body: some View {
+        NavigationStack {
+            PluginUpdatesDetailView(updater: updater)
+        }
+    }
+}
+
+private struct CommunityAppsVerifyingQAView: View {
+    @StateObject private var updater = PluginUpdater.communityAppsVerifyingQAFixture()
 
     var body: some View {
         NavigationStack {

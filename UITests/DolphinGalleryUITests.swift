@@ -474,6 +474,26 @@ final class UpdateSourceLayoutUITests: XCTestCase {
         XCTAssertTrue(app.buttons["community-release-picker-action"].waitForExistence(timeout: 3))
         attach("Community app details drawer - light")
     }
+
+    func testCommunityVerifyButtonShowsCompletedCountInLightMode() {
+        let app = launch("-community-apps-layout-qa", appearance: "light")
+        let verify = app.buttons["community-verify-on-device"]
+        XCTAssertTrue(verify.waitForExistence(timeout: 3))
+        XCTAssertTrue(verify.label.contains("Verified on device"))
+        XCTAssertTrue((verify.value as? String)?.contains("54/54") == true)
+        XCTAssertFalse(app.staticTexts["54 verified"].exists)
+        attach("Community verify completed - light")
+    }
+
+    func testCommunityVerifyButtonShowsProgressInDarkMode() {
+        let app = launch("-community-apps-verify-qa", appearance: "dark")
+        let verify = app.buttons["community-verify-on-device"]
+        XCTAssertTrue(verify.waitForExistence(timeout: 3))
+        XCTAssertTrue(verify.label.contains("Verifying on device"))
+        XCTAssertTrue((verify.value as? String)?.contains("12/54") == true)
+        XCTAssertTrue(app.progressIndicators["community-verify-progress"].exists)
+        attach("Community verify progress - dark")
+    }
 }
 
 final class ESP32DeviceInventoryUITests: XCTestCase {

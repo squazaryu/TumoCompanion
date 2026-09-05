@@ -1244,6 +1244,22 @@ final class PluginProtectionPolicyTests: XCTestCase {
     }
 
     @MainActor
+    func testCommunityVerificationProgressAndResultExposeAnExactTotal() {
+        let updater = PluginUpdater.communityAppsLayoutQAFixture()
+
+        XCTAssertEqual(updater.verificationTotalCount, 54)
+        XCTAssertNil(updater.verificationProgress)
+
+        updater.verifyResult = nil
+        updater.phase = .verifying(12, 54)
+        XCTAssertEqual(
+            updater.verificationProgress,
+            PluginVerificationProgress(current: 12, total: 54)
+        )
+        XCTAssertEqual(updater.verificationProgress?.fraction ?? 0, 12.0 / 54.0, accuracy: 0.0001)
+    }
+
+    @MainActor
     func testPersistentVerificationTimeoutKeepsLiveAppAndDoesNotReupload() async throws {
         let suite = "PluginLargeFAPVerificationFailureTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
