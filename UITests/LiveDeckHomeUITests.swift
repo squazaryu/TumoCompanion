@@ -59,6 +59,24 @@ final class LiveDeckHomeUITests: XCTestCase {
         add(screenshot)
     }
 
+    func testFirmwareSourceStaysOnDemandUntilOpened() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-onboardingDone", "YES", "-appearanceMode", "light"]
+        app.launch()
+
+        let firmware = app.buttons["updates-source-firmware"]
+        XCTAssertTrue(firmware.waitForExistence(timeout: 5))
+        XCTAssertTrue(firmware.label.contains("On demand"))
+
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = "Home Firmware source on demand"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+
+        firmware.tap()
+        XCTAssertTrue(app.navigationBars["Firmware"].waitForExistence(timeout: 3))
+    }
+
     func testSourceRowsRouteToDedicatedUpdateScreens() {
         let app = XCUIApplication()
         app.launchArguments = ["-onboardingDone", "YES", "-appearanceMode", "light"]
@@ -93,8 +111,10 @@ final class LiveDeckHomeUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Updates"].waitForExistence(timeout: 3))
         let community = app.buttons["updates-center-source-community"]
         let esp32 = app.buttons["updates-center-source-esp32"]
+        let firmware = app.buttons["updates-center-source-firmware"]
         XCTAssertTrue(community.waitForExistence(timeout: 3))
         XCTAssertTrue(esp32.waitForExistence(timeout: 3))
+        XCTAssertTrue(firmware.label.contains("On demand"))
         XCTAssertGreaterThan(esp32.frame.minY, community.frame.maxY)
 
         let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())

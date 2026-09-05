@@ -28,7 +28,6 @@ final class UpdatesCoordinator: ObservableObject {
     }
 
     func loadIfNeeded(recoverPackages: Bool) {
-        firmware.loadIfNeeded()
         if pluginLoadTask == nil, plugins.shouldLoadCatalog {
             pluginLoadTask = Task { [weak self] in
                 guard let self else { return }
@@ -82,7 +81,9 @@ final class UpdatesCoordinator: ObservableObject {
                 return
             }
             guard let self, !Task.isCancelled else { return }
-            await self.firmware.refreshInstalledIdentity()
+            if self.firmware.hasBeenOpened {
+                await self.firmware.refreshInstalledIdentity()
+            }
             await self.plugins.revalidateProtectedStateAfterConnection()
             await self.packages.validateCompatibility()
             await self.esp32.refreshDevicePackages()

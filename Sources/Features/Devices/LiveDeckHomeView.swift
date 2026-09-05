@@ -458,6 +458,10 @@ private struct LiveDeckSourcesCard: View {
             return .ready("Ready")
         }
 
+        guard updates.firmware.hasBeenOpened else {
+            return .waiting("On demand")
+        }
+
         switch updates.firmware.phase {
         case .loading, .preparing, .verifying:
             return .loading(.init(kind: .checking))

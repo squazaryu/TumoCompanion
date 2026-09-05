@@ -184,6 +184,10 @@ final class FirmwareLibrary: ObservableObject {
     @Published private(set) var transferChannel: TransferChannel = .ble
     @Published private(set) var stopRequested = false
     @Published private(set) var lastAttemptedRelease: FirmwareRelease?
+    /// Firmware is intentionally on-demand from Home/Updates. It becomes a live
+    /// source only after the user opens this screen, matching Community Apps and
+    /// FW Packages behaviour.
+    @Published private(set) var hasBeenOpened = false
 
     private let repo = "squazaryu/tumoflip"
     private let isDeviceReady: () -> Bool
@@ -233,6 +237,10 @@ final class FirmwareLibrary: ObservableObject {
 
     func setChannel(_ channel: TumoflipFirmwareChannel) {
         selectedChannel = channel
+    }
+
+    func markOpened() {
+        hasBeenOpened = true
     }
 
     func loadIfNeeded() {
