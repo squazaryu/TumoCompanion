@@ -1,5 +1,5 @@
 {
-  "release_tag": "8sep2026",
+  "release_tag": "9sep2026",
   "stems": {
     "24cxxprog": "Programmers",
     "4inrow": "Board",
@@ -168,6 +168,7 @@
     "lora_terminal": "UART",
     "magspoof": "GPIO",
     "mandelbrotset": "Simulation",
+    "marauder_gui": "ESP32",
     "mass_storage": "USB",
     "matagotchi": "Simulation",
     "meal_pager": "Sub-GHz",
