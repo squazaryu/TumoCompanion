@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.11.19",
-      "versionDate": "2026-09-05",
-      "versionDescription": "TumoCompanion 1.11.19 \u2014 Firmware sources remain On demand until the Firmware section is opened. Opening the section loads the release catalog and device identity; Ready is shown only after both are available. No firmware, FW Packages, Community Pack payload, or user-data changes.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.19/TumoCompanion-unsigned.ipa",
-      "size": 25675768,
+      "version": "1.11.20",
+      "versionDate": "2026-09-09",
+      "versionDescription": "TumoCompanion 1.11.20 \u2014 background transfer recovery checkpoints and bounded iOS background execution for firmware, FW Packages, Community Apps, and ESP32 staging. Nearby Files is now owned by Tumoflip FW Packages and the Community Pack duplicate is protected.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.20/TumoCompanion-unsigned.ipa",
+      "size": 25717915,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.11.20",
+          "date": "2026-09-09",
+          "localizedDescription": "TumoCompanion 1.11.20 \u2014 background transfer recovery checkpoints and bounded iOS background execution for firmware, FW Packages, Community Apps, and ESP32 staging. Nearby Files is now owned by Tumoflip FW Packages and the Community Pack duplicate is protected.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.20/TumoCompanion-unsigned.ipa",
+          "size": 25717915,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.11.19",
           "date": "2026-09-05",
