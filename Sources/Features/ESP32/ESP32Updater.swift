@@ -142,6 +142,7 @@ final class ESP32Updater: ObservableObject {
     @Published private(set) var transferChannel: TransferChannel = .ble
     @Published private(set) var deviceScanState: DeviceScanState = .idle
     @Published private(set) var releaseCheckFailed = false
+    @Published private(set) var stopRequested = false
 
     /// True only while the GitHub download is streaming. Gates the download
     /// progress callback so a late `didWriteData` Task (queued during the
@@ -160,9 +161,28 @@ final class ESP32Updater: ObservableObject {
     private(set) var latestManifest: ESP32InstallerManifest?
     private(set) var manifestError: String?
     private var releaseHasManifest = false
+    private let stopToken = StopToken()
+    private let backgroundGuard = BackgroundTransferGuard(name: "esp32-stage")
+    private var backgroundExpired = false
 
     init(storage: (any DeviceFileStore)? = nil) {
         storageOverride = storage
+    }
+
+    func requestStop() {
+        stopRequested = true
+        stopToken.stop()
+    }
+
+    private func handleBackgroundExpiration() {
+        guard !backgroundExpired else { return }
+        backgroundExpired = true
+        if var checkpoint = TransferRecoveryStore.shared.load(),
+           checkpoint.kind == .esp32 {
+            checkpoint.state = .paused
+            _ = TransferRecoveryStore.shared.save(checkpoint)
+        }
+        requestStop()
     }
 
 #if DEBUG
@@ -939,7 +959,30 @@ final class ESP32Updater: ObservableObject {
         let channel = storage.channel
         transferChannel = channel
         busy = true; progress = 0; downloadPhase = true; progressText = nil
-        defer { busy = false; progress = nil; downloadPhase = false; progressText = nil }
+        stopRequested = false
+        stopToken.reset()
+        backgroundExpired = false
+        backgroundGuard.begin { [weak self] in
+            self?.handleBackgroundExpiration()
+        }
+        let recoveryStore = TransferRecoveryStore.shared
+        let recoveryID = UUID()
+        _ = recoveryStore.save(TransferRecoveryCheckpoint(
+            id: recoveryID,
+            kind: .esp32,
+            releaseID: tag,
+            completed: 0,
+            total: 1,
+            detail: board.display
+        ))
+        defer {
+            backgroundGuard.end()
+            recoveryStore.clear()
+            busy = false
+            progress = nil
+            downloadPhase = false
+            progressText = nil
+        }
 
         let plans: [DownloadPlan]
         do {
@@ -954,6 +997,11 @@ final class ESP32Updater: ObservableObject {
             files = try await download(plans)
         } catch {
             status = "Download failed: \(error.localizedDescription)"
+            return
+        }
+
+        if stopToken.isStopped {
+            status = "Staging paused — reopen ESP32 Firmware and retry."
             return
         }
 
@@ -977,15 +1025,22 @@ final class ESP32Updater: ObservableObject {
 
         do {
             try await storage.makeDirectory(staging)
+            if stopToken.isStopped { throw CancellationError() }
 
             // Stable releases with an installer manifest provide a complete factory
             // package. Legacy releases have only an app image, so retain their known
             // boot files while still staging into a separate transaction directory.
             if !hasAuthoritativeFactoryPackage {
                 for name in board.bootFiles {
+                    if stopToken.isStopped { throw CancellationError() }
                     let data = try await storage.read("\(board.folder)/\(name)")
                     let path = "\(staging)/\(name)"
-                    try await storage.write(path, data: data)
+                    try await storage.write(
+                        path,
+                        data: data,
+                        progress: nil,
+                        isStopRequested: { [stopToken] in stopToken.isStopped }
+                    )
                     guard await storage.md5(path) == md5Hex(data) else {
                         throw CocoaError(.fileWriteUnknown, userInfo: [
                             NSLocalizedDescriptionKey: "Couldn't verify reused file \(name)."
@@ -999,9 +1054,19 @@ final class ESP32Updater: ObservableObject {
                 to: staging,
                 reporter: transferReporter,
                 channel: channel,
-                storage: storage)
+                storage: storage,
+                isStopRequested: { [stopToken] in stopToken.isStopped })
+
+            if stopToken.isStopped { throw CancellationError() }
+            if var checkpoint = recoveryStore.load(), checkpoint.id == recoveryID {
+                checkpoint.completed = files.count
+                checkpoint.total = max(1, files.count)
+                checkpoint.detail = "Verified package"
+                _ = recoveryStore.save(checkpoint)
+            }
 
             if writesAutomaticManifest {
+                if stopToken.isStopped { throw CancellationError() }
                 let packageManifest = try makeFlashPackageManifest(
                     board: board,
                     tag: tag,
@@ -1015,6 +1080,7 @@ final class ESP32Updater: ObservableObject {
                     manifest: packageManifest)
             }
 
+            if stopToken.isStopped { throw CancellationError() }
             try await ESP32PackageTransaction.replaceAtomically(
                 storage: storage,
                 target: target,
@@ -1029,7 +1095,9 @@ final class ESP32Updater: ObservableObject {
             if await storage.exists(staging) {
                 try? await storage.delete(staging, recursive: true)
             }
-            status = "Staging failed: \(error.localizedDescription)"
+            status = error is CancellationError
+                ? "Staging paused — reopen ESP32 Firmware and retry."
+                : "Staging failed: \(error.localizedDescription)"
         }
         await scanBoards()
     }
@@ -1092,6 +1160,7 @@ final class ESP32Updater: ObservableObject {
         result.reserveCapacity(plans.count)
 
         for (index, plan) in plans.enumerated() {
+            if stopToken.isStopped { throw CancellationError() }
             status = "Downloading \(index + 1)/\(plans.count): \(plan.sourceName)…"
             let completedBefore = completed
             let progressGate = PercentProgressGate()
@@ -1114,6 +1183,7 @@ final class ESP32Updater: ObservableObject {
                 throw URLError(.badServerResponse)
             }
             let data = try Data(contentsOf: temporaryURL)
+            if stopToken.isStopped { throw CancellationError() }
             guard plan.expectedSize <= 0 || data.count == plan.expectedSize else {
                 throw ESP32ManifestError.assetMetadataMismatch(plan.sourceName)
             }
@@ -1132,13 +1202,15 @@ final class ESP32Updater: ObservableObject {
         to directory: String,
         reporter: TransferActivityReporter,
         channel: TransferChannel,
-        storage: any DeviceFileStore
+        storage: any DeviceFileStore,
+        isStopRequested: @escaping @Sendable () -> Bool
     ) async throws -> [String: String] {
         let totalBytes = Int64(files.reduce(0) { $0 + $1.data.count })
         var completed: Int64 = 0
         var verifiedMD5: [String: String] = [:]
 
         for (index, file) in files.enumerated() {
+            if isStopRequested() { throw CancellationError() }
             let path = "\(directory)/\(file.plan.outputName)"
             let expectedMD5 = md5Hex(file.data)
             let completedBefore = completed
@@ -1148,17 +1220,23 @@ final class ESP32Updater: ObservableObject {
             for attempt in 0..<2 {
                 if attempt > 0 { status = "Verification failed — retrying \(file.plan.outputName)…" }
                 let progressGate = PercentProgressGate()
-                try await storage.write(path, data: file.data) { [weak self] sent in
-                    let current = completedBefore + Int64(sent)
-                    let pct = Int((Double(current) / Double(max(1, totalBytes))) * 100)
-                    guard progressGate.accept(pct) else { return }
-                    Task { @MainActor in
-                        guard let self else { return }
-                        self.progress = min(1, Double(current) / Double(max(1, totalBytes)))
-                        self.progressText = "\(pct)% · \(Self.fileSize(current)) / \(Self.fileSize(totalBytes))"
-                        reporter.progress(file.plan.outputName)
-                    }
-                }
+                try await storage.write(
+                    path,
+                    data: file.data,
+                    progress: { [weak self] sent in
+                        let current = completedBefore + Int64(sent)
+                        let pct = Int((Double(current) / Double(max(1, totalBytes))) * 100)
+                        guard progressGate.accept(pct) else { return }
+                        Task { @MainActor in
+                            guard let self else { return }
+                            self.progress = min(1, Double(current) / Double(max(1, totalBytes)))
+                            self.progressText = "\(pct)% · \(Self.fileSize(current)) / \(Self.fileSize(totalBytes))"
+                            reporter.progress(file.plan.outputName)
+                        }
+                    },
+                    isStopRequested: isStopRequested
+                )
+                if isStopRequested() { throw CancellationError() }
                 if await storage.md5(path) == expectedMD5 {
                     verified = true
                     break

@@ -9,6 +9,7 @@ final class UpdatesCoordinator: ObservableObject {
     let packages = TumoflipUpdater()
     let firmware = FirmwareLibrary()
     let esp32 = ESP32Updater()
+    @Published private(set) var interruptedTransfer: TransferRecoveryCheckpoint?
 
     private var pluginLoadTask: Task<Void, Never>?
     private var packageLoadTask: Task<Void, Never>?
@@ -17,6 +18,7 @@ final class UpdatesCoordinator: ObservableObject {
     private var observations = Set<AnyCancellable>()
 
     init() {
+        interruptedTransfer = TransferRecoveryStore.shared.load()
         Publishers.Merge4(
             plugins.objectWillChange,
             packages.objectWillChange,
@@ -25,6 +27,13 @@ final class UpdatesCoordinator: ObservableObject {
         )
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &observations)
+    }
+
+    /// Refresh the process-surviving transfer intent after a foreground transition.
+    /// A running checkpoint at this point means the prior process disappeared before
+    /// it could finish its defer block, so the store converts it to an explicit pause.
+    func refreshTransferRecovery() {
+        interruptedTransfer = TransferRecoveryStore.shared.markInterruptedAsPaused()
     }
 
     func loadIfNeeded(recoverPackages: Bool) {

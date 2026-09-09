@@ -145,7 +145,9 @@
 		BFE33FBE261830F715775863 /* SberLoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24DE2B5AF5B3FA4C77EEF6AB /* SberLoginView.swift */; };
 		C25AAD849847AC8C673B9462 /* DeviceServiceCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D5340A6B3C8B38B925507BA /* DeviceServiceCoordinator.swift */; };
 		C390ACDEA69EE872DDF566E0 /* RuntimeDiagnosticsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDD681FE18BFDF3BD90EC71D /* RuntimeDiagnosticsTests.swift */; };
+		C3CEEA1F75CECCD8BEAF4255 /* BackgroundTransfer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E68A9C04C4B4A34D456A445 /* BackgroundTransfer.swift */; };
 		C57A815B28B1629238A1F2DA /* AIRadarRelay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F693046B543D525DC64F4D9 /* AIRadarRelay.swift */; };
+		C78CF345B32C9CC99B502793 /* TransferBackgroundTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8935260266C922FDBB301B75 /* TransferBackgroundTests.swift */; };
 		C7EC549D7971B7FAAD3279A1 /* WiFiMapperEstimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F64FBF61D7D7605A7E126464 /* WiFiMapperEstimator.swift */; };
 		C7FE437577F2D7FE7C0CA9B2 /* AIRadar.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63F806FD448DEEBDC97DC1B /* AIRadar.swift */; };
 		C853BACB2CE740243CB30F57 /* TumoSurveySessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74A081B20A8CD41C0AB51069 /* TumoSurveySessionTests.swift */; };
@@ -322,6 +324,7 @@
 		67C0B0C4BD832B6A0C849C3A /* FlipperRPC.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlipperRPC.swift; sourceTree = "<group>"; };
 		6DB8FBDDFA1BA4791D40EADD /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		6E38D7DF4DD5D32376A5F7CC /* TumoSpectrumViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoSpectrumViewModel.swift; sourceTree = "<group>"; };
+		6E68A9C04C4B4A34D456A445 /* BackgroundTransfer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundTransfer.swift; sourceTree = "<group>"; };
 		6EFC5D9580C2A7DD169D763E /* CatalogAppDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogAppDetailView.swift; sourceTree = "<group>"; };
 		7084FC33B12DC1EB57FB72EB /* TumoSpectrumView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoSpectrumView.swift; sourceTree = "<group>"; };
 		74A081B20A8CD41C0AB51069 /* TumoSurveySessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoSurveySessionTests.swift; sourceTree = "<group>"; };
@@ -338,6 +341,7 @@
 		85A71B8014DF7BCBEAE77C5A /* TumoNetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoNetView.swift; sourceTree = "<group>"; };
 		8697965C8EA5F8D768000FC9 /* TumoflipUpdaterService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoflipUpdaterService.swift; sourceTree = "<group>"; };
 		87F2C64ACDABA1AEFFB7CCD8 /* PluginUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginUpdater.swift; sourceTree = "<group>"; };
+		8935260266C922FDBB301B75 /* TransferBackgroundTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferBackgroundTests.swift; sourceTree = "<group>"; };
 		8A54ADE2A988A392B1687C80 /* GitHubAuthStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubAuthStoreTests.swift; sourceTree = "<group>"; };
 		8D70BBAA6C69E3FCD8488170 /* HomeAssistantDiscoveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeAssistantDiscoveryTests.swift; sourceTree = "<group>"; };
 		8EBD710F983D218FB913E435 /* GitHubAuthStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubAuthStore.swift; sourceTree = "<group>"; };
@@ -734,6 +738,7 @@
 				0711A5F791B6D248100D3EBD /* ProtocolTests.swift */,
 				EDD681FE18BFDF3BD90EC71D /* RuntimeDiagnosticsTests.swift */,
 				FFAFC266DB9145E7CF8D0504 /* TransferActivityReporterTests.swift */,
+				8935260266C922FDBB301B75 /* TransferBackgroundTests.swift */,
 				985815E6A1B91675260A0A0D /* TumoFabricTests.swift */,
 				C172A449A754FE7D96BEC592 /* TumoflipCatalogIndexTests.swift */,
 				2E66A60CC5ADE5831A2D34FF /* TumoflipFirmwareRoutingTests.swift */,
@@ -780,6 +785,7 @@
 		A0F6794625C32B75519BA6EB /* Updates */ = {
 			isa = PBXGroup;
 			children = (
+				6E68A9C04C4B4A34D456A445 /* BackgroundTransfer.swift */,
 				18E9E2A54A0286AF6188F9A9 /* FapMetadata.swift */,
 				856D8627B88920587D56B850 /* FirmwareLibrary.swift */,
 				CFD10DB620EC18749FE46591 /* FirmwareLibraryView.swift */,
@@ -1182,6 +1188,7 @@
 				EAC0D7A0739C0B6EF7565475 /* ProtocolTests.swift in Sources */,
 				C390ACDEA69EE872DDF566E0 /* RuntimeDiagnosticsTests.swift in Sources */,
 				2066FEBC29259A4E4EE5964A /* TransferActivityReporterTests.swift in Sources */,
+				C78CF345B32C9CC99B502793 /* TransferBackgroundTests.swift in Sources */,
 				9570769329A543974A6E3501 /* TumoFabricTests.swift in Sources */,
 				B9D37723F9996CB284C2DB28 /* TumoNetTests.swift in Sources */,
 				BC76D387812E9C5E0D6DDF69 /* TumoSpectrumReportTests.swift in Sources */,
@@ -1223,6 +1230,7 @@
 				D5D267A9E0553575932192E6 /* AppBridgeConsole.swift in Sources */,
 				63C2AC8BC494254D9F0A745C /* AppBridgeRequest.swift in Sources */,
 				EAC745F4B6A84F12F9A78CBF /* AsyncStateComponents.swift in Sources */,
+				C3CEEA1F75CECCD8BEAF4255 /* BackgroundTransfer.swift in Sources */,
 				A910F14D11CCC2B19261AB3F /* BackupView.swift in Sources */,
 				58ADEF0B8E8D011FDB32D17F /* BridgeView.swift in Sources */,
 				FD2037726A6354E2F8C9A7C1 /* BuddyRelay.swift in Sources */,

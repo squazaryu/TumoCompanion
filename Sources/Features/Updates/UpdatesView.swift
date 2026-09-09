@@ -82,7 +82,10 @@ struct UpdatesView: View {
             }
         }
         .safeAreaInset(edge: .bottom) { actionBar }
-        .onAppear { updates.loadIfNeeded(recoverPackages: hasFileChannel) }
+        .onAppear {
+            updates.refreshTransferRecovery()
+            updates.loadIfNeeded(recoverPackages: hasFileChannel)
+        }
         .onChange(of: ble.state) { _, state in updates.revalidateAfterReady(state) }
         .onChange(of: ble.serialOwner) { _, owner in
             updates.revalidateAfterSerialOwner(owner)
@@ -139,6 +142,7 @@ struct UpdatesView: View {
     }
 
     private var hasAttentionItems: Bool {
+        if updates.interruptedTransfer?.state == .paused { return true }
         if updater.phase == .needsBaseline { return true }
         if updater.protectedAuditFailure != nil { return true }
         if updater.pendingProtectedReview.count > 0 { return true }
@@ -302,6 +306,14 @@ struct UpdatesView: View {
         if hasAttentionItems {
             CollapsibleCard(title: "Needs attention", systemImage: "exclamationmark.shield.fill", startExpanded: true) {
                 VStack(spacing: 10) {
+                    if let transfer = updates.interruptedTransfer,
+                       transfer.state == .paused {
+                        AttentionRow(
+                            systemImage: "pause.circle.fill",
+                            text: "\(transferKindLabel(transfer.kind)) transfer paused — reconnect and retry",
+                            tint: Theme.warning
+                        )
+                    }
                     if updater.phase == .needsBaseline {
                         NavigationLink { PluginUpdatesDetailView(updater: updater) } label: {
                             AttentionRow(systemImage: "magnifyingglass", text: "Community apps — first sync needed", tint: Theme.info)
@@ -363,6 +375,15 @@ struct UpdatesView: View {
                     }
                 }
             }
+        }
+    }
+
+    private func transferKindLabel(_ kind: TransferRecoveryKind) -> String {
+        switch kind {
+        case .firmware: return "Firmware"
+        case .packages: return "FW Packages"
+        case .communityApps: return "Community apps"
+        case .esp32: return "ESP32"
         }
     }
 
