@@ -195,6 +195,9 @@ final class FirmwareLibrary: ObservableObject {
     private var loadTask: Task<Void, Never>?
     private var identityTask: Task<Void, Never>?
     private var operationRunning = false
+    private let stopToken = StopToken()
+    private let backgroundGuard = BackgroundTransferGuard(name: "firmware-stage")
+    private var backgroundExpired = false
 
     init(
         isDeviceReady: @escaping () -> Bool = { FlipperBLE.shared.state == .ready },
@@ -269,7 +272,20 @@ final class FirmwareLibrary: ObservableObject {
         if let loadTask { await loadTask.value }
     }
 
-    func requestStop() { stopRequested = true }
+    func requestStop() {
+        stopRequested = true
+        stopToken.stop()
+    }
+
+    private func handleBackgroundExpiration() {
+        guard !backgroundExpired else { return }
+        backgroundExpired = true
+        if var checkpoint = TransferRecoveryStore.shared.load(kind: .firmware) {
+            checkpoint.state = .paused
+            _ = TransferRecoveryStore.shared.save(checkpoint)
+        }
+        requestStop()
+    }
 
     /// Clears stale completion feedback before presenting a new transfer intent.
     /// Active operations are never interrupted or reset by this helper.
@@ -291,8 +307,27 @@ final class FirmwareLibrary: ObservableObject {
         operationRunning = true
         lastAttemptedRelease = release
         stopRequested = false
+        stopToken.reset()
+        backgroundExpired = false
         phase = .preparing(version: release.version)
-        defer { operationRunning = false }
+        backgroundGuard.begin { [weak self] in
+            self?.handleBackgroundExpiration()
+        }
+        let recoveryStore = TransferRecoveryStore.shared
+        let recoveryID = UUID()
+        _ = recoveryStore.save(TransferRecoveryCheckpoint(
+            id: recoveryID,
+            kind: .firmware,
+            releaseID: release.id,
+            completed: 0,
+            total: 1,
+            detail: release.version
+        ))
+        defer {
+            backgroundGuard.end()
+            recoveryStore.clear(kind: .firmware)
+            operationRunning = false
+        }
 
         let store = TransferChannelStore.shared.activeStore
         transferChannel = store.channel
@@ -309,6 +344,8 @@ final class FirmwareLibrary: ObservableObject {
         var activityTotal = 1
         do {
             let archiveData = try await cachedArchive(for: release)
+            try Task.checkCancellation()
+            if stopToken.isStopped { throw FirmwareLibraryError.stopped }
             phase = .verifying(version: release.version)
             let expected = try await expectedSHA256(for: release)
             guard Self.sha256(archiveData) == expected else {
@@ -322,6 +359,7 @@ final class FirmwareLibrary: ObservableObject {
             var completed: Int64 = 0
 
             try? await store.delete(remoteRoot, recursive: true)
+            if stopToken.isStopped { throw FirmwareLibraryError.stopped }
             try await store.makeDirectory("/ext/update")
             try await store.makeDirectory(remoteRoot)
             activity.start(total: ordered.count, title: "Staging Tumoflip firmware")
@@ -330,7 +368,7 @@ final class FirmwareLibrary: ObservableObject {
             defer { reporter.end() }
 
             for (index, file) in ordered.enumerated() {
-                if stopRequested { throw FirmwareLibraryError.stopped }
+                if stopToken.isStopped { throw FirmwareLibraryError.stopped }
                 let finalPath = "\(remoteRoot)/\(file.name)"
                 let tempPath = "\(finalPath).part"
                 phase = .staging(
@@ -344,6 +382,12 @@ final class FirmwareLibrary: ObservableObject {
                     store: store, release: release, base: base, total: total)
                 completed += Int64(file.data.count)
                 activityCompleted = index + 1
+                if var checkpoint = recoveryStore.load(), checkpoint.id == recoveryID {
+                    checkpoint.completed = activityCompleted
+                    checkpoint.total = activityTotal
+                    checkpoint.detail = file.name
+                    _ = recoveryStore.save(checkpoint)
+                }
                 activity.update(
                     current: activityCompleted,
                     total: ordered.count,
@@ -396,28 +440,35 @@ final class FirmwareLibrary: ObservableObject {
                     throw FirmwareLibraryError.flipperNotReady
                 }
                 try? await store.delete(tempPath, recursive: false)
-                try await store.write(tempPath, data: file.data) { [weak self] sent in
-                    Task { @MainActor in
-                        guard let self else { return }
-                        self.phase = .staging(
-                            version: release.version, file: file.name,
-                            doneBytes: base + Int64(sent), totalBytes: total)
-                    }
-                }
+                try await store.write(
+                    tempPath,
+                    data: file.data,
+                    progress: { [weak self] sent in
+                        Task { @MainActor in
+                            guard let self else { return }
+                            self.phase = .staging(
+                                version: release.version, file: file.name,
+                                doneBytes: base + Int64(sent), totalBytes: total)
+                        }
+                    },
+                    isStopRequested: { [stopToken] in stopToken.isStopped }
+                )
                 guard await store.md5(tempPath) == Self.md5(file.data) else {
                     throw FirmwareLibraryError.deviceVerifyFailed(file.name)
                 }
+                if stopToken.isStopped { throw FirmwareLibraryError.stopped }
                 try? await store.delete(finalPath, recursive: false)
+                if stopToken.isStopped { throw FirmwareLibraryError.stopped }
                 try await store.move(tempPath, to: finalPath)
                 return
             } catch {
                 lastError = error
                 try? await store.delete(tempPath, recursive: false)
-                guard attempt < attempts, !stopRequested else { break }
+                guard attempt < attempts, !stopToken.isStopped else { break }
                 try? await Task.sleep(nanoseconds: 700_000_000)
             }
         }
-        if stopRequested { throw FirmwareLibraryError.stopped }
+        if stopToken.isStopped { throw FirmwareLibraryError.stopped }
         throw lastError
     }
 

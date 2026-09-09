@@ -31,6 +31,16 @@ protocol DeviceFileStore {
         data: Data,
         progress: (@Sendable (Int) -> Void)?
     ) async throws
+    /// Cancellation-aware variant used by long-running transfers. BLE storage
+    /// checks the flag between acknowledged RPC blocks; local USB storage checks it
+    /// between file chunks. Test doubles and simple stores inherit the compatibility
+    /// implementation below.
+    func write(
+        _ path: String,
+        data: Data,
+        progress: (@Sendable (Int) -> Void)?,
+        isStopRequested: @escaping @Sendable () -> Bool
+    ) async throws
     func makeDirectory(_ path: String) async throws
     func delete(_ path: String, recursive: Bool) async throws
     func move(_ from: String, to newPath: String) async throws
@@ -50,6 +60,17 @@ protocol DeviceFileStore {
 }
 
 extension DeviceFileStore {
+    func write(
+        _ path: String,
+        data: Data,
+        progress: (@Sendable (Int) -> Void)?,
+        isStopRequested: @escaping @Sendable () -> Bool
+    ) async throws {
+        if isStopRequested() { throw CancellationError() }
+        try await write(path, data: data, progress: progress)
+        if isStopRequested() { throw CancellationError() }
+    }
+
     func checkedMD5(_ path: String, timeout: TimeInterval) async throws -> String? {
         try await checkedMD5(path)
     }

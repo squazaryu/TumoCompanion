@@ -165,10 +165,11 @@ final class InstallActivityController {
         self.terminalUpdateTimeout = max(0, terminalUpdateTimeout)
     }
 
-    /// A relaunched app cannot resume an interrupted local install, so an Activity
-    /// left by the previous process must not keep advertising stale progress.
-    /// This is intentionally called only during app launch, never when another
-    /// install starts: parallel flows must not dismiss each other's activity.
+    /// A relaunched app resumes an interrupted transfer through its durable
+    /// transaction/checkpoint path, not through an old ActivityKit handle. An Activity
+    /// left by the previous process must therefore not keep advertising stale progress.
+    /// This is intentionally called only during app launch, never when another install
+    /// starts: parallel flows must not dismiss each other's activity.
     static func dismissOrphanedActivities() async {
         for orphan in Activity<InstallActivityAttributes>.activities {
             await orphan.end(nil, dismissalPolicy: .immediate)

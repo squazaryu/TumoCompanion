@@ -97,7 +97,7 @@ https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/apps.json
 
 ### 🔔 Quality of life
 - **all-the-plugins** auto-updater and ~daily background notifications for new plugin packs and ESP32 firmware (local only, no account).
-- **Live Activity** for installs (plugin packs *and* firmware packages) — live per-file progress on the lock screen and Dynamic Island, with a screen-awake guard so a long BLE install isn't interrupted.
+- **Live Activity** for installs (plugin packs *and* firmware packages) — live per-file progress on the lock screen and Dynamic Island, with a screen-awake/background guard. If iOS exhausts its finite background window, the active BLE write stops at a safe boundary and can be retried without promoting a partial file.
 - **Live Activity** — accurate install progress on the Lock Screen and Dynamic Island for firmware packages, firmware staging, and plugin installs.
 - Card-based UI; **4 app-icon styles** — Light, Dark, Liquid Glass, Liquid Glass · Dark — plus an **Auto** icon that follows the system appearance; light/dark themes.
 

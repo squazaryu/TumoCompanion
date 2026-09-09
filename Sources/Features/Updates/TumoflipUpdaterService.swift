@@ -294,24 +294,32 @@ final class TumoflipUpdater: ObservableObject {
     // BLE install/recovery. The transaction can run for minutes; if the phone auto-locks
     // or the app is briefly backgrounded mid-flight, iOS tears down BLE and the half-applied
     // transaction can't be verified/rolled back over the dead link. These guards prevent that.
-    #if canImport(UIKit)
-    private var bgTask: UIBackgroundTaskIdentifier = .invalid
-    #endif
+    private let backgroundGuard = BackgroundTransferGuard(name: "tumoflip-transaction")
+    private var backgroundExpired = false
 
     private func beginTransactionGuards() {
-        #if canImport(UIKit)
-        UIApplication.shared.isIdleTimerDisabled = true
-        bgTask = UIApplication.shared.beginBackgroundTask(withName: "tumoflip-transaction") { [weak self] in
-            self?.endTransactionGuards()
+        backgroundExpired = false
+        backgroundGuard.begin { [weak self] in
+            self?.handleBackgroundExpiration()
         }
-        #endif
     }
 
     private func endTransactionGuards() {
-        #if canImport(UIKit)
-        UIApplication.shared.isIdleTimerDisabled = false
-        if bgTask != .invalid { UIApplication.shared.endBackgroundTask(bgTask); bgTask = .invalid }
-        #endif
+        backgroundGuard.end()
+    }
+
+    /// UIKit gives a finite assertion window. Stop at the next acknowledged BLE
+    /// block so the installer can roll back safely, instead of continuing after the
+    /// assertion has expired and being killed with a half-written staging file.
+    private func handleBackgroundExpiration() {
+        guard !backgroundExpired else { return }
+        backgroundExpired = true
+        if var checkpoint = TransferRecoveryStore.shared.load(kind: .packages) {
+            checkpoint.state = .paused
+            _ = TransferRecoveryStore.shared.save(checkpoint)
+        }
+        stopRequested = true
+        stopToken.stop()
     }
 
     var busy: Bool {
@@ -751,6 +759,17 @@ final class TumoflipUpdater: ObservableObject {
         phase = .installing(done: 0, total: activityTotal, file: "Preparing…")
         beginTransactionGuards()
         defer { endTransactionGuards() }
+        let recoveryStore = TransferRecoveryStore.shared
+        let recoveryID = UUID()
+        _ = recoveryStore.save(TransferRecoveryCheckpoint(
+            id: recoveryID,
+            kind: .packages,
+            releaseID: sourceManifest.releaseId,
+            completed: 0,
+            total: max(1, selectedPendingFileCount),
+            detail: "Preparing…"
+        ))
+        defer { recoveryStore.clear(kind: .packages) }
         let live = InstallActivityController()
         var enteredDeviceMutationPhase = false
         do {
@@ -922,6 +941,12 @@ final class TumoflipUpdater: ObservableObject {
                         self?.phase = .installing(done: done, total: total, file: file)
                         live.update(current: done, total: total, detail: file)
                         transferReporter.progress(file)
+                    }
+                    if var checkpoint = recoveryStore.load(), checkpoint.id == recoveryID {
+                        checkpoint.completed = done
+                        checkpoint.total = max(1, total / 200)
+                        checkpoint.detail = file
+                        _ = recoveryStore.save(checkpoint)
                     }
                 }
                 try await installer.refreshCompatibilityState(manifest: manifest, plan: plan)

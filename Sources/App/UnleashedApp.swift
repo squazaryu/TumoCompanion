@@ -30,6 +30,10 @@ struct UnleashedApp: App {
         // BG task handler must be registered before launch completes.
         UpdateNotificationPresenter.shared.configure()
         PluginUpdateMonitor.register()
+        // A process killed during a transfer cannot run its defer blocks. Convert
+        // that stale intent into an explicit paused checkpoint before the UI starts;
+        // the next foreground screen can offer a deterministic retry/recovery path.
+        _ = TransferRecoveryStore.shared.markInterruptedAsPaused()
         Task { @MainActor in
             await InstallActivityController.dismissOrphanedActivities()
         }
@@ -58,6 +62,7 @@ struct UnleashedApp: App {
             // link instead of a scan that would never find it.
             if phase == .active {
                 ble.autoConnect()
+                updates.refreshTransferRecovery()
                 PluginUpdateMonitor.applicationDidBecomeActive()
                 MacBridgeDiscovery.shared.start()
                 HomeAssistantDiscovery.shared.start()

@@ -2242,7 +2242,24 @@ final class PluginUpdater: ObservableObject {
     /// currently being written always finishes and is md5-verified, so the app you
     /// pressed Stop on stays whole. Files not yet started keep their current version.
     @Published private(set) var stopRequested = false
-    func requestStop() { stopRequested = true }
+    private let stopToken = StopToken()
+    private let backgroundGuard = BackgroundTransferGuard(name: "community-app-install")
+    private var backgroundExpired = false
+
+    func requestStop() {
+        stopRequested = true
+        stopToken.stop()
+    }
+
+    private func handleBackgroundExpiration() {
+        guard !backgroundExpired else { return }
+        backgroundExpired = true
+        if var checkpoint = TransferRecoveryStore.shared.load(kind: .communityApps) {
+            checkpoint.state = .paused
+            _ = TransferRecoveryStore.shared.save(checkpoint)
+        }
+        requestStop()
+    }
 
     func install() async {
         let requested = updates.filter(\.selected)
@@ -2269,6 +2286,27 @@ final class PluginUpdater: ObservableObject {
         // fileChannelReady/prepare waits below, letting a double-tap start a
         // second, fully overlapping install() run.
         phase = .installing(0, requested.count)
+        stopToken.reset()
+        backgroundExpired = false
+        backgroundGuard.begin { [weak self] in
+            self?.handleBackgroundExpiration()
+        }
+        let recoveryStore = TransferRecoveryStore.shared
+        let recoveryID = UUID()
+        _ = recoveryStore.save(TransferRecoveryCheckpoint(
+            id: recoveryID,
+            kind: .communityApps,
+            releaseID: tag,
+            completed: 0,
+            total: requested.count,
+            detail: "Preparing…"
+        ))
+        defer {
+            backgroundGuard.end()
+            // If iOS kills the process before this defer runs, the checkpoint remains
+            // and the next launch can explain that the transfer needs a retry.
+            recoveryStore.clear(kind: .communityApps)
+        }
         let channel = activeChannel
         let storage = activeStorage
         guard await fileChannelReady(channel) else {
@@ -2375,14 +2413,19 @@ final class PluginUpdater: ObservableObject {
                 try? await storage.makeDirectory(dir)
                 do {
                     try? await storage.delete(tempPath)      // clear any stale temp from a prior run
-                    try await storage.write(tempPath, data: data) { sent in
-                        Task { @MainActor in
-                            if let d = self.installDetail, d.name == u.name, sent > d.sent {
-                                self.installDetail?.sent = sent
-                                transferReporter.progress(u.name)
+                    try await storage.write(
+                        tempPath,
+                        data: data,
+                        progress: { sent in
+                            Task { @MainActor in
+                                if let d = self.installDetail, d.name == u.name, sent > d.sent {
+                                    self.installDetail?.sent = sent
+                                    transferReporter.progress(u.name)
+                                }
                             }
-                        }
-                    }
+                        },
+                        isStopRequested: { [stopToken] in stopToken.isStopped }
+                    )
                     installDetail?.sent = data.count
                     // Stop check BEFORE the live app is touched: drop the temp and keep the
                     // previous, working version in place — nothing half-written is applied.
@@ -2406,6 +2449,11 @@ final class PluginUpdater: ObservableObject {
                     case .unavailable(let reason):
                         lastReason = reason
                         try? await storage.delete(tempPath)
+                        break uploadAttempts
+                    }
+                    if stopRequested {
+                        try? await storage.delete(tempPath)
+                        stoppedMidFile = true
                         break uploadAttempts
                     }
                     guard try await commitStagedInstall(
@@ -2438,6 +2486,10 @@ final class PluginUpdater: ObservableObject {
                     lastReason = error.localizedDescription
                     ulog.error("install \(u.name, privacy: .public) attempt \(attempt) failed: \(error.localizedDescription, privacy: .public)")
                     try? await storage.delete(tempPath)      // never leave a partial temp behind
+                    if stopRequested {
+                        stoppedMidFile = true
+                        break uploadAttempts
+                    }
                     try? await Task.sleep(nanoseconds: 800_000_000)   // let reconnect engage
                 }
             }
@@ -2449,6 +2501,11 @@ final class PluginUpdater: ObservableObject {
                                              pack: u.pack, wasNew: u.isNew), at: 0)
             } else if !stoppedMidFile && !protectedSkipped.contains(u.remotePath) {
                 failures.append("\(u.name): \(lastReason)")
+            }
+            if var checkpoint = recoveryStore.load(), checkpoint.id == recoveryID {
+                checkpoint.completed = i + 1
+                checkpoint.detail = u.name
+                _ = recoveryStore.save(checkpoint)
             }
             live.update(current: i + 1, total: selected.count, detail: u.name)
             // Stopped mid-file: the temp was discarded and the live app kept its previous
