@@ -89,11 +89,11 @@ private final class FakeBackgroundApplication: BackgroundTransferApplication {
     var isIdleTimerDisabled = false
     var lastStarted: UIBackgroundTaskIdentifier = .invalid
     var ended: [UIBackgroundTaskIdentifier] = []
-    private var expirationHandler: (() -> Void)?
+    private var expirationHandler: (@MainActor @Sendable () -> Void)?
 
     func beginBackgroundTask(
         withName name: String?,
-        expirationHandler: (() -> Void)?
+        expirationHandler: (@MainActor @Sendable () -> Void)?
     ) -> UIBackgroundTaskIdentifier {
         lastStarted = UIBackgroundTaskIdentifier(rawValue: 42)
         self.expirationHandler = expirationHandler

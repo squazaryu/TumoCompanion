@@ -4,7 +4,7 @@ import UIKit
 /// The operation kinds that can be resumed or explained after iOS suspends the app.
 /// Only metadata is persisted; package bytes never leave the existing cache and are
 /// therefore not duplicated in UserDefaults.
-enum TransferRecoveryKind: String, Codable, Equatable {
+enum TransferRecoveryKind: String, Codable, Equatable, CaseIterable {
     case firmware
     case packages
     case communityApps
@@ -62,19 +62,49 @@ final class TransferRecoveryStore {
     }
 
     func load() -> TransferRecoveryCheckpoint? {
-        guard let data = defaults.data(forKey: key) else { return nil }
+        loadAll().sorted { $0.kind.rawValue < $1.kind.rawValue }.first
+    }
+
+    func load(kind: TransferRecoveryKind) -> TransferRecoveryCheckpoint? {
+        guard let data = defaults.data(forKey: key(for: kind)) else {
+            // Read the pre-scoped key once so a checkpoint written by an earlier
+            // build is not silently lost after upgrading this feature.
+            guard let legacy = defaults.data(forKey: key),
+                  let checkpoint = try? JSONDecoder().decode(
+                    TransferRecoveryCheckpoint.self,
+                    from: legacy
+                  ),
+                  checkpoint.kind == kind else { return nil }
+            return checkpoint
+        }
         return try? JSONDecoder().decode(TransferRecoveryCheckpoint.self, from: data)
+    }
+
+    func loadAll() -> [TransferRecoveryCheckpoint] {
+        TransferRecoveryKind.allCases.compactMap { load(kind: $0) }
     }
 
     @discardableResult
     func save(_ checkpoint: TransferRecoveryCheckpoint) -> Bool {
         guard let data = try? JSONEncoder().encode(checkpoint) else { return false }
-        defaults.set(data, forKey: key)
-        return defaults.synchronize() && load() == checkpoint
+        defaults.set(data, forKey: key(for: checkpoint.kind))
+        return defaults.synchronize() && load(kind: checkpoint.kind) == checkpoint
     }
 
     func clear() {
+        for kind in TransferRecoveryKind.allCases {
+            defaults.removeObject(forKey: key(for: kind))
+        }
         defaults.removeObject(forKey: key)
+        _ = defaults.synchronize()
+    }
+
+    func clear(kind: TransferRecoveryKind) {
+        defaults.removeObject(forKey: key(for: kind))
+        if load(kind: kind) != nil,
+           defaults.data(forKey: key) != nil {
+            defaults.removeObject(forKey: key)
+        }
         _ = defaults.synchronize()
     }
 
@@ -83,12 +113,19 @@ final class TransferRecoveryStore {
     /// evidence that the previous transfer completed.
     @discardableResult
     func markInterruptedAsPaused() -> TransferRecoveryCheckpoint? {
-        guard var checkpoint = load(), checkpoint.state == .running else {
-            return load()
+        let paused = TransferRecoveryKind.allCases.compactMap { kind -> TransferRecoveryCheckpoint? in
+            guard var checkpoint = load(kind: kind), checkpoint.state == .running else {
+                return load(kind: kind)
+            }
+            checkpoint.state = .paused
+            _ = save(checkpoint)
+            return checkpoint
         }
-        checkpoint.state = .paused
-        _ = save(checkpoint)
-        return checkpoint
+        return paused.sorted { $0.kind.rawValue < $1.kind.rawValue }.first
+    }
+
+    private func key(for kind: TransferRecoveryKind) -> String {
+        "(key).(kind.rawValue)"
     }
 }
 
@@ -100,7 +137,7 @@ protocol BackgroundTransferApplication: AnyObject {
     var isIdleTimerDisabled: Bool { get set }
     func beginBackgroundTask(
         withName name: String?,
-        expirationHandler: (() -> Void)?
+        expirationHandler: (@MainActor @Sendable () -> Void)?
     ) -> UIBackgroundTaskIdentifier
     func endBackgroundTask(_ identifier: UIBackgroundTaskIdentifier)
 }
@@ -117,9 +154,14 @@ final class BackgroundTransferGuard {
     private var expirationHandler: (() -> Void)?
     private(set) var didExpire = false
 
+    init(name: String) {
+        self.name = name
+        self.application = UIApplication.shared
+    }
+
     init(
         name: String,
-        application: any BackgroundTransferApplication = UIApplication.shared
+        application: any BackgroundTransferApplication
     ) {
         self.name = name
         self.application = application

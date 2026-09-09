@@ -177,8 +177,7 @@ final class ESP32Updater: ObservableObject {
     private func handleBackgroundExpiration() {
         guard !backgroundExpired else { return }
         backgroundExpired = true
-        if var checkpoint = TransferRecoveryStore.shared.load(),
-           checkpoint.kind == .esp32 {
+        if var checkpoint = TransferRecoveryStore.shared.load(kind: .esp32) {
             checkpoint.state = .paused
             _ = TransferRecoveryStore.shared.save(checkpoint)
         }
@@ -977,7 +976,7 @@ final class ESP32Updater: ObservableObject {
         ))
         defer {
             backgroundGuard.end()
-            recoveryStore.clear()
+            recoveryStore.clear(kind: .esp32)
             busy = false
             progress = nil
             downloadPhase = false

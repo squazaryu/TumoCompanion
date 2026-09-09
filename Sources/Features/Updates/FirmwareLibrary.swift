@@ -280,8 +280,7 @@ final class FirmwareLibrary: ObservableObject {
     private func handleBackgroundExpiration() {
         guard !backgroundExpired else { return }
         backgroundExpired = true
-        if var checkpoint = TransferRecoveryStore.shared.load(),
-           checkpoint.kind == .firmware {
+        if var checkpoint = TransferRecoveryStore.shared.load(kind: .firmware) {
             checkpoint.state = .paused
             _ = TransferRecoveryStore.shared.save(checkpoint)
         }
@@ -326,7 +325,7 @@ final class FirmwareLibrary: ObservableObject {
         ))
         defer {
             backgroundGuard.end()
-            recoveryStore.clear()
+            recoveryStore.clear(kind: .firmware)
             operationRunning = false
         }
 

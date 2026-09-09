@@ -2254,8 +2254,7 @@ final class PluginUpdater: ObservableObject {
     private func handleBackgroundExpiration() {
         guard !backgroundExpired else { return }
         backgroundExpired = true
-        if var checkpoint = TransferRecoveryStore.shared.load(),
-           checkpoint.kind == .communityApps {
+        if var checkpoint = TransferRecoveryStore.shared.load(kind: .communityApps) {
             checkpoint.state = .paused
             _ = TransferRecoveryStore.shared.save(checkpoint)
         }
@@ -2306,7 +2305,7 @@ final class PluginUpdater: ObservableObject {
             backgroundGuard.end()
             // If iOS kills the process before this defer runs, the checkpoint remains
             // and the next launch can explain that the transfer needs a retry.
-            recoveryStore.clear()
+            recoveryStore.clear(kind: .communityApps)
         }
         let channel = activeChannel
         let storage = activeStorage

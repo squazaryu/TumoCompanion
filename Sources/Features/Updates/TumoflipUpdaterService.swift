@@ -314,8 +314,7 @@ final class TumoflipUpdater: ObservableObject {
     private func handleBackgroundExpiration() {
         guard !backgroundExpired else { return }
         backgroundExpired = true
-        if var checkpoint = TransferRecoveryStore.shared.load(),
-           checkpoint.kind == .packages {
+        if var checkpoint = TransferRecoveryStore.shared.load(kind: .packages) {
             checkpoint.state = .paused
             _ = TransferRecoveryStore.shared.save(checkpoint)
         }
@@ -770,7 +769,7 @@ final class TumoflipUpdater: ObservableObject {
             total: max(1, selectedPendingFileCount),
             detail: "Preparing…"
         ))
-        defer { recoveryStore.clear() }
+        defer { recoveryStore.clear(kind: .packages) }
         let live = InstallActivityController()
         var enteredDeviceMutationPhase = false
         do {
