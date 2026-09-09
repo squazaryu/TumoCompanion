@@ -996,7 +996,9 @@ final class ESP32Updater: ObservableObject {
         do {
             files = try await download(plans)
         } catch {
-            status = "Download failed: \(error.localizedDescription)"
+            status = stopToken.isStopped
+                ? "Staging paused — reopen ESP32 Firmware and retry."
+                : "Download failed: \(error.localizedDescription)"
             return
         }
 
