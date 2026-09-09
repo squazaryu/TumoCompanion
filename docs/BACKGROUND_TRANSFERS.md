@@ -31,7 +31,10 @@ make retry/recovery deterministic instead of leaving a partial live file.
 
 `BGAppRefreshTask` remains reserved for opportunistic release checks. It is not used to
 drive an active BLE upload because the scheduler provides no delivery deadline and does
-not maintain a live connection.
+not maintain a live connection. See Apple's [Core Bluetooth background processing
+guide](https://developer.apple.com/library/archive/documentation/NetworkingInternetWeb/Conceptual/CoreBluetooth_concepts/CoreBluetoothBackgroundProcessingForIOSApps/PerformingTasksWhileYourAppIsInTheBackground.html)
+and [background execution guidance](https://developer.apple.com/documentation/uikit/extending-your-app-s-background-execution-time)
+for the platform guarantees this design relies on.
 
 ## Device test checklist
 
