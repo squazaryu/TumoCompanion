@@ -1569,6 +1569,9 @@ final class PluginUpdater: ObservableObject {
         "keeloq_keystore_decryptor",
         "module_one_cockpit",
         "module_one_sensor_logger",
+        // Nearby Files is delivered by the Tumoflip FW Packages Base catalog;
+        // keep the Community Pack copy from overwriting the package-owned route.
+        "nearby_files",
         "nfc_ccid_bridge",
         "protocol_compiler",
         "proto_pirate",
