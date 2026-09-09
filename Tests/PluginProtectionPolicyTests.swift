@@ -260,6 +260,7 @@ final class PluginProtectionPolicyTests: XCTestCase {
             "esp_flasher", "esp32_wifi_marauder",
             "field_logger", "flipper_companion", "flipper_relay", "freq_analyzer_ext",
             "module_one_cockpit", "module_one_sensor_logger", "nfc_ccid_bridge",
+            "nearby_files",
             "protocol_compiler", "proto_pirate",
             "quac", "rolljam", "runtime_trace_viewer", "signal_workbench",
             "subghz_bruteforcer", "subghz_protocols", "subghz_raw_edit",
@@ -307,6 +308,19 @@ final class PluginProtectionPolicyTests: XCTestCase {
         XCTAssertTrue(PluginProtectionPolicy.isProtected(
             name: "esp_flasher",
             remotePath: routedPath,
+            excluded: PluginUpdater.builtInExcluded,
+            unprotectedBuiltIns: []))
+    }
+
+    func testAllThePluginsCannotOverwriteTumoflipNearbyFiles() {
+        let remotePath = "/ext/apps/GPIO/nearby_files.fap"
+        XCTAssertEqual(
+            PluginInstallRouting.targetPath(for: remotePath),
+            remotePath,
+            "Nearby Files follows the canonical FW Packages Base route")
+        XCTAssertTrue(PluginProtectionPolicy.isProtected(
+            name: "nearby_files",
+            remotePath: remotePath,
             excluded: PluginUpdater.builtInExcluded,
             unprotectedBuiltIns: []))
     }
