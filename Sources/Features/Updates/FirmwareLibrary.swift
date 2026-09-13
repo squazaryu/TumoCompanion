@@ -80,9 +80,23 @@ enum FirmwareReleasePolicy {
             return Array(channelReleases.prefix(limit))
         }
 
+        let newerDevReleases = channelReleases.filter { $0.publishedAt > latestMainDate }
+        if !newerDevReleases.isEmpty {
+            return Array(newerDevReleases.prefix(limit))
+        }
+
+        // A stable promotion can be published after the last Dev build on the
+        // same firmware line. Keep that line inspectable so a user on Dev does
+        // not get an empty catalog immediately after Stable is cut, while still
+        // hiding older development lines that are no longer related to Main.
+        guard let latestMain = releases.lazy
+            .filter({ $0.channel == .stable })
+            .max(by: { $0.publishedAt < $1.publishedAt }) else {
+            return Array(channelReleases.prefix(limit))
+        }
         return Array(
             channelReleases.lazy
-                .filter { $0.publishedAt > latestMainDate }
+                .filter { $0.versionLine == latestMain.versionLine }
                 .prefix(limit)
         )
     }
@@ -606,7 +620,8 @@ final class FirmwareLibrary: ObservableObject {
 extension FirmwareLibrary {
     static func layoutQAFixture(
         phase: Phase = .ready,
-        selectedChannel: TumoflipFirmwareChannel = .stable
+        selectedChannel: TumoflipFirmwareChannel = .stable,
+        devHistoryPromoted: Bool = false
     ) -> FirmwareLibrary {
         let library = FirmwareLibrary()
         let baseDate = Date(timeIntervalSince1970: 1_787_875_200)
@@ -634,13 +649,13 @@ extension FirmwareLibrary {
         }
 
         library.releases = [
-            release("t-dev-008-002", channel: .dev, daysAgo: 0, size: 1_920_000),
-            release("t-dev-008-001", channel: .dev, daysAgo: 1, size: 1_910_000),
-            release("t-flppr-fw-008", channel: .stable, daysAgo: 2, size: 1_900_000),
+            release("t-dev-008-002", channel: .dev, daysAgo: devHistoryPromoted ? 2 : 0, size: 1_920_000),
+            release("t-dev-008-001", channel: .dev, daysAgo: devHistoryPromoted ? 3 : 1, size: 1_910_000),
+            release("t-flppr-fw-008", channel: .stable, daysAgo: devHistoryPromoted ? 0 : 2, size: 1_900_000),
             release("t-flppr-fw-007", channel: .stable, daysAgo: 8, size: 1_860_000),
         ]
-        library.installedVersion = "t-flppr-fw-007"
-        library.installedAPI = "88.4"
+        library.installedVersion = devHistoryPromoted ? "t-dev-008-027" : "t-flppr-fw-007"
+        library.installedAPI = devHistoryPromoted ? "88.7" : "88.4"
         library.selectedChannel = selectedChannel
         library.phase = phase
         return library

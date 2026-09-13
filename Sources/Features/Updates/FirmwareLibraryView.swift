@@ -133,7 +133,7 @@ struct FirmwareLibraryView: View {
     private var emptyMessage: String {
         if library.busy { return "Loading releases..." }
         if library.selectedChannel == .dev {
-            return "No Dev builds have been published after the latest Main release."
+            return "No Dev builds are available for the latest Main line."
         }
         return "No Main firmware releases found."
     }

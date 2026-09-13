@@ -118,6 +118,23 @@ final class FirmwareCatalogTests: XCTestCase {
             ["t-dev-089-040-001"])
     }
 
+    func testDevKeepsTheLatestMainLineWhenStablePromotesTheDevHistory() {
+        let latestMain = release(
+            version: "t-flppr-fw-008", channel: .stable,
+            date: "2026-09-13T10:00:00Z")
+        let promotedDev = release(
+            version: "t-dev-008-027", channel: .dev,
+            date: "2026-09-11T10:00:00Z")
+        let olderLine = release(
+            version: "t-dev-007-099", channel: .dev,
+            date: "2026-09-12T10:00:00Z")
+
+        let visible = FirmwareReleasePolicy.visible(
+            [latestMain, promotedDev, olderLine], channel: .dev)
+
+        XCTAssertEqual(visible.map(\.version), ["t-dev-008-027"])
+    }
+
     private func release(
         version: String,
         channel: TumoflipFirmwareChannel,

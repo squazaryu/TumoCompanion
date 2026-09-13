@@ -398,6 +398,19 @@ final class UpdateSourceLayoutUITests: XCTestCase {
         attach("Firmware identity pending - dark")
     }
 
+    func testFirmwareDevHistoryRemainsVisibleAfterStablePromotion() {
+        let app = launch("-firmware-library-dev-fallback-qa", appearance: "dark")
+        XCTAssertTrue(app.staticTexts["RELEASE CATALOG"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.staticTexts["No Dev builds are available for the latest Main line."].exists)
+        let drawer = app.buttons["firmware-releases-drawer-toggle"]
+        XCTAssertTrue(drawer.exists)
+        drawer.tap()
+        XCTAssertTrue(app.segmentedControls["firmware-channel-picker"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["Version 008"].exists)
+        XCTAssertTrue(app.staticTexts["Beta 002"].exists)
+        attach("Firmware Dev history after stable promotion")
+    }
+
     func testFirmwareFailureReplacesDrawerInDarkMode() {
         let app = launch("-firmware-library-error-qa", appearance: "dark")
         XCTAssertTrue(app.staticTexts["Firmware transfer failed"].waitForExistence(timeout: 3))
