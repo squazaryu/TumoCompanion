@@ -1,5 +1,5 @@
 {
-  "release_tag": "9sep2026p2",
+  "release_tag": "15sep2026",
   "stems": {
     "24cxxprog": "Programmers",
     "4inrow": "Board",
@@ -358,6 +358,7 @@
     "xinput_controller": "USB",
     "xremote": "Infrared",
     "yatzee": "Board",
+    "yrm100x_pro": "GPIO",
     "zero_tracker": "Players",
     "zerofido": "Tools",
     "zombiez": "Arcade"
