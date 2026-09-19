@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.11.21",
-      "versionDate": "2026-09-13",
-      "versionDescription": "TumoCompanion 1.11.21 \u2014 fixes Dev firmware catalogs becoming empty after a Stable promotion by retaining the latest Main firmware line while still hiding unrelated older Dev lines.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.21/TumoCompanion-unsigned.ipa",
-      "size": 25719843,
+      "version": "1.11.22",
+      "versionDate": "2026-09-19",
+      "versionDescription": "TumoCompanion 1.11.22 protects the adapted Specter from Community Pack replacement by app identity and canonical SD filename. Install before FW Packages Dev 017; explicit Protected apps overrides remain available.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.22/TumoCompanion-unsigned.ipa",
+      "size": 25837188,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.11.22",
+          "date": "2026-09-19",
+          "localizedDescription": "TumoCompanion 1.11.22 protects the adapted Specter from Community Pack replacement by app identity and canonical SD filename. Install before FW Packages Dev 017; explicit Protected apps overrides remain available.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.22/TumoCompanion-unsigned.ipa",
+          "size": 25837188,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.11.21",
           "date": "2026-09-13",
