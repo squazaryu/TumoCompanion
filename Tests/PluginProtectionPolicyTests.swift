@@ -4,6 +4,21 @@ import ZIPFoundation
 @testable import UnleashedCompanion
 
 final class PluginProtectionPolicyTests: XCTestCase {
+    func testCommunityPackCannotOverwritePackageOwnedSpecter() {
+        for (name, path) in [
+            ("specter", "/ext/apps/NFC/specter.fap"),
+            ("SPECTER", "/EXT/APPS/NFC/SPECTER.FAP"),
+            ("renamed_entry", "/ext/apps/NFC/Specter.fap"),
+        ] {
+            XCTAssertTrue(PluginProtectionPolicy.isProtected(
+                name: name, remotePath: path,
+                excluded: PluginUpdater.builtInExcluded, unprotectedBuiltIns: []))
+        }
+        XCTAssertFalse(PluginProtectionPolicy.isProtected(
+            name: "specter", remotePath: "/ext/apps/NFC/specter.fap",
+            excluded: PluginUpdater.builtInExcluded, unprotectedBuiltIns: ["specter"]))
+    }
+
     private func routeUpdate(
         _ name: String,
         remotePath: String,

@@ -5,7 +5,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
-XCODE="/Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild"
+XCODE="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}/usr/bin/xcodebuild"
 PATH="/opt/homebrew/bin:$PATH"
 XCODE_JOBS="${XCODE_JOBS:-2}"
 

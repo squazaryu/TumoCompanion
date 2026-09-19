@@ -125,6 +125,11 @@ enum PluginProtectionPolicy {
         // protected protocol FAL as the unrelated `subghz` family.
         let path = PluginRouteReconciliation.pathIdentity(remotePath)
         var keys = [name.lowercased()]
+        // A renamed catalog label must not bypass ownership of the actual FAP
+        // target. FAT path identity is already case-insensitive here.
+        if path.hasPrefix("/ext/apps/"), path.hasSuffix(".fap") {
+            keys.append(((path as NSString).lastPathComponent as NSString).deletingPathExtension)
+        }
         if let family = dataFamilyOwners.first(where: { path.hasPrefix($0.prefix) }) {
             keys.append(family.owner)
         } else if path.hasPrefix("/ext/apps_data/") {
@@ -1580,6 +1585,7 @@ final class PluginUpdater: ObservableObject {
         "rolljam_standalone",
         "runtime_trace_viewer",
         "signal_workbench",
+        "specter",
         "subghz_bruteforcer",
         "subghz_protocols",
         "subghz_raw_edit",
