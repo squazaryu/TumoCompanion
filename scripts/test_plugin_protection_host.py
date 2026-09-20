@@ -18,6 +18,13 @@ for (name, path) in [("specter", "/ext/apps/NFC/specter.fap"), ("SPECTER", "/EXT
 if PluginProtectionPolicy.isProtected(name: "specter", remotePath: "/ext/apps/NFC/specter.fap", excluded: PluginUpdater.builtInExcluded, unprotectedBuiltIns: ["specter"]) { failures += 1 }
 if PluginProtectionPolicy.isProtected(name: "unrelated", remotePath: "/ext/apps/NFC/unrelated.fap", excluded: PluginUpdater.builtInExcluded, unprotectedBuiltIns: []) { failures += 1 }
 print("Specter protection failures: \(failures)")
+for (name, path) in [("hid_ble", "/ext/apps/Bluetooth/hid_ble.fap"), ("renamed_remote", "/EXT/APPS/BLUETOOTH/HID_BLE.FAP")] {
+    if !PluginProtectionPolicy.isProtected(name: name, remotePath: path, excluded: PluginUpdater.builtInExcluded, unprotectedBuiltIns: []) { failures += 1 }
+}
+for name in ["hid_usb", "bad_usb", "btremote_kodi"] {
+    if PluginProtectionPolicy.isProtected(name: name, remotePath: "/ext/apps/Bluetooth/\(name).fap", excluded: PluginUpdater.builtInExcluded, unprotectedBuiltIns: []) { failures += 1 }
+}
+print("Total managed-app protection failures: \(failures)")
 exit(failures == 0 ? 0 : 1)
 '''
 with tempfile.TemporaryDirectory(prefix="specter-policy-") as directory:
