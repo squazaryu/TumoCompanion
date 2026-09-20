@@ -116,6 +116,7 @@ enum PluginProtectionPolicy {
         ("/ext/apps_data/rolljam_standalone/", "rolljam"),
         ("/ext/apps_data/subghz/plugins/", "subghz_protocols"),
         ("/ext/apps_data/totp/", "totp"),
+        ("/ext/apps_data/hid_ble/", "hid_ble"),
     ]
 
     static func protectionKeys(name: String, remotePath: String) -> Set<String> {
@@ -1571,6 +1572,7 @@ final class PluginUpdater: ObservableObject {
         "flipper_xremote",
         "freq_analyzer_ext",
         "garage_door_remote",
+        "hid_ble",
         "keeloq_keystore_decryptor",
         "module_one_cockpit",
         "module_one_sensor_logger",
