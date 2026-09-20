@@ -893,6 +893,17 @@ final class TumoflipUpdater: ObservableObject {
                     deviceTarget: devTarget
                 )
                 let hits = self.blocked.filter { requestedTargets.contains($0.key) }
+                let managedBlocks = ManagedPackageRequirements.blocked(
+                    targets: Array(requestedTargets),
+                    originFork: finalIdentity.identity.originFork,
+                    firmwareAPI: finalIdentity.identity.firmwareAPI,
+                    hardwareTarget: finalIdentity.identity.hardwareTarget
+                )
+                if let reason = managedBlocks.values.first {
+                    self.blocked.merge(managedBlocks) { _, requirement in requirement }
+                    self.phase = .failed(reason + " Nothing was written.")
+                    return nil
+                }
                 if !hits.isEmpty {
                     self.phase = .failed(PackageCompatibilityGate.summary(hits))
                     return nil
@@ -1377,6 +1388,12 @@ final class TumoflipUpdater: ObservableObject {
         }
         let candidates = fapCandidates(source, groups: Set(TumoflipManifest.knownGroups))
         blocked = PackageCompatibilityGate.blocked(candidates, deviceApiMajor: api, deviceTarget: target)
+        blocked.merge(ManagedPackageRequirements.blocked(
+            targets: candidates.map(\.target),
+            originFork: deviceIdentity?.originFork,
+            firmwareAPI: deviceIdentity?.firmwareAPI,
+            hardwareTarget: deviceIdentity?.hardwareTarget
+        )) { _, requirement in requirement }
         compatibilityChecked = true
     }
 
