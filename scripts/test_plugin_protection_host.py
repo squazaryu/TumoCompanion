@@ -10,7 +10,9 @@ start = source.index("    static func pathIdentity(")
 identity = source[start:source.index("\n    }", start) + 6]
 start = source.index("    static let builtInExcluded: Set<String> = [")
 builtins = source[start:source.index("\n    ]", start) + 6]
-program = "import Foundation\n" + policy + "\nenum PluginRouteReconciliation {\n" + identity + "\n}\nenum PluginUpdater {\n" + builtins + "\n}\n" + r'''
+requirements_path = ROOT / "Sources/Features/Updates/ManagedPackageRequirements.swift"
+requirements = requirements_path.read_text() if requirements_path.exists() else ""
+program = "import Foundation\n" + policy + "\nenum PluginRouteReconciliation {\n" + identity + "\n}\nenum PluginUpdater {\n" + builtins + "\n}\n" + requirements + r'''
 var failures = 0
 for (name, path) in [("specter", "/ext/apps/NFC/specter.fap"), ("SPECTER", "/EXT/APPS/NFC/SPECTER.FAP"), ("renamed_entry", "/ext/apps/NFC/Specter.fap")] {
     if !PluginProtectionPolicy.isProtected(name: name, remotePath: path, excluded: PluginUpdater.builtInExcluded, unprotectedBuiltIns: []) { failures += 1 }
@@ -24,7 +26,20 @@ for (name, path) in [("hid_ble", "/ext/apps/Bluetooth/hid_ble.fap"), ("renamed_r
 for name in ["hid_usb", "bad_usb", "btremote_kodi"] {
     if PluginProtectionPolicy.isProtected(name: name, remotePath: "/ext/apps/Bluetooth/\(name).fap", excluded: PluginUpdater.builtInExcluded, unprotectedBuiltIns: []) { failures += 1 }
 }
-print("Total managed-app protection failures: \(failures)")
+let bleTarget = "/ext/apps/Bluetooth/hid_ble.fap"
+let cases: [(String?, String?, Int?, Bool)] = [
+    ("88.10", "tumoflip", 7, true), ("88.11", "tumoflip", 7, false),
+    ("88.12", "Tumoflip", 7, false), ("88.11", "unleashed", 7, true),
+    (nil, "tumoflip", 7, true), ("88.11", nil, 7, true),
+    ("88.11", "tumoflip", 18, true), ("88.bad", "tumoflip", 7, true),
+    ("89.0", "tumoflip", 7, true), ("88.11.0", "tumoflip", 7, true),
+]
+for (api, origin, target, shouldBlock) in cases {
+    let blocked = ManagedPackageRequirements.blocked(targets: [bleTarget], originFork: origin, firmwareAPI: api, hardwareTarget: target)
+    if (blocked[bleTarget] != nil) != shouldBlock { failures += 1 }
+}
+if ManagedPackageRequirements.blocked(targets: ["/ext/apps/USB/hid_usb.fap"], originFork: nil, firmwareAPI: nil, hardwareTarget: nil).count != 0 { failures += 1 }
+print("Total managed-app protection/compatibility failures: \(failures)")
 exit(failures == 0 ? 0 : 1)
 '''
 with tempfile.TemporaryDirectory(prefix="specter-policy-") as directory:
