@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.11.22",
-      "versionDate": "2026-09-19",
-      "versionDescription": "TumoCompanion 1.11.22 protects the adapted Specter from Community Pack replacement by app identity and canonical SD filename. Install before FW Packages Dev 017; explicit Protected apps overrides remain available.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.22/TumoCompanion-unsigned.ipa",
-      "size": 25837188,
+      "version": "1.11.23",
+      "versionDate": "2026-09-20",
+      "versionDescription": "TumoCompanion 1.11.23 protects package-owned Bluetooth Remote and its pairing data from Community replacement. Its installation now requires a freshly confirmed Tumoflip F7 with API 88.11. Install this app update first, firmware Dev 009-004 second, then FW Packages Dev 018.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.23/TumoCompanion-unsigned.ipa",
+      "size": 25840413,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.11.23",
+          "date": "2026-09-20",
+          "localizedDescription": "TumoCompanion 1.11.23 protects package-owned Bluetooth Remote and its pairing data from Community replacement. Its installation now requires a freshly confirmed Tumoflip F7 with API 88.11. Install this app update first, firmware Dev 009-004 second, then FW Packages Dev 018.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.23/TumoCompanion-unsigned.ipa",
+          "size": 25840413,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.11.22",
           "date": "2026-09-19",
