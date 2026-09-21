@@ -1,5 +1,5 @@
 {
-  "release_tag": "19sep2026",
+  "release_tag": "21sep2026",
   "stems": {
     "24cxxprog": "Programmers",
     "4inrow": "Board",
@@ -27,6 +27,7 @@
     "blackjack": "Board",
     "ble_spam": "Bluetooth",
     "bomberduck": "Arcade",
+    "bounce": "Arcade",
     "bpm_tapper": "Instruments",
     "brainfuck": "Tools",
     "bt_trigger": "Bluetooth",
@@ -283,6 +284,7 @@
     "spectrum_analyzer": "Analyzers",
     "spi_mem_manager": "Programmers",
     "ssd1306_test": "GPIO",
+    "stack_attack": "Arcade",
     "stepcounter": "Sensors",
     "sub_analyzer": "Analyzers",
     "sub_dup_finder": "Sub-GHz",
