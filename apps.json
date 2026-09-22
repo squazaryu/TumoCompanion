@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.11.23",
-      "versionDate": "2026-09-20",
-      "versionDescription": "TumoCompanion 1.11.23 protects package-owned Bluetooth Remote and its pairing data from Community replacement. Its installation now requires a freshly confirmed Tumoflip F7 with API 88.11. Install this app update first, firmware Dev 009-004 second, then FW Packages Dev 018.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.23/TumoCompanion-unsigned.ipa",
-      "size": 25840413,
+      "version": "1.11.24",
+      "versionDate": "2026-09-22",
+      "versionDescription": "TumoCompanion 1.11.24 protects Device Library, its cards/history and File History plugin from Community replacement, and checks Tumoflip F7 API 88.5+ before installation. Update this app, then Firmware Dev 009-009, then FW Packages Dev 021. The Bluetooth Remote repair is in the firmware; pairing data is preserved.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.24/TumoCompanion-unsigned.ipa",
+      "size": 25840904,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.11.24",
+          "date": "2026-09-22",
+          "localizedDescription": "TumoCompanion 1.11.24 protects Device Library, its cards/history and File History plugin from Community replacement, and checks Tumoflip F7 API 88.5+ before installation. Update this app, then Firmware Dev 009-009, then FW Packages Dev 021. The Bluetooth Remote repair is in the firmware; pairing data is preserved.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.24/TumoCompanion-unsigned.ipa",
+          "size": 25840904,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.11.23",
           "date": "2026-09-20",
