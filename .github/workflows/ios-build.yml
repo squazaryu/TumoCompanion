@@ -29,6 +29,36 @@ jobs:
         run: python3 scripts/test_plugin_protection_host.py
       - name: Build unsigned IPA
         run: scripts/build_ipa.sh
+      - name: Test managed package protection and installation
+        run: |
+          set -euo pipefail
+          SIMULATOR_ID="$(xcrun simctl list devices available --json | python3 -c '
+          import json, sys
+          devices = json.load(sys.stdin)["devices"]
+          candidates = [(runtime, device["udid"]) for runtime, entries in devices.items()
+                        if "iOS" in runtime for device in entries
+                        if device.get("isAvailable") and device["name"].startswith("iPhone")]
+          if not candidates:
+              raise SystemExit("No available iPhone simulator on CI")
+          print(sorted(candidates)[-1][1])
+          ')"
+          xcodebuild test -project UnleashedCompanion.xcodeproj \
+            -scheme UnleashedCompanion -configuration Debug \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
+            -jobs "$XCODE_JOBS" -parallel-testing-enabled NO \
+            -only-testing:UnleashedTests/ManagedPackageRequirementsTests \
+            -only-testing:UnleashedTests/PluginProtectionPolicyTests \
+            -only-testing:UnleashedTests/TumoflipInstallerTests \
+            -resultBundlePath build/ManagedPackages.xcresult \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
+      - name: Upload managed package test results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: managed-package-tests-${{ github.sha }}
+          path: build/ManagedPackages.xcresult
+          if-no-files-found: warn
+          retention-days: 7
       - name: Upload candidate (not a release)
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:

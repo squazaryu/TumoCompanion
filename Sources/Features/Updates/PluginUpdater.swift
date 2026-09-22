@@ -117,6 +117,7 @@ enum PluginProtectionPolicy {
         ("/ext/apps_data/subghz/plugins/", "subghz_protocols"),
         ("/ext/apps_data/totp/", "totp"),
         ("/ext/apps_data/hid_ble/", "hid_ble"),
+        ("/ext/apps_data/device_library/", "device_library"),
     ]
 
     static func protectionKeys(name: String, remotePath: String) -> Set<String> {
@@ -1564,6 +1565,7 @@ final class PluginUpdater: ObservableObject {
         "ble_gatt_lab",
         "claude_buddy",
         "claude_remote_ble",
+        "device_library",
         "esp_flasher",
         "esp32_wifi_marauder",
         "field_logger",

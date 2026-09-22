@@ -4,6 +4,26 @@ import ZIPFoundation
 @testable import UnleashedCompanion
 
 final class PluginProtectionPolicyTests: XCTestCase {
+    func testCommunityPackCannotOverwriteDeviceLibraryOrItsDataFamily() {
+        for path in ["/ext/apps/Tools/device_library.fap", "/EXT/APPS/TOOLS/DEVICE_LIBRARY.FAP",
+                     "/ext/apps_data/device_library/cards/example.card",
+                     "/EXT/APPS_DATA/DEVICE_LIBRARY/PLUGINS/FILE_HISTORY.FAL",
+                     "/ext/apps_data/device_library/history/checkpoint.bin"] {
+            XCTAssertTrue(PluginProtectionPolicy.isProtected(
+                name: "renamed_entry", remotePath: path,
+                excluded: PluginUpdater.builtInExcluded, unprotectedBuiltIns: []))
+            XCTAssertFalse(PluginProtectionPolicy.isProtected(
+                name: "renamed_entry", remotePath: path,
+                excluded: PluginUpdater.builtInExcluded, unprotectedBuiltIns: ["device_library"]))
+        }
+        for path in ["/ext/apps/Tools/file_history.fap", "/ext/apps_data/device_library_extra/data",
+                     "/ext/apps_data/another_app/file_history.fal"] {
+            XCTAssertFalse(PluginProtectionPolicy.isProtected(
+                name: "unrelated", remotePath: path,
+                excluded: PluginUpdater.builtInExcluded, unprotectedBuiltIns: []))
+        }
+    }
+
     func testCommunityPackCannotOverwritePackageOwnedSpecter() {
         for (name, path) in [
             ("specter", "/ext/apps/NFC/specter.fap"),

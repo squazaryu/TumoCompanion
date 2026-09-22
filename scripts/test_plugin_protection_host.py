@@ -40,6 +40,37 @@ for (api, origin, target, shouldBlock) in cases {
 }
 if ManagedPackageRequirements.blocked(targets: ["/ext/apps/USB/hid_usb.fap"], originFork: nil, firmwareAPI: nil, hardwareTarget: nil).count != 0 { failures += 1 }
 print("Total managed-app protection/compatibility failures: \(failures)")
+let libraryTarget = "/ext/apps/Tools/device_library.fap"
+let libraryPaths = [libraryTarget, libraryTarget.uppercased(),
+    "/ext/apps_data/device_library/cards/example.card",
+    "/EXT/APPS_DATA/DEVICE_LIBRARY/PLUGINS/FILE_HISTORY.FAL",
+    "/ext/apps_data/device_library/history/checkpoint.bin"]
+for path in libraryPaths {
+    if !PluginProtectionPolicy.isProtected(name: "renamed_entry", remotePath: path,
+        excluded: PluginUpdater.builtInExcluded, unprotectedBuiltIns: []) { failures += 1 }
+    if PluginProtectionPolicy.isProtected(name: "renamed_entry", remotePath: path,
+        excluded: PluginUpdater.builtInExcluded, unprotectedBuiltIns: ["device_library"]) { failures += 1 }
+}
+for path in ["/ext/apps/Tools/file_history.fap", "/ext/apps_data/device_library_extra/data", "/ext/apps_data/another_app/file_history.fal"] {
+    if PluginProtectionPolicy.isProtected(name: "unrelated", remotePath: path,
+        excluded: PluginUpdater.builtInExcluded, unprotectedBuiltIns: []) { failures += 1 }
+}
+let libraryCases: [(String?, String?, Int?, Bool)] = [
+    ("88.4", "tumoflip", 7, true), ("88.5", "tumoflip", 7, false),
+    ("88.13", "Tumoflip", 7, false), ("88.5", "unleashed", 7, true),
+    (nil, "tumoflip", 7, true), ("88.5", nil, 7, true),
+    ("88.5", "tumoflip", 18, true), ("88.bad", "tumoflip", 7, true),
+    ("89.0", "tumoflip", 7, true), ("88.5.0", "tumoflip", 7, true),
+    ("88.-1", "tumoflip", 7, true), ("88.99999999999999999999999", "tumoflip", 7, true),
+]
+for (api, origin, target, shouldBlock) in libraryCases {
+    let blocked = ManagedPackageRequirements.blocked(targets: [libraryTarget, libraryTarget.uppercased()], originFork: origin, firmwareAPI: api, hardwareTarget: target)
+    if (blocked[libraryTarget] != nil) != shouldBlock { failures += 1 }
+    if (blocked[libraryTarget.uppercased()] != nil) != shouldBlock { failures += 1 }
+}
+let mixed = ManagedPackageRequirements.blocked(targets: [libraryTarget, bleTarget], originFork: "tumoflip", firmwareAPI: "88.5", hardwareTarget: 7)
+if mixed[libraryTarget] != nil || mixed[bleTarget] == nil { failures += 1 }
+print("Including Device Library protection/compatibility failures: \(failures)")
 exit(failures == 0 ? 0 : 1)
 '''
 with tempfile.TemporaryDirectory(prefix="specter-policy-") as directory:
