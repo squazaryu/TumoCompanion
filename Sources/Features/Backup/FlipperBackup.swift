@@ -121,6 +121,10 @@ final class FlipperBackup: ObservableObject {
                 throw FlipperBackupError.invalidPath(stamp)
             }
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            #if os(iOS)
+            try FileManager.default.setAttributes(
+                [.protectionKey: FileProtectionType.complete], ofItemAtPath: directory.path)
+            #endif
             var files: [FlipperFile] = []
             for folder in Set(folders).sorted() {
                 guard !folder.isEmpty, !folder.contains("/"), folder != ".", folder != ".." else {
