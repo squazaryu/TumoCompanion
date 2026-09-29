@@ -70,7 +70,34 @@ final class RuntimeDiagnosticsTests: XCTestCase {
         XCTAssertFalse(caps.supportsTime)
         XCTAssertFalse(caps.supportsGPS)
         XCTAssertFalse(caps.supportsNetwork)
+        XCTAssertFalse(caps.supportsCrash)
         XCTAssertNil(caps.sessionVersion)
+    }
+
+    func testCrashCapabilityRequiresFirmwareAdvertisement() {
+        let newFirmware = RuntimeCapabilities(FlipperBLE.parseCapabilities(Data(
+            "runtime=1;fab=2;crash=1;feat=trace,crash".utf8)))
+        let olderFirmware = RuntimeCapabilities(FlipperBLE.parseCapabilities(Data(
+            "runtime=1;fab=2;trace=1;feat=trace".utf8)))
+        XCTAssertTrue(newFirmware.supportsCrash)
+        XCTAssertFalse(olderFirmware.supportsCrash)
+    }
+
+    func testCrashReportParsesRedactedRecordAndEmptyState() {
+        let report = RuntimeCrashReport(
+            "schema=1;status=ok;kind=null_pointer;app=subghz;seq=2;build=ABCD1234")
+        XCTAssertEqual(report?.kind, "null_pointer")
+        XCTAssertEqual(report?.appID, "subghz")
+        XCTAssertEqual(report?.sequence, 2)
+        XCTAssertEqual(report?.buildCommit, "ABCD1234")
+        XCTAssertEqual(RuntimeCrashReport("schema=1;status=none")?.hasCrash, false)
+    }
+
+    func testCrashReportRejectsMalformedOrUnredactedFields() {
+        XCTAssertNil(RuntimeCrashReport("schema=1;status=ok;kind=unknown;app=nfc;seq=1;build=ABCD1234"))
+        XCTAssertNil(RuntimeCrashReport("schema=1;status=ok;kind=watchdog;app=../secret;seq=1;build=ABCD1234"))
+        XCTAssertNil(RuntimeCrashReport("schema=1;status=ok;kind=watchdog;app=nfc;seq=0;build=ABCD1234"))
+        XCTAssertNil(RuntimeCrashReport("schema=1;status=ok;kind=watchdog;app=nfc;seq=1;build=not-a-hash"))
     }
 
     // MARK: - `runtime/status` (schema v2)
