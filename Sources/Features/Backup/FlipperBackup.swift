@@ -298,12 +298,18 @@ final class FlipperBackup: ObservableObject {
         var actual: [String: FlipperBackupManifest.File] = [:]
         var totalBytes: UInt64 = 0
         for entry in archive where entry.type == .file {
+            guard actual.count < 20_000 else {
+                throw FlipperBackupError.invalidArchive("too many files")
+            }
             guard entry.uncompressedSize <= maxFileBytes,
                   totalBytes <= maxArchiveBytes - entry.uncompressedSize else {
                 throw FlipperBackupError.invalidArchive("archive exceeds size limits")
             }
             totalBytes += entry.uncompressedSize
             if entry.path == manifestName {
+                guard entry.uncompressedSize <= 1024 * 1024 else {
+                    throw FlipperBackupError.invalidArchive("manifest too large")
+                }
                 guard manifestData == nil else {
                     throw FlipperBackupError.invalidArchive("duplicate manifest")
                 }
