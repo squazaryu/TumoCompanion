@@ -49,6 +49,7 @@ jobs:
             -only-testing:UnleashedTests/ManagedPackageRequirementsTests \
             -only-testing:UnleashedTests/PluginProtectionPolicyTests \
             -only-testing:UnleashedTests/TumoflipInstallerTests \
+            -only-testing:UnleashedTests/FlipperBackupTests \
             -resultBundlePath build/ManagedPackages.xcresult \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
       - name: Upload managed package test results
