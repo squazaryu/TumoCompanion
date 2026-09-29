@@ -161,6 +161,7 @@ final class ESP32Updater: ObservableObject {
     private(set) var latestManifest: ESP32InstallerManifest?
     private(set) var manifestError: String?
     private var releaseHasManifest = false
+    private var latestInstallerZIP: ESP32InstallerZIP?
     private let stopToken = StopToken()
     private let backgroundGuard = BackgroundTransferGuard(name: "esp32-stage")
     private var backgroundExpired = false
@@ -883,6 +884,7 @@ final class ESP32Updater: ObservableObject {
         } catch {
             releaseCheckFailed = true
             latestManifest = nil
+            latestInstallerZIP = nil
             manifestError = nil
             releaseHasManifest = false
             elog.error("github check: \(error.localizedDescription, privacy: .public)")
@@ -895,8 +897,10 @@ final class ESP32Updater: ObservableObject {
 
     private func loadInstallerManifest(for tag: String) async {
         latestManifest = nil
+        latestInstallerZIP = nil
         manifestError = nil
-        guard let manifestURL = latestAssets["firmware-manifest.json"] else {
+        guard let manifestURL = latestAssets["firmware-manifest.json"] ??
+                latestAssets["marauder-installer-assets.zip"] else {
             releaseHasManifest = false
             return
         }
@@ -906,15 +910,40 @@ final class ESP32Updater: ObservableObject {
             guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
                 throw URLError(.badServerResponse)
             }
-            let expectedSize = latestAssetSizes["firmware-manifest.json"] ?? 0
+            let isZIP = latestAssets["firmware-manifest.json"] == nil
+            let carrierName = isZIP ? "marauder-installer-assets.zip" : "firmware-manifest.json"
+            let expectedSize = latestAssetSizes[carrierName] ?? 0
             guard expectedSize <= 0 || data.count == expectedSize else {
-                throw ESP32ManifestError.assetMetadataMismatch("firmware-manifest.json")
+                throw ESP32ManifestError.assetMetadataMismatch(carrierName)
             }
-            if let expectedSHA = latestAssetSHA256["firmware-manifest.json"],
+            if let expectedSHA = latestAssetSHA256[carrierName],
                Self.sha256Hex(data).lowercased() != expectedSHA.lowercased() {
-                throw ESP32ManifestError.assetMetadataMismatch("firmware-manifest.json")
+                throw ESP32ManifestError.assetMetadataMismatch(carrierName)
             }
-            latestManifest = try Self.decodeManifest(data, expectedVersion: tag)
+            if isZIP {
+                guard let expectedSHA = latestAssetSHA256[carrierName] else {
+                    throw ESP32ManifestError.assetMetadataMismatch(carrierName)
+                }
+                let zip = try ESP32InstallerZIP(
+                    data: data, expectedSize: expectedSize, expectedSHA256: expectedSHA)
+                let manifest = try Self.decodeManifest(zip.manifestData, expectedVersion: tag)
+                let segments = manifest.targets.flatMap { $0.flash.factory.segments }
+                let names = Set(segments.map(\.fileName))
+                guard names.count == segments.count else {
+                    throw ESP32ManifestError.invalidSegments("duplicate installer file")
+                }
+                try zip.verifyEntries(expectedSegmentNames: names)
+                for segment in segments {
+                    _ = try zip.verifiedData(
+                        name: segment.fileName, size: segment.size, sha256: segment.sha256)
+                    latestAssetSizes[segment.fileName] = segment.size
+                    latestAssetSHA256[segment.fileName] = segment.sha256
+                }
+                latestInstallerZIP = zip
+                latestManifest = manifest
+            } else {
+                latestManifest = try Self.decodeManifest(data, expectedVersion: tag)
+            }
         } catch {
             manifestError = error.localizedDescription
             elog.error("installer manifest: \(error.localizedDescription, privacy: .public)")
@@ -933,7 +962,8 @@ final class ESP32Updater: ObservableObject {
 
     private struct DownloadPlan {
         let sourceName: String
-        let sourceURL: URL
+        let sourceURL: URL?
+        let embeddedData: Data?
         let expectedSize: Int
         let expectedSHA256: String?
         let outputName: String
@@ -1017,7 +1047,10 @@ final class ESP32Updater: ObservableObject {
         let hasAuthoritativeFactoryPackage = latestManifest != nil
         let writesAutomaticManifest = Self.shouldWriteAutomaticPackageManifest(
             hasAuthoritativeManifest: hasAuthoritativeFactoryPackage,
-            boardKey: board.key)
+            boardKey: board.key) &&
+            // A ZIP-backed C5 recipe has not passed the separate board/bootloader
+            // hardware gate. Keep it available as Manual Flash only.
+            !(latestInstallerZIP != nil && board.key == "esp32c5devkitc1")
 
         let transferReporter = TransferActivityReporter(channel: channel)
         _ = await transferReporter.prepare()
@@ -1114,22 +1147,31 @@ final class ESP32Updater: ObservableObject {
                 assetSizes: latestAssetSizes,
                 assetSHA256: latestAssetSHA256)
             return try segments.map { segment in
-                let url: URL
+                let url: URL?
+                let embedded: Data?
                 if board.key == "esp32c5devkitc1",
                    segment.fileName == c5CompatibilityBootloaderName {
                     guard let compatibilityURL = URL(string: c5CompatibilityBootloaderURL) else {
                         throw ESP32ManifestError.missingAsset(segment.fileName)
                     }
                     url = compatibilityURL
+                    embedded = nil
+                } else if let zip = latestInstallerZIP,
+                          latestAssets[segment.fileName] == nil {
+                    url = nil
+                    embedded = try zip.verifiedData(
+                        name: segment.fileName, size: segment.size, sha256: segment.sha256)
                 } else {
                     guard let releaseURL = latestAssets[segment.fileName] else {
                         throw ESP32ManifestError.missingAsset(segment.fileName)
                     }
                     url = releaseURL
+                    embedded = nil
                 }
                 return DownloadPlan(
                     sourceName: segment.fileName,
                     sourceURL: url,
+                    embeddedData: embedded,
                     expectedSize: segment.size,
                     expectedSHA256: segment.sha256,
                     outputName: Self.stagedFileName(for: segment, version: tag, boardKey: board.key),
@@ -1147,6 +1189,7 @@ final class ESP32Updater: ObservableObject {
         return [DownloadPlan(
             sourceName: assetName,
             sourceURL: assetURL,
+            embeddedData: nil,
             expectedSize: latestAssetSizes[assetName] ?? 0,
             expectedSHA256: latestAssetSHA256[assetName],
             outputName: "esp32_marauder_\(versionName)_\(board.key)_0x10000.bin",
@@ -1177,13 +1220,21 @@ final class ESP32Updater: ObservableObject {
                     self.progressText = "\(pct)% · \(Self.fileSize(current)) / \(Self.fileSize(expectedTotal))"
                 }
             }
-            let (temporaryURL, response) = try await URLSession.shared.download(
-                from: plan.sourceURL,
-                delegate: delegate)
-            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-                throw URLError(.badServerResponse)
+            let data: Data
+            if let embedded = plan.embeddedData {
+                data = embedded
+            } else if let sourceURL = plan.sourceURL {
+                let (temporaryURL, response) = try await URLSession.shared.download(
+                    from: sourceURL,
+                    delegate: delegate)
+                guard let http = response as? HTTPURLResponse,
+                      (200..<300).contains(http.statusCode) else {
+                    throw URLError(.badServerResponse)
+                }
+                data = try Data(contentsOf: temporaryURL)
+            } else {
+                throw ESP32ManifestError.missingAsset(plan.sourceName)
             }
-            let data = try Data(contentsOf: temporaryURL)
             if stopToken.isStopped { throw CancellationError() }
             guard plan.expectedSize <= 0 || data.count == plan.expectedSize else {
                 throw ESP32ManifestError.assetMetadataMismatch(plan.sourceName)
@@ -1193,6 +1244,11 @@ final class ESP32Updater: ObservableObject {
                 throw ESP32ManifestError.assetMetadataMismatch(plan.sourceName)
             }
             completed += Int64(data.count)
+            if plan.embeddedData != nil, expectedTotal > 0 {
+                let fraction = min(1, Double(completed) / Double(expectedTotal))
+                progress = fraction
+                progressText = "\(Int(fraction * 100))% · \(Self.fileSize(completed)) / \(Self.fileSize(expectedTotal))"
+            }
             result.append(DownloadedFile(plan: plan, data: data))
         }
         return result

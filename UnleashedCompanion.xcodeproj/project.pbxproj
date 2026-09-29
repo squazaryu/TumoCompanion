@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		0091E2386B3AC40E8BD81D3B /* GitHubAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDC48789DECAE2A030CB71DE /* GitHubAPIClient.swift */; };
+		01B4D466FB4B13D57E0B8562 /* ManagedPackageRequirements.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBF6B76DF703CE618B8190AC /* ManagedPackageRequirements.swift */; };
 		022F94D327300839527E7901 /* TumoVMNFCSmoke.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54C848C04983CF3B58C03C22 /* TumoVMNFCSmoke.swift */; };
 		028086AFF37EFC8952E84483 /* PluginProtectionPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3D4263C468870ABFDEB8589 /* PluginProtectionPolicyTests.swift */; };
 		03BE7BC7ADBD4866A4F4507E /* FlipperControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44CC0B1350B30151851F2958 /* FlipperControl.swift */; };
@@ -95,6 +96,7 @@
 		6639DBE5A0696A7A75531255 /* PluginUpdatesDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4930E5335E77EBB9BFA70EF /* PluginUpdatesDetailView.swift */; };
 		67BAED6714BF802153F252C9 /* SberIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 987F2B3510E58C6070C7D81E /* SberIntents.swift */; };
 		693460D40AB5EEABAB8122CD /* MarauderLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = E66CABAA55465F56CC1CF2E8 /* MarauderLog.swift */; };
+		6948E0150D925AD55F6BE7CF /* ESP32InstallerZIP.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA6580078CD3B2618087AF32 /* ESP32InstallerZIP.swift */; };
 		6D5E2E66502E9832B6670D9D /* CatalogListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FDC334B8785EB5B2A51B922 /* CatalogListView.swift */; };
 		6EE27A21DF228E8F03A47A84 /* RelayExecutor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7C2CDE14DBC7990927949B0 /* RelayExecutor.swift */; };
 		70D8F0F0A503DC6E3F82572A /* application.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37B6865ED8766C019F36D4E5 /* application.pb.swift */; };
@@ -114,9 +116,11 @@
 		8A0595A5EF674BC7E233228B /* quac-fw-package-migration.json in Resources */ = {isa = PBXBuildFile; fileRef = B1BDE37AAB9C7938FA910453 /* quac-fw-package-migration.json */; };
 		8A3D3C8FB0D3E6169E243B15 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9183EF8E1FF8617A2B48EA8 /* Theme.swift */; };
 		8AAAFB628D23BAFFA836BE80 /* ESP32UpdaterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B87192747729E361050D9378 /* ESP32UpdaterTests.swift */; };
+		8B88F99420AD227094FE7801 /* ManagedPackageRequirementsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80C175631E2564AF57CEFFCC /* ManagedPackageRequirementsTests.swift */; };
 		8FF4B486963DB3CDAFD33039 /* TumoCardNFCSmoke.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57114D9F2BB2FDEAB835D4D2 /* TumoCardNFCSmoke.swift */; };
 		926D8F0CDA3A5E5673DCBEE9 /* TumoSurveySession.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00DFB08592E9523B019BE0E /* TumoSurveySession.swift */; };
 		94270EE7D91E72A67DCCF72F /* DeviceServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6441776EDA9115C9BEB5946E /* DeviceServiceTests.swift */; };
+		951EAEDBCE7B83DF93A9DB5B /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 2928F152CD1BE076355840D1 /* ZIPFoundation */; };
 		9557FFF86AE01FDF6E8BA371 /* FlipperBLE.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56CC0246CF934A5E59B02502 /* FlipperBLE.swift */; };
 		9570769329A543974A6E3501 /* TumoFabricTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 985815E6A1B91675260A0A0D /* TumoFabricTests.swift */; };
 		9970C1E57A8F9C71B510102E /* TumoflipFirmwareRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 916BE931F747387EDB008311 /* TumoflipFirmwareRouting.swift */; };
@@ -146,6 +150,7 @@
 		C25AAD849847AC8C673B9462 /* DeviceServiceCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D5340A6B3C8B38B925507BA /* DeviceServiceCoordinator.swift */; };
 		C390ACDEA69EE872DDF566E0 /* RuntimeDiagnosticsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDD681FE18BFDF3BD90EC71D /* RuntimeDiagnosticsTests.swift */; };
 		C3CEEA1F75CECCD8BEAF4255 /* BackgroundTransfer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E68A9C04C4B4A34D456A445 /* BackgroundTransfer.swift */; };
+		C5796185B7EA8DF03AE039E0 /* ESP32InstallerZIPTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 925FBE2CA5FBABF051379C13 /* ESP32InstallerZIPTests.swift */; };
 		C57A815B28B1629238A1F2DA /* AIRadarRelay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F693046B543D525DC64F4D9 /* AIRadarRelay.swift */; };
 		C78CF345B32C9CC99B502793 /* TransferBackgroundTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8935260266C922FDBB301B75 /* TransferBackgroundTests.swift */; };
 		C7EC549D7971B7FAAD3279A1 /* WiFiMapperEstimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F64FBF61D7D7605A7E126464 /* WiFiMapperEstimator.swift */; };
@@ -335,6 +340,7 @@
 		7C22AA04318D3F69B5DB9176 /* ProtectedPluginAuditLedger.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = ProtectedPluginAuditLedger.json; sourceTree = "<group>"; };
 		7DD006180A3983508A725752 /* ProtectedPluginAudit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtectedPluginAudit.swift; sourceTree = "<group>"; };
 		7ECF810E2BD149C8F1726216 /* UnleashedCompanion.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = UnleashedCompanion.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		80C175631E2564AF57CEFFCC /* ManagedPackageRequirementsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManagedPackageRequirementsTests.swift; sourceTree = "<group>"; };
 		824EE059E5BDBC0F8B7419E8 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		83F35A633E1B5B22888D35A0 /* LiveDeckHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveDeckHomeView.swift; sourceTree = "<group>"; };
 		856D8627B88920587D56B850 /* FirmwareLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirmwareLibrary.swift; sourceTree = "<group>"; };
@@ -349,6 +355,7 @@
 		9043704DE321E7D7FCC7972F /* ESP32FlashPackageManifest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ESP32FlashPackageManifest.swift; sourceTree = "<group>"; };
 		90D1067254AC076FCC557F87 /* MarauderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarauderView.swift; sourceTree = "<group>"; };
 		916BE931F747387EDB008311 /* TumoflipFirmwareRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoflipFirmwareRouting.swift; sourceTree = "<group>"; };
+		925FBE2CA5FBABF051379C13 /* ESP32InstallerZIPTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ESP32InstallerZIPTests.swift; sourceTree = "<group>"; };
 		93515AAEC58847AD6DE38AE6 /* TumoVMNFCContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoVMNFCContractTests.swift; sourceTree = "<group>"; };
 		95DB35AEEDE67D42752C5953 /* MarauderPcap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarauderPcap.swift; sourceTree = "<group>"; };
 		95FA4896B7AE237BFC022E1E /* AIRadarBridgeClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIRadarBridgeClient.swift; sourceTree = "<group>"; };
@@ -406,6 +413,7 @@
 		D1BE57BD502CE825C04EACF7 /* fw-packages-stable-003-contract.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "fw-packages-stable-003-contract.json"; sourceTree = "<group>"; };
 		D40FDF9AC257DE97849E36E9 /* DolphinProfileService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DolphinProfileService.swift; sourceTree = "<group>"; };
 		D74C1AC4E19C6F9FC21C9D8D /* PluginUpdateMonitorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginUpdateMonitorTests.swift; sourceTree = "<group>"; };
+		DA6580078CD3B2618087AF32 /* ESP32InstallerZIP.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ESP32InstallerZIP.swift; sourceTree = "<group>"; };
 		DB003747D5AF7D07C4094F9F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		DC29E67F84F7B70C836FB6EB /* UnleashedTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = UnleashedTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		DCE61D0B4EB2C9925E58FA87 /* DevicesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevicesView.swift; sourceTree = "<group>"; };
@@ -428,6 +436,7 @@
 		F9183EF8E1FF8617A2B48EA8 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		FA766CD63AD11289FB5F0DC8 /* GitHubOAuthClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubOAuthClientTests.swift; sourceTree = "<group>"; };
 		FB7E01B87B6C90282CEE9FE0 /* SettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsStore.swift; sourceTree = "<group>"; };
+		FBF6B76DF703CE618B8190AC /* ManagedPackageRequirements.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManagedPackageRequirements.swift; sourceTree = "<group>"; };
 		FCB5C504F3756F796BB35073 /* DolphinGalleryUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DolphinGalleryUITests.swift; sourceTree = "<group>"; };
 		FCE7269E5AB13331C01704F7 /* USBStorageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = USBStorageTests.swift; sourceTree = "<group>"; };
 		FDC48789DECAE2A030CB71DE /* GitHubAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubAPIClient.swift; sourceTree = "<group>"; };
@@ -440,6 +449,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				4A77788F18859871DC4B2C6B /* UnleashedShared.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		841420ACCCCCEA78B5B60740 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				951EAEDBCE7B83DF93A9DB5B /* ZIPFoundation in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -684,6 +701,7 @@
 			children = (
 				C1B731E78843D6D04ECF5B60 /* ESP32FirmwareView.swift */,
 				9043704DE321E7D7FCC7972F /* ESP32FlashPackageManifest.swift */,
+				DA6580078CD3B2618087AF32 /* ESP32InstallerZIP.swift */,
 				43BFF8A135671585F6B17A7C /* ESP32Updater.swift */,
 			);
 			path = ESP32;
@@ -720,6 +738,7 @@
 				6441776EDA9115C9BEB5946E /* DeviceServiceTests.swift */,
 				3352B17F82ACA14AD4B854B7 /* DolphinProfileTests.swift */,
 				E80D165190935774781982C8 /* ESP32FlashPackageManifestTests.swift */,
+				925FBE2CA5FBABF051379C13 /* ESP32InstallerZIPTests.swift */,
 				B87192747729E361050D9378 /* ESP32UpdaterTests.swift */,
 				98F04DB6042C632AC1B52D91 /* FapMetadataTests.swift */,
 				406855A4F6EC92517E41CF68 /* FirmwareArchiveTests.swift */,
@@ -730,6 +749,7 @@
 				8D70BBAA6C69E3FCD8488170 /* HomeAssistantDiscoveryTests.swift */,
 				3ECE4D716C1F73A551397D21 /* InstallActivityAttributesTests.swift */,
 				EFE40D69BB44713828E2399C /* InstallActivityControllerTests.swift */,
+				80C175631E2564AF57CEFFCC /* ManagedPackageRequirementsTests.swift */,
 				8F246F25BA68E90EAD73408E /* MarauderLiveAggregationTests.swift */,
 				B3D4263C468870ABFDEB8589 /* PluginProtectionPolicyTests.swift */,
 				34BC23F6FD22122831005AA0 /* PluginSelectionPolicyTests.swift */,
@@ -794,6 +814,7 @@
 				3D35965EF8F66DCC57BE7E33 /* GitHubCredentials.swift */,
 				2462BE494E6F4BA685D1DD95 /* GitHubOAuthClient.swift */,
 				F7DFAFD2A63623B73457A3B2 /* InstallActivityController.swift */,
+				FBF6B76DF703CE618B8190AC /* ManagedPackageRequirements.swift */,
 				CBA5FCA0F80809900471F32E /* PluginUpdateMonitor.swift */,
 				87F2C64ACDABA1AEFFB7CCD8 /* PluginUpdater.swift */,
 				E4930E5335E77EBB9BFA70EF /* PluginUpdatesDetailView.swift */,
@@ -990,6 +1011,7 @@
 			buildPhases = (
 				3A841E53D2EC01D99C3FF3A5 /* Sources */,
 				2251667A86BD09C9D348F01D /* Resources */,
+				841420ACCCCCEA78B5B60740 /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -998,6 +1020,7 @@
 			);
 			name = UnleashedTests;
 			packageProductDependencies = (
+				2928F152CD1BE076355840D1 /* ZIPFoundation */,
 			);
 			productName = UnleashedTests;
 			productReference = DC29E67F84F7B70C836FB6EB /* UnleashedTests.xctest */;
@@ -1170,6 +1193,7 @@
 				94270EE7D91E72A67DCCF72F /* DeviceServiceTests.swift in Sources */,
 				660358B5ED53BD9B93390DC2 /* DolphinProfileTests.swift in Sources */,
 				BA3F2055C70D4F3CBECCA623 /* ESP32FlashPackageManifestTests.swift in Sources */,
+				C5796185B7EA8DF03AE039E0 /* ESP32InstallerZIPTests.swift in Sources */,
 				8AAAFB628D23BAFFA836BE80 /* ESP32UpdaterTests.swift in Sources */,
 				C9BA4C5BB222941D1B3C3FA9 /* FapMetadataTests.swift in Sources */,
 				CCE4664E2C132A8662B2F7F3 /* FirmwareArchiveTests.swift in Sources */,
@@ -1180,6 +1204,7 @@
 				561C47A5EC74F7DF05D11A2B /* HomeAssistantDiscoveryTests.swift in Sources */,
 				55DF4154B997B215DD5CF9C6 /* InstallActivityAttributesTests.swift in Sources */,
 				3AFC49D5F409F11451DD50AC /* InstallActivityControllerTests.swift in Sources */,
+				8B88F99420AD227094FE7801 /* ManagedPackageRequirementsTests.swift in Sources */,
 				558EF6327C3F312D4C1A26B7 /* MarauderLiveAggregationTests.swift in Sources */,
 				028086AFF37EFC8952E84483 /* PluginProtectionPolicyTests.swift in Sources */,
 				497514C65E0284BC9C754AC1 /* PluginSelectionPolicyTests.swift in Sources */,
@@ -1249,6 +1274,7 @@
 				3E084727311DC9FAEC499A99 /* DolphinProfileService.swift in Sources */,
 				0DC75147EFFA11291AB3D10D /* ESP32FirmwareView.swift in Sources */,
 				D6ACA63F88F6163391E1E1FD /* ESP32FlashPackageManifest.swift in Sources */,
+				6948E0150D925AD55F6BE7CF /* ESP32InstallerZIP.swift in Sources */,
 				624755C1707F30D1CF685556 /* ESP32Updater.swift in Sources */,
 				B868D9DF098B04FB000252E1 /* FapMetadata.swift in Sources */,
 				56E703AEE38BA106610D2DA5 /* FieldServiceModels.swift in Sources */,
@@ -1277,6 +1303,7 @@
 				5FFADBEF4597B3F7A0AD9FAA /* LiveDeckHomeView.swift in Sources */,
 				3A33EB625F256D95748132BB /* LocationProvider.swift in Sources */,
 				20E37F40F64BD3080356A54F /* MacBridgeDiscovery.swift in Sources */,
+				01B4D466FB4B13D57E0B8562 /* ManagedPackageRequirements.swift in Sources */,
 				A67E7F06A079691F84FE3B2A /* MarauderLiveView.swift in Sources */,
 				693460D40AB5EEABAB8122CD /* MarauderLog.swift in Sources */,
 				46EF26B33502AED58F1E687A /* MarauderPcap.swift in Sources */,
@@ -1410,7 +1437,7 @@
 				CODE_SIGNING_REQUIRED = NO;
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 274;
+				CURRENT_PROJECT_VERSION = 277;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -1431,7 +1458,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GITHUB_OAUTH_CLIENT_ID = Ov23liKmKXYcliMvoCgL;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 1.11.21;
+				MARKETING_VERSION = 1.11.24;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -1636,7 +1663,7 @@
 				CODE_SIGNING_REQUIRED = NO;
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 274;
+				CURRENT_PROJECT_VERSION = 277;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = "";
 				ENABLE_NS_ASSERTIONS = NO;
@@ -1651,7 +1678,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GITHUB_OAUTH_CLIENT_ID = Ov23liKmKXYcliMvoCgL;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 1.11.21;
+				MARKETING_VERSION = 1.11.24;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1773,6 +1800,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		2928F152CD1BE076355840D1 /* ZIPFoundation */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C32EDE87E2BE3615C6E24355 /* XCRemoteSwiftPackageReference "ZIPFoundation" */;
+			productName = ZIPFoundation;
+		};
 		89D1A875D2EC8E243C24C7DA /* ZIPFoundation */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = C32EDE87E2BE3615C6E24355 /* XCRemoteSwiftPackageReference "ZIPFoundation" */;
