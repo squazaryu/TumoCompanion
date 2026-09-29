@@ -76,6 +76,37 @@ final class ESP32InstallerZIPTests: XCTestCase {
             data: data, expectedSize: data.count, expectedSHA256: sha256(data)))
     }
 
+    func testEncryptedExtraEntryAfterExpectedFilesFailsClosed() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("esp32-installer-extra-\(UUID().uuidString).zip")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let archive = try Archive(url: url, accessMode: .create)
+        for name in [
+            "firmware-manifest.json",
+            segmentName,
+            "esp32_marauder_installer_v1_17_0_20260916_extra.bin",
+        ] {
+            let value = Data("{}".utf8)
+            try archive.addEntry(
+                with: name, type: .file, uncompressedSize: Int64(value.count),
+                provider: { position, size in
+                    let start = Int(position)
+                    return value.subdata(in: start..<min(start + size, value.count))
+                })
+        }
+        var data = try Data(contentsOf: url)
+        let signature: [UInt8] = [0x50, 0x4B, 0x01, 0x02]
+        let headers = data.indices.filter { index in
+            index + 10 < data.count && Array(data[index..<(index + 4)]) == signature
+        }
+        XCTAssertEqual(headers.count, 3)
+        let last = try XCTUnwrap(headers.last)
+        data[last + 8] |= 1
+
+        XCTAssertThrowsError(try ESP32InstallerZIP(
+            data: data, expectedSize: data.count, expectedSHA256: sha256(data)))
+    }
+
     func testSymlinkEntryFailsClosed() throws {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("esp32-installer-symlink-\(UUID().uuidString).zip")

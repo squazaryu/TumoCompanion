@@ -46,6 +46,7 @@ struct ESP32InstallerZIP {
               Self.sha256(data).caseInsensitiveCompare(expectedSHA256) == .orderedSame else {
             throw ESP32InstallerZIPError.carrierMismatch
         }
+        let declaredCount = try Self.validateCentralDirectory(data)
 
         let archive: Archive
         do { archive = try Archive(data: data, accessMode: .read) }
@@ -67,6 +68,9 @@ struct ESP32InstallerZIP {
             }
             expandedBytes += entry.uncompressedSize
             entries[entry.path] = entry
+        }
+        guard entries.count == declaredCount else {
+            throw ESP32InstallerZIPError.carrierMismatch
         }
         guard let manifest = entries[Self.manifestName] else {
             throw ESP32InstallerZIPError.missingManifest
@@ -116,6 +120,66 @@ struct ESP32InstallerZIP {
             (65...90).contains(byte) || (97...122).contains(byte) ||
             (48...57).contains(byte) || byte == 45 || byte == 46 || byte == 95
         }
+    }
+
+    /// ZIPFoundation intentionally stops enumeration at unsupported encrypted
+    /// entries. Check the bounded central directory ourselves so a hidden entry
+    /// after the expected files cannot disappear from the inventory comparison.
+    private static func validateCentralDirectory(_ data: Data) throws -> Int {
+        guard data.count >= 22 else { throw ESP32InstallerZIPError.carrierMismatch }
+        let lowerBound = max(0, data.count - 22 - 65_535)
+        for endOffset in stride(from: data.count - 22, through: lowerBound, by: -1) {
+            guard data[endOffset] == 0x50, data[endOffset + 1] == 0x4B,
+                  data[endOffset + 2] == 0x05, data[endOffset + 3] == 0x06,
+                  endOffset + 22 + read16(data, at: endOffset + 20) == data.count else {
+                continue
+            }
+            let count = read16(data, at: endOffset + 10)
+            let directoryOffset = read32(data, at: endOffset + 16)
+            let directorySize = read32(data, at: endOffset + 12)
+            guard read16(data, at: endOffset + 4) == 0,
+                  read16(data, at: endOffset + 6) == 0,
+                  read16(data, at: endOffset + 8) == count,
+                  count > 0, count <= maxEntryCount,
+                  directoryOffset <= endOffset,
+                  directorySize <= endOffset - directoryOffset else {
+                throw ESP32InstallerZIPError.carrierMismatch
+            }
+            let directoryEnd = directoryOffset + directorySize
+            var cursor = directoryOffset
+            var found = 0
+            while cursor < directoryEnd {
+                guard cursor + 46 <= directoryEnd,
+                      data[cursor] == 0x50, data[cursor + 1] == 0x4B,
+                      data[cursor + 2] == 0x01, data[cursor + 3] == 0x02 else {
+                    throw ESP32InstallerZIPError.carrierMismatch
+                }
+                if read16(data, at: cursor + 8) & 1 != 0 {
+                    throw ESP32InstallerZIPError.unsafeEntry("encrypted")
+                }
+                let entryLength = 46 + read16(data, at: cursor + 28) +
+                    read16(data, at: cursor + 30) + read16(data, at: cursor + 32)
+                guard entryLength <= directoryEnd - cursor else {
+                    throw ESP32InstallerZIPError.carrierMismatch
+                }
+                cursor += entryLength
+                found += 1
+                guard found <= maxEntryCount else { throw ESP32InstallerZIPError.oversized }
+            }
+            guard cursor == directoryEnd, found == count else {
+                throw ESP32InstallerZIPError.carrierMismatch
+            }
+            return count
+        }
+        throw ESP32InstallerZIPError.carrierMismatch
+    }
+
+    private static func read16(_ data: Data, at offset: Int) -> Int {
+        Int(data[offset]) | (Int(data[offset + 1]) << 8)
+    }
+
+    private static func read32(_ data: Data, at offset: Int) -> Int {
+        read16(data, at: offset) | (read16(data, at: offset + 2) << 16)
     }
 
     private static func validSHA(_ digest: String) -> Bool {
