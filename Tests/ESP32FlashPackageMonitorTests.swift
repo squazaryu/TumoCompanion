@@ -82,6 +82,18 @@ final class ESP32FlashPackageMonitorTests: XCTestCase {
             .manual)
     }
 
+    func testChangedSegmentAssetChangesRecipeInventory() {
+        let original = release(carrierID: 20)
+        var assets = original.assets
+        assets["module-one.bin"] = ESP32FlashPackageMonitor.Asset(
+            id: 30, name: "module-one.bin", size: 100,
+            digest: String(repeating: "b", count: 64),
+            url: URL(string: "https://github.com/owner/repo/releases/download/v1/module-one.bin"))
+        let changed = ESP32FlashPackageMonitor.Release(
+            id: original.id, tag: original.tag, assets: assets)
+        XCTAssertNotEqual(original.inventory, changed.inventory)
+    }
+
     private func release(carrierID: Int64?) -> ESP32FlashPackageMonitor.Release {
         let asset = carrierID.map {
             ESP32FlashPackageMonitor.Asset(

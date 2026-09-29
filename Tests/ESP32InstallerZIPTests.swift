@@ -90,7 +90,7 @@ final class ESP32InstallerZIPTests: XCTestCase {
             })
         try archive.addEntry(
             with: "firmware-manifest.json", type: .file,
-            uncompressedSize: 2,
+            uncompressedSize: Int64(2),
             provider: { position, size in
                 let value = Data("{}".utf8)
                 let start = Int(position)

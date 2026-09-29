@@ -27,8 +27,14 @@ enum ESP32FlashPackageMonitor {
         }
 
         var inventory: String {
-            guard let carrier else { return "none" }
-            return "\(id):\(tag):\(carrier.id):\(carrier.size):\(carrier.digest ?? "missing")"
+            guard carrier != nil else { return "none" }
+            // Direct-manifest recipes also depend on separate segment assets.
+            // Include every asset so a replacement under the same tag cannot
+            // retain an already accepted plan fingerprint.
+            let listing = assets.values.sorted { $0.name < $1.name }.map { asset in
+                "\(asset.name):\(asset.id):\(asset.size):\(asset.digest ?? "missing")"
+            }.joined(separator: "|")
+            return ESP32FlashPackageMonitor.sha256(Data("\(id):\(tag):\(listing)".utf8))
         }
     }
 
@@ -146,13 +152,13 @@ enum ESP32FlashPackageMonitor {
     }
 
     private static func publishedReleases() async throws -> [Release] {
-        let url = URL(string: "https://api.github.com/repos/\(repo)/releases?per_page=30")!
+        let url = URL(string: "https://api.github.com/repos/\(repo)/releases?per_page=100")!
         let response = try await GitHubAPIClient.shared.data(
             from: url, maxAge: 20 * 60, allowStaleOnError: false)
         guard let raw = try JSONSerialization.jsonObject(with: response.data) as? [[String: Any]] else {
             throw GitHubAPIError.invalidJSON
         }
-        let releases = raw.compactMap(decodeRelease).prefix(20).map { $0 }
+        let releases = raw.compactMap(decodeRelease).prefix(30).map { $0 }
         guard !releases.isEmpty else { throw GitHubAPIError.invalidJSON }
         return releases
     }
