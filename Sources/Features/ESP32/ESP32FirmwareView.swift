@@ -142,9 +142,12 @@ struct ESP32FirmwareView: View {
                 }
             }
             if up.verifiedPackageAvailable {
-                Label("Verified full installer package", systemImage: "checkmark.shield.fill")
+                let review = up.stagingBoards.contains { up.requiresReview($0) }
+                Label(
+                    review ? "Board package needs review" : "Verified full installer package",
+                    systemImage: review ? "exclamationmark.shield.fill" : "checkmark.shield.fill")
                     .font(.caption)
-                    .foregroundStyle(Theme.success)
+                    .foregroundStyle(review ? Theme.warning : Theme.success)
             }
 
             if !up.stagingBoards.isEmpty {
@@ -310,6 +313,7 @@ struct ESP32FirmwareView: View {
     /// needed to download or restore a package.
     private func packageBoardRow(_ board: ESP32Updater.Board) -> some View {
         let newer = up.newVersion(for: board)
+        let review = up.requiresReview(board)
         let archivedSource = up.isArchived(board)
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
@@ -325,9 +329,10 @@ struct ESP32FirmwareView: View {
                 }
                 Spacer(minLength: 8)
                 StatusPill(
-                    text: newer ? "Update" : "Latest",
-                    color: newer ? Theme.warning : Theme.success,
-                    systemImage: newer ? "arrow.down.circle.fill" : "checkmark.circle.fill"
+                    text: review ? "Review" : (newer ? "Update" : "Latest"),
+                    color: review || newer ? Theme.warning : Theme.success,
+                    systemImage: review ? "exclamationmark.triangle.fill" :
+                        (newer ? "arrow.down.circle.fill" : "checkmark.circle.fill")
                 )
             }
 
@@ -339,18 +344,24 @@ struct ESP32FirmwareView: View {
                 if newer, let tag = up.latestTag {
                     packageActionButton(
                         title: "Update to \(tag)",
-                        enabled: !up.busy && hasFileChannel
+                        enabled: !up.busy && hasFileChannel && up.canStageLatest && !review
                     ) {
                         Task { await up.install(board) }
                     }
                 } else {
                     packageActionButton(
                         title: "Download again",
-                        enabled: !up.busy && hasFileChannel && up.canStageLatest
+                        enabled: !up.busy && hasFileChannel && up.canStageLatest && !review
                     ) {
                         Task { await up.install(board) }
                     }
                 }
+            }
+            if review {
+                Text("The installer recipe changed under this release. Review is required before staging.")
+                    .font(.caption2)
+                    .foregroundStyle(Theme.warning)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             if archivedSource {
                 Text("Archived copy stays unchanged.")

@@ -51,6 +51,8 @@ jobs:
             -only-testing:UnleashedTests/TumoflipInstallerTests \
             -only-testing:UnleashedTests/ESP32InstallerZIPTests \
             -only-testing:UnleashedTests/ESP32UpdaterTests \
+            -only-testing:UnleashedTests/ESP32FlashTransitionTests \
+            -only-testing:UnleashedTests/ESP32FlashPackageMonitorTests \
             -resultBundlePath build/ManagedPackages.xcresult \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
       - name: Upload managed package test results

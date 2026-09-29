@@ -162,6 +162,8 @@ final class ESP32Updater: ObservableObject {
     private(set) var manifestError: String?
     private var releaseHasManifest = false
     private var latestInstallerZIP: ESP32InstallerZIP?
+    private var latestReleaseID: Int64?
+    private var latestCarrierInventory: String?
     private let stopToken = StopToken()
     private let backgroundGuard = BackgroundTransferGuard(name: "esp32-stage")
     private var backgroundExpired = false
@@ -254,6 +256,12 @@ final class ESP32Updater: ObservableObject {
 
     var canStageLatest: Bool {
         latestTag != nil && (!releaseHasManifest || verifiedPackageAvailable)
+    }
+
+    func requiresReview(_ board: Board) -> Bool {
+        guard let id = latestReleaseID, let inventory = latestCarrierInventory else { return false }
+        return ESP32FlashPackageMonitor.requiresReview(
+            releaseID: id, boardKey: board.key, inventory: inventory)
     }
 
     nonisolated static func norm(_ v: String) -> String {
@@ -724,6 +732,8 @@ final class ESP32Updater: ObservableObject {
                 boards = snapshot.active
                 archivedBoards = snapshot.archived
                 deviceScanState = .loaded
+                ESP32FlashPackageMonitor.rememberBoards(
+                    Set((boards + archivedBoards).map(\.key)))
                 return true
             } catch {
                 if attempt == 0, Self.shouldRetryScan(after: error) {
@@ -863,11 +873,14 @@ final class ESP32Updater: ObservableObject {
         do {
             let result = try await GitHubAPIClient.shared.data(from: url)
             guard let obj = try JSONSerialization.jsonObject(with: result.data) as? [String: Any],
-                  let tag = obj["tag_name"] as? String else {
+                  let tag = obj["tag_name"] as? String,
+                  let release = ESP32FlashPackageMonitor.decodeRelease(obj) else {
                 throw URLError(.cannotParseResponse)
             }
             releaseCheckFailed = false
             latestTag = tag
+            latestReleaseID = release.id
+            latestCarrierInventory = release.inventory
             latestAssets = [:]; latestAssetSizes = [:]; latestAssetSHA256 = [:]
             for a in (obj["assets"] as? [[String: Any]]) ?? [] {
                 guard let n = a["name"] as? String,
@@ -885,6 +898,8 @@ final class ESP32Updater: ObservableObject {
             releaseCheckFailed = true
             latestManifest = nil
             latestInstallerZIP = nil
+            latestReleaseID = nil
+            latestCarrierInventory = nil
             manifestError = nil
             releaseHasManifest = false
             elog.error("github check: \(error.localizedDescription, privacy: .public)")
@@ -978,6 +993,10 @@ final class ESP32Updater: ObservableObject {
 
     func install(_ board: Board) async {
         guard let tag = latestTag else { return }
+        guard !requiresReview(board) else {
+            status = "Installer recipe changed. Review the board package before staging it."
+            return
+        }
         guard canStageLatest else {
             status = manifestError.map { "Release manifest rejected: \($0)" }
                 ?? "No verified installer package is available."
