@@ -216,7 +216,10 @@ struct FirmwareLibraryView: View {
         let multiBuildHeaders = library.visibleGroups.filter { $0.releases.count > 1 }.count
         let groupHeaders = CGFloat(multiBuildHeaders) * 24
         let releaseRows = CGFloat(min(library.visibleReleases.count, 5)) * 36
-        return min(420, max(230, drawerChromeAndSections + groupHeaders + releaseRows))
+        // The selected release adds a backup offer and the inline confirmation.
+        // Give them room until the panel reaches its scrollable maximum.
+        let preflightRows: CGFloat = pendingRelease == nil ? 0 : 118
+        return min(420, max(230, drawerChromeAndSections + groupHeaders + releaseRows + preflightRows))
     }
 
     private var releaseDetailsPanel: some View {
