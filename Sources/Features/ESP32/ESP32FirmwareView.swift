@@ -144,10 +144,14 @@ struct ESP32FirmwareView: View {
             if up.verifiedPackageAvailable {
                 let review = up.stagingBoards.contains { up.requiresReview($0) }
                 Label(
-                    review ? "Board package needs review" : "Verified full installer package",
+                    review ? "Board package needs review" :
+                        (up.installerZIPVerified ? "Verified installer files" :
+                            "Installer manifest found · files checked during staging"),
                     systemImage: review ? "exclamationmark.shield.fill" : "checkmark.shield.fill")
                     .font(.caption)
-                    .foregroundStyle(review ? Theme.warning : Theme.success)
+                    .foregroundStyle(review ? Theme.warning :
+                        (up.installerZIPVerified ? Theme.success : Theme.accent))
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             if !up.stagingBoards.isEmpty {

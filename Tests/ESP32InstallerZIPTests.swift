@@ -60,6 +60,47 @@ final class ESP32InstallerZIPTests: XCTestCase {
         ]))
     }
 
+    func testEncryptedCentralDirectoryEntryFailsClosed() throws {
+        var data = try makeArchive([
+            "firmware-manifest.json": Data("{}".utf8),
+            segmentName: Data("image".utf8),
+        ])
+        let signature: [UInt8] = [0x50, 0x4B, 0x01, 0x02]
+        let header = data.indices.first { index in
+            index + 10 < data.count && Array(data[index..<(index + 4)]) == signature
+        }
+        let offset = try XCTUnwrap(header)
+        data[offset + 8] |= 1 // ZIP general-purpose encrypted bit.
+
+        XCTAssertThrowsError(try ESP32InstallerZIP(
+            data: data, expectedSize: data.count, expectedSHA256: sha256(data)))
+    }
+
+    func testSymlinkEntryFailsClosed() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("esp32-installer-symlink-\(UUID().uuidString).zip")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let archive = try Archive(url: url, accessMode: .create)
+        let target = Data("../escape".utf8)
+        try archive.addEntry(
+            with: segmentName, type: .symlink, uncompressedSize: Int64(target.count),
+            provider: { position, size in
+                let start = Int(position)
+                return target.subdata(in: start..<min(start + size, target.count))
+            })
+        try archive.addEntry(
+            with: "firmware-manifest.json", type: .file,
+            uncompressedSize: 2,
+            provider: { position, size in
+                let value = Data("{}".utf8)
+                let start = Int(position)
+                return value.subdata(in: start..<min(start + size, value.count))
+            })
+        let data = try Data(contentsOf: url)
+        XCTAssertThrowsError(try ESP32InstallerZIP(
+            data: data, expectedSize: data.count, expectedSHA256: sha256(data)))
+    }
+
     private func makeArchive(_ files: [String: Data]) throws -> Data {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("esp32-installer-test-\(UUID().uuidString).zip")

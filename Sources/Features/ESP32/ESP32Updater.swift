@@ -254,6 +254,10 @@ final class ESP32Updater: ObservableObject {
         releaseHasManifest && latestManifest != nil && manifestError == nil
     }
 
+    var installerZIPVerified: Bool {
+        latestInstallerZIP != nil && verifiedPackageAvailable
+    }
+
     var canStageLatest: Bool {
         latestTag != nil && (!releaseHasManifest || verifiedPackageAvailable)
     }
@@ -921,16 +925,22 @@ final class ESP32Updater: ObservableObject {
         }
         releaseHasManifest = true
         do {
-            let (data, response) = try await URLSession.shared.data(from: manifestURL)
-            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-                throw URLError(.badServerResponse)
-            }
             let isZIP = latestAssets["firmware-manifest.json"] == nil
             let carrierName = isZIP ? "marauder-installer-assets.zip" : "firmware-manifest.json"
             let expectedSize = latestAssetSizes[carrierName] ?? 0
-            guard expectedSize <= 0 || data.count == expectedSize else {
+            guard expectedSize > 0,
+                  expectedSize <= (isZIP ? 64 * 1024 * 1024 : 1024 * 1024) else {
                 throw ESP32ManifestError.assetMetadataMismatch(carrierName)
             }
+            let (temporaryURL, response) = try await URLSession.shared.download(from: manifestURL)
+            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+                throw URLError(.badServerResponse)
+            }
+            guard let actualSize = try temporaryURL.resourceValues(forKeys: [.fileSizeKey]).fileSize,
+                  actualSize == expectedSize else {
+                throw ESP32ManifestError.assetMetadataMismatch(carrierName)
+            }
+            let data = try Data(contentsOf: temporaryURL)
             if let expectedSHA = latestAssetSHA256[carrierName],
                Self.sha256Hex(data).lowercased() != expectedSHA.lowercased() {
                 throw ESP32ManifestError.assetMetadataMismatch(carrierName)
@@ -1224,7 +1234,8 @@ final class ESP32Updater: ObservableObject {
 
         for (index, plan) in plans.enumerated() {
             if stopToken.isStopped { throw CancellationError() }
-            status = "Downloading \(index + 1)/\(plans.count): \(plan.sourceName)…"
+            status = "\(plan.embeddedData == nil ? "Downloading" : "Using verified ZIP file") " +
+                "\(index + 1)/\(plans.count): \(plan.sourceName)…"
             let completedBefore = completed
             let progressGate = PercentProgressGate()
             let delegate = DownloadProgressDelegate { [weak self] written, _ in

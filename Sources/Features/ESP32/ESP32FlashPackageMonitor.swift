@@ -65,6 +65,11 @@ enum ESP32FlashPackageMonitor {
         let known = Set(defaults.stringArray(forKey: knownBoardsKey) ?? [])
             .filter(ESP32Updater.automaticPackageSupported(for:))
         guard !known.isEmpty else { return true }
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        switch settings.authorizationStatus {
+        case .authorized, .provisional, .ephemeral: break
+        default: return true
+        }
         do {
             let releases = try await publishedReleases()
             return await reconcile(
@@ -85,9 +90,14 @@ enum ESP32FlashPackageMonitor {
         deliver: (Release, String) async throws -> Void
     ) async -> Bool {
         var states = loadObservations(defaults)
+        let supportedBoards = knownBoards.filter(ESP32Updater.automaticPackageSupported(for:))
+        let activeKeys = Set(releases.flatMap { release in
+            supportedBoards.map { "\(release.id):\($0)" }
+        })
+        states = states.filter { activeKeys.contains($0.key) }
         var allSucceeded = true
         for release in releases {
-            for board in knownBoards.sorted() where ESP32Updater.automaticPackageSupported(for: board) {
+            for board in supportedBoards.sorted() {
                 let key = "\(release.id):\(board)"
                 let previous = states[key]
                 if previous?.inventory == release.inventory { continue }
@@ -142,7 +152,9 @@ enum ESP32FlashPackageMonitor {
         guard let raw = try JSONSerialization.jsonObject(with: response.data) as? [[String: Any]] else {
             throw GitHubAPIError.invalidJSON
         }
-        return raw.compactMap(decodeRelease).prefix(20).map { $0 }
+        let releases = raw.compactMap(decodeRelease).prefix(20).map { $0 }
+        guard !releases.isEmpty else { throw GitHubAPIError.invalidJSON }
+        return releases
     }
 
     static func decodeRelease(_ object: [String: Any]) -> Release? {
@@ -156,8 +168,8 @@ enum ESP32FlashPackageMonitor {
         for item in (object["assets"] as? [[String: Any]]) ?? [] {
             guard let name = item["name"] as? String,
                   let id = (item["id"] as? NSNumber)?.int64Value,
-                  let size = (item["size"] as? NSNumber)?.intValue,
-                  assets[name] == nil else { continue }
+                  let size = (item["size"] as? NSNumber)?.intValue else { continue }
+            guard assets[name] == nil else { return nil }
             let digest = (item["digest"] as? String).flatMap { value -> String? in
                 value.lowercased().hasPrefix("sha256:")
                     ? String(value.dropFirst("sha256:".count)) : nil
