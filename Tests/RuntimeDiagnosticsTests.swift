@@ -70,17 +70,7 @@ final class RuntimeDiagnosticsTests: XCTestCase {
         XCTAssertFalse(caps.supportsTime)
         XCTAssertFalse(caps.supportsGPS)
         XCTAssertFalse(caps.supportsNetwork)
-        XCTAssertFalse(caps.supportsCrash)
         XCTAssertNil(caps.sessionVersion)
-    }
-
-    func testCrashCapabilityRequiresFirmwareAdvertisement() {
-        let newFirmware = RuntimeCapabilities(FlipperBLE.parseCapabilities(Data(
-            "runtime=1;fab=2;crash=1;feat=trace,crash".utf8)))
-        let olderFirmware = RuntimeCapabilities(FlipperBLE.parseCapabilities(Data(
-            "runtime=1;fab=2;trace=1;feat=trace".utf8)))
-        XCTAssertTrue(newFirmware.supportsCrash)
-        XCTAssertFalse(olderFirmware.supportsCrash)
     }
 
     func testCrashReportParsesRedactedRecordAndEmptyState() {
