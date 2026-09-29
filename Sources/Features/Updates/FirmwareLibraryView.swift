@@ -5,10 +5,14 @@ struct FirmwareLibraryView: View {
     @EnvironmentObject private var ble: FlipperBLE
     @EnvironmentObject private var transfer: TransferChannelStore
     @ObservedObject var library: FirmwareLibrary
+    @StateObject private var preflightBackup = FlipperBackup()
     @State private var showHelp = false
     @State private var pendingRelease: FirmwareRelease?
     @State private var detailsRelease: FirmwareRelease?
     @State private var releaseDrawerExpanded = false
+    @State private var verifiedBackupReleaseID: String?
+    @State private var verifiedBackupReceipt: FlipperBackupReceipt?
+    @State private var backupError: String?
 
     private var releaseDrawerBinding: Binding<Bool> {
         Binding(
@@ -275,19 +279,24 @@ struct FirmwareLibraryView: View {
                     isLatest: index == 0 && group.id == library.visibleGroups.first?.id
                 )
                 if pendingRelease?.id == release.id {
-                    InlineActionConfirmationRow(
-                        title: "Archive › update",
-                        systemImage: "checkmark.shield.fill",
-                        iconColor: Theme.success,
-                        tint: Theme.accent,
-                        confirmTitle: "Prepare",
-                        confirmSystemImage: "arrow.down.to.line.compact",
-                        accessibilityIdentifier: "firmware-preparation-confirmation",
-                        cancelAccessibilityLabel: "Cancel preparation",
-                        confirmAccessibilityLabel: "Confirm prepare \(release.version)",
-                        onCancel: cancelPreparation,
-                        onConfirm: { confirmPreparation(of: release) }
-                    )
+                    VStack(alignment: .leading, spacing: 7) {
+                        backupOffer(for: release)
+                        if !preflightBackup.running {
+                            InlineActionConfirmationRow(
+                                title: "Archive › update",
+                                systemImage: "checkmark.shield.fill",
+                                iconColor: Theme.success,
+                                tint: Theme.accent,
+                                confirmTitle: "Prepare",
+                                confirmSystemImage: "arrow.down.to.line.compact",
+                                accessibilityIdentifier: "firmware-preparation-confirmation",
+                                cancelAccessibilityLabel: "Cancel preparation",
+                                confirmAccessibilityLabel: "Confirm prepare \(release.version)",
+                                onCancel: cancelPreparation,
+                                onConfirm: { confirmPreparation(of: release) }
+                            )
+                        }
+                    }
                     .transition(.move(edge: .top).combined(with: .opacity))
                 }
                 if index < group.releases.count - 1 {
@@ -388,8 +397,78 @@ struct FirmwareLibraryView: View {
 
     private func requestPreparation(of release: FirmwareRelease) {
         library.clearTerminalFeedback()
+        if verifiedBackupReleaseID != release.id {
+            verifiedBackupReceipt = nil
+            backupError = nil
+        }
         withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) {
             pendingRelease = release
+        }
+    }
+
+    private func backupOffer(for release: FirmwareRelease) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 6) {
+                Label("User files", systemImage: "externaldrive")
+                    .font(.caption.weight(.semibold))
+                Spacer(minLength: 4)
+                Button(verifiedBackupReleaseID == release.id ? "Back up again" : "Back up") {
+                    startPreflightBackup(for: release)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.mini)
+                .disabled(preflightBackup.running || ble.state != .ready)
+            }
+            if preflightBackup.running {
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.mini)
+                    Text(preflightBackup.status ?? "Backing up…")
+                }
+                .font(.caption2)
+            } else if verifiedBackupReleaseID == release.id, let receipt = verifiedBackupReceipt {
+                Label("\(receipt.files) files verified on iPhone", systemImage: "checkmark.circle.fill")
+                    .font(.caption2)
+                    .foregroundStyle(Theme.success)
+            } else if let backupError {
+                Label(backupError, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption2)
+                    .foregroundStyle(Theme.danger)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Text(ble.state == .ready
+                    ? "Save a verified copy on this iPhone before preparing the updater."
+                    : "Connect over BLE to back up files before updating.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(8)
+        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+        .accessibilityIdentifier("firmware-preflight-backup")
+    }
+
+    private func startPreflightBackup(for release: FirmwareRelease) {
+        backupError = nil
+        Task {
+            do {
+                let folders = try await preflightBackup.requiredTopLevelFolders()
+                let selected = folders.filter { !FlipperBackup.excludedDefaults.contains($0) }
+                let formatter = DateFormatter()
+                formatter.dateFormat = "yyyyMMdd-HHmm"
+                let receipt = try await preflightBackup.backup(
+                    folders: selected, stamp: formatter.string(from: Date()))
+                if pendingRelease?.id == release.id {
+                    verifiedBackupReleaseID = release.id
+                    verifiedBackupReceipt = receipt
+                }
+            } catch {
+                if pendingRelease?.id == release.id {
+                    verifiedBackupReleaseID = nil
+                    verifiedBackupReceipt = nil
+                    backupError = error.localizedDescription
+                }
+            }
         }
     }
 
