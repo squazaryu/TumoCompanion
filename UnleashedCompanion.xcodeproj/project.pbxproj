@@ -94,6 +94,7 @@
 		6533954C72F9FBB4D7C9458D /* fw-packages-stable-003-contract.json in Resources */ = {isa = PBXBuildFile; fileRef = D1BE57BD502CE825C04EACF7 /* fw-packages-stable-003-contract.json */; };
 		660358B5ED53BD9B93390DC2 /* DolphinProfileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3352B17F82ACA14AD4B854B7 /* DolphinProfileTests.swift */; };
 		6639DBE5A0696A7A75531255 /* PluginUpdatesDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4930E5335E77EBB9BFA70EF /* PluginUpdatesDetailView.swift */; };
+		675F56C5398CAE0F3D7A93AC /* FlipperBackupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 131E8170B4D6E08EBF784CF7 /* FlipperBackupTests.swift */; };
 		67BAED6714BF802153F252C9 /* SberIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 987F2B3510E58C6070C7D81E /* SberIntents.swift */; };
 		693460D40AB5EEABAB8122CD /* MarauderLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = E66CABAA55465F56CC1CF2E8 /* MarauderLog.swift */; };
 		6D5E2E66502E9832B6670D9D /* CatalogListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FDC334B8785EB5B2A51B922 /* CatalogListView.swift */; };
@@ -262,6 +263,7 @@
 		090EE11AA22E9A2D32CB5FBC /* FilesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilesView.swift; sourceTree = "<group>"; };
 		0BD911DD24B8F7F707E87CE0 /* TumoflipUpdaterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoflipUpdaterView.swift; sourceTree = "<group>"; };
 		0C80C0FD84155F0D33B39D83 /* desktop.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = desktop.pb.swift; sourceTree = "<group>"; };
+		131E8170B4D6E08EBF784CF7 /* FlipperBackupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlipperBackupTests.swift; sourceTree = "<group>"; };
 		18979E931D5ADCCC963ABB98 /* TumoVMNFCContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoVMNFCContract.swift; sourceTree = "<group>"; };
 		18E9E2A54A0286AF6188F9A9 /* FapMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FapMetadata.swift; sourceTree = "<group>"; };
 		19E12C880E5E2F99397122BC /* GitHubAccessCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubAccessCard.swift; sourceTree = "<group>"; };
@@ -728,6 +730,7 @@
 				98F04DB6042C632AC1B52D91 /* FapMetadataTests.swift */,
 				406855A4F6EC92517E41CF68 /* FirmwareArchiveTests.swift */,
 				63CF454F5F1DBADC991DD631 /* FirmwareCatalogTests.swift */,
+				131E8170B4D6E08EBF784CF7 /* FlipperBackupTests.swift */,
 				BF7F5D1B21FCD35496F56E26 /* GitHubAPIClientTests.swift */,
 				8A54ADE2A988A392B1687C80 /* GitHubAuthStoreTests.swift */,
 				FA766CD63AD11289FB5F0DC8 /* GitHubOAuthClientTests.swift */,
@@ -1180,6 +1183,7 @@
 				C9BA4C5BB222941D1B3C3FA9 /* FapMetadataTests.swift in Sources */,
 				CCE4664E2C132A8662B2F7F3 /* FirmwareArchiveTests.swift in Sources */,
 				DBF198850F9BCC58CE887DCF /* FirmwareCatalogTests.swift in Sources */,
+				675F56C5398CAE0F3D7A93AC /* FlipperBackupTests.swift in Sources */,
 				597368D182EF7A5FD2E780FA /* GitHubAPIClientTests.swift in Sources */,
 				FF7338AC7B807DA5FD9CB559 /* GitHubAuthStoreTests.swift in Sources */,
 				4657F289AE20F68598CF1F23 /* GitHubOAuthClientTests.swift in Sources */,
