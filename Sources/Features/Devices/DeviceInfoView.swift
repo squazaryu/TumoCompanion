@@ -15,7 +15,8 @@ final class DeviceInfoViewModel: ObservableObject {
     /// a prior Flipper's info after disconnecting and connecting to a different one.
     func reset() {
         info = []; power = []; error = nil
-        runtimeStatus = nil; runtimeTwin = nil; runtimeTrace = nil; runtimeError = nil
+        runtimeStatus = nil; runtimeTwin = nil; runtimeTrace = nil
+        runtimeCrashReport = nil; runtimeError = nil
     }
 
     private var dict: [String: String] {
@@ -106,6 +107,7 @@ final class DeviceInfoViewModel: ObservableObject {
     @Published var runtimeStatus: RuntimeStatus?
     @Published var runtimeTwin: RuntimeTwin?
     @Published var runtimeTrace: RuntimeTrace?
+    @Published var runtimeCrashReport: RuntimeCrashReport?
     @Published var runtimeLoading = false
     @Published var runtimeError: String?
 
@@ -124,6 +126,18 @@ final class DeviceInfoViewModel: ObservableObject {
         let caps = RuntimeCapabilities(ble.appBridgeCapabilities)
         if caps.supportsTwin { runtimeTwin = try? await ble.runtimeTwin() }
         if caps.supportsTrace { runtimeTrace = try? await ble.runtimeTrace() }
+        // Older firmware returns badcmd; keep this optional diagnostic silent.
+        runtimeCrashReport = try? await ble.runtimeCrashReport()
+    }
+
+    func clearRuntimeCrashReport(_ ble: FlipperBLE) async {
+        guard runtimeCrashReport?.hasCrash == true else { return }
+        do {
+            try await ble.acknowledgeRuntimeCrashReport()
+            runtimeCrashReport = RuntimeCrashReport("schema=1;status=none")
+        } catch {
+            runtimeError = error.localizedDescription
+        }
     }
 }
 
@@ -133,6 +147,7 @@ final class DeviceInfoViewModel: ObservableObject {
 struct DeviceInfoView: View {
     @EnvironmentObject var ble: FlipperBLE
     @StateObject private var vm = DeviceInfoViewModel()
+    @State private var confirmingCrashClear = false
 
     var body: some View {
         Group {
@@ -266,6 +281,33 @@ struct DeviceInfoView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                }
+            }
+
+            if let crash = vm.runtimeCrashReport, crash.hasCrash {
+                Divider().opacity(0.4)
+                Text("LAST CRASH").font(.caption2).fontWeight(.semibold)
+                    .foregroundStyle(.secondary).tracking(0.5)
+                infoRow("Cause", crash.kindLabel ?? "Unknown")
+                if let app = crash.appID { infoRow("App prefix", app) }
+                if let build = crash.buildCommit { infoRow("Build", build) }
+                if let sequence = crash.sequence { infoRow("Sequence", String(sequence)) }
+                if confirmingCrashClear {
+                    Text("Remove this saved crash report?")
+                        .font(.caption2).foregroundStyle(.secondary)
+                    HStack {
+                        Button("Keep") { confirmingCrashClear = false }
+                        Spacer()
+                        Button("Clear", role: .destructive) {
+                            confirmingCrashClear = false
+                            Task { await vm.clearRuntimeCrashReport(ble) }
+                        }
+                    }
+                    .font(.caption)
+                } else {
+                    Button("Clear report") { confirmingCrashClear = true }
+                        .font(.caption)
+                        .accessibilityIdentifier("runtime-clear-crash-report")
                 }
             }
 
