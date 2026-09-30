@@ -166,6 +166,7 @@ targets:
       - path: Tests
     dependencies:
       - target: UnleashedCompanion
+      - package: ZIPFoundation
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.tumoflip.unleashedcompanion.tests
