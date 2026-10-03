@@ -2,6 +2,13 @@ import XCTest
 @testable import UnleashedCompanion
 
 final class RPCReadBudgetTests: XCTestCase {
+    func testFreshBudgetStartsEmptyAndNotExceeded() {
+        let budget = RPCReadBudget(maximumBytes: 128)
+        XCTAssertEqual(budget.maximumBytes, 128)
+        XCTAssertEqual(budget.acceptedBytes, 0)
+        XCTAssertFalse(budget.exceeded)
+    }
+
     func testOversizedReplyStaysFailedWhileRemainingFramesDrain() {
         var budget = RPCReadBudget(maximumBytes: 3)
         XCTAssertTrue(budget.accept(2))
