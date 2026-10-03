@@ -51,6 +51,11 @@ jobs:
             -only-testing:UnleashedTests/TumoflipInstallerTests \
             -only-testing:UnleashedTests/RuntimeDiagnosticsTests \
             -only-testing:UnleashedTests/FlipperBackupTests \
+            -only-testing:UnleashedTests/SignalTimelineTests \
+            -only-testing:UnleashedTests/RemoteIDTests \
+            -only-testing:UnleashedTests/UpdateAssistantTests \
+            -only-testing:UnleashedTests/UpdateAssistantModelTests \
+            -only-testing:UnleashedTests/RPCReadBudgetTests \
             -only-testing:UnleashedTests/ESP32InstallerZIPTests \
             -only-testing:UnleashedTests/ESP32UpdaterTests \
             -only-testing:UnleashedTests/ESP32FlashTransitionTests \
