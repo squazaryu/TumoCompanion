@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.11.24",
-      "versionDate": "2026-09-22",
-      "versionDescription": "TumoCompanion 1.11.24 protects Device Library, its cards/history and File History plugin from Community replacement, and checks Tumoflip F7 API 88.5+ before installation. Update this app, then Firmware Dev 009-009, then FW Packages Dev 021. The Bluetooth Remote repair is in the firmware; pairing data is preserved.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.24/TumoCompanion-unsigned.ipa",
-      "size": 25840904,
+      "version": "1.11.26",
+      "versionDate": "2026-10-03",
+      "versionDescription": "TumoCompanion 1.11.26 adds passive RAW A/B timeline analysis, explicit before/after update checkpoints, verified incremental standalone backups and offline Remote ID diagnostics. Retains the backup/crash/ESP32 checks from RC1. Update this app, then Firmware Dev 009-018, then FW Packages Dev 024. Remote ID requires compatible ESP32 firmware; no board flash or file cleanup is automatic.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.26/TumoCompanion-unsigned.ipa",
+      "size": 25888155,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.11.26",
+          "date": "2026-10-03",
+          "localizedDescription": "TumoCompanion 1.11.26 adds passive RAW A/B timeline analysis, explicit before/after update checkpoints, verified incremental standalone backups and offline Remote ID diagnostics. Retains the backup/crash/ESP32 checks from RC1. Update this app, then Firmware Dev 009-018, then FW Packages Dev 024. Remote ID requires compatible ESP32 firmware; no board flash or file cleanup is automatic.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.26/TumoCompanion-unsigned.ipa",
+          "size": 25888155,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.11.24",
           "date": "2026-09-22",
