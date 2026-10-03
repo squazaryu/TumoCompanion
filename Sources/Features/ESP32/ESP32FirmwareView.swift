@@ -20,6 +20,9 @@ struct ESP32FirmwareView: View {
     var body: some View {
         CardScroll(refreshAction: { await up.refresh() }) {
             statusCard
+            NavigationLink { RemoteIDView() } label: {
+                Label("Remote ID diagnostics", systemImage: "antenna.radiowaves.left.and.right")
+            }.card().disabled(up.busy)
             if up.stagingBoards.isEmpty && !up.busy {
                 switch up.deviceScanState {
                 case .loaded:

@@ -18,6 +18,12 @@ struct CaptureInventory: Codable, Equatable {
         var id: String { path }
     }
     let files: [File]
+    private enum CodingKeys: String, CodingKey { case files }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        try self.init(files: container.decode([File].self, forKey: .files))
+    }
 
     init(files: [File]) throws {
         guard files.count <= 20_000, Set(files.map(\.path)).count == files.count,

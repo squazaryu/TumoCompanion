@@ -29,6 +29,9 @@ struct FirmwareLibraryView: View {
     var body: some View {
         CardScroll(refreshAction: refreshLibrary) {
             connectionCard
+            NavigationLink { UpdateAssistantView() } label: {
+                Label("Before / after update checks", systemImage: "checklist")
+            }.card().disabled(library.busy)
             if library.visibleGroups.isEmpty {
                 emptyCard
             } else {

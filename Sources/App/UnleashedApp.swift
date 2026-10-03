@@ -83,7 +83,18 @@ struct RootView: View {
     @ViewBuilder
     var body: some View {
 #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("-protected-apps-audit-qa") {
+        if ProcessInfo.processInfo.arguments.contains("-signal-timeline-qa") {
+            NavigationStack {
+                SignalTimelineView(sourceA: "/ext/subghz/own_remote_press_A.sub",
+                                   sourceB: "/ext/subghz/own_remote_press_B.sub",
+                                   fixture: ProductPreviewFixtures.waveformA,
+                                   fixtureB: ProductPreviewFixtures.waveformB)
+            }.preferredColorScheme(.dark)
+        } else if ProcessInfo.processInfo.arguments.contains("-update-assistant-qa") {
+            NavigationStack { UpdateAssistantView(fixture: true) }.preferredColorScheme(.dark)
+        } else if ProcessInfo.processInfo.arguments.contains("-remote-id-qa") {
+            NavigationStack { RemoteIDView(fixture: ProductPreviewFixtures.remoteID) }.preferredColorScheme(.dark)
+        } else if ProcessInfo.processInfo.arguments.contains("-protected-apps-audit-qa") {
             ProtectedAppsAuditQAView()
         } else if ProcessInfo.processInfo.arguments.contains("-protected-apps-audit-unavailable-qa") {
             ProtectedAppsAuditQAView(failureKind: .unavailable)

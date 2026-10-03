@@ -8,6 +8,11 @@ struct TumoSpectrumView: View {
     var body: some View {
         CardScroll {
             statusCard
+            NavigationLink {
+                SignalTimelineView(sourceA: viewModel.report?.capture.path,
+                                   sourceB: viewModel.report?.compared?.path)
+            } label: { Label("Interactive RAW timeline", systemImage: "waveform.path") }
+                .card()
             if let report = viewModel.report {
                 overviewCard(report)
                 histogramCard(report.capture)

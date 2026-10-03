@@ -279,7 +279,7 @@ final class FlipperBackup: ObservableObject {
         let previousManifest = previousURL.flatMap { try? Self.validateArchive(at: $0) }
         let previousArchive: Archive?
         if let previousURL {
-            do { previousArchive = try Archive(url: previousURL, accessMode: .read) }
+            do { previousArchive = try Archive(url: previousURL, accessMode: .read, pathEncoding: nil) }
             catch { previousArchive = nil }
         } else { previousArchive = nil }
         let previousRecords = Dictionary(uniqueKeysWithValues:
