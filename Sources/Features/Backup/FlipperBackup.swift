@@ -22,6 +22,7 @@ struct FlipperBackupReceipt {
     let url: URL
     let files: Int
     let bytes: Int64
+    var reusedFiles: Int = 0
 }
 
 private enum FlipperBackupError: LocalizedError {
@@ -133,6 +134,7 @@ final class FlipperBackup: ObservableObject {
                 try await collect("/ext/\(folder)", into: &files, depth: 0)
             }
             guard !files.isEmpty else { throw FlipperBackupError.noFiles }
+            let originalInventory = try inventory(files)
             guard files.reduce(UInt64(0), { $0 + UInt64($1.size) }) <= Self.maxArchiveBytes else {
                 throw FlipperBackupError.invalidArchive("selected files are too large")
             }
@@ -148,7 +150,14 @@ final class FlipperBackup: ObservableObject {
                 try? FileManager.default.removeItem(at: staging)
             }
 
-            let manifest = try await writeArchive(at: staging, scratch: scratch, files: files)
+            let (manifest, reused) = try await writeArchive(at: staging, scratch: scratch, files: files)
+            var finalInventory: [FlipperFile] = []
+            for folder in Set(folders).sorted() {
+                try await collect("/ext/\(folder)", into: &finalInventory, depth: 0)
+            }
+            guard originalInventory == (try inventory(finalInventory)) else {
+                throw FlipperBackupError.invalidArchive("device files changed during backup")
+            }
             try Task.checkCancellation()
             guard try Self.validateArchive(at: staging) != nil else {
                 throw FlipperBackupError.invalidArchive("manifest missing")
@@ -159,11 +168,12 @@ final class FlipperBackup: ObservableObject {
             #endif
             try FileManager.default.moveItem(at: staging, to: final)
             refreshBackups()
-            status = "Backed up \(manifest.files.count) file\(manifest.files.count == 1 ? "" : "s")."
+            status = "Backed up \(manifest.files.count) files; \(reused) unchanged files reused."
             return FlipperBackupReceipt(
                 url: final,
                 files: manifest.files.count,
-                bytes: manifest.files.reduce(0) { $0 + Int64($1.size) })
+                bytes: manifest.files.reduce(0) { $0 + Int64($1.size) },
+                reusedFiles: reused)
         } catch {
             status = "Backup incomplete: \(error.localizedDescription)"
             throw error
@@ -257,23 +267,50 @@ final class FlipperBackup: ObservableObject {
         at url: URL,
         scratch: URL,
         files: [FlipperFile]
-    ) async throws -> FlipperBackupManifest {
+    ) async throws -> (FlipperBackupManifest, Int) {
         let archive: Archive
         do { archive = try Archive(url: url, accessMode: .create) }
         catch { throw FlipperBackupError.archiveCreation }
         let chunk = scratch.appendingPathComponent("file")
         var records: [FlipperBackupManifest.File] = []
+        var reused = 0
+        // Reuse only a fully verified snapshot. Corrupt/legacy archives are not cache evidence.
+        let previousURL = backups.first
+        let previousManifest = previousURL.flatMap { try? Self.validateArchive(at: $0) }
+        let previousArchive: Archive?
+        if let previousURL {
+            do { previousArchive = try Archive(url: previousURL, accessMode: .read) }
+            catch { previousArchive = nil }
+        } else { previousArchive = nil }
+        let previousRecords = Dictionary(uniqueKeysWithValues:
+            (previousManifest?.files ?? []).map { ($0.path, $0) })
         for (index, file) in files.enumerated() {
             try Task.checkCancellation()
             status = "Backing up \(index + 1)/\(files.count)…"
-            let data = try await storage.read(file.path)
+            let relative = String(file.path.dropFirst("/ext/".count))
+            guard let deviceHash = try await storage.checkedMD5(file.path, timeout: 300),
+                  deviceHash.count == 32 else {
+                throw FlipperBackupError.checksumMismatch(file.path)
+            }
+            var cached: Data?
+            if let record = previousRecords[relative], record.size == Int(file.size),
+               let previousArchive, let entry = previousArchive[relative] {
+                var bytes = Data()
+                _ = try previousArchive.extract(entry) { bytes.append($0) }
+                if bytes.count == record.size, Self.sha256(bytes) == record.sha256,
+                   Self.md5(bytes) == deviceHash {
+                    cached = bytes
+                }
+            }
+            let data: Data
+            if let cached { data = cached; reused += 1 }
+            else { data = try await storage.read(file.path) }
             guard data.count == Int(file.size) else {
                 throw FlipperBackupError.incompleteRead(file.path)
             }
             guard try await storage.checkedMD5(file.path, timeout: 300) == Self.md5(data) else {
                 throw FlipperBackupError.checksumMismatch(file.path)
             }
-            let relative = String(file.path.dropFirst("/ext/".count))
             _ = try Self.safeDestination(for: relative)
             try data.write(to: chunk, options: .atomic)
             try archive.addEntry(with: relative, fileURL: chunk, compressionMethod: .deflate)
@@ -285,7 +322,14 @@ final class FlipperBackup: ObservableObject {
         try encoder.encode(manifest).write(to: chunk, options: .atomic)
         try archive.addEntry(
             with: Self.manifestName, fileURL: chunk, compressionMethod: .deflate)
-        return manifest
+        return (manifest, reused)
+    }
+
+    private func inventory(_ files: [FlipperFile]) throws -> [String: UInt32] {
+        guard Set(files.map(\.path)).count == files.count else {
+            throw FlipperBackupError.invalidArchive("duplicate device file paths")
+        }
+        return Dictionary(uniqueKeysWithValues: files.map { ($0.path, $0.size) })
     }
 
     /// Validate the entire ZIP before restoring any file. Old archives without a
