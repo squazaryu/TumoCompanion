@@ -7,6 +7,10 @@ struct RPCReadBudget {
     private(set) var exceeded = false
     private var frames = 0
 
+    init(maximumBytes: Int) {
+        self.maximumBytes = maximumBytes
+    }
+
     mutating func accept(_ bytes: Int) -> Bool {
         let maximumFrames = maximumBytes == Int.max ? Int.max :
             max(128, min(131_072, max(0, maximumBytes) / 256 + 129))
