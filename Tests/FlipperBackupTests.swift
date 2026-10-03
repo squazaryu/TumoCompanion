@@ -12,6 +12,8 @@ final class FlipperBackupTests: XCTestCase {
         var unreadable = Set<String>()
         var wrongSize = Set<String>()
         var directories = Set<String>()
+        var readCount = 0
+        var afterRead: (() -> Void)?
 
         func list(_ path: String) async throws -> [FlipperFile] {
             let prefix = path + "/"
@@ -26,8 +28,11 @@ final class FlipperBackupTests: XCTestCase {
         }
 
         func read(_ path: String) async throws -> Data {
+            readCount += 1
             if unreadable.contains(path) { throw FakeError.readFailed }
-            return files[path]!
+            let data = files[path]!
+            afterRead?()
+            return data
         }
 
         func checkedMD5(_ path: String, timeout: TimeInterval) async throws -> String? {
@@ -45,6 +50,54 @@ final class FlipperBackupTests: XCTestCase {
         ) async throws {
             files[path] = data
         }
+    }
+
+    func testSecondBackupReusesVerifiedUnchangedBytesButRemainsStandalone() async throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storage = FakeStorage()
+        storage.files = ["/ext/subghz/one.sub": Data("one".utf8),
+                         "/ext/subghz/two.sub": Data("two".utf8)]
+        let backup = FlipperBackup(storage: storage, directory: directory)
+        let first = try await backup.backup(folders: ["subghz"], stamp: "first")
+        XCTAssertEqual(storage.readCount, 2)
+        storage.files["/ext/subghz/two.sub"] = Data("new".utf8)
+        let second = try await backup.backup(folders: ["subghz"], stamp: "second")
+        XCTAssertEqual(storage.readCount, 3, "Only changed data should cross BLE again")
+        try FileManager.default.removeItem(at: first.url)
+        storage.files.removeAll()
+        try await backup.restore(second.url)
+        XCTAssertEqual(storage.files["/ext/subghz/one.sub"], Data("one".utf8))
+        XCTAssertEqual(storage.files["/ext/subghz/two.sub"], Data("new".utf8))
+    }
+
+    func testChangedInventoryCannotPublishBackup() async throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storage = FakeStorage()
+        storage.files["/ext/subghz/one.sub"] = Data("one".utf8)
+        storage.afterRead = { storage.files["/ext/subghz/new.sub"] = Data("new".utf8) }
+        let backup = FlipperBackup(storage: storage, directory: directory)
+        do {
+            _ = try await backup.backup(folders: ["subghz"], stamp: "changing")
+            XCTFail("An incomplete inventory must not become a successful snapshot")
+        } catch { }
+        XCTAssertTrue(backup.backups.isEmpty)
+    }
+
+    func testCorruptedPreviousArchiveFallsBackToDeviceRead() async throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storage = FakeStorage()
+        storage.files["/ext/subghz/one.sub"] = Data("one".utf8)
+        let backup = FlipperBackup(storage: storage, directory: directory)
+        let first = try await backup.backup(folders: ["subghz"], stamp: "first")
+        try Data("corrupt".utf8).write(to: first.url)
+        let second = try await backup.backup(folders: ["subghz"], stamp: "second")
+        XCTAssertEqual(storage.readCount, 2)
+        storage.files.removeAll()
+        try await backup.restore(second.url)
+        XCTAssertEqual(storage.files["/ext/subghz/one.sub"], Data("one".utf8))
     }
 
     func testFailedReadDoesNotPublishPartialBackup() async throws {
