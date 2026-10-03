@@ -8,6 +8,7 @@ enum FlipperRPCError: Error, LocalizedError {
     case status(PB_CommandStatus)
     case timeout
     case decode
+    case responseTooLarge
 
     var errorDescription: String? {
         switch self {
@@ -19,6 +20,7 @@ enum FlipperRPCError: Error, LocalizedError {
         case .status(let s):   return "Flipper error: \(s)"
         case .timeout:         return "Command timed out"
         case .decode:          return "Failed to decode response"
+        case .responseTooLarge: return "Storage response exceeds the permitted read size"
         }
     }
 }
@@ -79,6 +81,7 @@ final class FlipperRPC: ObservableObject {
 
     private struct Pending {
         var accumulated: [PB_Main] = []
+        var readBudget: RPCReadBudget
         let continuation: CheckedContinuation<[PB_Main], Error>
     }
     private var pending: [UInt32: Pending] = [:]
@@ -120,9 +123,9 @@ final class FlipperRPC: ObservableObject {
     /// Flipper signals `has_next == false`. The closure receives a Main with a
     /// fresh `command_id` already assigned — set its `content` and any fields.
     @discardableResult
-    func command(timeout: TimeInterval = 30,
+    func command(timeout: TimeInterval = 30, maxStorageReadBytes: Int = Int.max,
                  _ configure: @escaping (inout PB_Main) -> Void) async throws -> [PB_Main] {
-        try await commandStreaming(timeout: timeout, [configure])
+        try await commandStreaming(timeout: timeout, maxStorageReadBytes: maxStorageReadBytes, [configure])
     }
 
     /// Send a multi-frame request: all frames share one `command_id`, every frame
@@ -141,7 +144,7 @@ final class FlipperRPC: ObservableObject {
     /// the Flipper's final write confirmation — see the `move()`/`read()` timeout bumps
     /// above for the same underlying class of bug on other size-scaling operations.
     @discardableResult
-    func commandStreaming(timeout: TimeInterval = 60,
+    func commandStreaming(timeout: TimeInterval = 60, maxStorageReadBytes: Int = Int.max,
                           onFrameSent: (@Sendable (Int) -> Void)? = nil,
                           shouldStop: @escaping @Sendable () -> Bool = { false },
                           _ configures: [(inout PB_Main) -> Void]) async throws -> [PB_Main] {
@@ -189,7 +192,7 @@ final class FlipperRPC: ObservableObject {
             group.addTask {
                 try await withCheckedThrowingContinuation { cont in
                     self.lock.lock()
-                    self.pending[id] = Pending(continuation: cont)
+                    self.pending[id] = Pending(readBudget: RPCReadBudget(maximumBytes: maxStorageReadBytes), continuation: cont)
                     self.lock.unlock()
                     // Send each frame only after the Flipper acks the previous
                     // one (writeSerial's completion). This paces uploads to the
@@ -296,13 +299,19 @@ final class FlipperRPC: ObservableObject {
             }
             let id = main.commandID
             if id != 0, var p = pending[id] {
-                p.accumulated.append(main)
+                let bytes: Int
+                if case .storageReadResponse(let response) = main.content { bytes = response.file.data.count }
+                else { bytes = 0 }
+                if p.readBudget.accept(bytes) { p.accumulated.append(main) }
+                else { p.accumulated.removeAll(keepingCapacity: false) }
                 if main.hasNext_p {
                     pending[id] = p
                 } else {
                     pending.removeValue(forKey: id)
                     if main.commandStatus != .ok {
                         toResolve.append((p, nil, FlipperRPCError.status(main.commandStatus)))
+                    } else if p.readBudget.exceeded {
+                        toResolve.append((p, nil, FlipperRPCError.responseTooLarge))
                     } else {
                         toResolve.append((p, p.accumulated, nil))
                     }

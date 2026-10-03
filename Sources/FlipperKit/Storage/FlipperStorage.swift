@@ -168,7 +168,11 @@ final class FlipperStorage {
     // MARK: - Read
 
     func read(_ path: String) async throws -> Data {
-        let responses = try await rpc.command(timeout: 120) { main in
+        try await read(path, maximumBytes: Int.max)
+    }
+
+    func read(_ path: String, maximumBytes: Int) async throws -> Data {
+        let responses = try await rpc.command(timeout: 120, maxStorageReadBytes: maximumBytes) { main in
             main.content = .storageReadRequest({
                 var r = PBStorage_ReadRequest(); r.path = path; return r
             }())

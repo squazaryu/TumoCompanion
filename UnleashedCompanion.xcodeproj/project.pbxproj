@@ -120,6 +120,7 @@
 		81045F2ACE03A6F7F90E76E6 /* flipper.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DB011D9C22032D6D39A1ECF /* flipper.pb.swift */; };
 		816926EE2BFA24265146ECE6 /* TumoflipUpdaterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BD911DD24B8F7F707E87CE0 /* TumoflipUpdaterView.swift */; };
 		82EC3BC8107230E5C12ED1A4 /* system.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2485BA585EAEAF510AE43475 /* system.pb.swift */; };
+		834ED5943CEEF7C139CC035B /* RPCReadBudget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DAC7802254E690B3766FC5C /* RPCReadBudget.swift */; };
 		8368D7C7F909F8FCC3A2BEB6 /* property.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E7FA44A3E6DC5FED65AC3A5 /* property.pb.swift */; };
 		878B98A78707C356A520BCA7 /* PluginUpdateMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBA5FCA0F80809900471F32E /* PluginUpdateMonitor.swift */; };
 		88411C55162E96E16569C398 /* AIRadarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6F24142729978361986A6C2 /* AIRadarView.swift */; };
@@ -189,6 +190,7 @@
 		E266B47A78B89D1F131AC867 /* RemoteIDReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1182D29C123C1F78168038A /* RemoteIDReport.swift */; };
 		E37D4C1411C566C54C6EED88 /* PluginUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87F2C64ACDABA1AEFFB7CCD8 /* PluginUpdater.swift */; };
 		E43809C683427E97F667E269 /* SwiftProtobuf in Frameworks */ = {isa = PBXBuildFile; productRef = 96AC5A38B6EE177D6E846BDB /* SwiftProtobuf */; };
+		E56D897A2B175FCF379B122E /* RPCReadBudgetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EEC053469687E6D198E7859 /* RPCReadBudgetTests.swift */; };
 		E5B24296D9B0CCC6FC451147 /* UpdateAssistantSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8552372C065116D007A406D3 /* UpdateAssistantSource.swift */; };
 		E78FE5BE88CC99B01E11E721 /* ESP32FlashPackageMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35183991A8FB5B0949565493 /* ESP32FlashPackageMonitor.swift */; };
 		E79C6619468C7F98B5CC5723 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6DB8FBDDFA1BA4791D40EADD /* Assets.xcassets */; };
@@ -306,6 +308,7 @@
 		2BB98D039C72778CC12CED00 /* TumoSpectrumReportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoSpectrumReportTests.swift; sourceTree = "<group>"; };
 		2D5340A6B3C8B38B925507BA /* DeviceServiceCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceServiceCoordinator.swift; sourceTree = "<group>"; };
 		2E66A60CC5ADE5831A2D34FF /* TumoflipFirmwareRoutingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoflipFirmwareRoutingTests.swift; sourceTree = "<group>"; };
+		2EEC053469687E6D198E7859 /* RPCReadBudgetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RPCReadBudgetTests.swift; sourceTree = "<group>"; };
 		301B6FE711A1B7281FDA825F /* FieldServiceNetworkClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FieldServiceNetworkClient.swift; sourceTree = "<group>"; };
 		3342FDAF60635FDA2E1AC94C /* russian_trusted_root_ca.pem */ = {isa = PBXFileReference; path = russian_trusted_root_ca.pem; sourceTree = "<group>"; };
 		3352B17F82ACA14AD4B854B7 /* DolphinProfileTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DolphinProfileTests.swift; sourceTree = "<group>"; };
@@ -352,6 +355,7 @@
 		6441776EDA9115C9BEB5946E /* DeviceServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceServiceTests.swift; sourceTree = "<group>"; };
 		67C0B0C4BD832B6A0C849C3A /* FlipperRPC.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlipperRPC.swift; sourceTree = "<group>"; };
 		69B7F686FA8087C45E3E1350 /* SignalTimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignalTimelineView.swift; sourceTree = "<group>"; };
+		6DAC7802254E690B3766FC5C /* RPCReadBudget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RPCReadBudget.swift; sourceTree = "<group>"; };
 		6DB8FBDDFA1BA4791D40EADD /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		6E38D7DF4DD5D32376A5F7CC /* TumoSpectrumViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoSpectrumViewModel.swift; sourceTree = "<group>"; };
 		6E68A9C04C4B4A34D456A445 /* BackgroundTransfer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundTransfer.swift; sourceTree = "<group>"; };
@@ -804,6 +808,7 @@
 				50C60E19A1D2DFA673E41C3F /* ProtectedPluginAuditTests.swift */,
 				0711A5F791B6D248100D3EBD /* ProtocolTests.swift */,
 				06F011FAE4BA71D89C6B83AC /* RemoteIDTests.swift */,
+				2EEC053469687E6D198E7859 /* RPCReadBudgetTests.swift */,
 				EDD681FE18BFDF3BD90EC71D /* RuntimeDiagnosticsTests.swift */,
 				97CEBDA4FB8E0C34199354EF /* SignalTimelineTests.swift */,
 				FFAFC266DB9145E7CF8D0504 /* TransferActivityReporterTests.swift */,
@@ -849,6 +854,7 @@
 				299EFF336F47935AE03E9500 /* CompanionBridge.swift */,
 				44CC0B1350B30151851F2958 /* FlipperControl.swift */,
 				67C0B0C4BD832B6A0C849C3A /* FlipperRPC.swift */,
+				6DAC7802254E690B3766FC5C /* RPCReadBudget.swift */,
 			);
 			path = RPC;
 			sourceTree = "<group>";
@@ -1271,6 +1277,7 @@
 				382D481F4B3744731A3527CE /* PluginUpdateMonitorTests.swift in Sources */,
 				0A68BD88E9E469306F4861E7 /* ProtectedPluginAuditTests.swift in Sources */,
 				EAC0D7A0739C0B6EF7565475 /* ProtocolTests.swift in Sources */,
+				E56D897A2B175FCF379B122E /* RPCReadBudgetTests.swift in Sources */,
 				31EF8ECD5C4E84AA992FAD1B /* RemoteIDTests.swift in Sources */,
 				C390ACDEA69EE872DDF566E0 /* RuntimeDiagnosticsTests.swift in Sources */,
 				ECFA4386B158912CCFB96EA8 /* SignalTimelineTests.swift in Sources */,
@@ -1386,6 +1393,7 @@
 				6639DBE5A0696A7A75531255 /* PluginUpdatesDetailView.swift in Sources */,
 				C29D3F9556C6FD8267672E5B /* ProductPreviewFixtures.swift in Sources */,
 				30DE04679A29134FDF2D50BD /* ProtectedPluginAudit.swift in Sources */,
+				834ED5943CEEF7C139CC035B /* RPCReadBudget.swift in Sources */,
 				6EE27A21DF228E8F03A47A84 /* RelayExecutor.swift in Sources */,
 				E266B47A78B89D1F131AC867 /* RemoteIDReport.swift in Sources */,
 				A72BEB971CB682ADE6397BB2 /* RemoteIDView.swift in Sources */,

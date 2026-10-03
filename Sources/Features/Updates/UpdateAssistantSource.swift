@@ -16,7 +16,7 @@ struct LiveUpdateAssistantSource: UpdateAssistantSource {
     func deviceInfo() async throws -> [(String, String)] { try await FlipperSystem().deviceInfo() }
     func list(_ path: String) async throws -> [FlipperFile] { try await storage.list(path) }
     func checkedMD5(_ path: String) async throws -> String? { try await storage.checkedMD5(path, timeout: 300) }
-    func read(_ path: String) async throws -> Data { try await storage.read(path) }
+    func read(_ path: String) async throws -> Data { try await storage.read(path, maximumBytes: 128 * 1024) }
 
     func sdSpace() async throws -> (free: UInt64, total: UInt64) {
         let replies = try await storage.rpc.command { main in

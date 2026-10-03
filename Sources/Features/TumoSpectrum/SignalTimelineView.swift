@@ -129,7 +129,7 @@ struct SignalTimelineView: View {
               !file.isDirectory, file.size <= SignalWaveform.maxBytes else {
             throw SignalAnalysisError.invalid("Capture is missing or larger than 4 MiB.")
         }
-        let bytes = try await storage.read(path)
+        let bytes = try await storage.read(path, maximumBytes: SignalWaveform.maxBytes)
         guard bytes.count == Int(file.size) else { throw SignalAnalysisError.invalid("Capture changed during read.") }
         return try await Task.detached(priority: .userInitiated) { try SignalWaveform.parse(bytes) }.value
     }

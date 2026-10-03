@@ -88,7 +88,7 @@ struct RemoteIDView: View {
         loading = true; errorMessage = nil; report = nil
         defer { loading = false }
         do {
-            let data = try await FlipperStorage().read(file.path)
+            let data = try await FlipperStorage().read(file.path, maximumBytes: 2 * 1024 * 1024)
             guard data.count == Int(file.size) else { throw SignalAnalysisError.invalid("Log changed while reading") }
             let parsed = try await Task.detached(priority: .userInitiated) { try RemoteIDReport.parse(data) }.value
             try Task.checkCancellation()
