@@ -120,6 +120,63 @@ struct RuntimeStatus: Equatable {
     }
 }
 
+/// Bounded, redacted last-crash record from `runtime/crash_report`.
+/// Older firmware replies `badcmd`; Device info treats that optional read as absent.
+struct RuntimeCrashReport: Equatable {
+    let schema: Int
+    let kind: String?
+    let appID: String?
+    let sequence: Int?
+    let buildCommit: String?
+
+    var hasCrash: Bool { kind != nil }
+
+    var kindLabel: String? {
+        switch kind {
+        case "hardfault": return "Hard fault"
+        case "null_pointer": return "Null pointer"
+        case "memory_fault": return "Memory fault"
+        case "bus_fault": return "Bus fault"
+        case "usage_fault": return "Usage fault"
+        case "watchdog": return "Watchdog reset"
+        case "other": return "Other fault"
+        default: return nil
+        }
+    }
+
+    init?(_ payload: String) {
+        let fields = parseRuntimeFields(payload)
+        guard fields["schema"] == "1", let status = fields["status"] else { return nil }
+        schema = 1
+        if status == "none" {
+            guard fields.count == 2 else { return nil }
+            kind = nil
+            appID = nil
+            sequence = nil
+            buildCommit = nil
+            return
+        }
+        guard status == "ok",
+              let kindValue = fields["kind"],
+              ["hardfault", "null_pointer", "memory_fault", "bus_fault", "usage_fault", "watchdog", "other"]
+                .contains(kindValue),
+              let app = fields["app"], (1...12).contains(app.utf8.count),
+              app.utf8.allSatisfy({ byte in
+                  (65...90).contains(byte) || (97...122).contains(byte) ||
+                  (48...57).contains(byte) || byte == 45 || byte == 95
+              }),
+              let count = fields["seq"].flatMap(Int.init), (1...65_535).contains(count),
+              let build = fields["build"], build.utf8.count == 8,
+              build.utf8.allSatisfy({ byte in
+                  (48...57).contains(byte) || (65...70).contains(byte) || (97...102).contains(byte)
+              }) else { return nil }
+        kind = kindValue
+        appID = app
+        sequence = count
+        buildCommit = build
+    }
+}
+
 /// One entry in the compact `runtime/trace` ring: `code,command,result`.
 /// `code`: `r` received, `t` successful reply, `e` error, `s` session ownership.
 /// `command`: first character of the related command (or owner name, for `s`).
@@ -256,5 +313,22 @@ extension FlipperBLE {
             throw RuntimeDiagnosticsError.malformedPayload("twin")
         }
         return twin
+    }
+
+    func runtimeCrashReport(timeout: TimeInterval = 5) async throws -> RuntimeCrashReport {
+        let data = try await appBridgeRequest(
+            appID: "runtime", command: "crash_report", timeout: timeout)
+        guard let text = String(data: data, encoding: .utf8),
+              let report = RuntimeCrashReport(text) else {
+            throw RuntimeDiagnosticsError.malformedPayload("crash_report")
+        }
+        return report
+    }
+
+    func acknowledgeRuntimeCrashReport(timeout: TimeInterval = 5) async throws {
+        let data = try await appBridgeRequest(appID: "runtime", command: "crash_ack", timeout: timeout)
+        guard data == Data("ok".utf8) else {
+            throw RuntimeDiagnosticsError.malformedPayload("crash_ack")
+        }
     }
 }
