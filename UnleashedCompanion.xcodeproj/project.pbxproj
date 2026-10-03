@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		0091E2386B3AC40E8BD81D3B /* GitHubAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDC48789DECAE2A030CB71DE /* GitHubAPIClient.swift */; };
+		01B4D466FB4B13D57E0B8562 /* ManagedPackageRequirements.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBF6B76DF703CE618B8190AC /* ManagedPackageRequirements.swift */; };
 		022F94D327300839527E7901 /* TumoVMNFCSmoke.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54C848C04983CF3B58C03C22 /* TumoVMNFCSmoke.swift */; };
 		028086AFF37EFC8952E84483 /* PluginProtectionPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3D4263C468870ABFDEB8589 /* PluginProtectionPolicyTests.swift */; };
 		03BE7BC7ADBD4866A4F4507E /* FlipperControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44CC0B1350B30151851F2958 /* FlipperControl.swift */; };
@@ -16,6 +17,7 @@
 		064B636DC710B2D96484CFF2 /* UnleashedShared.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = B269822737BE205267576415 /* UnleashedShared.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		06BF7D0FEBAED3E67DB81AA8 /* UnleashedWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 02EF4133669223E43E09D659 /* UnleashedWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		08FC1F6E6EA1377927AA4124 /* AppBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3F4BFB7A552AD0967C934C /* AppBridge.swift */; };
+		0A2C0CA47A2AB39710DAB4C5 /* ESP32FlashTransition.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FC62F39C7023F858EF3A6FE /* ESP32FlashTransition.swift */; };
 		0A68BD88E9E469306F4861E7 /* ProtectedPluginAuditTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C60E19A1D2DFA673E41C3F /* ProtectedPluginAuditTests.swift */; };
 		0D58380E2D1F29BB7FF7DF4B /* TumoflipStatusTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B5D803E53BDA356E1AA5784 /* TumoflipStatusTests.swift */; };
 		0D820CE7564243D692B1A3E9 /* WiFiNetworkMapPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4178D107C8E9CCE11C051E5A /* WiFiNetworkMapPresentationTests.swift */; };
@@ -24,9 +26,11 @@
 		1090F2D6355450C8931CA7BE /* TumoflipPackageCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BF873B24AD38F74D287976F /* TumoflipPackageCatalog.swift */; };
 		1271969636C8F7AE272D9529 /* storage.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33D8A4DF0DF2880CD4231FB /* storage.pb.swift */; };
 		178F947E4834FD231F84D405 /* BuildInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7DAA192B026B24A4907283A /* BuildInfo.swift */; };
+		17985E189BB1CAD1BBBAFF27 /* UpdateAssistantView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC28019A4A2C0F0F16297923 /* UpdateAssistantView.swift */; };
 		19DFE5895853A9679A01976A /* USBStorageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCE7269E5AB13331C01704F7 /* USBStorageTests.swift */; };
 		1AE382BCB64AC41DE36D359F /* WiFiMapperLiveMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A84647765F90EDA3EED9B484 /* WiFiMapperLiveMapView.swift */; };
 		1D65DE3335571D6E326C95C1 /* FirmwareLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 856D8627B88920587D56B850 /* FirmwareLibrary.swift */; };
+		1F1AB1E851AC3B31C8832CC4 /* ESP32FlashTransitionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5F13F14D793B9AFCA425D47 /* ESP32FlashTransitionTests.swift */; };
 		2066FEBC29259A4E4EE5964A /* TransferActivityReporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFAFC266DB9145E7CF8D0504 /* TransferActivityReporterTests.swift */; };
 		20E37F40F64BD3080356A54F /* MacBridgeDiscovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = C45488972BD725C3ECE8BDA8 /* MacBridgeDiscovery.swift */; };
 		255DDC35E88194CCE38D71CB /* DeviceServicesUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24AE55444A9A10FFD0C9F3C5 /* DeviceServicesUITests.swift */; };
@@ -41,6 +45,7 @@
 		2F479A7E15B371A4316B556B /* TumoVMNFCContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93515AAEC58847AD6DE38AE6 /* TumoVMNFCContractTests.swift */; };
 		30DE04679A29134FDF2D50BD /* ProtectedPluginAudit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DD006180A3983508A725752 /* ProtectedPluginAudit.swift */; };
 		31DE3241E429DCE7FAA6C3B2 /* CatalogClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54BC731EF974B7077777585D /* CatalogClientTests.swift */; };
+		31EF8ECD5C4E84AA992FAD1B /* RemoteIDTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06F011FAE4BA71D89C6B83AC /* RemoteIDTests.swift */; };
 		325E596D66161817F31CD52A /* TumoflipFirmwareRoutingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E66A60CC5ADE5831A2D34FF /* TumoflipFirmwareRoutingTests.swift */; };
 		32DECC0F5D2C157C5F95F156 /* InstalledAppsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A8D772599DB1220427F1819 /* InstalledAppsView.swift */; };
 		345773BBA61CE3969A8F861D /* MediaRemoteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11F891A5C5257DF57F4A24F /* MediaRemoteView.swift */; };
@@ -59,6 +64,7 @@
 		3F042FA8BCF01CBAD8377161 /* DolphinGalleryModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2223CB55367C869D06A5001D /* DolphinGalleryModel.swift */; };
 		3FFE12E9A014C7F05D300AAB /* MarauderResultViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52741A242FCEED74C342D4D6 /* MarauderResultViews.swift */; };
 		41E926FF08644F751DB96360 /* DeviceInfoViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2530743A4F45B32311FB1951 /* DeviceInfoViewTests.swift */; };
+		45D5269166EC5905307560FC /* UpdateAssistantModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3845B43332146E5BCD2D94F5 /* UpdateAssistantModelTests.swift */; };
 		4657F289AE20F68598CF1F23 /* GitHubOAuthClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA766CD63AD11289FB5F0DC8 /* GitHubOAuthClientTests.swift */; };
 		46936C2B1C79FA9536851B40 /* GitHubAuthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EBD710F983D218FB913E435 /* GitHubAuthStore.swift */; };
 		46EF26B33502AED58F1E687A /* MarauderPcap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95DB35AEEDE67D42752C5953 /* MarauderPcap.swift */; };
@@ -78,6 +84,7 @@
 		55DF4154B997B215DD5CF9C6 /* InstallActivityAttributesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ECE4D716C1F73A551397D21 /* InstallActivityAttributesTests.swift */; };
 		561C47A5EC74F7DF05D11A2B /* HomeAssistantDiscoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D70BBAA6C69E3FCD8488170 /* HomeAssistantDiscoveryTests.swift */; };
 		56630654C5F12C545C47A195 /* AIRadarBridgeClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95FA4896B7AE237BFC022E1E /* AIRadarBridgeClient.swift */; };
+		568F87B4231E35B91CE405B5 /* SignalTimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69B7F686FA8087C45E3E1350 /* SignalTimelineView.swift */; };
 		56E703AEE38BA106610D2DA5 /* FieldServiceModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B95CE7D8E715A07E4318F9D1 /* FieldServiceModels.swift */; };
 		58ADEF0B8E8D011FDB32D17F /* BridgeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A72EEDF7D1BE89A42EBAFB7D /* BridgeView.swift */; };
 		597368D182EF7A5FD2E780FA /* GitHubAPIClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF7F5D1B21FCD35496F56E26 /* GitHubAPIClientTests.swift */; };
@@ -93,32 +100,41 @@
 		6533954C72F9FBB4D7C9458D /* fw-packages-stable-003-contract.json in Resources */ = {isa = PBXBuildFile; fileRef = D1BE57BD502CE825C04EACF7 /* fw-packages-stable-003-contract.json */; };
 		660358B5ED53BD9B93390DC2 /* DolphinProfileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3352B17F82ACA14AD4B854B7 /* DolphinProfileTests.swift */; };
 		6639DBE5A0696A7A75531255 /* PluginUpdatesDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4930E5335E77EBB9BFA70EF /* PluginUpdatesDetailView.swift */; };
+		675F56C5398CAE0F3D7A93AC /* FlipperBackupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 131E8170B4D6E08EBF784CF7 /* FlipperBackupTests.swift */; };
 		67BAED6714BF802153F252C9 /* SberIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 987F2B3510E58C6070C7D81E /* SberIntents.swift */; };
 		693460D40AB5EEABAB8122CD /* MarauderLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = E66CABAA55465F56CC1CF2E8 /* MarauderLog.swift */; };
+		6948E0150D925AD55F6BE7CF /* ESP32InstallerZIP.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA6580078CD3B2618087AF32 /* ESP32InstallerZIP.swift */; };
 		6D5E2E66502E9832B6670D9D /* CatalogListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FDC334B8785EB5B2A51B922 /* CatalogListView.swift */; };
+		6E15A0D9AF95FDD3FA41A564 /* CaptureInventory.swift in Sources */ = {isa = PBXBuildFile; fileRef = D239A4B484A3BEF324CBDE89 /* CaptureInventory.swift */; };
 		6EE27A21DF228E8F03A47A84 /* RelayExecutor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7C2CDE14DBC7990927949B0 /* RelayExecutor.swift */; };
 		70D8F0F0A503DC6E3F82572A /* application.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37B6865ED8766C019F36D4E5 /* application.pb.swift */; };
 		71002F8061F2ADC7436D1CD5 /* DolphinPacks in Resources */ = {isa = PBXBuildFile; fileRef = 99A7C616CDB7459049791342 /* DolphinPacks */; };
+		724395A9C4D2CDE2A1D7A2DC /* ESP32FlashPackageMonitorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2C51B99EB54D1DD1622F0B5 /* ESP32FlashPackageMonitorTests.swift */; };
 		72AA0AFD7A1A377DA0CFBFFE /* AppBridgeConsoleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C90997591A015CAB64F92E9 /* AppBridgeConsoleTests.swift */; };
 		752AD784AC7FA646BAB74A3D /* FilesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 090EE11AA22E9A2D32CB5FBC /* FilesView.swift */; };
 		780B3810E03353B0DD280923 /* WiFiMapperMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD0C38DF6573695C9B805A24 /* WiFiMapperMapView.swift */; };
 		7A2DB7310DAE7C8152FCD4A2 /* DolphinPreviews in Resources */ = {isa = PBXBuildFile; fileRef = CC55E01E623BEF12E94B15DA /* DolphinPreviews */; };
 		7A36F37E942A5E8A7D052227 /* TumoflipPackageCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A85C1EA60100AC3C2A62346A /* TumoflipPackageCatalogTests.swift */; };
 		7C70DD575F23538982EAC3FF /* WiFiMapperGeoJSONTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3443A5546515DB6C6D192059 /* WiFiMapperGeoJSONTests.swift */; };
+		80B7E6DD94BE47201E95CC20 /* UpdateAssistantTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB95CC2D30449BD2911405CD /* UpdateAssistantTests.swift */; };
 		81045F2ACE03A6F7F90E76E6 /* flipper.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DB011D9C22032D6D39A1ECF /* flipper.pb.swift */; };
 		816926EE2BFA24265146ECE6 /* TumoflipUpdaterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BD911DD24B8F7F707E87CE0 /* TumoflipUpdaterView.swift */; };
 		82EC3BC8107230E5C12ED1A4 /* system.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2485BA585EAEAF510AE43475 /* system.pb.swift */; };
+		834ED5943CEEF7C139CC035B /* RPCReadBudget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DAC7802254E690B3766FC5C /* RPCReadBudget.swift */; };
 		8368D7C7F909F8FCC3A2BEB6 /* property.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E7FA44A3E6DC5FED65AC3A5 /* property.pb.swift */; };
 		878B98A78707C356A520BCA7 /* PluginUpdateMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBA5FCA0F80809900471F32E /* PluginUpdateMonitor.swift */; };
 		88411C55162E96E16569C398 /* AIRadarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6F24142729978361986A6C2 /* AIRadarView.swift */; };
 		8A0595A5EF674BC7E233228B /* quac-fw-package-migration.json in Resources */ = {isa = PBXBuildFile; fileRef = B1BDE37AAB9C7938FA910453 /* quac-fw-package-migration.json */; };
 		8A3D3C8FB0D3E6169E243B15 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9183EF8E1FF8617A2B48EA8 /* Theme.swift */; };
 		8AAAFB628D23BAFFA836BE80 /* ESP32UpdaterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B87192747729E361050D9378 /* ESP32UpdaterTests.swift */; };
+		8B88F99420AD227094FE7801 /* ManagedPackageRequirementsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80C175631E2564AF57CEFFCC /* ManagedPackageRequirementsTests.swift */; };
 		8FF4B486963DB3CDAFD33039 /* TumoCardNFCSmoke.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57114D9F2BB2FDEAB835D4D2 /* TumoCardNFCSmoke.swift */; };
 		926D8F0CDA3A5E5673DCBEE9 /* TumoSurveySession.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00DFB08592E9523B019BE0E /* TumoSurveySession.swift */; };
 		94270EE7D91E72A67DCCF72F /* DeviceServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6441776EDA9115C9BEB5946E /* DeviceServiceTests.swift */; };
+		951EAEDBCE7B83DF93A9DB5B /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 2928F152CD1BE076355840D1 /* ZIPFoundation */; };
 		9557FFF86AE01FDF6E8BA371 /* FlipperBLE.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56CC0246CF934A5E59B02502 /* FlipperBLE.swift */; };
 		9570769329A543974A6E3501 /* TumoFabricTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 985815E6A1B91675260A0A0D /* TumoFabricTests.swift */; };
+		96966A4735712E46A1D61787 /* SignalWaveform.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA2662EDCFCF09A2E06BDA20 /* SignalWaveform.swift */; };
 		9970C1E57A8F9C71B510102E /* TumoflipFirmwareRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 916BE931F747387EDB008311 /* TumoflipFirmwareRouting.swift */; };
 		9B2BB6377BAE0FC06FCDF701 /* DolphinAnimations in Resources */ = {isa = PBXBuildFile; fileRef = 022BE984F8DAB89F987AEC28 /* DolphinAnimations */; };
 		9D4526D85608E2635C63D0D8 /* HomeLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A900650A66F8794D717BD99 /* HomeLayout.swift */; };
@@ -126,7 +142,9 @@
 		9FC598E759742CCC4DE8B272 /* TransferChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30560D061F3814086328E2D /* TransferChannel.swift */; };
 		A2FA43CE0B4A58285A1A58DA /* TumoflipManifestTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4333919B345598E3C08BFCD /* TumoflipManifestTests.swift */; };
 		A30F13ACC0229564B37C93F9 /* TransferActivityReporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45807167A09B0989A1262077 /* TransferActivityReporter.swift */; };
+		A42035AEC82D908DD9FC8829 /* UpdateAssistantModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F37BC7F7DB33833C9B562233 /* UpdateAssistantModel.swift */; };
 		A67E7F06A079691F84FE3B2A /* MarauderLiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C823E47E64B2DF1022C4964B /* MarauderLiveView.swift */; };
+		A72BEB971CB682ADE6397BB2 /* RemoteIDView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97FD48533294A374B7BE3AD0 /* RemoteIDView.swift */; };
 		A8BA58C91AF58AB4871C32C2 /* FlipperBackup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B35CB407A050A2BA05BFED2 /* FlipperBackup.swift */; };
 		A910F14D11CCC2B19261AB3F /* BackupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F48EA867BF44D4BC76EDE7E /* BackupView.swift */; };
 		A9DC9FF761C1761A9C3BF594 /* UpdatesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 263FF028D83D9F5E4C56E6CF /* UpdatesView.swift */; };
@@ -144,14 +162,17 @@
 		BE83B7C0719E55A9D2AF0EB9 /* FieldServiceNetworkClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 301B6FE711A1B7281FDA825F /* FieldServiceNetworkClient.swift */; };
 		BFE33FBE261830F715775863 /* SberLoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24DE2B5AF5B3FA4C77EEF6AB /* SberLoginView.swift */; };
 		C25AAD849847AC8C673B9462 /* DeviceServiceCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D5340A6B3C8B38B925507BA /* DeviceServiceCoordinator.swift */; };
+		C29D3F9556C6FD8267672E5B /* ProductPreviewFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F44EAAAFED111C3F8C23882 /* ProductPreviewFixtures.swift */; };
 		C390ACDEA69EE872DDF566E0 /* RuntimeDiagnosticsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDD681FE18BFDF3BD90EC71D /* RuntimeDiagnosticsTests.swift */; };
 		C3CEEA1F75CECCD8BEAF4255 /* BackgroundTransfer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E68A9C04C4B4A34D456A445 /* BackgroundTransfer.swift */; };
+		C5796185B7EA8DF03AE039E0 /* ESP32InstallerZIPTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 925FBE2CA5FBABF051379C13 /* ESP32InstallerZIPTests.swift */; };
 		C57A815B28B1629238A1F2DA /* AIRadarRelay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F693046B543D525DC64F4D9 /* AIRadarRelay.swift */; };
 		C78CF345B32C9CC99B502793 /* TransferBackgroundTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8935260266C922FDBB301B75 /* TransferBackgroundTests.swift */; };
 		C7EC549D7971B7FAAD3279A1 /* WiFiMapperEstimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F64FBF61D7D7605A7E126464 /* WiFiMapperEstimator.swift */; };
 		C7FE437577F2D7FE7C0CA9B2 /* AIRadar.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63F806FD448DEEBDC97DC1B /* AIRadar.swift */; };
 		C853BACB2CE740243CB30F57 /* TumoSurveySessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74A081B20A8CD41C0AB51069 /* TumoSurveySessionTests.swift */; };
 		C9BA4C5BB222941D1B3C3FA9 /* FapMetadataTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98F04DB6042C632AC1B52D91 /* FapMetadataTests.swift */; };
+		C9CDBD1B0D3457D904744A5C /* AcceptanceSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4812E884A369FADCC75861AE /* AcceptanceSummary.swift */; };
 		CA7AA395FCBEA0A8A6283DB1 /* ScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E6D8B0369156C577A846FC0 /* ScreenView.swift */; };
 		CCE4664E2C132A8662B2F7F3 /* FirmwareArchiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 406855A4F6EC92517E41CF68 /* FirmwareArchiveTests.swift */; };
 		CF45484B76A4045DEB111C85 /* SourceRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 381F674E5A1903409E33517D /* SourceRow.swift */; };
@@ -166,13 +187,18 @@
 		E0452138F079A133810BE595 /* TumoSpectrumReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3C85FA6B539178BE8FD40A5 /* TumoSpectrumReport.swift */; };
 		E1C136836BE8EE3CE2B7ACF8 /* TumoSurveyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E686792ED6F1FF78429527CC /* TumoSurveyView.swift */; };
 		E23B527B427E0F06FBA09EA7 /* TumoVMNFCContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18979E931D5ADCCC963ABB98 /* TumoVMNFCContract.swift */; };
+		E266B47A78B89D1F131AC867 /* RemoteIDReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1182D29C123C1F78168038A /* RemoteIDReport.swift */; };
 		E37D4C1411C566C54C6EED88 /* PluginUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87F2C64ACDABA1AEFFB7CCD8 /* PluginUpdater.swift */; };
 		E43809C683427E97F667E269 /* SwiftProtobuf in Frameworks */ = {isa = PBXBuildFile; productRef = 96AC5A38B6EE177D6E846BDB /* SwiftProtobuf */; };
+		E56D897A2B175FCF379B122E /* RPCReadBudgetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EEC053469687E6D198E7859 /* RPCReadBudgetTests.swift */; };
+		E5B24296D9B0CCC6FC451147 /* UpdateAssistantSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8552372C065116D007A406D3 /* UpdateAssistantSource.swift */; };
+		E78FE5BE88CC99B01E11E721 /* ESP32FlashPackageMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35183991A8FB5B0949565493 /* ESP32FlashPackageMonitor.swift */; };
 		E79C6619468C7F98B5CC5723 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6DB8FBDDFA1BA4791D40EADD /* Assets.xcassets */; };
 		E930003EB761E5C7508356C3 /* PersonalizationSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EA4626A8FC90297BDBAF45B /* PersonalizationSettingsView.swift */; };
 		EAC0D7A0739C0B6EF7565475 /* ProtocolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0711A5F791B6D248100D3EBD /* ProtocolTests.swift */; };
 		EAC745F4B6A84F12F9A78CBF /* AsyncStateComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAC4D255962F3DE6272FFC3B /* AsyncStateComponents.swift */; };
 		EAEEC9F6B54EE144CBB3E418 /* TumoflipUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A2841D785BA1CA7A7A15B8B /* TumoflipUpdater.swift */; };
+		ECFA4386B158912CCFB96EA8 /* SignalTimelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97CEBDA4FB8E0C34199354EF /* SignalTimelineTests.swift */; };
 		EF29087E95CB46A7D220142A /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 824EE059E5BDBC0F8B7419E8 /* SettingsView.swift */; };
 		EF56AFBD98636A14B23FEACB /* TumoflipInstallerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3CBD3609865B0C18EB48702 /* TumoflipInstallerTests.swift */; };
 		F30B3CDE868D0D21D9B16978 /* SWCompression in Frameworks */ = {isa = PBXBuildFile; productRef = 9D0BB7285006013700BB39B4 /* SWCompression */; };
@@ -256,10 +282,12 @@
 		02EF4133669223E43E09D659 /* UnleashedWidgets.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = UnleashedWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		02FBA7705F3270054F81BF98 /* LiveDeckHomeUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveDeckHomeUITests.swift; sourceTree = "<group>"; };
 		0544D0FD5C4C15A8EE3509DE /* FieldServicesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FieldServicesView.swift; sourceTree = "<group>"; };
+		06F011FAE4BA71D89C6B83AC /* RemoteIDTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteIDTests.swift; sourceTree = "<group>"; };
 		0711A5F791B6D248100D3EBD /* ProtocolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtocolTests.swift; sourceTree = "<group>"; };
 		090EE11AA22E9A2D32CB5FBC /* FilesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilesView.swift; sourceTree = "<group>"; };
 		0BD911DD24B8F7F707E87CE0 /* TumoflipUpdaterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoflipUpdaterView.swift; sourceTree = "<group>"; };
 		0C80C0FD84155F0D33B39D83 /* desktop.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = desktop.pb.swift; sourceTree = "<group>"; };
+		131E8170B4D6E08EBF784CF7 /* FlipperBackupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlipperBackupTests.swift; sourceTree = "<group>"; };
 		18979E931D5ADCCC963ABB98 /* TumoVMNFCContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoVMNFCContract.swift; sourceTree = "<group>"; };
 		18E9E2A54A0286AF6188F9A9 /* FapMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FapMetadata.swift; sourceTree = "<group>"; };
 		19E12C880E5E2F99397122BC /* GitHubAccessCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubAccessCard.swift; sourceTree = "<group>"; };
@@ -280,13 +308,16 @@
 		2BB98D039C72778CC12CED00 /* TumoSpectrumReportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoSpectrumReportTests.swift; sourceTree = "<group>"; };
 		2D5340A6B3C8B38B925507BA /* DeviceServiceCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceServiceCoordinator.swift; sourceTree = "<group>"; };
 		2E66A60CC5ADE5831A2D34FF /* TumoflipFirmwareRoutingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoflipFirmwareRoutingTests.swift; sourceTree = "<group>"; };
+		2EEC053469687E6D198E7859 /* RPCReadBudgetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RPCReadBudgetTests.swift; sourceTree = "<group>"; };
 		301B6FE711A1B7281FDA825F /* FieldServiceNetworkClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FieldServiceNetworkClient.swift; sourceTree = "<group>"; };
 		3342FDAF60635FDA2E1AC94C /* russian_trusted_root_ca.pem */ = {isa = PBXFileReference; path = russian_trusted_root_ca.pem; sourceTree = "<group>"; };
 		3352B17F82ACA14AD4B854B7 /* DolphinProfileTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DolphinProfileTests.swift; sourceTree = "<group>"; };
 		3443A5546515DB6C6D192059 /* WiFiMapperGeoJSONTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WiFiMapperGeoJSONTests.swift; sourceTree = "<group>"; };
 		34BC23F6FD22122831005AA0 /* PluginSelectionPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginSelectionPolicyTests.swift; sourceTree = "<group>"; };
+		35183991A8FB5B0949565493 /* ESP32FlashPackageMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ESP32FlashPackageMonitor.swift; sourceTree = "<group>"; };
 		37B6865ED8766C019F36D4E5 /* application.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = application.pb.swift; sourceTree = "<group>"; };
 		381F674E5A1903409E33517D /* SourceRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceRow.swift; sourceTree = "<group>"; };
+		3845B43332146E5BCD2D94F5 /* UpdateAssistantModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateAssistantModelTests.swift; sourceTree = "<group>"; };
 		3AA09E6B23CF0D4774C8E449 /* TumoNet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoNet.swift; sourceTree = "<group>"; };
 		3B35CB407A050A2BA05BFED2 /* FlipperBackup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlipperBackup.swift; sourceTree = "<group>"; };
 		3B425A6BF85037300E8AFB83 /* gui.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = gui.pb.swift; sourceTree = "<group>"; };
@@ -300,6 +331,7 @@
 		43BFF8A135671585F6B17A7C /* ESP32Updater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ESP32Updater.swift; sourceTree = "<group>"; };
 		44CC0B1350B30151851F2958 /* FlipperControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlipperControl.swift; sourceTree = "<group>"; };
 		45807167A09B0989A1262077 /* TransferActivityReporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferActivityReporter.swift; sourceTree = "<group>"; };
+		4812E884A369FADCC75861AE /* AcceptanceSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AcceptanceSummary.swift; sourceTree = "<group>"; };
 		49779D1EE16F87054D725A1E /* UpdateTaskCancellationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateTaskCancellationTests.swift; sourceTree = "<group>"; };
 		4A0A014201261EED37823E5C /* RemotesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemotesView.swift; sourceTree = "<group>"; };
 		4C77746A516D982B72D1FB47 /* AppBridgeConsole.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBridgeConsole.swift; sourceTree = "<group>"; };
@@ -322,10 +354,13 @@
 		63CF454F5F1DBADC991DD631 /* FirmwareCatalogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirmwareCatalogTests.swift; sourceTree = "<group>"; };
 		6441776EDA9115C9BEB5946E /* DeviceServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceServiceTests.swift; sourceTree = "<group>"; };
 		67C0B0C4BD832B6A0C849C3A /* FlipperRPC.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlipperRPC.swift; sourceTree = "<group>"; };
+		69B7F686FA8087C45E3E1350 /* SignalTimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignalTimelineView.swift; sourceTree = "<group>"; };
+		6DAC7802254E690B3766FC5C /* RPCReadBudget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RPCReadBudget.swift; sourceTree = "<group>"; };
 		6DB8FBDDFA1BA4791D40EADD /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		6E38D7DF4DD5D32376A5F7CC /* TumoSpectrumViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoSpectrumViewModel.swift; sourceTree = "<group>"; };
 		6E68A9C04C4B4A34D456A445 /* BackgroundTransfer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundTransfer.swift; sourceTree = "<group>"; };
 		6EFC5D9580C2A7DD169D763E /* CatalogAppDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogAppDetailView.swift; sourceTree = "<group>"; };
+		6FC62F39C7023F858EF3A6FE /* ESP32FlashTransition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ESP32FlashTransition.swift; sourceTree = "<group>"; };
 		7084FC33B12DC1EB57FB72EB /* TumoSpectrumView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoSpectrumView.swift; sourceTree = "<group>"; };
 		74A081B20A8CD41C0AB51069 /* TumoSurveySessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoSurveySessionTests.swift; sourceTree = "<group>"; };
 		760947E327C818A052C25256 /* TumoNetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoNetTests.swift; sourceTree = "<group>"; };
@@ -335,8 +370,10 @@
 		7C22AA04318D3F69B5DB9176 /* ProtectedPluginAuditLedger.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = ProtectedPluginAuditLedger.json; sourceTree = "<group>"; };
 		7DD006180A3983508A725752 /* ProtectedPluginAudit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtectedPluginAudit.swift; sourceTree = "<group>"; };
 		7ECF810E2BD149C8F1726216 /* UnleashedCompanion.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = UnleashedCompanion.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		80C175631E2564AF57CEFFCC /* ManagedPackageRequirementsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManagedPackageRequirementsTests.swift; sourceTree = "<group>"; };
 		824EE059E5BDBC0F8B7419E8 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		83F35A633E1B5B22888D35A0 /* LiveDeckHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveDeckHomeView.swift; sourceTree = "<group>"; };
+		8552372C065116D007A406D3 /* UpdateAssistantSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateAssistantSource.swift; sourceTree = "<group>"; };
 		856D8627B88920587D56B850 /* FirmwareLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirmwareLibrary.swift; sourceTree = "<group>"; };
 		85A71B8014DF7BCBEAE77C5A /* TumoNetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoNetView.swift; sourceTree = "<group>"; };
 		8697965C8EA5F8D768000FC9 /* TumoflipUpdaterService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoflipUpdaterService.swift; sourceTree = "<group>"; };
@@ -349,10 +386,13 @@
 		9043704DE321E7D7FCC7972F /* ESP32FlashPackageManifest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ESP32FlashPackageManifest.swift; sourceTree = "<group>"; };
 		90D1067254AC076FCC557F87 /* MarauderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarauderView.swift; sourceTree = "<group>"; };
 		916BE931F747387EDB008311 /* TumoflipFirmwareRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoflipFirmwareRouting.swift; sourceTree = "<group>"; };
+		925FBE2CA5FBABF051379C13 /* ESP32InstallerZIPTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ESP32InstallerZIPTests.swift; sourceTree = "<group>"; };
 		93515AAEC58847AD6DE38AE6 /* TumoVMNFCContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoVMNFCContractTests.swift; sourceTree = "<group>"; };
 		95DB35AEEDE67D42752C5953 /* MarauderPcap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarauderPcap.swift; sourceTree = "<group>"; };
 		95FA4896B7AE237BFC022E1E /* AIRadarBridgeClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIRadarBridgeClient.swift; sourceTree = "<group>"; };
 		972149B84383F12E16D90AB8 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		97CEBDA4FB8E0C34199354EF /* SignalTimelineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignalTimelineTests.swift; sourceTree = "<group>"; };
+		97FD48533294A374B7BE3AD0 /* RemoteIDView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteIDView.swift; sourceTree = "<group>"; };
 		985815E6A1B91675260A0A0D /* TumoFabricTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoFabricTests.swift; sourceTree = "<group>"; };
 		987F2B3510E58C6070C7D81E /* SberIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SberIntents.swift; sourceTree = "<group>"; };
 		98F04DB6042C632AC1B52D91 /* FapMetadataTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FapMetadataTests.swift; sourceTree = "<group>"; };
@@ -364,6 +404,7 @@
 		9C90997591A015CAB64F92E9 /* AppBridgeConsoleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBridgeConsoleTests.swift; sourceTree = "<group>"; };
 		9D7F2E9465545B42943BBBE2 /* RuntimeDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeDiagnostics.swift; sourceTree = "<group>"; };
 		9E6ED0B4F3EAE93733349EEA /* TumoflipCatalogIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoflipCatalogIndex.swift; sourceTree = "<group>"; };
+		9F44EAAAFED111C3F8C23882 /* ProductPreviewFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductPreviewFixtures.swift; sourceTree = "<group>"; };
 		A30560D061F3814086328E2D /* TransferChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferChannel.swift; sourceTree = "<group>"; };
 		A3CBD3609865B0C18EB48702 /* TumoflipInstallerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoflipInstallerTests.swift; sourceTree = "<group>"; };
 		A72EEDF7D1BE89A42EBAFB7D /* BridgeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeView.swift; sourceTree = "<group>"; };
@@ -394,6 +435,7 @@
 		C172A449A754FE7D96BEC592 /* TumoflipCatalogIndexTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoflipCatalogIndexTests.swift; sourceTree = "<group>"; };
 		C1B731E78843D6D04ECF5B60 /* ESP32FirmwareView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ESP32FirmwareView.swift; sourceTree = "<group>"; };
 		C1BBC0C91333C23488DCC52C /* WiFiNetworkClusterMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WiFiNetworkClusterMap.swift; sourceTree = "<group>"; };
+		C2C51B99EB54D1DD1622F0B5 /* ESP32FlashPackageMonitorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ESP32FlashPackageMonitorTests.swift; sourceTree = "<group>"; };
 		C3C85FA6B539178BE8FD40A5 /* TumoSpectrumReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoSpectrumReport.swift; sourceTree = "<group>"; };
 		C4333919B345598E3C08BFCD /* TumoflipManifestTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoflipManifestTests.swift; sourceTree = "<group>"; };
 		C45488972BD725C3ECE8BDA8 /* MacBridgeDiscovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacBridgeDiscovery.swift; sourceTree = "<group>"; };
@@ -404,23 +446,30 @@
 		CC55E01E623BEF12E94B15DA /* DolphinPreviews */ = {isa = PBXFileReference; lastKnownFileType = folder; name = DolphinPreviews; path = Resources/DolphinPreviews; sourceTree = SOURCE_ROOT; };
 		CFD10DB620EC18749FE46591 /* FirmwareLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirmwareLibraryView.swift; sourceTree = "<group>"; };
 		D1BE57BD502CE825C04EACF7 /* fw-packages-stable-003-contract.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "fw-packages-stable-003-contract.json"; sourceTree = "<group>"; };
+		D239A4B484A3BEF324CBDE89 /* CaptureInventory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureInventory.swift; sourceTree = "<group>"; };
 		D40FDF9AC257DE97849E36E9 /* DolphinProfileService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DolphinProfileService.swift; sourceTree = "<group>"; };
+		D5F13F14D793B9AFCA425D47 /* ESP32FlashTransitionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ESP32FlashTransitionTests.swift; sourceTree = "<group>"; };
 		D74C1AC4E19C6F9FC21C9D8D /* PluginUpdateMonitorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginUpdateMonitorTests.swift; sourceTree = "<group>"; };
+		DA6580078CD3B2618087AF32 /* ESP32InstallerZIP.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ESP32InstallerZIP.swift; sourceTree = "<group>"; };
 		DB003747D5AF7D07C4094F9F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		DC29E67F84F7B70C836FB6EB /* UnleashedTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = UnleashedTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		DCE61D0B4EB2C9925E58FA87 /* DevicesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevicesView.swift; sourceTree = "<group>"; };
+		E1182D29C123C1F78168038A /* RemoteIDReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteIDReport.swift; sourceTree = "<group>"; };
 		E2EDFAFA602C188F8A589294 /* UnleashedUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = UnleashedUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		E4930E5335E77EBB9BFA70EF /* PluginUpdatesDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginUpdatesDetailView.swift; sourceTree = "<group>"; };
 		E5384B4D1A11BD66FA2E57DD /* UnleashedApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnleashedApp.swift; sourceTree = "<group>"; };
 		E66CABAA55465F56CC1CF2E8 /* MarauderLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarauderLog.swift; sourceTree = "<group>"; };
 		E686792ED6F1FF78429527CC /* TumoSurveyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoSurveyView.swift; sourceTree = "<group>"; };
 		E80D165190935774781982C8 /* ESP32FlashPackageManifestTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ESP32FlashPackageManifestTests.swift; sourceTree = "<group>"; };
+		EA2662EDCFCF09A2E06BDA20 /* SignalWaveform.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignalWaveform.swift; sourceTree = "<group>"; };
 		EB89F00DE286E56D6DA34162 /* FileEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileEditorView.swift; sourceTree = "<group>"; };
+		EC28019A4A2C0F0F16297923 /* UpdateAssistantView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateAssistantView.swift; sourceTree = "<group>"; };
 		ECF30EB507BBE4F21FC1E85D /* UpdatesCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdatesCoordinator.swift; sourceTree = "<group>"; };
 		EDD681FE18BFDF3BD90EC71D /* RuntimeDiagnosticsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeDiagnosticsTests.swift; sourceTree = "<group>"; };
 		EFE40D69BB44713828E2399C /* InstallActivityControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstallActivityControllerTests.swift; sourceTree = "<group>"; };
 		F00DFB08592E9523B019BE0E /* TumoSurveySession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoSurveySession.swift; sourceTree = "<group>"; };
 		F11F891A5C5257DF57F4A24F /* MediaRemoteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaRemoteView.swift; sourceTree = "<group>"; };
+		F37BC7F7DB33833C9B562233 /* UpdateAssistantModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateAssistantModel.swift; sourceTree = "<group>"; };
 		F38957D3A41ABA4105DA1783 /* FlipperStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlipperStorage.swift; sourceTree = "<group>"; };
 		F63F806FD448DEEBDC97DC1B /* AIRadar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIRadar.swift; sourceTree = "<group>"; };
 		F64FBF61D7D7605A7E126464 /* WiFiMapperEstimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WiFiMapperEstimator.swift; sourceTree = "<group>"; };
@@ -428,6 +477,8 @@
 		F9183EF8E1FF8617A2B48EA8 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		FA766CD63AD11289FB5F0DC8 /* GitHubOAuthClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubOAuthClientTests.swift; sourceTree = "<group>"; };
 		FB7E01B87B6C90282CEE9FE0 /* SettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsStore.swift; sourceTree = "<group>"; };
+		FB95CC2D30449BD2911405CD /* UpdateAssistantTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateAssistantTests.swift; sourceTree = "<group>"; };
+		FBF6B76DF703CE618B8190AC /* ManagedPackageRequirements.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManagedPackageRequirements.swift; sourceTree = "<group>"; };
 		FCB5C504F3756F796BB35073 /* DolphinGalleryUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DolphinGalleryUITests.swift; sourceTree = "<group>"; };
 		FCE7269E5AB13331C01704F7 /* USBStorageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = USBStorageTests.swift; sourceTree = "<group>"; };
 		FDC48789DECAE2A030CB71DE /* GitHubAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubAPIClient.swift; sourceTree = "<group>"; };
@@ -440,6 +491,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				4A77788F18859871DC4B2C6B /* UnleashedShared.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		841420ACCCCCEA78B5B60740 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				951EAEDBCE7B83DF93A9DB5B /* ZIPFoundation in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -585,6 +644,8 @@
 		3A457AA2AD23CEED0CD14B98 /* TumoSpectrum */ = {
 			isa = PBXGroup;
 			children = (
+				69B7F686FA8087C45E3E1350 /* SignalTimelineView.swift */,
+				EA2662EDCFCF09A2E06BDA20 /* SignalWaveform.swift */,
 				C3C85FA6B539178BE8FD40A5 /* TumoSpectrumReport.swift */,
 				7084FC33B12DC1EB57FB72EB /* TumoSpectrumView.swift */,
 				6E38D7DF4DD5D32376A5F7CC /* TumoSpectrumViewModel.swift */,
@@ -684,7 +745,12 @@
 			children = (
 				C1B731E78843D6D04ECF5B60 /* ESP32FirmwareView.swift */,
 				9043704DE321E7D7FCC7972F /* ESP32FlashPackageManifest.swift */,
+				35183991A8FB5B0949565493 /* ESP32FlashPackageMonitor.swift */,
+				6FC62F39C7023F858EF3A6FE /* ESP32FlashTransition.swift */,
+				DA6580078CD3B2618087AF32 /* ESP32InstallerZIP.swift */,
 				43BFF8A135671585F6B17A7C /* ESP32Updater.swift */,
+				E1182D29C123C1F78168038A /* RemoteIDReport.swift */,
+				97FD48533294A374B7BE3AD0 /* RemoteIDView.swift */,
 			);
 			path = ESP32;
 			sourceTree = "<group>";
@@ -720,23 +786,31 @@
 				6441776EDA9115C9BEB5946E /* DeviceServiceTests.swift */,
 				3352B17F82ACA14AD4B854B7 /* DolphinProfileTests.swift */,
 				E80D165190935774781982C8 /* ESP32FlashPackageManifestTests.swift */,
+				C2C51B99EB54D1DD1622F0B5 /* ESP32FlashPackageMonitorTests.swift */,
+				D5F13F14D793B9AFCA425D47 /* ESP32FlashTransitionTests.swift */,
+				925FBE2CA5FBABF051379C13 /* ESP32InstallerZIPTests.swift */,
 				B87192747729E361050D9378 /* ESP32UpdaterTests.swift */,
 				98F04DB6042C632AC1B52D91 /* FapMetadataTests.swift */,
 				406855A4F6EC92517E41CF68 /* FirmwareArchiveTests.swift */,
 				63CF454F5F1DBADC991DD631 /* FirmwareCatalogTests.swift */,
+				131E8170B4D6E08EBF784CF7 /* FlipperBackupTests.swift */,
 				BF7F5D1B21FCD35496F56E26 /* GitHubAPIClientTests.swift */,
 				8A54ADE2A988A392B1687C80 /* GitHubAuthStoreTests.swift */,
 				FA766CD63AD11289FB5F0DC8 /* GitHubOAuthClientTests.swift */,
 				8D70BBAA6C69E3FCD8488170 /* HomeAssistantDiscoveryTests.swift */,
 				3ECE4D716C1F73A551397D21 /* InstallActivityAttributesTests.swift */,
 				EFE40D69BB44713828E2399C /* InstallActivityControllerTests.swift */,
+				80C175631E2564AF57CEFFCC /* ManagedPackageRequirementsTests.swift */,
 				8F246F25BA68E90EAD73408E /* MarauderLiveAggregationTests.swift */,
 				B3D4263C468870ABFDEB8589 /* PluginProtectionPolicyTests.swift */,
 				34BC23F6FD22122831005AA0 /* PluginSelectionPolicyTests.swift */,
 				D74C1AC4E19C6F9FC21C9D8D /* PluginUpdateMonitorTests.swift */,
 				50C60E19A1D2DFA673E41C3F /* ProtectedPluginAuditTests.swift */,
 				0711A5F791B6D248100D3EBD /* ProtocolTests.swift */,
+				06F011FAE4BA71D89C6B83AC /* RemoteIDTests.swift */,
+				2EEC053469687E6D198E7859 /* RPCReadBudgetTests.swift */,
 				EDD681FE18BFDF3BD90EC71D /* RuntimeDiagnosticsTests.swift */,
+				97CEBDA4FB8E0C34199354EF /* SignalTimelineTests.swift */,
 				FFAFC266DB9145E7CF8D0504 /* TransferActivityReporterTests.swift */,
 				8935260266C922FDBB301B75 /* TransferBackgroundTests.swift */,
 				985815E6A1B91675260A0A0D /* TumoFabricTests.swift */,
@@ -751,6 +825,8 @@
 				2BB98D039C72778CC12CED00 /* TumoSpectrumReportTests.swift */,
 				74A081B20A8CD41C0AB51069 /* TumoSurveySessionTests.swift */,
 				93515AAEC58847AD6DE38AE6 /* TumoVMNFCContractTests.swift */,
+				3845B43332146E5BCD2D94F5 /* UpdateAssistantModelTests.swift */,
+				FB95CC2D30449BD2911405CD /* UpdateAssistantTests.swift */,
 				49779D1EE16F87054D725A1E /* UpdateTaskCancellationTests.swift */,
 				FCE7269E5AB13331C01704F7 /* USBStorageTests.swift */,
 				3443A5546515DB6C6D192059 /* WiFiMapperGeoJSONTests.swift */,
@@ -778,6 +854,7 @@
 				299EFF336F47935AE03E9500 /* CompanionBridge.swift */,
 				44CC0B1350B30151851F2958 /* FlipperControl.swift */,
 				67C0B0C4BD832B6A0C849C3A /* FlipperRPC.swift */,
+				6DAC7802254E690B3766FC5C /* RPCReadBudget.swift */,
 			);
 			path = RPC;
 			sourceTree = "<group>";
@@ -785,7 +862,9 @@
 		A0F6794625C32B75519BA6EB /* Updates */ = {
 			isa = PBXGroup;
 			children = (
+				4812E884A369FADCC75861AE /* AcceptanceSummary.swift */,
 				6E68A9C04C4B4A34D456A445 /* BackgroundTransfer.swift */,
+				D239A4B484A3BEF324CBDE89 /* CaptureInventory.swift */,
 				18E9E2A54A0286AF6188F9A9 /* FapMetadata.swift */,
 				856D8627B88920587D56B850 /* FirmwareLibrary.swift */,
 				CFD10DB620EC18749FE46591 /* FirmwareLibraryView.swift */,
@@ -794,9 +873,11 @@
 				3D35965EF8F66DCC57BE7E33 /* GitHubCredentials.swift */,
 				2462BE494E6F4BA685D1DD95 /* GitHubOAuthClient.swift */,
 				F7DFAFD2A63623B73457A3B2 /* InstallActivityController.swift */,
+				FBF6B76DF703CE618B8190AC /* ManagedPackageRequirements.swift */,
 				CBA5FCA0F80809900471F32E /* PluginUpdateMonitor.swift */,
 				87F2C64ACDABA1AEFFB7CCD8 /* PluginUpdater.swift */,
 				E4930E5335E77EBB9BFA70EF /* PluginUpdatesDetailView.swift */,
+				9F44EAAAFED111C3F8C23882 /* ProductPreviewFixtures.swift */,
 				7DD006180A3983508A725752 /* ProtectedPluginAudit.swift */,
 				381F674E5A1903409E33517D /* SourceRow.swift */,
 				45807167A09B0989A1262077 /* TransferActivityReporter.swift */,
@@ -807,6 +888,9 @@
 				2A2841D785BA1CA7A7A15B8B /* TumoflipUpdater.swift */,
 				8697965C8EA5F8D768000FC9 /* TumoflipUpdaterService.swift */,
 				0BD911DD24B8F7F707E87CE0 /* TumoflipUpdaterView.swift */,
+				F37BC7F7DB33833C9B562233 /* UpdateAssistantModel.swift */,
+				8552372C065116D007A406D3 /* UpdateAssistantSource.swift */,
+				EC28019A4A2C0F0F16297923 /* UpdateAssistantView.swift */,
 				ECF30EB507BBE4F21FC1E85D /* UpdatesCoordinator.swift */,
 				263FF028D83D9F5E4C56E6CF /* UpdatesView.swift */,
 			);
@@ -990,6 +1074,7 @@
 			buildPhases = (
 				3A841E53D2EC01D99C3FF3A5 /* Sources */,
 				2251667A86BD09C9D348F01D /* Resources */,
+				841420ACCCCCEA78B5B60740 /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -998,6 +1083,7 @@
 			);
 			name = UnleashedTests;
 			packageProductDependencies = (
+				2928F152CD1BE076355840D1 /* ZIPFoundation */,
 			);
 			productName = UnleashedTests;
 			productReference = DC29E67F84F7B70C836FB6EB /* UnleashedTests.xctest */;
@@ -1170,23 +1256,31 @@
 				94270EE7D91E72A67DCCF72F /* DeviceServiceTests.swift in Sources */,
 				660358B5ED53BD9B93390DC2 /* DolphinProfileTests.swift in Sources */,
 				BA3F2055C70D4F3CBECCA623 /* ESP32FlashPackageManifestTests.swift in Sources */,
+				724395A9C4D2CDE2A1D7A2DC /* ESP32FlashPackageMonitorTests.swift in Sources */,
+				1F1AB1E851AC3B31C8832CC4 /* ESP32FlashTransitionTests.swift in Sources */,
+				C5796185B7EA8DF03AE039E0 /* ESP32InstallerZIPTests.swift in Sources */,
 				8AAAFB628D23BAFFA836BE80 /* ESP32UpdaterTests.swift in Sources */,
 				C9BA4C5BB222941D1B3C3FA9 /* FapMetadataTests.swift in Sources */,
 				CCE4664E2C132A8662B2F7F3 /* FirmwareArchiveTests.swift in Sources */,
 				DBF198850F9BCC58CE887DCF /* FirmwareCatalogTests.swift in Sources */,
+				675F56C5398CAE0F3D7A93AC /* FlipperBackupTests.swift in Sources */,
 				597368D182EF7A5FD2E780FA /* GitHubAPIClientTests.swift in Sources */,
 				FF7338AC7B807DA5FD9CB559 /* GitHubAuthStoreTests.swift in Sources */,
 				4657F289AE20F68598CF1F23 /* GitHubOAuthClientTests.swift in Sources */,
 				561C47A5EC74F7DF05D11A2B /* HomeAssistantDiscoveryTests.swift in Sources */,
 				55DF4154B997B215DD5CF9C6 /* InstallActivityAttributesTests.swift in Sources */,
 				3AFC49D5F409F11451DD50AC /* InstallActivityControllerTests.swift in Sources */,
+				8B88F99420AD227094FE7801 /* ManagedPackageRequirementsTests.swift in Sources */,
 				558EF6327C3F312D4C1A26B7 /* MarauderLiveAggregationTests.swift in Sources */,
 				028086AFF37EFC8952E84483 /* PluginProtectionPolicyTests.swift in Sources */,
 				497514C65E0284BC9C754AC1 /* PluginSelectionPolicyTests.swift in Sources */,
 				382D481F4B3744731A3527CE /* PluginUpdateMonitorTests.swift in Sources */,
 				0A68BD88E9E469306F4861E7 /* ProtectedPluginAuditTests.swift in Sources */,
 				EAC0D7A0739C0B6EF7565475 /* ProtocolTests.swift in Sources */,
+				E56D897A2B175FCF379B122E /* RPCReadBudgetTests.swift in Sources */,
+				31EF8ECD5C4E84AA992FAD1B /* RemoteIDTests.swift in Sources */,
 				C390ACDEA69EE872DDF566E0 /* RuntimeDiagnosticsTests.swift in Sources */,
+				ECFA4386B158912CCFB96EA8 /* SignalTimelineTests.swift in Sources */,
 				2066FEBC29259A4E4EE5964A /* TransferActivityReporterTests.swift in Sources */,
 				C78CF345B32C9CC99B502793 /* TransferBackgroundTests.swift in Sources */,
 				9570769329A543974A6E3501 /* TumoFabricTests.swift in Sources */,
@@ -1202,6 +1296,8 @@
 				7A36F37E942A5E8A7D052227 /* TumoflipPackageCatalogTests.swift in Sources */,
 				0D58380E2D1F29BB7FF7DF4B /* TumoflipStatusTests.swift in Sources */,
 				19DFE5895853A9679A01976A /* USBStorageTests.swift in Sources */,
+				45D5269166EC5905307560FC /* UpdateAssistantModelTests.swift in Sources */,
+				80B7E6DD94BE47201E95CC20 /* UpdateAssistantTests.swift in Sources */,
 				3C78180A4BD00482052340ED /* UpdateTaskCancellationTests.swift in Sources */,
 				7C70DD575F23538982EAC3FF /* WiFiMapperGeoJSONTests.swift in Sources */,
 				0D820CE7564243D692B1A3E9 /* WiFiNetworkMapPresentationTests.swift in Sources */,
@@ -1226,6 +1322,7 @@
 				56630654C5F12C545C47A195 /* AIRadarBridgeClient.swift in Sources */,
 				C57A815B28B1629238A1F2DA /* AIRadarRelay.swift in Sources */,
 				88411C55162E96E16569C398 /* AIRadarView.swift in Sources */,
+				C9CDBD1B0D3457D904744A5C /* AcceptanceSummary.swift in Sources */,
 				08FC1F6E6EA1377927AA4124 /* AppBridge.swift in Sources */,
 				D5D267A9E0553575932192E6 /* AppBridgeConsole.swift in Sources */,
 				63C2AC8BC494254D9F0A745C /* AppBridgeRequest.swift in Sources */,
@@ -1235,6 +1332,7 @@
 				58ADEF0B8E8D011FDB32D17F /* BridgeView.swift in Sources */,
 				FD2037726A6354E2F8C9A7C1 /* BuddyRelay.swift in Sources */,
 				178F947E4834FD231F84D405 /* BuildInfo.swift in Sources */,
+				6E15A0D9AF95FDD3FA41A564 /* CaptureInventory.swift in Sources */,
 				AA54E113784D1DE45ED3721F /* CatalogAppDetailView.swift in Sources */,
 				6D5E2E66502E9832B6670D9D /* CatalogListView.swift in Sources */,
 				3E3E586D830439E2A9A3C8F9 /* CompanionBridge.swift in Sources */,
@@ -1249,6 +1347,9 @@
 				3E084727311DC9FAEC499A99 /* DolphinProfileService.swift in Sources */,
 				0DC75147EFFA11291AB3D10D /* ESP32FirmwareView.swift in Sources */,
 				D6ACA63F88F6163391E1E1FD /* ESP32FlashPackageManifest.swift in Sources */,
+				E78FE5BE88CC99B01E11E721 /* ESP32FlashPackageMonitor.swift in Sources */,
+				0A2C0CA47A2AB39710DAB4C5 /* ESP32FlashTransition.swift in Sources */,
+				6948E0150D925AD55F6BE7CF /* ESP32InstallerZIP.swift in Sources */,
 				624755C1707F30D1CF685556 /* ESP32Updater.swift in Sources */,
 				B868D9DF098B04FB000252E1 /* FapMetadata.swift in Sources */,
 				56E703AEE38BA106610D2DA5 /* FieldServiceModels.swift in Sources */,
@@ -1277,6 +1378,7 @@
 				5FFADBEF4597B3F7A0AD9FAA /* LiveDeckHomeView.swift in Sources */,
 				3A33EB625F256D95748132BB /* LocationProvider.swift in Sources */,
 				20E37F40F64BD3080356A54F /* MacBridgeDiscovery.swift in Sources */,
+				01B4D466FB4B13D57E0B8562 /* ManagedPackageRequirements.swift in Sources */,
 				A67E7F06A079691F84FE3B2A /* MarauderLiveView.swift in Sources */,
 				693460D40AB5EEABAB8122CD /* MarauderLog.swift in Sources */,
 				46EF26B33502AED58F1E687A /* MarauderPcap.swift in Sources */,
@@ -1289,8 +1391,12 @@
 				878B98A78707C356A520BCA7 /* PluginUpdateMonitor.swift in Sources */,
 				E37D4C1411C566C54C6EED88 /* PluginUpdater.swift in Sources */,
 				6639DBE5A0696A7A75531255 /* PluginUpdatesDetailView.swift in Sources */,
+				C29D3F9556C6FD8267672E5B /* ProductPreviewFixtures.swift in Sources */,
 				30DE04679A29134FDF2D50BD /* ProtectedPluginAudit.swift in Sources */,
+				834ED5943CEEF7C139CC035B /* RPCReadBudget.swift in Sources */,
 				6EE27A21DF228E8F03A47A84 /* RelayExecutor.swift in Sources */,
+				E266B47A78B89D1F131AC867 /* RemoteIDReport.swift in Sources */,
+				A72BEB971CB682ADE6397BB2 /* RemoteIDView.swift in Sources */,
 				3508D2DF378C22434730D556 /* RemotesView.swift in Sources */,
 				F8120678A5AB6773D39227A6 /* RuntimeDiagnostics.swift in Sources */,
 				27599EE38999934EC1A45783 /* SberCloud.swift in Sources */,
@@ -1301,6 +1407,8 @@
 				286D5E6F077478422471B1C8 /* SettingsDetailViews.swift in Sources */,
 				4BBAD747CC56D88F16E46077 /* SettingsStore.swift in Sources */,
 				EF29087E95CB46A7D220142A /* SettingsView.swift in Sources */,
+				568F87B4231E35B91CE405B5 /* SignalTimelineView.swift in Sources */,
+				96966A4735712E46A1D61787 /* SignalWaveform.swift in Sources */,
 				CF45484B76A4045DEB111C85 /* SourceRow.swift in Sources */,
 				8A3D3C8FB0D3E6169E243B15 /* Theme.swift in Sources */,
 				A30F13ACC0229564B37C93F9 /* TransferActivityReporter.swift in Sources */,
@@ -1325,6 +1433,9 @@
 				5EAC241A8A24322589A7FB52 /* TumoflipUpdaterService.swift in Sources */,
 				816926EE2BFA24265146ECE6 /* TumoflipUpdaterView.swift in Sources */,
 				50436CE794BC67AC3CA055FC /* UnleashedApp.swift in Sources */,
+				A42035AEC82D908DD9FC8829 /* UpdateAssistantModel.swift in Sources */,
+				E5B24296D9B0CCC6FC451147 /* UpdateAssistantSource.swift in Sources */,
+				17985E189BB1CAD1BBBAFF27 /* UpdateAssistantView.swift in Sources */,
 				26FF73B8130C693F08F1E0ED /* UpdatesCoordinator.swift in Sources */,
 				A9DC9FF761C1761A9C3BF594 /* UpdatesView.swift in Sources */,
 				C7EC549D7971B7FAAD3279A1 /* WiFiMapperEstimator.swift in Sources */,
@@ -1410,7 +1521,7 @@
 				CODE_SIGNING_REQUIRED = NO;
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 274;
+				CURRENT_PROJECT_VERSION = 279;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -1431,7 +1542,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GITHUB_OAUTH_CLIENT_ID = Ov23liKmKXYcliMvoCgL;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 1.11.21;
+				MARKETING_VERSION = 1.11.26;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -1636,7 +1747,7 @@
 				CODE_SIGNING_REQUIRED = NO;
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 274;
+				CURRENT_PROJECT_VERSION = 279;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = "";
 				ENABLE_NS_ASSERTIONS = NO;
@@ -1651,7 +1762,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GITHUB_OAUTH_CLIENT_ID = Ov23liKmKXYcliMvoCgL;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 1.11.21;
+				MARKETING_VERSION = 1.11.26;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1773,6 +1884,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		2928F152CD1BE076355840D1 /* ZIPFoundation */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C32EDE87E2BE3615C6E24355 /* XCRemoteSwiftPackageReference "ZIPFoundation" */;
+			productName = ZIPFoundation;
+		};
 		89D1A875D2EC8E243C24C7DA /* ZIPFoundation */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = C32EDE87E2BE3615C6E24355 /* XCRemoteSwiftPackageReference "ZIPFoundation" */;

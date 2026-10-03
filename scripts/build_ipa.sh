@@ -40,11 +40,12 @@ echo "==> Resolving Swift packages"
   -project UnleashedCompanion.xcodeproj -scheme UnleashedCompanion >/dev/null
 
 echo "==> Building (Release, iphoneos, unsigned)"
+mkdir -p "$ROOT/build"
 "$XCODE" build \
   -project UnleashedCompanion.xcodeproj -scheme UnleashedCompanion \
   -sdk iphoneos -configuration Release -destination 'generic/platform=iOS' \
   -jobs "$XCODE_JOBS" \
-  CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO | tail -3
+  CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO 2>&1 | tee "$ROOT/build/ipa-build.log"
 
 APP=$("$XCODE" -project UnleashedCompanion.xcodeproj -scheme UnleashedCompanion \
   -sdk iphoneos -configuration Release -showBuildSettings -json 2>/dev/null \

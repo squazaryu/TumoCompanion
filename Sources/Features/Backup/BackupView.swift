@@ -41,7 +41,13 @@ struct BackupView: View {
 
             SectionCard(title: "Create backup", systemImage: "arrow.down.circle") {
                 PillButton(title: bk.running ? "Working…" : "Back up now", systemImage: "arrow.down.circle") {
-                    Task { await bk.backup(folders: Array(selected), stamp: stamp()) }
+                    Task {
+                        do {
+                            try await bk.backup(folders: Array(selected), stamp: stamp())
+                        } catch {
+                            // FlipperBackup publishes the specific failure next to this button.
+                        }
+                    }
                 }
                 .disabled(ble.state != .ready || bk.running || selected.isEmpty)
                 if let s = bk.status {
@@ -68,12 +74,20 @@ struct BackupView: View {
         .alert("Restore this backup?", isPresented: Binding(
             get: { restoreTarget != nil }, set: { if !$0 { restoreTarget = nil } })) {
             Button("Restore", role: .destructive) {
-                if let u = restoreTarget { Task { await bk.restore(u) } }
+                if let u = restoreTarget {
+                    Task {
+                        do {
+                            try await bk.restore(u)
+                        } catch {
+                            // FlipperBackup keeps the restore error visible in status.
+                        }
+                    }
+                }
                 restoreTarget = nil
             }
             Button("Cancel", role: .cancel) { restoreTarget = nil }
         } message: {
-            Text("Files in the backup will be written to the Flipper, overwriting any with the same path.")
+            Text("The backup will be checked before writing. Existing files with the same path will be overwritten.")
         }
         .task {
             bk.refreshBackups()

@@ -29,6 +29,14 @@ jobs:
         run: python3 scripts/test_plugin_protection_host.py
       - name: Build unsigned IPA
         run: scripts/build_ipa.sh
+
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: ios-build-diagnostics
+          path: build/ipa-build.log
+          retention-days: 3
       - name: Test managed package protection and installation
         run: |
           set -euo pipefail
@@ -49,6 +57,17 @@ jobs:
             -only-testing:UnleashedTests/ManagedPackageRequirementsTests \
             -only-testing:UnleashedTests/PluginProtectionPolicyTests \
             -only-testing:UnleashedTests/TumoflipInstallerTests \
+            -only-testing:UnleashedTests/RuntimeDiagnosticsTests \
+            -only-testing:UnleashedTests/FlipperBackupTests \
+            -only-testing:UnleashedTests/SignalTimelineTests \
+            -only-testing:UnleashedTests/RemoteIDTests \
+            -only-testing:UnleashedTests/UpdateAssistantTests \
+            -only-testing:UnleashedTests/UpdateAssistantModelTests \
+            -only-testing:UnleashedTests/RPCReadBudgetTests \
+            -only-testing:UnleashedTests/ESP32InstallerZIPTests \
+            -only-testing:UnleashedTests/ESP32UpdaterTests \
+            -only-testing:UnleashedTests/ESP32FlashTransitionTests \
+            -only-testing:UnleashedTests/ESP32FlashPackageMonitorTests \
             -resultBundlePath build/ManagedPackages.xcresult \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
       - name: Upload managed package test results

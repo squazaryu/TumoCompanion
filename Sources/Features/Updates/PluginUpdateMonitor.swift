@@ -100,12 +100,16 @@ enum PluginUpdateMonitor {
 
     @discardableResult
     static func check() async -> Bool {
-        await check(
+        async let releaseTags = check(
             defaults: .standard,
             sources: sources,
             latestTag: latestTag,
             deliver: deliver
         )
+        async let flashPackages = ESP32FlashPackageMonitor.check()
+        let tagsSucceeded = await releaseTags
+        let packagesSucceeded = await flashPackages
+        return tagsSucceeded && packagesSucceeded
     }
 
     /// Injectable core used by unit tests. A changed tag is persisted only after the
