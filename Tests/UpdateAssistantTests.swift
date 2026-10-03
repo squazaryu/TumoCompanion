@@ -26,4 +26,13 @@ final class UpdateAssistantTests: XCTestCase {
         XCTAssertFalse(UpdateCheck.manual.isPassed)
         XCTAssertTrue(UpdateCheck.passed.isPassed)
     }
+
+    func testAcceptanceReportIsBoundToFirmwareAndLeavesManualItemsPending() throws {
+        let data = Data("Tumoflip Hardware Acceptance Suite\nSchema: 1\nVersion: t-dev-009-017\nCommit: 12345678\nTarget: 7\n[PASS] SD read/write\n[PENDING] own radio\n".utf8)
+        let summary = try AcceptanceSummary.parse(data, version: "t-dev-009-017", commit: "12345678")
+        XCTAssertEqual(summary.passed, 1)
+        XCTAssertEqual(summary.manual, 1)
+        XCTAssertThrowsError(try AcceptanceSummary.parse(data, version: "t-dev-009-018", commit: "12345678"))
+        XCTAssertThrowsError(try AcceptanceSummary.parse(data, version: "t-dev-009-017", commit: "87654321"))
+    }
 }
