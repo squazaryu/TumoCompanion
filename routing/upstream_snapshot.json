@@ -1,5 +1,5 @@
 {
-  "release_tag": "6oct2026",
+  "release_tag": "9oct2026",
   "stems": {
     "24cxxprog": "Programmers",
     "4inrow": "Board",
@@ -241,6 +241,7 @@
     "programmercalc": "Calculators",
     "proto_pirate": "Sub-GHz",
     "protoview": "Analyzers",
+    "pulse_bpm": "Timers",
     "qrcode": "Tools",
     "quac": "Tools",
     "quadrastic": "Arcade",
@@ -285,6 +286,7 @@
     "spi_mem_manager": "Programmers",
     "ssd1306_test": "GPIO",
     "stack_attack": "Arcade",
+    "stack_game": "Arcade",
     "stepcounter": "Sensors",
     "sub_analyzer": "Analyzers",
     "sub_dup_finder": "Sub-GHz",
@@ -305,6 +307,7 @@
     "tanks": "Arcade",
     "tarot": "Board",
     "tcl_ac_remote": "ACs",
+    "telemetro": "Calculators",
     "tesla_mod": "GPIO",
     "tetris": "Puzzle",
     "text2sam": "Media",
