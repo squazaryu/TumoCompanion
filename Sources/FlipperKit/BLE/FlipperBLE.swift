@@ -44,6 +44,28 @@ enum SerialChannelOwner: Equatable {
     case claudeBuddy
 }
 
+enum BLEReconnectPolicy {
+    static func shouldRetry(
+        keepAlive: Bool,
+        userInitiatedDisconnect: Bool,
+        centralPoweredOn: Bool,
+        expectedPeripheralID: UUID?,
+        failedPeripheralID: UUID
+    ) -> Bool {
+        keepAlive && !userInitiatedDisconnect && centralPoweredOn &&
+            expectedPeripheralID == failedPeripheralID
+    }
+
+    /// Retry the first failed keep-alive connection immediately so CoreBluetooth has
+    /// a pending request before iOS suspends the background-woken process. Back off
+    /// repeated failures, with a finite cap to avoid a busy loop on a persistent error.
+    static func retryDelay(forFailureAttempt attempt: Int) -> TimeInterval {
+        let delays: [TimeInterval] = [0, 1, 2, 4, 8, 16, 30]
+        let index = min(max(attempt - 1, 0), delays.count - 1)
+        return delays[index]
+    }
+}
+
 struct DiscoveredFlipper: Identifiable, Equatable {
     let id: UUID            // CBPeripheral.identifier
     var name: String
@@ -107,6 +129,7 @@ final class FlipperBLE: NSObject, ObservableObject {
     private var userInitiatedDisconnect = false
     private var reconnectAttempts = 0
     private let maxReconnectAttempts = 5
+    private var connectFailureAttempts = 0
 
     /// Keep the BLE link alive in the background: a timeout-less standing connect that
     /// iOS holds across suspension / app relaunch, with unbounded reconnect, so Flipper
@@ -131,6 +154,12 @@ final class FlipperBLE: NSObject, ObservableObject {
     private var readyGen = 0
     private let readyTimeout: TimeInterval = 12
     private var connectStartedAt: Date?
+
+    private static func connectionErrorSummary(_ error: Error?) -> String {
+        guard let error else { return "none" }
+        let nsError = error as NSError
+        return "\(nsError.domain)#\(nsError.code)"
+    }
 
     private override init() {
         super.init()
@@ -225,6 +254,7 @@ final class FlipperBLE: NSObject, ObservableObject {
             wantsConnectID = id
             userInitiatedDisconnect = false
             reconnectAttempts = 0
+            connectFailureAttempts = 0
             beginConnect(p)
             return
         }
@@ -261,6 +291,7 @@ final class FlipperBLE: NSObject, ObservableObject {
         wantsConnectID = id
         userInitiatedDisconnect = false
         reconnectAttempts = 0
+        connectFailureAttempts = 0
         if let p = central.retrievePeripherals(withIdentifiers: [id]).first {
             beginConnect(p)
         } else {
@@ -274,6 +305,7 @@ final class FlipperBLE: NSObject, ObservableObject {
     func disconnect() {
         userInitiatedDisconnect = true
         wantsConnectID = nil
+        connectFailureAttempts = 0
         readyGen &+= 1   // disarm any pending ready watchdog
         if let p = peripheral { central.cancelPeripheralConnection(p) }
     }
@@ -513,6 +545,7 @@ final class FlipperBLE: NSObject, ObservableObject {
         wantsConnectID = p.identifier
         userInitiatedDisconnect = false
         reconnectAttempts = 0
+        connectFailureAttempts = 0
         if peripheral == nil {
             blelog.notice("clearing stale held Flipper link — reconnecting fresh")
             peripheral = p
@@ -627,6 +660,7 @@ extension FlipperBLE: CBCentralManagerDelegate {
             wantsConnectID = p.identifier
             userInitiatedDisconnect = false
             reconnectAttempts = 0
+            connectFailureAttempts = 0
             peripheral = p
             p.delegate = self
             DispatchQueue.main.async { self.state = .connecting }
@@ -675,6 +709,7 @@ extension FlipperBLE: CBCentralManagerDelegate {
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         reconnectAttempts = 0
+        connectFailureAttempts = 0
         stopScan()
         // Remember it so we can reattach across app launches without a scan.
         UserDefaults.standard.set(peripheral.identifier.uuidString, forKey: lastDeviceKey)
@@ -689,12 +724,13 @@ extension FlipperBLE: CBCentralManagerDelegate {
                         error: Error?) {
         flushTxQueue()   // resume any in-flight upload waiters
         appBridge.failAll(.disconnected)   // fail any pending FAB2 requests once
+        let cause = Self.connectionErrorSummary(error)
         // Auto-reconnect on an unexpected drop (out of range, Flipper slept, etc.).
         // Keep-alive reconnects forever; otherwise we give up after maxReconnectAttempts.
         if !userInitiatedDisconnect, let want = wantsConnectID,
            keepAlive || reconnectAttempts < maxReconnectAttempts {
             reconnectAttempts += 1
-            blelog.notice("unexpected disconnect, reconnect attempt \(self.reconnectAttempts)\(self.keepAlive ? " (keep-alive)" : "")")
+            blelog.notice("unexpected disconnect, cause=\(cause, privacy: .public), reconnect attempt \(self.reconnectAttempts)\(self.keepAlive ? " (keep-alive)" : "")")
             DispatchQueue.main.async {
                 self.state = .connecting
                 self.supportsAppBridge = false
@@ -715,6 +751,7 @@ extension FlipperBLE: CBCentralManagerDelegate {
             }
             return
         }
+        blelog.notice("BLE disconnect did not reconnect, cause=\(cause, privacy: .public), keepAlive=\(self.keepAlive, privacy: .public), userInitiated=\(self.userInitiatedDisconnect, privacy: .public)")
         DispatchQueue.main.async {
             self.state = .disconnected
             self.connectedName = nil
@@ -725,7 +762,61 @@ extension FlipperBLE: CBCentralManagerDelegate {
     }
 
     func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
-        DispatchQueue.main.async { self.state = .disconnected }
+        let cause = Self.connectionErrorSummary(error)
+        let shouldRetry = BLEReconnectPolicy.shouldRetry(
+            keepAlive: keepAlive,
+            userInitiatedDisconnect: userInitiatedDisconnect,
+            centralPoweredOn: central.state == .poweredOn,
+            expectedPeripheralID: wantsConnectID,
+            failedPeripheralID: peripheral.identifier
+        )
+        blelog.error(
+            "BLE connect failed, cause=\(cause, privacy: .public), centralState=\(central.state.rawValue), keepAlive=\(self.keepAlive, privacy: .public), userInitiated=\(self.userInitiatedDisconnect, privacy: .public), expectedPeer=\(self.wantsConnectID == peripheral.identifier, privacy: .public)"
+        )
+
+        guard shouldRetry else {
+            if userInitiatedDisconnect || wantsConnectID == peripheral.identifier,
+               central.state == .poweredOn {
+                DispatchQueue.main.async {
+                    if self.state == .connecting { self.state = .disconnected }
+                }
+            }
+            return
+        }
+
+        connectFailureAttempts += 1
+        let attempt = connectFailureAttempts
+        let delay = BLEReconnectPolicy.retryDelay(forFailureAttempt: attempt)
+        blelog.notice("keep-alive reconnect scheduled: attempt=\(attempt), delay=\(delay)s")
+        DispatchQueue.main.async { self.state = .connecting }
+
+        let retry = { [weak self, weak peripheral] in
+            guard let self, let peripheral else { return }
+            guard BLEReconnectPolicy.shouldRetry(
+                keepAlive: self.keepAlive,
+                userInitiatedDisconnect: self.userInitiatedDisconnect,
+                centralPoweredOn: self.central.state == .poweredOn,
+                expectedPeripheralID: self.wantsConnectID,
+                failedPeripheralID: peripheral.identifier
+            ) else {
+                if self.wantsConnectID == peripheral.identifier,
+                   !self.keepAlive || self.userInitiatedDisconnect {
+                    DispatchQueue.main.async {
+                        if self.state == .connecting { self.state = .disconnected }
+                    }
+                }
+                return
+            }
+            guard self.central.state == .poweredOn,
+                  peripheral.state == .disconnected else { return }
+            self.beginConnect(peripheral)
+        }
+
+        if delay == 0 {
+            retry()
+        } else {
+            queue.asyncAfter(deadline: .now() + delay, execute: retry)
+        }
     }
 }
 

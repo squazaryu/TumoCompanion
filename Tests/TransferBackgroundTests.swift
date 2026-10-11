@@ -108,3 +108,68 @@ private final class FakeBackgroundApplication: BackgroundTransferApplication {
         expirationHandler?()
     }
 }
+
+@MainActor
+final class BLEKeepAliveReconnectPolicyTests: XCTestCase {
+    func testRetryRequiresKeepAliveAndTheExpectedPeripheral() {
+        let expected = UUID()
+
+        XCTAssertTrue(BLEReconnectPolicy.shouldRetry(
+            keepAlive: true,
+            userInitiatedDisconnect: false,
+            centralPoweredOn: true,
+            expectedPeripheralID: expected,
+            failedPeripheralID: expected
+        ))
+        XCTAssertFalse(BLEReconnectPolicy.shouldRetry(
+            keepAlive: false,
+            userInitiatedDisconnect: false,
+            centralPoweredOn: true,
+            expectedPeripheralID: expected,
+            failedPeripheralID: expected
+        ))
+        XCTAssertFalse(BLEReconnectPolicy.shouldRetry(
+            keepAlive: true,
+            userInitiatedDisconnect: true,
+            centralPoweredOn: true,
+            expectedPeripheralID: expected,
+            failedPeripheralID: expected
+        ))
+        XCTAssertFalse(BLEReconnectPolicy.shouldRetry(
+            keepAlive: true,
+            userInitiatedDisconnect: false,
+            centralPoweredOn: true,
+            expectedPeripheralID: UUID(),
+            failedPeripheralID: expected
+        ))
+        XCTAssertFalse(BLEReconnectPolicy.shouldRetry(
+            keepAlive: true,
+            userInitiatedDisconnect: false,
+            centralPoweredOn: true,
+            expectedPeripheralID: nil,
+            failedPeripheralID: expected
+        ))
+        XCTAssertFalse(BLEReconnectPolicy.shouldRetry(
+            keepAlive: true,
+            userInitiatedDisconnect: false,
+            centralPoweredOn: false,
+            expectedPeripheralID: expected,
+            failedPeripheralID: expected
+        ))
+    }
+
+    func testRetryDelayStartsImmediatelyThenUsesCappedBackoff() {
+        let expected: [(attempt: Int, delay: TimeInterval)] = [
+            (1, 0), (2, 1), (3, 2), (4, 4), (5, 8), (6, 16), (7, 30), (20, 30),
+        ]
+
+        for item in expected {
+            XCTAssertEqual(
+                BLEReconnectPolicy.retryDelay(forFailureAttempt: item.attempt),
+                item.delay,
+                accuracy: 0.001,
+                "unexpected delay for failure attempt \(item.attempt)"
+            )
+        }
+    }
+}
