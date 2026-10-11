@@ -117,31 +117,43 @@ final class BLEKeepAliveReconnectPolicyTests: XCTestCase {
         XCTAssertTrue(BLEReconnectPolicy.shouldRetry(
             keepAlive: true,
             userInitiatedDisconnect: false,
+            centralPoweredOn: true,
             expectedPeripheralID: expected,
             failedPeripheralID: expected
         ))
         XCTAssertFalse(BLEReconnectPolicy.shouldRetry(
             keepAlive: false,
             userInitiatedDisconnect: false,
+            centralPoweredOn: true,
             expectedPeripheralID: expected,
             failedPeripheralID: expected
         ))
         XCTAssertFalse(BLEReconnectPolicy.shouldRetry(
             keepAlive: true,
             userInitiatedDisconnect: true,
+            centralPoweredOn: true,
             expectedPeripheralID: expected,
             failedPeripheralID: expected
         ))
         XCTAssertFalse(BLEReconnectPolicy.shouldRetry(
             keepAlive: true,
             userInitiatedDisconnect: false,
+            centralPoweredOn: true,
             expectedPeripheralID: UUID(),
             failedPeripheralID: expected
         ))
         XCTAssertFalse(BLEReconnectPolicy.shouldRetry(
             keepAlive: true,
             userInitiatedDisconnect: false,
+            centralPoweredOn: true,
             expectedPeripheralID: nil,
+            failedPeripheralID: expected
+        ))
+        XCTAssertFalse(BLEReconnectPolicy.shouldRetry(
+            keepAlive: true,
+            userInitiatedDisconnect: false,
+            centralPoweredOn: false,
+            expectedPeripheralID: expected,
             failedPeripheralID: expected
         ))
     }
