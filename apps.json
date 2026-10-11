@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.11.26",
-      "versionDate": "2026-10-03",
-      "versionDescription": "TumoCompanion 1.11.26 adds passive RAW A/B timeline analysis, explicit before/after update checkpoints, verified incremental standalone backups and offline Remote ID diagnostics. Retains the backup/crash/ESP32 checks from RC1. Update this app, then Firmware Dev 009-018, then FW Packages Dev 024. Remote ID requires compatible ESP32 firmware; no board flash or file cleanup is automatic.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.26/TumoCompanion-unsigned.ipa",
-      "size": 25888155,
+      "version": "1.11.27",
+      "versionDate": "2026-10-11",
+      "versionDescription": "Bluetooth background recovery: log CoreBluetooth disconnect/connect error codes and retry failed keep-alive connections with bounded backoff. No firmware update required. Physical iPhone/Flipper acceptance remains pending.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.27/TumoCompanion-unsigned.ipa",
+      "size": 25894921,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.11.27",
+          "date": "2026-10-11",
+          "localizedDescription": "Bluetooth background recovery: log CoreBluetooth disconnect/connect error codes and retry failed keep-alive connections with bounded backoff. No firmware update required. Physical iPhone/Flipper acceptance remains pending.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.27/TumoCompanion-unsigned.ipa",
+          "size": 25894921,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.11.26",
           "date": "2026-10-03",
