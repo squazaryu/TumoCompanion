@@ -199,6 +199,10 @@ public nonisolated struct PBStorage_ReadRequest: Sendable {
 
   public var path: String = String()
 
+  public var offset: UInt32 = 0
+
+  public var size: UInt32 = 0
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -217,6 +221,8 @@ public nonisolated struct PBStorage_ReadResponse: Sendable {
   public var hasFile: Bool {self._file != nil}
   /// Clears the value of `file`. Subsequent reads from it will return its default value.
   public mutating func clearFile() {self._file = nil}
+
+  public var ranged: Bool = false
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -669,7 +675,7 @@ nonisolated extension PBStorage_ListResponse: SwiftProtobuf.Message, SwiftProtob
 
 nonisolated extension PBStorage_ReadRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ReadRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}path\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}path\0\u{1}offset\0\u{1}size\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -678,6 +684,8 @@ nonisolated extension PBStorage_ReadRequest: SwiftProtobuf.Message, SwiftProtobu
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.path) }()
+      case 2: try { try decoder.decodeSingularUInt32Field(value: &self.offset) }()
+      case 3: try { try decoder.decodeSingularUInt32Field(value: &self.size) }()
       default: break
       }
     }
@@ -687,11 +695,19 @@ nonisolated extension PBStorage_ReadRequest: SwiftProtobuf.Message, SwiftProtobu
     if !self.path.isEmpty {
       try visitor.visitSingularStringField(value: self.path, fieldNumber: 1)
     }
+    if self.offset != 0 {
+      try visitor.visitSingularUInt32Field(value: self.offset, fieldNumber: 2)
+    }
+    if self.size != 0 {
+      try visitor.visitSingularUInt32Field(value: self.size, fieldNumber: 3)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: PBStorage_ReadRequest, rhs: PBStorage_ReadRequest) -> Bool {
     if lhs.path != rhs.path {return false}
+    if lhs.offset != rhs.offset {return false}
+    if lhs.size != rhs.size {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -699,7 +715,7 @@ nonisolated extension PBStorage_ReadRequest: SwiftProtobuf.Message, SwiftProtobu
 
 nonisolated extension PBStorage_ReadResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ReadResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}file\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}file\0\u{1}ranged\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -708,6 +724,7 @@ nonisolated extension PBStorage_ReadResponse: SwiftProtobuf.Message, SwiftProtob
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularMessageField(value: &self._file) }()
+      case 2: try { try decoder.decodeSingularBoolField(value: &self.ranged) }()
       default: break
       }
     }
@@ -721,11 +738,15 @@ nonisolated extension PBStorage_ReadResponse: SwiftProtobuf.Message, SwiftProtob
     try { if let v = self._file {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
     } }()
+    if self.ranged != false {
+      try visitor.visitSingularBoolField(value: self.ranged, fieldNumber: 2)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: PBStorage_ReadResponse, rhs: PBStorage_ReadResponse) -> Bool {
     if lhs._file != rhs._file {return false}
+    if lhs.ranged != rhs.ranged {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
