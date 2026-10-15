@@ -3,15 +3,20 @@ import Foundation
 /// Keep bounded read memory while draining the server's remaining response frames.
 struct RPCReadBudget {
     let maximumBytes: Int
+    let requireRangedRead: Bool
     private(set) var acceptedBytes = 0
     private(set) var exceeded = false
+    private(set) var rangeUnsupported = false
     private var frames = 0
 
-    init(maximumBytes: Int) {
+    init(maximumBytes: Int, requireRangedRead: Bool = false) {
         self.maximumBytes = maximumBytes
+        self.requireRangedRead = requireRangedRead
     }
 
-    mutating func accept(_ bytes: Int) -> Bool {
+    mutating func accept(_ bytes: Int, rangeAcknowledged: Bool = false) -> Bool {
+        if requireRangedRead && !rangeAcknowledged { rangeUnsupported = true }
+        guard !rangeUnsupported else { return false }
         let maximumFrames = maximumBytes == Int.max ? Int.max :
             max(128, min(131_072, max(0, maximumBytes) / 256 + 129))
         guard !exceeded, maximumBytes >= 0, bytes >= 0,

@@ -167,6 +167,32 @@ final class FlipperStorage {
 
     // MARK: - Read
 
+    /// A single range is bounded; callers can request consecutive ranges for
+    /// larger files. Partial replies and old firmware full-file replies are
+    /// rejected by RPC before data can be returned as the requested slice.
+    static let maximumRangeReadBytes: UInt32 = 1_048_576
+
+    func readRange(_ path: String, offset: UInt32, count: UInt32) async throws -> Data {
+        guard count <= Self.maximumRangeReadBytes else { throw FlipperRPCError.responseTooLarge }
+        guard count > 0 else { return Data() }
+        let responses = try await rpc.command(
+            timeout: 120, maxStorageReadBytes: Int(count), requireRangedRead: true
+        ) { main in
+            var request = PBStorage_ReadRequest()
+            request.path = path
+            request.offset = offset
+            request.size = count
+            main.content = .storageReadRequest(request)
+        }
+        var data = Data()
+        for response in responses {
+            if case .storageReadResponse(let chunk) = response.content {
+                data.append(chunk.file.data)
+            }
+        }
+        return data
+    }
+
     func read(_ path: String) async throws -> Data {
         try await read(path, maximumBytes: Int.max)
     }

@@ -25,7 +25,7 @@ assert(empty.accept(0, rangeAcknowledged: true))
 assert(!empty.accept(0, rangeAcknowledged: false) && empty.rangeUnsupported)
 
 var flood = RPCReadBudget(maximumBytes: 1, requireRangedRead: true)
-for _ in 0..<128 { assert(flood.accept(0, rangeAcknowledged: true)) }
+for _ in 0..<129 { assert(flood.accept(0, rangeAcknowledged: true)) }
 assert(!flood.accept(0, rangeAcknowledged: true) && flood.exceeded)
 var huge = RPCReadBudget(maximumBytes: Int.max)
 assert(huge.accept(Int.max) && !huge.accept(1))

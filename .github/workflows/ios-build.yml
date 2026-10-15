@@ -27,6 +27,8 @@ jobs:
         run: brew install xcodegen
       - name: Verify package overwrite protection
         run: python3 scripts/test_plugin_protection_host.py
+      - name: Verify bounded ranged-read policy without Bluetooth
+        run: python3 scripts/test_rpc_read_budget_host.py
       - name: Build unsigned IPA
         run: scripts/build_ipa.sh
 
