@@ -1,5 +1,5 @@
 {
-  "release_tag": "18oct2026",
+  "release_tag": "22oct2026p3",
   "stems": {
     "24cxxprog": "Programmers",
     "4inrow": "Board",
@@ -276,7 +276,7 @@
     "shapshup": "Sub-GHz",
     "signal_generator": "GPIO",
     "simon_says": "Puzzle",
-    "simultaneous_rfid_reader": "GPIO",
+    "simultaneous_rfid_reader": "UHF",
     "slotmachine": "Board",
     "snake20": "Arcade",
     "solitaire": "Board",
@@ -308,6 +308,7 @@
     "tarot": "Board",
     "tcl_ac_remote": "ACs",
     "telemetro": "Calculators",
+    "telink_sws": "Programmers",
     "tesla_mod": "GPIO",
     "tetris": "Puzzle",
     "text2sam": "Media",
@@ -324,7 +325,8 @@
     "tuning_fork": "Instruments",
     "uart_terminal": "UART",
     "ublox": "GPS",
-    "uhf_rfid": "GPIO",
+    "uhf_expansion": "UHF",
+    "uhf_rfid": "UHF",
     "uk_mbirth_sonicare": "NFC",
     "ulc_brute": "MIFARE",
     "ulc_relay": "MIFARE",
@@ -363,7 +365,7 @@
     "xinput_controller": "USB",
     "xremote": "Infrared",
     "yatzee": "Board",
-    "yrm100x_pro": "GPIO",
+    "yrm100x_pro": "UHF",
     "zero_tracker": "Players",
     "zerofido": "Tools",
     "zombiez": "Arcade"
