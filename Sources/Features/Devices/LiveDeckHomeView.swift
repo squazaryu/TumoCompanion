@@ -140,7 +140,7 @@ private struct LiveDeckConsoleCard: View {
                                 } else {
                                     FlipperScreenCanvas(pixels: control.screenPixels)
                                         .frame(maxWidth: .infinity)
-                                        .frame(height: 108)
+                                        .frame(minHeight: 108, maxHeight: .infinity)
                                         .transition(.opacity)
                                 }
                             } else {
@@ -152,14 +152,16 @@ private struct LiveDeckConsoleCard: View {
                                 }
                                 .foregroundStyle(.secondary)
                                 .frame(maxWidth: .infinity)
-                                .frame(height: 108)
+                                .frame(minHeight: 108, maxHeight: .infinity)
                             }
                         }
+                        .frame(minHeight: 108, maxHeight: .infinity)
                         .modifier(FlipperScreenFreshness(
                             receivedAt: automationPreview ? .distantFuture : control.lastScreenFrameAt,
                             status: status
                         ))
-                        .background(Color.black.opacity(0.9), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .background(isReady ? Color(red: 0.96, green: 0.55, blue: 0.06) : Color.black.opacity(0.9),
+                                    in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                         .overlay {
                             RoundedRectangle(cornerRadius: 12, style: .continuous)
                                 .strokeBorder(tint.opacity(0.28), lineWidth: 1)
@@ -168,6 +170,7 @@ private struct LiveDeckConsoleCard: View {
                     .buttonStyle(.plain)
                     .accessibilityLabel("Open Flipper screen")
                 }
+                .frame(maxHeight: .infinity)
                 .layoutPriority(1)
 
                 VStack(alignment: .leading, spacing: 6) {
@@ -181,6 +184,7 @@ private struct LiveDeckConsoleCard: View {
                 .frame(minWidth: stackedConsole ? 0 : 138,
                        maxWidth: stackedConsole ? .infinity : 166, alignment: .leading)
             }
+            .fixedSize(horizontal: false, vertical: true)
 
             // The status rail belongs to the whole console card, not only the
             // screen column. A full-width rail keeps longer states such as
@@ -291,7 +295,7 @@ private struct LiveDeckPreviewScreen: View {
         }
         .foregroundStyle(.black.opacity(0.78))
         .frame(maxWidth: .infinity)
-        .frame(height: 108)
+        .frame(minHeight: 108, maxHeight: .infinity)
         .background(
             LinearGradient(
                 colors: [Color(red: 0.98, green: 0.62, blue: 0.12), Color(red: 0.93, green: 0.48, blue: 0.05)],

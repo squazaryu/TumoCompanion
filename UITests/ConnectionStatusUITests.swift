@@ -1,6 +1,42 @@
 import XCTest
 
 final class ConnectionStatusUITests: XCTestCase {
+    func testPreviewHeightMatchesRightColumnWithoutChangingItsWidthInDarkMode() {
+        assertPreviewHeight(appearance: "dark")
+    }
+
+    func testPreviewHeightMatchesRightColumnWithoutChangingItsWidthInLightMode() {
+        assertPreviewHeight(appearance: "light")
+    }
+
+    private func assertPreviewHeight(appearance: String) {
+        let app = XCUIApplication()
+        app.launchArguments = ["-onboardingDone", "YES", "-appearanceMode", appearance,
+                               "-connection-status-qa", "unresponsive",
+                               "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryL"]
+        app.launch()
+        let deny = XCUIApplication(bundleIdentifier: "com.apple.springboard").buttons.matching(
+            NSPredicate(format: "label == %@ OR label == %@", "Don’t Allow", "Don't Allow")
+        ).firstMatch
+        if deny.waitForExistence(timeout: 2) { deny.tap() }
+        let preview = app.buttons["Open Flipper screen"]
+        XCTAssertTrue(preview.waitForExistence(timeout: 5))
+        let backup = app.buttons["Open Backup"]
+        let info = app.buttons["Info"]
+        XCTAssertTrue(backup.exists)
+        XCTAssertEqual(preview.frame.maxY, backup.frame.maxY, accuracy: 1,
+                       "Preview bottom must align with the right column, not stop early")
+        XCTAssertGreaterThan(info.frame.minX, preview.frame.maxX,
+                             "Keep actions on the right, not below a full-width preview")
+        let fraction = preview.frame.width / app.windows.firstMatch.frame.width
+        XCTAssertGreaterThan(fraction, 0.35)
+        XCTAssertLessThan(fraction, 0.60)
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = "Console preview height - \(appearance)"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+
     func testCheckingDoesNotClaimLiveOrReady() {
         assertStatus("checking", title: "Checking", appearance: "light", lastFrame: true)
     }
