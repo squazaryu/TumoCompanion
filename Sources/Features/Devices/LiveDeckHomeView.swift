@@ -94,6 +94,7 @@ private struct LiveDeckConsoleCard: View {
     @EnvironmentObject private var control: FlipperControl
     @EnvironmentObject private var transfer: TransferChannelStore
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var previewHeight = ConsolePreviewMetrics.minimumHeight
 
     let onScreen: () -> Void
     let onNavigate: (HomeTileID) -> Void
@@ -183,7 +184,7 @@ private struct LiveDeckConsoleCard: View {
                                 .frame(minHeight: 108, maxHeight: .infinity)
                             }
                         }
-                        .frame(minHeight: 108, maxHeight: .infinity)
+                        .frame(height: previewHeight)
                         .modifier(FlipperScreenFreshness(
                             receivedAt: automationPreview ? .distantFuture : control.lastScreenFrameAt,
                             status: status
@@ -212,8 +213,16 @@ private struct LiveDeckConsoleCard: View {
                 }
                 .frame(minWidth: stackedConsole ? 0 : 138,
                        maxWidth: stackedConsole ? .infinity : 166, alignment: .leading)
+                .background {
+                    GeometryReader { geometry in
+                        Color.clear.preference(key: ConsoleControlsHeightKey.self, value: geometry.size.height)
+                    }
+                }
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("console-right-controls")
             }
             .fixedSize(horizontal: false, vertical: true)
+            .onPreferenceChange(ConsoleControlsHeightKey.self, perform: updatePreviewHeight)
 
             // The status rail belongs to the whole console card, not only the
             // screen column. A full-width rail keeps longer states such as
@@ -277,10 +286,27 @@ private struct LiveDeckConsoleCard: View {
 
     private func checkConnection() { Task { await connection.verifyNow() } }
 
+    private func updatePreviewHeight(_ measured: CGFloat) {
+        guard measured.isFinite, measured > 0 else { return }
+        let next = ConsolePreviewMetrics.height(matchingControls: measured)
+        guard next != previewHeight else { return }
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) { previewHeight = next }
+    }
+
     private var metadataDivider: some View {
         Text("·")
             .foregroundStyle(.tertiary)
             .accessibilityHidden(true)
+    }
+}
+
+private struct ConsoleControlsHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
 
