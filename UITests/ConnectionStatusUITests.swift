@@ -1,6 +1,21 @@
 import XCTest
 
 final class ConnectionStatusUITests: XCTestCase {
+    func testRealPreparingPlaceholderHeightInDarkMode() {
+        assertPreviewHeight(appearance: "dark", renderer: "preparing")
+    }
+
+    func testRealPreparingPlaceholderHeightInLightMode() {
+        assertPreviewHeight(appearance: "light", renderer: "preparing")
+    }
+
+    func testRealPixelRendererHeightInDarkMode() {
+        assertPreviewHeight(appearance: "dark", renderer: "pixels")
+    }
+
+    func testRealPixelRendererHeightInLightMode() {
+        assertPreviewHeight(appearance: "light", renderer: "pixels")
+    }
     func testPreviewHeightMatchesRightColumnWithoutChangingItsWidthInDarkMode() {
         assertPreviewHeight(appearance: "dark")
     }
@@ -9,11 +24,12 @@ final class ConnectionStatusUITests: XCTestCase {
         assertPreviewHeight(appearance: "light")
     }
 
-    private func assertPreviewHeight(appearance: String) {
+    private func assertPreviewHeight(appearance: String, renderer: String? = nil) {
         let app = XCUIApplication()
         app.launchArguments = ["-onboardingDone", "YES", "-appearanceMode", appearance,
-                               "-connection-status-qa", "unresponsive",
+                               "-connection-status-qa", renderer == "preparing" ? "connecting" : "unresponsive",
                                "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryL"]
+        if let renderer { app.launchArguments += ["-console-render-qa", renderer] }
         app.launch()
         let deny = XCUIApplication(bundleIdentifier: "com.apple.springboard").buttons.matching(
             NSPredicate(format: "label == %@ OR label == %@", "Don’t Allow", "Don't Allow")
@@ -21,6 +37,7 @@ final class ConnectionStatusUITests: XCTestCase {
         if deny.waitForExistence(timeout: 2) { deny.tap() }
         let preview = app.buttons["Open Flipper screen"]
         XCTAssertTrue(preview.waitForExistence(timeout: 5))
+        if let renderer { XCTAssertEqual(preview.value as? String, renderer == "preparing" ? "Preparing RPC" : "Device screen") }
         let backup = app.buttons["Open Backup"]
         let info = app.buttons["Info"]
         XCTAssertTrue(backup.exists)
@@ -32,7 +49,7 @@ final class ConnectionStatusUITests: XCTestCase {
         XCTAssertGreaterThan(fraction, 0.35)
         XCTAssertLessThan(fraction, 0.60)
         let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-        screenshot.name = "Console preview height - \(appearance)"
+        screenshot.name = "Console preview height - \(renderer ?? "mock") - \(appearance)"
         screenshot.lifetime = .keepAlways
         add(screenshot)
     }

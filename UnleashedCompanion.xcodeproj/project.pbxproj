@@ -212,6 +212,7 @@
 		EF56AFBD98636A14B23FEACB /* TumoflipInstallerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3CBD3609865B0C18EB48702 /* TumoflipInstallerTests.swift */; };
 		F30B3CDE868D0D21D9B16978 /* SWCompression in Frameworks */ = {isa = PBXBuildFile; productRef = 9D0BB7285006013700BB39B4 /* SWCompression */; };
 		F4BC72E618B69CDD92EC1A6D /* TumoFabricView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61C88C49155B1D53CE4859BA /* TumoFabricView.swift */; };
+		F4DB566C06AFC2E83D8C3D2E /* BLECharacteristicSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 715087ACF9254AABEB3A3534 /* BLECharacteristicSupport.swift */; };
 		F68E2E999E17B1FE745AE1CD /* FirmwareLibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFD10DB620EC18749FE46591 /* FirmwareLibraryView.swift */; };
 		F758C353B4ABFDA1AF6D1117 /* ProtectedPluginAuditLedger.json in Resources */ = {isa = PBXBuildFile; fileRef = 7C22AA04318D3F69B5DB9176 /* ProtectedPluginAuditLedger.json */; };
 		F787B496917BA4E1E9EC0F64 /* TumoflipManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D5AA653C25A05CF91F348E8 /* TumoflipManifest.swift */; };
@@ -376,6 +377,7 @@
 		6EFC5D9580C2A7DD169D763E /* CatalogAppDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogAppDetailView.swift; sourceTree = "<group>"; };
 		6FC62F39C7023F858EF3A6FE /* ESP32FlashTransition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ESP32FlashTransition.swift; sourceTree = "<group>"; };
 		7084FC33B12DC1EB57FB72EB /* TumoSpectrumView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoSpectrumView.swift; sourceTree = "<group>"; };
+		715087ACF9254AABEB3A3534 /* BLECharacteristicSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BLECharacteristicSupport.swift; sourceTree = "<group>"; };
 		74A081B20A8CD41C0AB51069 /* TumoSurveySessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoSurveySessionTests.swift; sourceTree = "<group>"; };
 		760947E327C818A052C25256 /* TumoNetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoNetTests.swift; sourceTree = "<group>"; };
 		76878DEC8BC405158A23294C /* SberCloud.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SberCloud.swift; sourceTree = "<group>"; };
@@ -787,6 +789,7 @@
 			children = (
 				AD3F4BFB7A552AD0967C934C /* AppBridge.swift */,
 				296A7D30A6C58A754FF6B5E5 /* AppBridgeRequest.swift */,
+				715087ACF9254AABEB3A3534 /* BLECharacteristicSupport.swift */,
 				4A2AD17C4B42A37C8951AA5E /* BLESessionReadiness.swift */,
 				5A2D71355CD8F8159A7F08ED /* ConnectionEvidence.swift */,
 				CAA5FB3F56BD340788D176F4 /* ConnectionMonitor.swift */,
@@ -1358,6 +1361,7 @@
 				D5D267A9E0553575932192E6 /* AppBridgeConsole.swift in Sources */,
 				63C2AC8BC494254D9F0A745C /* AppBridgeRequest.swift in Sources */,
 				EAC745F4B6A84F12F9A78CBF /* AsyncStateComponents.swift in Sources */,
+				F4DB566C06AFC2E83D8C3D2E /* BLECharacteristicSupport.swift in Sources */,
 				E10D6ABE75FEAA7AC6E48AE1 /* BLESessionReadiness.swift in Sources */,
 				C3CEEA1F75CECCD8BEAF4255 /* BackgroundTransfer.swift in Sources */,
 				A910F14D11CCC2B19261AB3F /* BackupView.swift in Sources */,

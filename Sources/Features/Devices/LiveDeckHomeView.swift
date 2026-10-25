@@ -1,5 +1,17 @@
 import SwiftUI
 
+/// DEBUG UI input only: exercise the real placeholder/pixel renderer instead
+/// of substituting the decorative mock screen. Never changes BLE state.
+private enum ConsoleRendererFixture: String {
+    case preparing, pixels
+
+    static let samplePixels: [Bool] = (0..<(128 * 64)).map { offset in
+        let x = offset % 128, y = offset / 128
+        return x < 2 || x > 125 || y < 2 || y > 61 ||
+            (x > 12 && x < 116 && y > 12 && y < 52 && (x % 16 < 2 || y % 12 < 2))
+    }
+}
+
 /// Compact Home dashboard for the connected Flipper.
 ///
 /// The console is the single source of truth for device and screen state. The
@@ -15,6 +27,12 @@ struct LiveDeckHomeView: View {
     let refreshAction: () async -> Void
 
     #if DEBUG
+    private var rendererFixture: ConsoleRendererFixture? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let index = arguments.firstIndex(of: "-console-render-qa"),
+              arguments.indices.contains(index + 1) else { return nil }
+        return ConsoleRendererFixture(rawValue: arguments[index + 1])
+    }
     private var connectionPreview: ConnectionStatus? {
         let arguments = ProcessInfo.processInfo.arguments
         guard let index = arguments.firstIndex(of: "-connection-status-qa"),
@@ -22,11 +40,12 @@ struct LiveDeckHomeView: View {
         return ConnectionStatus(rawValue: arguments[index + 1])
     }
     private var automationPreview: Bool {
-        ProcessInfo.processInfo.arguments.contains("-live-deck-connected-qa") || connectionPreview != nil
+        ProcessInfo.processInfo.arguments.contains("-live-deck-connected-qa") || connectionPreview != nil || rendererFixture != nil
     }
     #else
     private var automationPreview: Bool { false }
     private var connectionPreview: ConnectionStatus? { nil }
+    private var rendererFixture: ConsoleRendererFixture? { nil }
     #endif
 
     private func navigate(_ tile: HomeTileID) {
@@ -40,7 +59,8 @@ struct LiveDeckHomeView: View {
                     onScreen: { navigate(.screen) },
                     onNavigate: navigate,
                     automationPreview: automationPreview,
-                    previewStatus: connectionPreview
+                    previewStatus: connectionPreview,
+                    rendererFixture: rendererFixture
                 )
 
                 LiveDeckNearbyCard()
@@ -79,8 +99,12 @@ private struct LiveDeckConsoleCard: View {
     let onNavigate: (HomeTileID) -> Void
     let automationPreview: Bool
     let previewStatus: ConnectionStatus?
+    let rendererFixture: ConsoleRendererFixture?
 
-    private var isReady: Bool { automationPreview || ble.state == .ready }
+    private var isReady: Bool {
+        if let rendererFixture { return rendererFixture == .pixels }
+        return automationPreview || ble.state == .ready
+    }
 
     private var displayName: String {
         automationPreview ? "Flipper TUMOFLIP" : (ble.connectedName ?? "Flipper Zero")
@@ -134,11 +158,11 @@ private struct LiveDeckConsoleCard: View {
                     Button(action: onScreen) {
                         ZStack {
                             if isReady {
-                                if automationPreview {
+                                if automationPreview && rendererFixture == nil {
                                     LiveDeckPreviewScreen(battery: displayedBattery ?? 0)
                                         .transition(.opacity)
                                 } else {
-                                    FlipperScreenCanvas(pixels: control.screenPixels)
+                                    FlipperScreenCanvas(pixels: rendererFixture == .pixels ? ConsoleRendererFixture.samplePixels : control.screenPixels)
                                         .frame(maxWidth: .infinity)
                                         .frame(minHeight: 108, maxHeight: .infinity)
                                         .transition(.opacity)
@@ -169,6 +193,7 @@ private struct LiveDeckConsoleCard: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Open Flipper screen")
+                    .accessibilityValue(!isReady ? "Preparing RPC" : (rendererFixture == .pixels ? "Device screen" : "Screen preview"))
                 }
                 .frame(maxHeight: .infinity)
                 .layoutPriority(1)
