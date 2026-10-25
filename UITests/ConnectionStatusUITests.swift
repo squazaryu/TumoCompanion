@@ -126,6 +126,7 @@ final class ConnectionStatusUITests: XCTestCase {
             XCTAssertTrue(app.descendants(matching: .any).matching(identifier: identifier).firstMatch.waitForExistence(timeout: 5))
         }
         XCTAssertTrue(app.buttons["connection-check"].exists)
+        XCTAssertGreaterThanOrEqual(app.buttons["connection-check"].frame.height, 44)
         let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         screenshot.name = "Connectivity - channel health - light"
         screenshot.lifetime = .keepAlways
@@ -150,8 +151,7 @@ final class ConnectionStatusUITests: XCTestCase {
         XCTAssertTrue(status.waitForExistence(timeout: 5))
         XCTAssertEqual(status.label, title)
         let check = app.buttons["connection-check"]
-        XCTAssertTrue(check.exists)
-        XCTAssertGreaterThanOrEqual(check.frame.height, 44)
+        XCTAssertFalse(check.exists)
         XCTAssertTrue(app.staticTexts["Last frame"].exists == lastFrame)
         let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         screenshot.name = "Connection \(state) - \(appearance)\(largeType ? " - large type" : "")"

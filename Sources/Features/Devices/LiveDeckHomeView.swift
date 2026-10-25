@@ -277,14 +277,10 @@ private struct LiveDeckConsoleCard: View {
             .allowsHitTesting(false)
             .accessibilityElement(children: .contain)
 
-            ConnectionFeedbackView(status: status, check: checkConnection)
-
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .card(tint: tint, padding: 12)
     }
-
-    private func checkConnection() { Task { await connection.verifyNow() } }
 
     private func updatePreviewHeight(_ measured: CGFloat) {
         guard measured.isFinite, measured > 0 else { return }
