@@ -58,6 +58,51 @@ final class RPCConnectionProbeTests: XCTestCase {
         XCTAssertEqual(offline, .unavailable)
         XCTAssertEqual(transport.writes, 0)
     }
+
+    func testProbeYieldsToARealStorageCommand() async throws {
+        let transport = ProbeTransport()
+        let rpc = FlipperRPC(ble: transport)
+        let storage = Task {
+            try await rpc.command(timeout: 1) { main in
+                var request = PBStorage_ListRequest()
+                request.path = "/ext/apps"
+                main.content = .storageListRequest(request)
+            }
+        }
+        while transport.writes == 0 { await Task.yield() }
+        let probe = try await rpc.probeConnectionIfIdle(timeout: 0.1)
+        XCTAssertEqual(probe, .busy)
+        XCTAssertEqual(transport.writes, 1)
+        transport.replyEmpty()
+        let result = try await storage.value
+        XCTAssertEqual(result.count, 1)
+    }
+
+    func testCancellingAnInFlightProbeDoesNotLetOtherCommandsOvertakeIt() async throws {
+        let transport = ProbeTransport()
+        let rpc = FlipperRPC(ble: transport)
+        let first = Task { try await rpc.probeConnectionIfIdle(timeout: 0.05) }
+        while transport.writes == 0 { await Task.yield() }
+        first.cancel()
+        let following = try await rpc.probeConnectionIfIdle(timeout: 0.1)
+        XCTAssertEqual(following, .busy)
+        _ = try? await first.value
+        transport.onWrite = { bytes in transport.reply(to: bytes, matchingNonce: true) }
+        let recovered = try await rpc.probeConnectionIfIdle(timeout: 0.1)
+        XCTAssertEqual(recovered, .verified)
+    }
+
+    func testDisconnectResolvesPendingProbe() async throws {
+        let transport = ProbeTransport()
+        let rpc = FlipperRPC(ble: transport)
+        let first = Task { try await rpc.probeConnectionIfIdle(timeout: 1) }
+        while transport.writes == 0 { await Task.yield() }
+        transport.connection.send(.disconnected)
+        do {
+            _ = try await first.value
+            XCTFail("Disconnect must fail a pending request")
+        } catch { XCTAssertTrue(error is FlipperRPCError) }
+    }
 }
 
 private final class ProbeTransport: FlipperRPCTransport {
@@ -72,11 +117,12 @@ private final class ProbeTransport: FlipperRPCTransport {
     var onWrite: ((Data) -> Void)?
     private let lock = NSLock()
     private var writeCount = 0
+    private var lastWrite: Data?
     var writes: Int { lock.lock(); defer { lock.unlock() }; return writeCount }
 
     func waitUntilReady(timeout: TimeInterval) async -> Bool { state == .ready }
     func writeSerial(_ data: Data, completion: (() -> Void)?) {
-        lock.lock(); writeCount += 1; lock.unlock()
+        lock.lock(); writeCount += 1; lastWrite = data; lock.unlock()
         completion?()
         onWrite?(data)
     }
@@ -92,5 +138,15 @@ private final class ProbeTransport: FlipperRPCTransport {
         response.content = .systemPingResponse(pong)
         let frame = try! FlipperRPC.delimited(response)
         serialIn.send(BLESerialPacket(data: frame, sessionID: sessionID))
+    }
+
+    func replyEmpty() {
+        lock.lock(); let bytes = lastWrite; lock.unlock()
+        guard let bytes, let (_, header) = FlipperRPC.readVarint(bytes),
+              let request = try? PB_Main(serializedBytes: bytes.dropFirst(header)) else { return }
+        var response = PB_Main()
+        response.commandID = request.commandID
+        response.content = .empty(PB_Empty())
+        serialIn.send(BLESerialPacket(data: try! FlipperRPC.delimited(response), sessionID: sessionID))
     }
 }

@@ -81,7 +81,7 @@ final class RPCCommandGate: @unchecked Sendable {
 final class FlipperRPC: ObservableObject {
     static let shared = FlipperRPC()
 
-    let ble: FlipperBLE
+    let ble: FlipperRPCTransport
     /// Unsolicited frames (command_id == 0): screen frames, desktop status, etc.
     let unsolicited = PassthroughSubject<PB_Main, Never>()
     let validTraffic = PassthroughSubject<UUID, Never>()
@@ -103,17 +103,17 @@ final class FlipperRPC: ObservableObject {
     private var stateCancellable: AnyCancellable?
     private var ownerCancellable: AnyCancellable?
 
-    init(ble: FlipperBLE = .shared) {
+    init(ble: FlipperRPCTransport = FlipperBLE.shared) {
         self.ble = ble
         cancellable = ble.serialIn.sink { [weak self] packet in
             self?.ingest(packet)
         }
         // Fail in-flight requests immediately on disconnect instead of letting
         // them hang until their timeout.
-        stateCancellable = ble.$state.sink { [weak self] state in
+        stateCancellable = ble.statePublisher.sink { [weak self] state in
             if state != .ready { self?.failAllPending(FlipperRPCError.notReady) }
         }
-        ownerCancellable = ble.$serialOwner
+        ownerCancellable = ble.ownerPublisher
             .removeDuplicates()
             .sink { [weak self] owner in
                 if owner == .claudeBuddy {
@@ -138,16 +138,12 @@ final class FlipperRPC: ObservableObject {
     /// idle. It never queues behind or interrupts an installation. Once sent,
     /// cancellation leaves the permit held until reply/4s deadline so another
     /// command cannot overtake an in-flight ping during a scene transition.
-    func probeConnectionIfIdle() async throws -> ConnectionProbeResult {
+    func probeConnectionIfIdle(timeout: TimeInterval = 4) async throws -> ConnectionProbeResult {
         guard ble.state == .ready, ble.serialOwner == .rpc else { return .unavailable }
         guard commandGate.tryAcquire() else { return .busy }
         defer { commandGate.release() }
         try Task.checkCancellation()
-        lock.lock()
-        let id = nextCommandID
-        nextCommandID &+= 1
-        if nextCommandID == 0 { nextCommandID = 1 }
-        lock.unlock()
+        let id = allocateCommandID()
 
         let nonce = Data(UUID().uuidString.utf8)
         var request = PB_Main()
@@ -164,8 +160,8 @@ final class FlipperRPC: ObservableObject {
             lock.lock()
             pending[id] = Pending(readBudget: RPCReadBudget(maximumBytes: 1024), continuation: continuation)
             lock.unlock()
-            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 4, execute: deadline)
-            ble.writeSerial(bytes)
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + max(0.01, timeout), execute: deadline)
+            ble.writeSerial(bytes, completion: nil)
         }
         guard responses.count == 1, responses[0].commandStatus == .ok,
               case .systemPingResponse(let pong) = responses[0].content,
@@ -178,6 +174,15 @@ final class FlipperRPC: ObservableObject {
         let waiter = pending.removeValue(forKey: id)
         lock.unlock()
         waiter?.continuation.resume(throwing: error)
+    }
+
+    private func allocateCommandID() -> UInt32 {
+        lock.lock()
+        defer { lock.unlock() }
+        let id = nextCommandID
+        nextCommandID &+= 1
+        if nextCommandID == 0 { nextCommandID = 1 }
+        return id
     }
 
     /// Build and send a command, returning every response frame until the
@@ -224,7 +229,7 @@ final class FlipperRPC: ObservableObject {
         // Tolerate the connected→ready discovery gap and brief reconnect blips:
         // wait a moment for the link instead of failing the instant it isn't ready.
         if ble.state != .ready {
-            guard await ble.waitUntilReady() else { throw FlipperRPCError.notReady }
+            guard await ble.waitUntilReady(timeout: 6) else { throw FlipperRPCError.notReady }
         }
         // Refuse RPC while the Buddy app owns the serial channel (see buddyMode).
         guard ble.serialOwner == .rpc else {
@@ -233,11 +238,7 @@ final class FlipperRPC: ObservableObject {
                 : FlipperRPCError.notReady
         }
 
-        lock.lock()
-        let id = nextCommandID
-        nextCommandID &+= 1
-        if nextCommandID == 0 { nextCommandID = 1 }
-        lock.unlock()
+        let id = allocateCommandID()
 
         var frames: [(continuing: Data, final: Data)] = []
         for (index, configure) in configures.enumerated() {
@@ -330,7 +331,7 @@ final class FlipperRPC: ObservableObject {
         var main = PB_Main()
         main.commandID = 0
         configure(&main)
-        if let frame = try? Self.delimited(main) { ble.writeSerial(frame) }
+        if let frame = try? Self.delimited(main) { ble.writeSerial(frame, completion: nil) }
     }
 
     // MARK: - Receiving

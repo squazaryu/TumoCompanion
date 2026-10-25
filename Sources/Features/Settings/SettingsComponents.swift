@@ -94,6 +94,7 @@ struct SettingsCategoryCard<Destination: View>: View {
 
 struct SettingsHeroCard: View {
     @EnvironmentObject private var ble: FlipperBLE
+    @EnvironmentObject private var connection: ConnectionMonitor
     @EnvironmentObject private var settings: SettingsStore
 
     var body: some View {
@@ -126,7 +127,7 @@ struct SettingsHeroCard: View {
 
     private var connectionLabel: String {
         switch ble.state {
-        case .ready: return "Flipper ready"
+        case .ready: return connection.status.title
         case .connected, .connecting: return "Connecting"
         case .scanning: return "Scanning"
         case .poweredOff: return "Bluetooth off"
@@ -137,7 +138,7 @@ struct SettingsHeroCard: View {
 
     private var connectionColor: Color {
         switch ble.state {
-        case .ready: return Theme.success
+        case .ready: return connection.status.color
         case .connected, .connecting, .scanning: return Theme.warning
         case .poweredOff, .unauthorized: return Theme.danger
         default: return .secondary
@@ -146,7 +147,7 @@ struct SettingsHeroCard: View {
 
     private var connectionIcon: String {
         switch ble.state {
-        case .ready: return "checkmark.circle.fill"
+        case .ready: return connection.status == .ready ? "checkmark.circle.fill" : "antenna.radiowaves.left.and.right"
         case .scanning: return "dot.radiowaves.left.and.right"
         default: return "antenna.radiowaves.left.and.right"
         }

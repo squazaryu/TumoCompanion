@@ -93,6 +93,7 @@
 		5B3AA404F2C6230D9FAC8795 /* TumoflipManifestPackageReleaseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78482E05DB7B6420088FF379 /* TumoflipManifestPackageReleaseTests.swift */; };
 		5CF5B93624E1418CAC1E13A9 /* TumoNetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85A71B8014DF7BCBEAE77C5A /* TumoNetView.swift */; };
 		5EAC241A8A24322589A7FB52 /* TumoflipUpdaterService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8697965C8EA5F8D768000FC9 /* TumoflipUpdaterService.swift */; };
+		5F45C07CEDB7AA5961C29BCD /* ConnectionFeedbackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 027309666B82E78173905E9F /* ConnectionFeedbackView.swift */; };
 		5FFADBEF4597B3F7A0AD9FAA /* LiveDeckHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83F35A633E1B5B22888D35A0 /* LiveDeckHomeView.swift */; };
 		61371A51934A206CF6FF6545 /* FileEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB89F00DE286E56D6DA34162 /* FileEditorView.swift */; };
 		621D52882D83E8928D9FA094 /* TumoSpectrumView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7084FC33B12DC1EB57FB72EB /* TumoSpectrumView.swift */; };
@@ -106,6 +107,7 @@
 		67BAED6714BF802153F252C9 /* SberIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 987F2B3510E58C6070C7D81E /* SberIntents.swift */; };
 		693460D40AB5EEABAB8122CD /* MarauderLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = E66CABAA55465F56CC1CF2E8 /* MarauderLog.swift */; };
 		6948E0150D925AD55F6BE7CF /* ESP32InstallerZIP.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA6580078CD3B2618087AF32 /* ESP32InstallerZIP.swift */; };
+		6B564A92D93D508D1CCBDF50 /* BLESessionReadinessTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 515AF64A0AF1E4C44D20659A /* BLESessionReadinessTests.swift */; };
 		6D5E2E66502E9832B6670D9D /* CatalogListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FDC334B8785EB5B2A51B922 /* CatalogListView.swift */; };
 		6E15A0D9AF95FDD3FA41A564 /* CaptureInventory.swift in Sources */ = {isa = PBXBuildFile; fileRef = D239A4B484A3BEF324CBDE89 /* CaptureInventory.swift */; };
 		6EE27A21DF228E8F03A47A84 /* RelayExecutor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7C2CDE14DBC7990927949B0 /* RelayExecutor.swift */; };
@@ -138,6 +140,7 @@
 		9557FFF86AE01FDF6E8BA371 /* FlipperBLE.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56CC0246CF934A5E59B02502 /* FlipperBLE.swift */; };
 		9570769329A543974A6E3501 /* TumoFabricTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 985815E6A1B91675260A0A0D /* TumoFabricTests.swift */; };
 		96966A4735712E46A1D61787 /* SignalWaveform.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA2662EDCFCF09A2E06BDA20 /* SignalWaveform.swift */; };
+		978416054A404FA72A18311D /* FlipperRPCTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE542A6D7A116545EF3BE2A9 /* FlipperRPCTransport.swift */; };
 		9970C1E57A8F9C71B510102E /* TumoflipFirmwareRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 916BE931F747387EDB008311 /* TumoflipFirmwareRouting.swift */; };
 		9B2BB6377BAE0FC06FCDF701 /* DolphinAnimations in Resources */ = {isa = PBXBuildFile; fileRef = 022BE984F8DAB89F987AEC28 /* DolphinAnimations */; };
 		9D4526D85608E2635C63D0D8 /* HomeLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A900650A66F8794D717BD99 /* HomeLayout.swift */; };
@@ -285,6 +288,7 @@
 
 /* Begin PBXFileReference section */
 		022BE984F8DAB89F987AEC28 /* DolphinAnimations */ = {isa = PBXFileReference; lastKnownFileType = folder; name = DolphinAnimations; path = Resources/DolphinAnimations; sourceTree = SOURCE_ROOT; };
+		027309666B82E78173905E9F /* ConnectionFeedbackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionFeedbackView.swift; sourceTree = "<group>"; };
 		02EF4133669223E43E09D659 /* UnleashedWidgets.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = UnleashedWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		02FBA7705F3270054F81BF98 /* LiveDeckHomeUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveDeckHomeUITests.swift; sourceTree = "<group>"; };
 		0544D0FD5C4C15A8EE3509DE /* FieldServicesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FieldServicesView.swift; sourceTree = "<group>"; };
@@ -348,6 +352,7 @@
 		50C60E19A1D2DFA673E41C3F /* ProtectedPluginAuditTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtectedPluginAuditTests.swift; sourceTree = "<group>"; };
 		50CD66866729ECD5B550F4B7 /* DolphinProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DolphinProfile.swift; sourceTree = "<group>"; };
 		5122076A627322769B9B5014 /* UnleashedWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnleashedWidgets.swift; sourceTree = "<group>"; };
+		515AF64A0AF1E4C44D20659A /* BLESessionReadinessTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BLESessionReadinessTests.swift; sourceTree = "<group>"; };
 		52741A242FCEED74C342D4D6 /* MarauderResultViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarauderResultViews.swift; sourceTree = "<group>"; };
 		54BC731EF974B7077777585D /* CatalogClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogClientTests.swift; sourceTree = "<group>"; };
 		54C848C04983CF3B58C03C22 /* TumoVMNFCSmoke.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoVMNFCSmoke.swift; sourceTree = "<group>"; };
@@ -465,6 +470,7 @@
 		DB003747D5AF7D07C4094F9F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		DC29E67F84F7B70C836FB6EB /* UnleashedTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = UnleashedTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		DCE61D0B4EB2C9925E58FA87 /* DevicesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevicesView.swift; sourceTree = "<group>"; };
+		DE542A6D7A116545EF3BE2A9 /* FlipperRPCTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlipperRPCTransport.swift; sourceTree = "<group>"; };
 		E1182D29C123C1F78168038A /* RemoteIDReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteIDReport.swift; sourceTree = "<group>"; };
 		E2EDFAFA602C188F8A589294 /* UnleashedUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = UnleashedUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		E4930E5335E77EBB9BFA70EF /* PluginUpdatesDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginUpdatesDetailView.swift; sourceTree = "<group>"; };
@@ -797,6 +803,7 @@
 			children = (
 				9C90997591A015CAB64F92E9 /* AppBridgeConsoleTests.swift */,
 				B04D2FFBE41EED4A3482CEFA /* AppBridgeRequestTests.swift */,
+				515AF64A0AF1E4C44D20659A /* BLESessionReadinessTests.swift */,
 				54BC731EF974B7077777585D /* CatalogClientTests.swift */,
 				F0D8E6618EDCB0A85BA0F207 /* ConnectionMonitorTests.swift */,
 				2530743A4F45B32311FB1951 /* DeviceInfoViewTests.swift */,
@@ -872,6 +879,7 @@
 				299EFF336F47935AE03E9500 /* CompanionBridge.swift */,
 				44CC0B1350B30151851F2958 /* FlipperControl.swift */,
 				67C0B0C4BD832B6A0C849C3A /* FlipperRPC.swift */,
+				DE542A6D7A116545EF3BE2A9 /* FlipperRPCTransport.swift */,
 				6DAC7802254E690B3766FC5C /* RPCReadBudget.swift */,
 			);
 			path = RPC;
@@ -1011,6 +1019,7 @@
 		D1E684C10E32722F14816544 /* Devices */ = {
 			isa = PBXGroup;
 			children = (
+				027309666B82E78173905E9F /* ConnectionFeedbackView.swift */,
 				B503520198AB916BA4F47F10 /* DeviceInfoView.swift */,
 				DCE61D0B4EB2C9925E58FA87 /* DevicesView.swift */,
 				83F35A633E1B5B22888D35A0 /* LiveDeckHomeView.swift */,
@@ -1269,6 +1278,7 @@
 			files = (
 				72AA0AFD7A1A377DA0CFBFFE /* AppBridgeConsoleTests.swift in Sources */,
 				BCA5C227A003B22953FA49D7 /* AppBridgeRequestTests.swift in Sources */,
+				6B564A92D93D508D1CCBDF50 /* BLESessionReadinessTests.swift in Sources */,
 				31DE3241E429DCE7FAA6C3B2 /* CatalogClientTests.swift in Sources */,
 				8B2CC56FC09F0AD9CBB1E412 /* ConnectionMonitorTests.swift in Sources */,
 				41E926FF08644F751DB96360 /* DeviceInfoViewTests.swift in Sources */,
@@ -1359,6 +1369,7 @@
 				6D5E2E66502E9832B6670D9D /* CatalogListView.swift in Sources */,
 				3E3E586D830439E2A9A3C8F9 /* CompanionBridge.swift in Sources */,
 				CD886282119506575601F39B /* ConnectionEvidence.swift in Sources */,
+				5F45C07CEDB7AA5961C29BCD /* ConnectionFeedbackView.swift in Sources */,
 				C8DA24FE8BB820E7094AE4B4 /* ConnectionMonitor.swift in Sources */,
 				D1F9B1FCB9746D60A07E5702 /* CustomizeHomeView.swift in Sources */,
 				4E7FA0C44894AAF123F151F1 /* DeviceInfoView.swift in Sources */,
@@ -1388,6 +1399,7 @@
 				CFDE4BE98F4A5BB2FC3232B4 /* FlipperCatalogClient.swift in Sources */,
 				03BE7BC7ADBD4866A4F4507E /* FlipperControl.swift in Sources */,
 				5441B6081BFE2F6A4CCD4970 /* FlipperRPC.swift in Sources */,
+				978416054A404FA72A18311D /* FlipperRPCTransport.swift in Sources */,
 				53CB5CFA2958BBC762C9260C /* FlipperStorage.swift in Sources */,
 				B7D3F97F8516475BDCB9C56A /* FlipperSystem.swift in Sources */,
 				0091E2386B3AC40E8BD81D3B /* GitHubAPIClient.swift in Sources */,

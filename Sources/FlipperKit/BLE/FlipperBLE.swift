@@ -123,6 +123,7 @@ final class FlipperBLE: NSObject, ObservableObject {
     private var peripheral: CBPeripheral?
     private var rxChar: CBCharacteristic?      // write to Flipper (RPC)
     private var txChar: CBCharacteristic?      // notify from Flipper (RPC)
+    private var flowChar: CBCharacteristic?
     private var bridgeCmdChar: CBCharacteristic?
     private var bridgeEvtChar: CBCharacteristic?
     private var readiness = BLESessionReadiness()
@@ -266,10 +267,14 @@ final class FlipperBLE: NSObject, ObservableObject {
             return
         }
         // 3. Nothing retained — scan.
-        startScan()
+        startScanOnQueue()
     }
 
     func startScan() {
+        queue.async { [weak self] in self?.startScanOnQueue() }
+    }
+
+    private func startScanOnQueue() {
         guard central.state == .poweredOn else { return }
         // Even when the user asks to scan, grab an already-connected Flipper first
         // (it won't show up in a scan because it isn't advertising).
@@ -286,6 +291,10 @@ final class FlipperBLE: NSObject, ObservableObject {
     }
 
     func stopScan() {
+        queue.async { [weak self] in self?.stopScanOnQueue() }
+    }
+
+    private func stopScanOnQueue() {
         central.stopScan()
         // Reset the state so the UI leaves "scanning" (the stop button flips back).
         DispatchQueue.main.async {
@@ -294,7 +303,11 @@ final class FlipperBLE: NSObject, ObservableObject {
     }
 
     func connect(_ id: UUID) {
-        stopScan()
+        queue.async { [weak self] in self?.connectOnQueue(id) }
+    }
+
+    private func connectOnQueue(_ id: UUID) {
+        stopScanOnQueue()
         wantsConnectID = id
         userInitiatedDisconnect = false
         reconnectAttempts = 0
@@ -310,6 +323,10 @@ final class FlipperBLE: NSObject, ObservableObject {
     }
 
     func disconnect() {
+        queue.async { [weak self] in self?.disconnectOnQueue() }
+    }
+
+    private func disconnectOnQueue() {
         userInitiatedDisconnect = true
         wantsConnectID = nil
         connectFailureAttempts = 0
@@ -338,8 +355,10 @@ final class FlipperBLE: NSObject, ObservableObject {
     /// bytes have been handed to the link within the Flipper's flow-control credit
     /// (or immediately if the link is gone), so callers can pace + show progress.
     func writeSerial(_ data: Data, completion: (() -> Void)? = nil) {
-        guard peripheral != nil, rxChar != nil, !data.isEmpty else { completion?(); return }
+        guard !data.isEmpty else { completion?(); return }
         queue.async {
+            guard self.peripheral?.state == .connected, self.rxChar != nil,
+                  self.readiness.serialReady else { completion?(); return }
             self.txItems.append(TxItem(data: data, done: completion))
             self.pumpTx()
         }
@@ -634,7 +653,7 @@ final class FlipperBLE: NSObject, ObservableObject {
     private func clearDiscoveredCharacteristics() {
         readiness = BLESessionReadiness()
         gattSessionID = UUID()
-        rxChar = nil; txChar = nil
+        rxChar = nil; txChar = nil; flowChar = nil
         bridgeCmdChar = nil; bridgeEvtChar = nil
         flushTxQueue()                    // drops tx/raw queues + resumes waiters
         appBridge.failAll(.disconnected)
@@ -724,7 +743,7 @@ extension FlipperBLE: CBCentralManagerDelegate {
         guard peripheral === self.peripheral else { return }
         reconnectAttempts = 0
         connectFailureAttempts = 0
-        stopScan()
+        stopScanOnQueue()
         // Remember it so we can reattach across app launches without a scan.
         UserDefaults.standard.set(peripheral.identifier.uuidString, forKey: lastDeviceKey)
         DispatchQueue.main.async {
@@ -863,6 +882,7 @@ extension FlipperBLE: CBPeripheralDelegate {
                 rxChar = c
                 readiness.hasSerialRX = c.properties.contains(.writeWithoutResponse)
             case FlipperUUID.serialFlow:
+                flowChar = c
                 readiness.hasSerialFlow = c.properties.contains(.notify)
                 // Subscribe to flow-control credit updates (buffer-empty refills).
                 peripheral.setNotifyValue(true, for: c)
@@ -889,8 +909,7 @@ extension FlipperBLE: CBPeripheralDelegate {
         switch characteristic.uuid {
         case FlipperUUID.serialTx where characteristic === txChar:
             readiness.serialTXNotifying = notifying
-        case FlipperUUID.serialFlow:
-            guard characteristic.service?.peripheral === peripheral else { return }
+        case FlipperUUID.serialFlow where characteristic === flowChar:
             readiness.serialFlowNotifying = notifying
         case FlipperUUID.appBridgeEvents where characteristic === bridgeEvtChar:
             readiness.bridgeNotifying = notifying
@@ -941,11 +960,13 @@ extension FlipperBLE: CBPeripheralDelegate {
                 serialIn.send(BLESerialPacket(data: data, sessionID: gattSessionID))
             }
         case FlipperUUID.serialFlow:
+            guard characteristic === flowChar, readiness.serialReady else { return }
             // Flipper freed its RX buffer → refill our send credit and continue.
             if let credit = Self.parseFlowControl(data) { setTxCredit(credit) }
         case FlipperUUID.batteryLevel:
             if let b = data.first { DispatchQueue.main.async { self.battery = min(100, Int(b)) } }
         case FlipperUUID.appBridgeEvents:
+            guard characteristic === bridgeEvtChar else { return }
             if let frame = AppBridgeFrame(decoding: data) {
                 if frame.version == 2 && frame.isResponse {
                     // Correlated reply to one of our requests (incl. the v2 probe).

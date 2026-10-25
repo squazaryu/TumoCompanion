@@ -23,6 +23,21 @@ check(readiness.takeBridgeProbe(), "Late bridge subscription must still start ne
 check(!readiness.takeBridgeProbe(), "Probe only once per transport session")
 readiness = BLESessionReadiness()
 check(!readiness.serialReady, "New session must not reuse old GATT evidence")
+for mask in 0..<32 {
+    var candidate = BLESessionReadiness()
+    candidate.hasSerialRX = mask & 1 != 0
+    candidate.hasSerialTX = mask & 2 != 0
+    candidate.hasSerialFlow = mask & 4 != 0
+    candidate.serialTXNotifying = mask & 8 != 0
+    candidate.serialFlowNotifying = mask & 16 != 0
+    check(candidate.serialReady == (mask == 31), "Every serial prerequisite is mandatory")
+}
+readiness.hasBridgeCommand = true
+readiness.bridgeNotifying = true
+check(!readiness.takeBridgeProbe(), "Bridge-first discovery must still wait for serial")
+readiness.hasSerialRX = true; readiness.hasSerialTX = true; readiness.hasSerialFlow = true
+readiness.serialTXNotifying = true; readiness.serialFlowNotifying = true
+check(readiness.takeBridgeProbe(), "Bridge-first ordering must not lose negotiation")
 
 var evidence = ConnectionEvidence()
 evidence.transportChanged(ready: true, connecting: false)

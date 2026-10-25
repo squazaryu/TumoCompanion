@@ -30,6 +30,7 @@ final class FlipperControl: ObservableObject {
     /// Latest decoded screen frame as a 128x64 1-bpp bitmap, expanded to bytes.
     @Published var screenPixels: [Bool] = Array(repeating: false, count: 128 * 64)
     @Published var streaming = false
+    @Published private(set) var lastScreenFrameAt: Date?
 
     static let screenW = 128
     static let screenH = 64
@@ -121,6 +122,7 @@ final class FlipperControl: ObservableObject {
             shouldStart = false
             shouldStop = streamActive
             if shouldStop { streamActive = false }
+            lastScreenFrameAt = nil
         }
         streamLock.unlock()
 
@@ -216,6 +218,7 @@ final class FlipperControl: ObservableObject {
 
         guard let pixels else { return }
         screenPixels = pixels
+        lastScreenFrameAt = Date()
 
         frameDeliveryLock.lock()
         let needsAnotherDelivery = pendingPixels != nil

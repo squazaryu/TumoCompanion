@@ -5,6 +5,7 @@ import UIKit
 struct UnleashedApp: App {
     @StateObject private var ble = FlipperBLE.shared
     @StateObject private var rpc = FlipperRPC.shared
+    @StateObject private var connection = ConnectionMonitor()
     @StateObject private var control = FlipperControl()
     @StateObject private var relay = RelayExecutor()
     @StateObject private var companion = CompanionBridge.shared
@@ -44,6 +45,7 @@ struct UnleashedApp: App {
             RootView()
                 .environmentObject(ble)
                 .environmentObject(rpc)
+                .environmentObject(connection)
                 .environmentObject(control)
                 .environmentObject(relay)
                 .environmentObject(companion)
@@ -56,7 +58,8 @@ struct UnleashedApp: App {
                 .tint(Theme.accent)
                 .background(WindowStyleApplier(style: settings.appearance.uiStyle))
         }
-        .onChange(of: scenePhase) { _, phase in
+        .onChange(of: scenePhase, initial: true) { _, phase in
+            connection.setForegroundActive(phase == .active)
             // Coming back to the foreground: reattach to the Flipper. A Flipper
             // stops advertising while connected, so this reattaches to the held
             // link instead of a scan that would never find it.

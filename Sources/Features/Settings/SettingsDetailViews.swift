@@ -9,12 +9,13 @@ struct ConnectivitySettingsView: View {
 
     var body: some View {
         CardScroll {
+            ConnectionHealthCard()
             SectionCard(title: "Connection", systemImage: "antenna.radiowaves.left.and.right") {
                 Toggle(isOn: $ble.keepAlive) {
                     Label("Keep bridge alive in background", systemImage: "bolt.horizontal.circle")
                 }
                 .tint(Theme.accent)
-                Text("Holds the Bluetooth link open while the app is backgrounded so the Flipper can trigger the relay and other App Bridge actions. It costs a little battery and cannot survive force-quitting the app.")
+                Text("Allows Bluetooth events and reconnection while backgrounded. iOS can still suspend or terminate the app; force-quitting prevents automatic recovery. Channel checks run only in the foreground and yield to transfers.")
                     .settingsDescription()
             }
 

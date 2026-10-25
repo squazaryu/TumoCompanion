@@ -22,6 +22,24 @@ final class ConnectionStatusUITests: XCTestCase {
                      largeType: true)
     }
 
+    func testConnectivityExplainsBluetoothRPCAndBridgeSeparately() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-onboardingDone", "YES", "-appearanceMode", "light"]
+        app.launch()
+        app.tabBars.buttons["Settings"].tap()
+        let connectivity = app.buttons["settings-connectivity"]
+        XCTAssertTrue(connectivity.waitForExistence(timeout: 5))
+        connectivity.tap()
+        for identifier in ["connection-health-ble", "connection-health-rpc", "connection-health-bridge"] {
+            XCTAssertTrue(app.descendants(matching: .any).matching(identifier: identifier).firstMatch.waitForExistence(timeout: 5))
+        }
+        XCTAssertTrue(app.buttons["connection-check"].exists)
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = "Connectivity - channel health - light"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+
     private func assertStatus(
         _ state: String, title: String, appearance: String, lastFrame: Bool,
         largeType: Bool = false
@@ -31,6 +49,11 @@ final class ConnectionStatusUITests: XCTestCase {
                                "-connection-status-qa", state]
         if largeType { app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryXXXL"] }
         app.launch()
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let deny = springboard.buttons.matching(NSPredicate(
+            format: "label == %@ OR label == %@", "Don’t Allow", "Don't Allow"
+        )).firstMatch
+        if deny.waitForExistence(timeout: 2) { deny.tap() }
         let status = app.staticTexts["connection-status-title"]
         XCTAssertTrue(status.waitForExistence(timeout: 5))
         XCTAssertEqual(status.label, title)

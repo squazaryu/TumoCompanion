@@ -15,11 +15,18 @@ struct LiveDeckHomeView: View {
     let refreshAction: () async -> Void
 
     #if DEBUG
+    private var connectionPreview: ConnectionStatus? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let index = arguments.firstIndex(of: "-connection-status-qa"),
+              arguments.indices.contains(index + 1) else { return nil }
+        return ConnectionStatus(rawValue: arguments[index + 1])
+    }
     private var automationPreview: Bool {
-        ProcessInfo.processInfo.arguments.contains("-live-deck-connected-qa")
+        ProcessInfo.processInfo.arguments.contains("-live-deck-connected-qa") || connectionPreview != nil
     }
     #else
     private var automationPreview: Bool { false }
+    private var connectionPreview: ConnectionStatus? { nil }
     #endif
 
     private func navigate(_ tile: HomeTileID) {
@@ -32,7 +39,8 @@ struct LiveDeckHomeView: View {
                 LiveDeckConsoleCard(
                     onScreen: { navigate(.screen) },
                     onNavigate: navigate,
-                    automationPreview: automationPreview
+                    automationPreview: automationPreview,
+                    previewStatus: connectionPreview
                 )
 
                 LiveDeckNearbyCard()
@@ -62,12 +70,15 @@ struct LiveDeckHomeView: View {
 
 private struct LiveDeckConsoleCard: View {
     @EnvironmentObject private var ble: FlipperBLE
+    @EnvironmentObject private var connection: ConnectionMonitor
     @EnvironmentObject private var control: FlipperControl
     @EnvironmentObject private var transfer: TransferChannelStore
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     let onScreen: () -> Void
     let onNavigate: (HomeTileID) -> Void
     let automationPreview: Bool
+    let previewStatus: ConnectionStatus?
 
     private var isReady: Bool { automationPreview || ble.state == .ready }
 
@@ -80,31 +91,17 @@ private struct LiveDeckConsoleCard: View {
     }
 
     private var tint: Color {
-        if automationPreview { return Theme.success }
-        switch ble.state {
-        case .ready: return Theme.success
-        case .connected, .connecting, .scanning: return Theme.caution
-        case .poweredOff, .unauthorized: return Theme.danger
-        default: return .secondary
-        }
+        status.color
     }
 
-    private var status: LiveDeckConnectionStatus {
-        if automationPreview { return .ready }
-        switch ble.state {
-        case .ready: return .ready
-        case .scanning: return .scanning
-        case .connecting, .connected: return .connecting
-        case .poweredOff: return .offline("Bluetooth is off")
-        case .unauthorized: return .offline("Bluetooth permission needed")
-        case .disconnected: return .offline("No Flipper connected")
-        }
+    private var status: ConnectionStatus {
+        previewStatus ?? (automationPreview ? .ready : connection.status)
     }
 
     private var bridgeTitle: String {
         guard isReady else { return "No bridge" }
         guard automationPreview || ble.supportsAppBridge else { return "No bridge" }
-        return automationPreview || ble.appBridgeV2 ? "Bridge v2" : "Bridge v1"
+        return automationPreview || ble.appBridgeV2 ? "Bridge v2" : "Bridge —"
     }
 
     private var channelTitle: String {
@@ -113,6 +110,13 @@ private struct LiveDeckConsoleCard: View {
 
     private var statusRailFont: Font {
         .system(size: 12, weight: .semibold, design: .rounded)
+    }
+
+    private var stackedConsole: Bool { dynamicTypeSize >= .xxLarge }
+    private var consoleLayout: AnyLayout {
+        stackedConsole
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
+            : AnyLayout(HStackLayout(alignment: .top, spacing: 12))
     }
 
     var body: some View {
@@ -125,7 +129,7 @@ private struct LiveDeckConsoleCard: View {
                 Spacer()
             }
 
-            HStack(alignment: .top, spacing: 12) {
+            consoleLayout {
                 VStack(alignment: .leading, spacing: 6) {
                     Button(action: onScreen) {
                         ZStack {
@@ -151,6 +155,10 @@ private struct LiveDeckConsoleCard: View {
                                 .frame(height: 108)
                             }
                         }
+                        .modifier(FlipperScreenFreshness(
+                            receivedAt: automationPreview ? .distantFuture : control.lastScreenFrameAt,
+                            status: status
+                        ))
                         .background(Color.black.opacity(0.9), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                         .overlay {
                             RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -158,7 +166,7 @@ private struct LiveDeckConsoleCard: View {
                         }
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel((control.streaming || automationPreview) ? "Open live Flipper screen" : "Open Flipper screen")
+                    .accessibilityLabel("Open Flipper screen")
                 }
                 .layoutPriority(1)
 
@@ -170,7 +178,8 @@ private struct LiveDeckConsoleCard: View {
 
                     LiveDeckConsoleActionList(onNavigate: onNavigate)
                 }
-                .frame(minWidth: 138, maxWidth: 166, alignment: .leading)
+                .frame(minWidth: stackedConsole ? 0 : 138,
+                       maxWidth: stackedConsole ? .infinity : 166, alignment: .leading)
             }
 
             // The status rail belongs to the whole console card, not only the
@@ -181,8 +190,9 @@ private struct LiveDeckConsoleCard: View {
                     Circle()
                         .fill(tint)
                         .frame(width: 6, height: 6)
-                    Text(status.shortTitle)
+                    Text(status.title)
                         .font(statusRailFont)
+                        .accessibilityIdentifier("connection-status-title")
                 }
                 .frame(maxWidth: .infinity, alignment: .center)
 
@@ -223,16 +233,21 @@ private struct LiveDeckConsoleCard: View {
                     .strokeBorder(tint.opacity(0.22), lineWidth: 1)
             }
             .allowsHitTesting(false)
-            .accessibilityElement(children: .combine)
+            .accessibilityElement(children: .contain)
+
+            ConnectionFeedbackView(status: status, check: checkConnection)
 
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .card(tint: tint, padding: 12)
     }
 
+    private func checkConnection() { Task { await connection.verifyNow() } }
+
     private var metadataDivider: some View {
         Text("·")
             .foregroundStyle(.tertiary)
+            .accessibilityHidden(true)
     }
 }
 
@@ -310,7 +325,7 @@ private struct LiveDeckConsoleActionList: View {
                     .lineLimit(1)
                     .foregroundStyle(.primary.opacity(0.82))
                     .frame(maxWidth: .infinity)
-                    .frame(minHeight: 37)
+                    .frame(minHeight: 44)
                     .padding(.horizontal, 4)
                     .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
                     .overlay {
@@ -1029,23 +1044,6 @@ private struct LiveDeckBattery: View {
         default: return "battery.100"
         }
     }
-}
-
-private enum LiveDeckConnectionStatus: Equatable {
-    case ready
-    case scanning
-    case connecting
-    case offline(String)
-
-    var shortTitle: String {
-        switch self {
-        case .ready: return "Ready"
-        case .scanning: return "Scanning"
-        case .connecting: return "Connecting"
-        case .offline: return "Offline"
-        }
-    }
-
 }
 
 private enum LiveDeckSourceActivityKind: Equatable {
