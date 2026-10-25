@@ -38,6 +38,10 @@ final class ConnectionStatusUITests: XCTestCase {
         let preview = app.buttons["Open Flipper screen"]
         XCTAssertTrue(preview.waitForExistence(timeout: 5))
         if let renderer { XCTAssertEqual(preview.value as? String, renderer == "preparing" ? "Preparing RPC" : "Device screen") }
+        if renderer == "preparing" {
+            XCTAssertTrue(app.staticTexts["Preparing RPC"].exists,
+                          "A BLE-connected session waiting for RPC must not ask the user to connect again")
+        }
         let backup = app.buttons["Open Backup"]
         let info = app.buttons["Info"]
         XCTAssertTrue(backup.exists)
