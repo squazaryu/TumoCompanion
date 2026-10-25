@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.11.30",
+      "version": "1.11.31",
       "versionDate": "2026-10-26",
-      "versionDescription": "Fixes the Connecting regression in 1.11.28/29 by accepting Flipper BLE indications as well as notifications, without weakening subscription/RPC checks. Sets preview height explicitly from the measured controls and checks actual placeholder/pixel renderers on iPhone 16 Pro. No firmware or FW Packages update required. Verify About shows 1.11.30 (283); physical post-update acceptance remains pending.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.30/TumoCompanion-unsigned.ipa",
-      "size": 25959916,
+      "versionDescription": "Removes the extra Home connection explanation and round check button. Compact status remains; automatic monitoring and Settings > Connectivity diagnostics are unchanged. Includes 1.11.30 BLE indication readiness and measured preview-height fixes. No firmware or FW Packages update required. Verify About shows 1.11.31 (284); physical acceptance remains pending.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.31/TumoCompanion-unsigned.ipa",
+      "size": 25958733,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.11.31",
+          "date": "2026-10-26",
+          "localizedDescription": "Removes the extra Home connection explanation and round check button. Compact status remains; automatic monitoring and Settings > Connectivity diagnostics are unchanged. Includes 1.11.30 BLE indication readiness and measured preview-height fixes. No firmware or FW Packages update required. Verify About shows 1.11.31 (284); physical acceptance remains pending.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.31/TumoCompanion-unsigned.ipa",
+          "size": 25958733,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.11.30",
           "date": "2026-10-26",
