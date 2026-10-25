@@ -61,6 +61,7 @@
 		3E084727311DC9FAEC499A99 /* DolphinProfileService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D40FDF9AC257DE97849E36E9 /* DolphinProfileService.swift */; };
 		3E13B3B8C91DE3972B8B88AE /* MarauderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90D1067254AC076FCC557F87 /* MarauderView.swift */; };
 		3E3E586D830439E2A9A3C8F9 /* CompanionBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 299EFF336F47935AE03E9500 /* CompanionBridge.swift */; };
+		3EA73A81D902F8FFC7C48069 /* RPCConnectionProbeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 860B1E3F86A4A0D7108FDC7D /* RPCConnectionProbeTests.swift */; };
 		3F042FA8BCF01CBAD8377161 /* DolphinGalleryModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2223CB55367C869D06A5001D /* DolphinGalleryModel.swift */; };
 		3FFE12E9A014C7F05D300AAB /* MarauderResultViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52741A242FCEED74C342D4D6 /* MarauderResultViews.swift */; };
 		41E926FF08644F751DB96360 /* DeviceInfoViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2530743A4F45B32311FB1951 /* DeviceInfoViewTests.swift */; };
@@ -384,6 +385,7 @@
 		8552372C065116D007A406D3 /* UpdateAssistantSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateAssistantSource.swift; sourceTree = "<group>"; };
 		856D8627B88920587D56B850 /* FirmwareLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirmwareLibrary.swift; sourceTree = "<group>"; };
 		85A71B8014DF7BCBEAE77C5A /* TumoNetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoNetView.swift; sourceTree = "<group>"; };
+		860B1E3F86A4A0D7108FDC7D /* RPCConnectionProbeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RPCConnectionProbeTests.swift; sourceTree = "<group>"; };
 		8697965C8EA5F8D768000FC9 /* TumoflipUpdaterService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TumoflipUpdaterService.swift; sourceTree = "<group>"; };
 		87F2C64ACDABA1AEFFB7CCD8 /* PluginUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginUpdater.swift; sourceTree = "<group>"; };
 		8935260266C922FDBB301B75 /* TransferBackgroundTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferBackgroundTests.swift; sourceTree = "<group>"; };
@@ -823,6 +825,7 @@
 				50C60E19A1D2DFA673E41C3F /* ProtectedPluginAuditTests.swift */,
 				0711A5F791B6D248100D3EBD /* ProtocolTests.swift */,
 				06F011FAE4BA71D89C6B83AC /* RemoteIDTests.swift */,
+				860B1E3F86A4A0D7108FDC7D /* RPCConnectionProbeTests.swift */,
 				2EEC053469687E6D198E7859 /* RPCReadBudgetTests.swift */,
 				EDD681FE18BFDF3BD90EC71D /* RuntimeDiagnosticsTests.swift */,
 				97CEBDA4FB8E0C34199354EF /* SignalTimelineTests.swift */,
@@ -1293,6 +1296,7 @@
 				382D481F4B3744731A3527CE /* PluginUpdateMonitorTests.swift in Sources */,
 				0A68BD88E9E469306F4861E7 /* ProtectedPluginAuditTests.swift in Sources */,
 				EAC0D7A0739C0B6EF7565475 /* ProtocolTests.swift in Sources */,
+				3EA73A81D902F8FFC7C48069 /* RPCConnectionProbeTests.swift in Sources */,
 				E56D897A2B175FCF379B122E /* RPCReadBudgetTests.swift in Sources */,
 				31EF8ECD5C4E84AA992FAD1B /* RemoteIDTests.swift in Sources */,
 				C390ACDEA69EE872DDF566E0 /* RuntimeDiagnosticsTests.swift in Sources */,
