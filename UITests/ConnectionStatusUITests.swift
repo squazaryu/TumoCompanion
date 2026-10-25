@@ -16,6 +16,14 @@ final class ConnectionStatusUITests: XCTestCase {
     func testRealPixelRendererHeightInLightMode() {
         assertPreviewHeight(appearance: "light", renderer: "pixels")
     }
+
+    func testRealPreparingHeightWithMediumText() {
+        assertPreviewHeight(appearance: "dark", renderer: "preparing", textSize: "UICTContentSizeCategoryM")
+    }
+
+    func testRealPixelRendererHeightWithExtraLargeText() {
+        assertPreviewHeight(appearance: "light", renderer: "pixels", textSize: "UICTContentSizeCategoryXL")
+    }
     func testPreviewHeightMatchesRightColumnWithoutChangingItsWidthInDarkMode() {
         assertPreviewHeight(appearance: "dark")
     }
@@ -24,11 +32,12 @@ final class ConnectionStatusUITests: XCTestCase {
         assertPreviewHeight(appearance: "light")
     }
 
-    private func assertPreviewHeight(appearance: String, renderer: String? = nil) {
+    private func assertPreviewHeight(appearance: String, renderer: String? = nil,
+                                     textSize: String = "UICTContentSizeCategoryL") {
         let app = XCUIApplication()
         app.launchArguments = ["-onboardingDone", "YES", "-appearanceMode", appearance,
                                "-connection-status-qa", renderer == "preparing" ? "connecting" : "unresponsive",
-                               "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryL"]
+                               "-UIPreferredContentSizeCategoryName", textSize]
         if let renderer { app.launchArguments += ["-console-render-qa", renderer] }
         app.launch()
         let deny = XCUIApplication(bundleIdentifier: "com.apple.springboard").buttons.matching(
@@ -45,6 +54,12 @@ final class ConnectionStatusUITests: XCTestCase {
         let backup = app.buttons["Open Backup"]
         let info = app.buttons["Info"]
         XCTAssertTrue(backup.exists)
+        let controls = app.otherElements["console-right-controls"]
+        XCTAssertTrue(controls.exists)
+        // Compare both projected screen-space bounds directly. Rounding an
+        // automation value119.00001 upward invents a whole extra point.
+        XCTAssertEqual(preview.frame.height, max(108, controls.frame.height), accuracy: 1,
+                       "The window must use the measured right column, not flexible intrinsic content")
         XCTAssertEqual(preview.frame.maxY, backup.frame.maxY, accuracy: 1,
                        "Preview bottom must align with the right column, not stop early")
         XCTAssertGreaterThan(info.frame.minX, preview.frame.maxX,
@@ -53,7 +68,7 @@ final class ConnectionStatusUITests: XCTestCase {
         XCTAssertGreaterThan(fraction, 0.35)
         XCTAssertLessThan(fraction, 0.60)
         let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-        screenshot.name = "Console preview height - \(renderer ?? "mock") - \(appearance)"
+        screenshot.name = "Console preview height - \(renderer ?? "mock") - \(appearance) - \(textSize)"
         screenshot.lifetime = .keepAlways
         add(screenshot)
     }
