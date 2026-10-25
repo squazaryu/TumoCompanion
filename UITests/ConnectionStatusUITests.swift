@@ -1,6 +1,26 @@
 import XCTest
 
 final class ConnectionStatusUITests: XCTestCase {
+    func testHomeKeepsStatusButHidesConnectionExplanationAndManualCheck() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-onboardingDone", "YES", "-appearanceMode", "light",
+                               "-connection-status-qa", "unresponsive", "-console-render-qa", "pixels"]
+        app.launch()
+        let deny = XCUIApplication(bundleIdentifier: "com.apple.springboard").buttons.matching(
+            NSPredicate(format: "label == %@ OR label == %@", "Don’t Allow", "Don't Allow")
+        ).firstMatch
+        if deny.waitForExistence(timeout: 2) { deny.tap() }
+        let status = app.staticTexts["connection-status-title"]
+        XCTAssertTrue(status.waitForExistence(timeout: 5))
+        XCTAssertEqual(status.label, "No response")
+        XCTAssertFalse(app.staticTexts["Bluetooth is present, but RPC has not replied."].exists)
+        XCTAssertFalse(app.buttons["connection-check"].exists)
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = "Home without connection explanation or check button - light"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+
     func testRealPreparingPlaceholderHeightInDarkMode() {
         assertPreviewHeight(appearance: "dark", renderer: "preparing")
     }
