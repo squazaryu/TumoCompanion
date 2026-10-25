@@ -92,6 +92,7 @@ private struct FlipperBackButtonStyle: ButtonStyle {
 
 struct ScreenView: View {
     @EnvironmentObject var ble: FlipperBLE
+    @EnvironmentObject private var connection: ConnectionMonitor
     @EnvironmentObject var control: FlipperControl
     @State private var shareItem: ShareImage?
 
@@ -172,6 +173,7 @@ struct ScreenView: View {
 
     private var screen: some View {
         FlipperScreenCanvas(pixels: control.screenPixels)
+            .modifier(FlipperScreenFreshness(receivedAt: control.lastScreenFrameAt, status: connection.status))
             .frame(maxWidth: 520)
             .padding(.horizontal, 4)
     }
