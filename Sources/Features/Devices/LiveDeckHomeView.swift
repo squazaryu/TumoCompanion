@@ -106,6 +106,10 @@ private struct LiveDeckConsoleCard: View {
         return automationPreview || ble.state == .ready
     }
 
+    private var placeholderTitle: String {
+        rendererFixture == .preparing || ble.state == .connected ? "Preparing RPC" : "Connect Flipper"
+    }
+
     private var displayName: String {
         automationPreview ? "Flipper TUMOFLIP" : (ble.connectedName ?? "Flipper Zero")
     }
@@ -171,7 +175,7 @@ private struct LiveDeckConsoleCard: View {
                                 VStack(spacing: 6) {
                                     Image(systemName: "rectangle.on.rectangle.slash")
                                         .font(.title3)
-                                    Text("Connect Flipper")
+                                    Text(placeholderTitle)
                                         .font(.caption.weight(.semibold))
                                 }
                                 .foregroundStyle(.secondary)
@@ -193,7 +197,7 @@ private struct LiveDeckConsoleCard: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Open Flipper screen")
-                    .accessibilityValue(!isReady ? "Preparing RPC" : (rendererFixture == .pixels ? "Device screen" : "Screen preview"))
+                    .accessibilityValue(!isReady ? placeholderTitle : (rendererFixture == .pixels ? "Device screen" : "Screen preview"))
                 }
                 .frame(maxHeight: .infinity)
                 .layoutPriority(1)

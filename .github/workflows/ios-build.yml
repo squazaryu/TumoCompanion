@@ -31,6 +31,8 @@ jobs:
         run: python3 scripts/test_rpc_read_budget_host.py
       - name: Verify BLE readiness and RPC evidence without Bluetooth
         run: python3 scripts/test_connection_health_host.py
+      - name: Verify actual Flipper GATT properties against CoreBluetooth
+        run: python3 scripts/test_ble_gatt_contract_host.py
       - name: Build unsigned IPA
         run: scripts/build_ipa.sh
 
