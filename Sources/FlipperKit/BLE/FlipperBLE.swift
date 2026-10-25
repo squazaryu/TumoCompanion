@@ -876,14 +876,16 @@ extension FlipperBLE: CBPeripheralDelegate {
             switch c.uuid {
             case FlipperUUID.serialTx:
                 txChar = c
-                readiness.hasSerialTX = c.properties.contains(.notify)
+                readiness.hasSerialTX = BLECharacteristicSupport.supportsValueUpdates(c.properties)
+                blelog.notice("serial TX properties=\(c.properties.rawValue, privacy: .public), subscribed=\(c.isNotifying, privacy: .public)")
                 peripheral.setNotifyValue(true, for: c)
             case FlipperUUID.serialRx:
                 rxChar = c
                 readiness.hasSerialRX = c.properties.contains(.writeWithoutResponse)
             case FlipperUUID.serialFlow:
                 flowChar = c
-                readiness.hasSerialFlow = c.properties.contains(.notify)
+                readiness.hasSerialFlow = BLECharacteristicSupport.supportsValueUpdates(c.properties)
+                blelog.notice("serial flow properties=\(c.properties.rawValue, privacy: .public), subscribed=\(c.isNotifying, privacy: .public)")
                 // Subscribe to flow-control credit updates (buffer-empty refills).
                 peripheral.setNotifyValue(true, for: c)
             case FlipperUUID.appBridgeEvents:

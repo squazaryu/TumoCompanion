@@ -1,7 +1,33 @@
 import XCTest
+import CoreBluetooth
 @testable import UnleashedCompanion
 
 final class BLESessionReadinessTests: XCTestCase {
+    func testActualFlipperTXUsesIndicationsWithoutNotify() {
+        let properties: CBCharacteristicProperties = [.read, .indicate]
+        XCTAssertFalse(properties.contains(.notify))
+        XCTAssertTrue(BLECharacteristicSupport.supportsValueUpdates(properties))
+    }
+
+    func testActualFlipperFlowUsesNotifications() {
+        XCTAssertTrue(BLECharacteristicSupport.supportsValueUpdates([.read, .notify]))
+        XCTAssertTrue(BLECharacteristicSupport.supportsValueUpdates([.read, .notify, .indicate]))
+        XCTAssertFalse(BLECharacteristicSupport.supportsValueUpdates([.read, .writeWithoutResponse]))
+    }
+
+    func testIndicationsDoNotBypassAcknowledgementOrReinitializeTheSession() {
+        var session = BLESessionReadiness()
+        session.hasSerialRX = true
+        session.hasSerialTX = BLECharacteristicSupport.supportsValueUpdates([.read, .indicate])
+        session.hasSerialFlow = BLECharacteristicSupport.supportsValueUpdates([.read, .notify])
+        XCTAssertFalse(session.takeSerialReady())
+        session.serialTXNotifying = true
+        XCTAssertFalse(session.takeSerialReady())
+        session.serialFlowNotifying = true
+        XCTAssertTrue(session.takeSerialReady())
+        XCTAssertFalse(session.takeSerialReady())
+    }
+
     func testEveryPrerequisiteIsRequiredAndReadinessIsIdempotent() {
         for mask in 0..<32 {
             var session = BLESessionReadiness()
