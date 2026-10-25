@@ -97,7 +97,8 @@ final class FlipperBLE: NSObject, ObservableObject {
     @Published private(set) var supportsAppBridge = false
 
     /// Raw bytes arriving on the serial TX characteristic (RPC stream).
-    let serialIn = PassthroughSubject<Data, Never>()
+    let serialIn = PassthroughSubject<BLESerialPacket, Never>()
+    @Published private(set) var activeSessionID: UUID?
     /// Raw newline-JSON routed only to Claude Buddy. Separating it at the BLE
     /// boundary prevents the first Buddy frame from reaching the protobuf parser.
     let buddySerialIn = PassthroughSubject<Data, Never>()
@@ -124,6 +125,8 @@ final class FlipperBLE: NSObject, ObservableObject {
     private var txChar: CBCharacteristic?      // notify from Flipper (RPC)
     private var bridgeCmdChar: CBCharacteristic?
     private var bridgeEvtChar: CBCharacteristic?
+    private var readiness = BLESessionReadiness()
+    private var gattSessionID = UUID() // confined to the CoreBluetooth queue
 
     private var wantsConnectID: UUID?
     private var userInitiatedDisconnect = false
@@ -232,8 +235,12 @@ final class FlipperBLE: NSObject, ObservableObject {
     /// toggle BLE on the Flipper" trap). So we reattach to a retained connection
     /// first, fall back to the last known device, and only scan as a last resort.
     func autoConnect() {
+        queue.async { [weak self] in self?.autoConnectOnQueue() }
+    }
+
+    private func autoConnectOnQueue() {
         guard central.state == .poweredOn else { return }
-        if state == .ready || state == .connected { return }
+        if (state == .ready || state == .connected), peripheral?.state == .connected { return }
         // A connect attempt that's still fresh is left to run (its ready watchdog will
         // recover it). But don't early-return forever on a .connecting that has gone
         // stale past the ready timeout — fall through to force a clean fresh attempt.
@@ -487,6 +494,7 @@ final class FlipperBLE: NSObject, ObservableObject {
     /// times out and we stay on FAB1. Safe to call on every connect.
     private func probeAppBridgeV2() {
         guard peripheral != nil, bridgeCmdChar != nil else { return }
+        let sessionID = gattSessionID
         Task { [weak self] in
             guard let self else { return }
             do {
@@ -500,6 +508,7 @@ final class FlipperBLE: NSObject, ObservableObject {
                     return
                 }
                 await MainActor.run {
+                    guard self.activeSessionID == sessionID, self.state == .ready else { return }
                     self.appBridgeCapabilities = caps
                     self.appBridgeV2 = true
                     blelog.notice("App Bridge v2 negotiated (\(caps.count, privacy: .public) caps)")
@@ -560,6 +569,7 @@ final class FlipperBLE: NSObject, ObservableObject {
     }
 
     private func beginConnect(_ p: CBPeripheral) {
+        clearDiscoveredCharacteristics()
         peripheral = p
         p.delegate = self
         DispatchQueue.main.async { self.state = .connecting }
@@ -599,7 +609,7 @@ final class FlipperBLE: NSObject, ObservableObject {
             guard let self = self, let p = p else { return }
             guard self.readyGen == gen else { return }                       // reached .ready or superseded
             guard self.state == .connecting || self.state == .connected else { return }
-            guard self.rxChar == nil || self.txChar == nil else { return }   // serial chars up → usable
+            guard !self.readiness.serialReady else { return }
             guard !self.userInitiatedDisconnect else { return }
             blelog.error("BLE ready timed out — forcing clean reconnect")
             self.clearDiscoveredCharacteristics()
@@ -622,11 +632,14 @@ final class FlipperBLE: NSObject, ObservableObject {
     /// Drop every reference that may hold a stale GATT handle before a clean reconnect.
     /// Queue-confined fields are cleared here; published ones hop to main.
     private func clearDiscoveredCharacteristics() {
+        readiness = BLESessionReadiness()
+        gattSessionID = UUID()
         rxChar = nil; txChar = nil
         bridgeCmdChar = nil; bridgeEvtChar = nil
         flushTxQueue()                    // drops tx/raw queues + resumes waiters
         appBridge.failAll(.disconnected)
         DispatchQueue.main.async {
+            self.activeSessionID = nil
             self.supportsAppBridge = false
             self.appBridgeV2 = false
             self.appBridgeCapabilities = [:]
@@ -708,6 +721,7 @@ extension FlipperBLE: CBCentralManagerDelegate {
     }
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
+        guard peripheral === self.peripheral else { return }
         reconnectAttempts = 0
         connectFailureAttempts = 0
         stopScan()
@@ -722,8 +736,8 @@ extension FlipperBLE: CBCentralManagerDelegate {
 
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral,
                         error: Error?) {
-        flushTxQueue()   // resume any in-flight upload waiters
-        appBridge.failAll(.disconnected)   // fail any pending FAB2 requests once
+        guard peripheral === self.peripheral else { return }
+        clearDiscoveredCharacteristics() // BLE-queue cleanup, never delayed past a new connect
         let cause = Self.connectionErrorSummary(error)
         // Auto-reconnect on an unexpected drop (out of range, Flipper slept, etc.).
         // Keep-alive reconnects forever; otherwise we give up after maxReconnectAttempts.
@@ -733,9 +747,6 @@ extension FlipperBLE: CBCentralManagerDelegate {
             blelog.notice("unexpected disconnect, cause=\(cause, privacy: .public), reconnect attempt \(self.reconnectAttempts)\(self.keepAlive ? " (keep-alive)" : "")")
             DispatchQueue.main.async {
                 self.state = .connecting
-                self.supportsAppBridge = false
-                self.rxChar = nil; self.txChar = nil
-                self.bridgeCmdChar = nil; self.bridgeEvtChar = nil
             }
             if let p = central.retrievePeripherals(withIdentifiers: [want]).first {
                 // Keep-alive: reissue the standing connect immediately while the app is
@@ -755,9 +766,6 @@ extension FlipperBLE: CBCentralManagerDelegate {
         DispatchQueue.main.async {
             self.state = .disconnected
             self.connectedName = nil
-            self.supportsAppBridge = false
-            self.rxChar = nil; self.txChar = nil
-            self.bridgeCmdChar = nil; self.bridgeEvtChar = nil
         }
     }
 
@@ -823,6 +831,7 @@ extension FlipperBLE: CBCentralManagerDelegate {
 // MARK: - CBPeripheralDelegate
 extension FlipperBLE: CBPeripheralDelegate {
     func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
+        guard peripheral === self.peripheral, peripheral.state == .connected, error == nil else { return }
         for service in peripheral.services ?? [] {
             switch service.uuid {
             case FlipperUUID.serialService:
@@ -843,14 +852,18 @@ extension FlipperBLE: CBPeripheralDelegate {
 
     func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService,
                     error: Error?) {
+        guard peripheral === self.peripheral, peripheral.state == .connected, error == nil else { return }
         for c in service.characteristics ?? [] {
             switch c.uuid {
             case FlipperUUID.serialTx:
                 txChar = c
+                readiness.hasSerialTX = c.properties.contains(.notify)
                 peripheral.setNotifyValue(true, for: c)
             case FlipperUUID.serialRx:
                 rxChar = c
+                readiness.hasSerialRX = c.properties.contains(.writeWithoutResponse)
             case FlipperUUID.serialFlow:
+                readiness.hasSerialFlow = c.properties.contains(.notify)
                 // Subscribe to flow-control credit updates (buffer-empty refills).
                 peripheral.setNotifyValue(true, for: c)
             case FlipperUUID.appBridgeEvents:
@@ -858,6 +871,7 @@ extension FlipperBLE: CBPeripheralDelegate {
                 peripheral.setNotifyValue(true, for: c)
             case FlipperUUID.appBridgeCommands:
                 bridgeCmdChar = c
+                readiness.hasBridgeCommand = c.properties.contains(.write)
             case FlipperUUID.batteryLevel:
                 peripheral.setNotifyValue(true, for: c)
                 peripheral.readValue(for: c)
@@ -865,23 +879,57 @@ extension FlipperBLE: CBPeripheralDelegate {
                 break
             }
         }
-        if rxChar != nil && txChar != nil {
+        advanceReadiness()
+    }
+
+    func peripheral(_ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic,
+                    error: Error?) {
+        guard peripheral === self.peripheral, peripheral.state == .connected else { return }
+        let notifying = error == nil && characteristic.isNotifying
+        switch characteristic.uuid {
+        case FlipperUUID.serialTx where characteristic === txChar:
+            readiness.serialTXNotifying = notifying
+        case FlipperUUID.serialFlow:
+            guard characteristic.service?.peripheral === peripheral else { return }
+            readiness.serialFlowNotifying = notifying
+        case FlipperUUID.appBridgeEvents where characteristic === bridgeEvtChar:
+            readiness.bridgeNotifying = notifying
+        default: return
+        }
+        if error != nil { blelog.error("BLE subscription failed: \(characteristic.uuid.uuidString, privacy: .public)") }
+        if !readiness.serialReady {
+            DispatchQueue.main.async { if self.state == .ready { self.state = .connected } }
+            armReadyWatchdog(for: peripheral)
+        }
+        advanceReadiness()
+    }
+
+    private func advanceReadiness() {
+        if readiness.takeSerialReady() {
             readyGen &+= 1   // reached app-level readiness → disarm the ready watchdog
-            blelog.notice("RPC ready; appBridge=\(self.bridgeEvtChar != nil, privacy: .public)")
+            blelog.notice("BLE serial notifications confirmed")
             // Buffer starts empty → we may send a full RX buffer before the first
             // flow-control notification. (Don't READ the initial value: it can be
             // stale-high and over-credit us mid-stream.)
             txItems.removeAll(); txOffset = 0; txCredit = serialRxBuffer
-            DispatchQueue.main.async { self.appBridgeV2 = false; self.appBridgeCapabilities = [:]; self.state = .ready } // re-negotiate each connect
-            if bridgeCmdChar != nil { probeAppBridgeV2() }
+            let sessionID = gattSessionID
+            DispatchQueue.main.async {
+                self.activeSessionID = sessionID
+                self.state = .ready
+            }
         }
+        // The bridge service may be discovered AFTER serial, or its notification
+        // acknowledgement may arrive later. Neither case may reset serial credit.
+        if readiness.takeBridgeProbe() { probeAppBridgeV2() }
     }
 
     func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic,
                     error: Error?) {
+        guard peripheral === self.peripheral, peripheral.state == .connected, error == nil else { return }
         guard let data = characteristic.value else { return }
         switch characteristic.uuid {
         case FlipperUUID.serialTx:
+            guard characteristic === txChar, readiness.serialReady else { return }
             if buddyDetectionEnabled && (
                 serialRouteOwner == .claudeBuddy || Self.looksLikeBuddyFrame(data)
             ) {
@@ -890,7 +938,7 @@ extension FlipperBLE: CBPeripheralDelegate {
                 }
                 buddySerialIn.send(data)
             } else {
-                serialIn.send(data)
+                serialIn.send(BLESerialPacket(data: data, sessionID: gattSessionID))
             }
         case FlipperUUID.serialFlow:
             // Flipper freed its RX buffer → refill our send credit and continue.

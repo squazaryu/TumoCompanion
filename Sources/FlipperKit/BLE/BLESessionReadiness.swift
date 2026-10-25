@@ -1,5 +1,10 @@
 import Foundation
 
+struct BLESerialPacket {
+    let data: Data
+    let sessionID: UUID
+}
+
 /// Queue-confined evidence for ONE GATT session. Discovery is not subscription
 /// confirmation. Taking either transition is idempotent across service callbacks.
 struct BLESessionReadiness {
@@ -19,7 +24,8 @@ struct BLESessionReadiness {
     }
 
     mutating func takeSerialReady() -> Bool {
-        guard serialReady, !publishedSerialReady else { return false }
+        guard serialReady else { publishedSerialReady = false; return false }
+        guard !publishedSerialReady else { return false }
         publishedSerialReady = true
         return true
     }

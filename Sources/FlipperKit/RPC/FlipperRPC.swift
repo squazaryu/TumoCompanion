@@ -36,6 +36,15 @@ final class RPCCommandGate: @unchecked Sendable {
     private var held = false
     private var waiters: [CheckedContinuation<Void, Never>] = []
 
+    /// Health checks must yield immediately to a transfer, including queued work.
+    func tryAcquire() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !held, waiters.isEmpty else { return false }
+        held = true
+        return true
+    }
+
     func acquire() async {
         await withCheckedContinuation { continuation in
             lock.lock()
@@ -75,8 +84,10 @@ final class FlipperRPC: ObservableObject {
     let ble: FlipperBLE
     /// Unsolicited frames (command_id == 0): screen frames, desktop status, etc.
     let unsolicited = PassthroughSubject<PB_Main, Never>()
+    let validTraffic = PassthroughSubject<UUID, Never>()
 
     private var rxBuffer = Data()
+    private var rxSessionID: UUID?
     private var nextCommandID: UInt32 = 1
     private let lock = NSLock()
     private let commandGate = RPCCommandGate()
@@ -94,8 +105,8 @@ final class FlipperRPC: ObservableObject {
 
     init(ble: FlipperBLE = .shared) {
         self.ble = ble
-        cancellable = ble.serialIn.sink { [weak self] data in
-            self?.ingest(data)
+        cancellable = ble.serialIn.sink { [weak self] packet in
+            self?.ingest(packet)
         }
         // Fail in-flight requests immediately on disconnect instead of letting
         // them hang until their timeout.
@@ -116,11 +127,58 @@ final class FlipperRPC: ObservableObject {
         let waiters = pending
         pending.removeAll()
         rxBuffer.removeAll()
+        rxSessionID = nil
         lock.unlock()
         for (_, p) in waiters { p.continuation.resume(throwing: error) }
     }
 
     // MARK: - Sending
+
+    /// A bounded, correlated ping, admitted only when the complete RPC gate is
+    /// idle. It never queues behind or interrupts an installation. Once sent,
+    /// cancellation leaves the permit held until reply/4s deadline so another
+    /// command cannot overtake an in-flight ping during a scene transition.
+    func probeConnectionIfIdle() async throws -> ConnectionProbeResult {
+        guard ble.state == .ready, ble.serialOwner == .rpc else { return .unavailable }
+        guard commandGate.tryAcquire() else { return .busy }
+        defer { commandGate.release() }
+        try Task.checkCancellation()
+        lock.lock()
+        let id = nextCommandID
+        nextCommandID &+= 1
+        if nextCommandID == 0 { nextCommandID = 1 }
+        lock.unlock()
+
+        let nonce = Data(UUID().uuidString.utf8)
+        var request = PB_Main()
+        request.commandID = id
+        var ping = PBSystem_PingRequest()
+        ping.data = nonce
+        request.content = .systemPingRequest(ping)
+        let bytes = try Self.delimited(request)
+        let deadline = DispatchWorkItem { [weak self] in
+            self?.failPending(id: id, error: FlipperRPCError.timeout)
+        }
+        defer { deadline.cancel() }
+        let responses: [PB_Main] = try await withCheckedThrowingContinuation { continuation in
+            lock.lock()
+            pending[id] = Pending(readBudget: RPCReadBudget(maximumBytes: 1024), continuation: continuation)
+            lock.unlock()
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 4, execute: deadline)
+            ble.writeSerial(bytes)
+        }
+        guard responses.count == 1, responses[0].commandStatus == .ok,
+              case .systemPingResponse(let pong) = responses[0].content,
+              pong.data == nonce else { throw FlipperRPCError.decode }
+        return .verified
+    }
+
+    private func failPending(id: UInt32, error: Error) {
+        lock.lock()
+        let waiter = pending.removeValue(forKey: id)
+        lock.unlock()
+        waiter?.continuation.resume(throwing: error)
+    }
 
     /// Build and send a command, returning every response frame until the
     /// Flipper signals `has_next == false`. The closure receives a Main with a
@@ -277,9 +335,10 @@ final class FlipperRPC: ObservableObject {
 
     // MARK: - Receiving
 
-    private func ingest(_ data: Data) {
+    private func ingest(_ packet: BLESerialPacket) {
         lock.lock()
-        rxBuffer.append(data)
+        if rxSessionID != packet.sessionID { rxBuffer.removeAll(); rxSessionID = packet.sessionID }
+        rxBuffer.append(packet.data)
         var frames: [PB_Main] = []
         while true {
             guard let (length, headerLen) = Self.readVarint(rxBuffer) else { break }
@@ -335,6 +394,8 @@ final class FlipperRPC: ObservableObject {
             }
         }
         lock.unlock()
+
+        if !frames.isEmpty { validTraffic.send(packet.sessionID) }
 
         for (p, value, error) in toResolve {
             if let error = error { p.continuation.resume(throwing: error) }

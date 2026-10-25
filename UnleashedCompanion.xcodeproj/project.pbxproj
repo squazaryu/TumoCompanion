@@ -172,6 +172,7 @@
 		C7EC549D7971B7FAAD3279A1 /* WiFiMapperEstimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F64FBF61D7D7605A7E126464 /* WiFiMapperEstimator.swift */; };
 		C7FE437577F2D7FE7C0CA9B2 /* AIRadar.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63F806FD448DEEBDC97DC1B /* AIRadar.swift */; };
 		C853BACB2CE740243CB30F57 /* TumoSurveySessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74A081B20A8CD41C0AB51069 /* TumoSurveySessionTests.swift */; };
+		C8DA24FE8BB820E7094AE4B4 /* ConnectionMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAA5FB3F56BD340788D176F4 /* ConnectionMonitor.swift */; };
 		C9BA4C5BB222941D1B3C3FA9 /* FapMetadataTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98F04DB6042C632AC1B52D91 /* FapMetadataTests.swift */; };
 		C9CDBD1B0D3457D904744A5C /* AcceptanceSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4812E884A369FADCC75861AE /* AcceptanceSummary.swift */; };
 		CA7AA395FCBEA0A8A6283DB1 /* ScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E6D8B0369156C577A846FC0 /* ScreenView.swift */; };
@@ -446,6 +447,7 @@
 		C45488972BD725C3ECE8BDA8 /* MacBridgeDiscovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacBridgeDiscovery.swift; sourceTree = "<group>"; };
 		C6F24142729978361986A6C2 /* AIRadarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIRadarView.swift; sourceTree = "<group>"; };
 		C823E47E64B2DF1022C4964B /* MarauderLiveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarauderLiveView.swift; sourceTree = "<group>"; };
+		CAA5FB3F56BD340788D176F4 /* ConnectionMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionMonitor.swift; sourceTree = "<group>"; };
 		CAC4D255962F3DE6272FFC3B /* AsyncStateComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AsyncStateComponents.swift; sourceTree = "<group>"; };
 		CBA5FCA0F80809900471F32E /* PluginUpdateMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginUpdateMonitor.swift; sourceTree = "<group>"; };
 		CC55E01E623BEF12E94B15DA /* DolphinPreviews */ = {isa = PBXFileReference; lastKnownFileType = folder; name = DolphinPreviews; path = Resources/DolphinPreviews; sourceTree = SOURCE_ROOT; };
@@ -776,6 +778,7 @@
 				296A7D30A6C58A754FF6B5E5 /* AppBridgeRequest.swift */,
 				4A2AD17C4B42A37C8951AA5E /* BLESessionReadiness.swift */,
 				5A2D71355CD8F8159A7F08ED /* ConnectionEvidence.swift */,
+				CAA5FB3F56BD340788D176F4 /* ConnectionMonitor.swift */,
 				56CC0246CF934A5E59B02502 /* FlipperBLE.swift */,
 				9D7F2E9465545B42943BBBE2 /* RuntimeDiagnostics.swift */,
 				BE4449AEEFC4858417F6F97A /* TumoFabric.swift */,
@@ -1348,6 +1351,7 @@
 				6D5E2E66502E9832B6670D9D /* CatalogListView.swift in Sources */,
 				3E3E586D830439E2A9A3C8F9 /* CompanionBridge.swift in Sources */,
 				CD886282119506575601F39B /* ConnectionEvidence.swift in Sources */,
+				C8DA24FE8BB820E7094AE4B4 /* ConnectionMonitor.swift in Sources */,
 				D1F9B1FCB9746D60A07E5702 /* CustomizeHomeView.swift in Sources */,
 				4E7FA0C44894AAF123F151F1 /* DeviceInfoView.swift in Sources */,
 				C25AAD849847AC8C673B9462 /* DeviceServiceCoordinator.swift in Sources */,
