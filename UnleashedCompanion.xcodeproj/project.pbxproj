@@ -78,6 +78,7 @@
 		50436CE794BC67AC3CA055FC /* UnleashedApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5384B4D1A11BD66FA2E57DD /* UnleashedApp.swift */; };
 		50FBBB4D678B5A086581A1CA /* DolphinGalleryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BED9B32FBAF32014BF4E49E /* DolphinGalleryView.swift */; };
 		53CB5CFA2958BBC762C9260C /* FlipperStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = F38957D3A41ABA4105DA1783 /* FlipperStorage.swift */; };
+		542542DC605B167B83ADE8CE /* ConnectionStatusUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35AD6DF165DCB025AEBDA6FA /* ConnectionStatusUITests.swift */; };
 		5441B6081BFE2F6A4CCD4970 /* FlipperRPC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67C0B0C4BD832B6A0C849C3A /* FlipperRPC.swift */; };
 		54AD23ED5234F284C394FF85 /* TumoFabric.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE4449AEEFC4858417F6F97A /* TumoFabric.swift */; };
 		558EF6327C3F312D4C1A26B7 /* MarauderLiveAggregationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F246F25BA68E90EAD73408E /* MarauderLiveAggregationTests.swift */; };
@@ -319,6 +320,7 @@
 		3443A5546515DB6C6D192059 /* WiFiMapperGeoJSONTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WiFiMapperGeoJSONTests.swift; sourceTree = "<group>"; };
 		34BC23F6FD22122831005AA0 /* PluginSelectionPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginSelectionPolicyTests.swift; sourceTree = "<group>"; };
 		35183991A8FB5B0949565493 /* ESP32FlashPackageMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ESP32FlashPackageMonitor.swift; sourceTree = "<group>"; };
+		35AD6DF165DCB025AEBDA6FA /* ConnectionStatusUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionStatusUITests.swift; sourceTree = "<group>"; };
 		37B6865ED8766C019F36D4E5 /* application.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = application.pb.swift; sourceTree = "<group>"; };
 		381F674E5A1903409E33517D /* SourceRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceRow.swift; sourceTree = "<group>"; };
 		3845B43332146E5BCD2D94F5 /* UpdateAssistantModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateAssistantModelTests.swift; sourceTree = "<group>"; };
@@ -562,6 +564,7 @@
 		1A5A957AFCF284436C396F83 /* UITests */ = {
 			isa = PBXGroup;
 			children = (
+				35AD6DF165DCB025AEBDA6FA /* ConnectionStatusUITests.swift */,
 				24AE55444A9A10FFD0C9F3C5 /* DeviceServicesUITests.swift */,
 				FCB5C504F3756F796BB35073 /* DolphinGalleryUITests.swift */,
 				02FBA7705F3270054F81BF98 /* LiveDeckHomeUITests.swift */,
@@ -1321,6 +1324,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				542542DC605B167B83ADE8CE /* ConnectionStatusUITests.swift in Sources */,
 				255DDC35E88194CCE38D71CB /* DeviceServicesUITests.swift in Sources */,
 				B384864F1C44B833958723B0 /* DolphinGalleryUITests.swift in Sources */,
 				D4F22DB15550D7B88E3D4FE3 /* LiveDeckHomeUITests.swift in Sources */,
