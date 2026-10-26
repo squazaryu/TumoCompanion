@@ -1,5 +1,5 @@
 {
-  "release_tag": "23oct2026",
+  "release_tag": "25oct2026",
   "stems": {
     "24cxxprog": "Programmers",
     "4inrow": "Board",
@@ -242,6 +242,7 @@
     "proto_pirate": "Sub-GHz",
     "protoview": "Analyzers",
     "pulse_bpm": "Timers",
+    "pwnpal": "ESP32",
     "qrcode": "Tools",
     "quac": "Tools",
     "quadrastic": "Arcade",
