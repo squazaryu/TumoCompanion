@@ -71,6 +71,22 @@ for (api, origin, target, shouldBlock) in libraryCases {
 let mixed = ManagedPackageRequirements.blocked(targets: [libraryTarget, bleTarget], originFork: "tumoflip", firmwareAPI: "88.5", hardwareTarget: 7)
 if mixed[libraryTarget] != nil || mixed[bleTarget] == nil { failures += 1 }
 print("Including Device Library protection/compatibility failures: \(failures)")
+let fieldTargets = ["/ext/apps/Tools/field_tools.fap", "/ext/apps/NFC/tumo_nfc_sniffer.fap"]
+for path in fieldTargets + ["/EXT/APPS/NFC/NFC_SNIFFER.FAP"] {
+    if !PluginProtectionPolicy.isProtected(name: "renamed_entry", remotePath: path,
+        excluded: PluginUpdater.builtInExcluded, unprotectedBuiltIns: []) { failures += 1 }
+}
+for path in fieldTargets {
+    for (api, fork, hardware, blocked) in [
+        ("88.22", "tumoflip", 7, true), ("88.23", "tumoflip", 7, false),
+        ("88.24", "Tumoflip", 7, false), ("88.23", "unleashed", 7, true),
+        ("88.23", "tumoflip", 18, true), ("88.bad", "tumoflip", 7, true)] {
+        let result = ManagedPackageRequirements.blocked(targets: [path], originFork: fork,
+            firmwareAPI: api, hardwareTarget: hardware)
+        if (result[path] != nil) != blocked { failures += 1 }
+    }
+}
+print("Including Field Kit protection/compatibility failures: \(failures)")
 exit(failures == 0 ? 0 : 1)
 '''
 with tempfile.TemporaryDirectory(prefix="specter-policy-") as directory:

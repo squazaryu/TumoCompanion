@@ -2,6 +2,17 @@ import XCTest
 @testable import UnleashedCompanion
 
 final class ManagedPackageRequirementsTests: XCTestCase {
+    func testFieldKitRequiresTheOwnedForkAndNewResourceReservationAPI() {
+        for path in ["/ext/apps/Tools/field_tools.fap", "/ext/apps/NFC/tumo_nfc_sniffer.fap"] {
+            for (fork, api, target) in [("tumoflip", "88.22", 7), ("unleashed", "88.23", 7),
+                                        ("tumoflip", "88.23", 18)] {
+                XCTAssertNotNil(ManagedPackageRequirements.blocked(targets: [path], originFork: fork,
+                    firmwareAPI: api, hardwareTarget: target)[path])
+            }
+            XCTAssertTrue(ManagedPackageRequirements.blocked(targets: [path], originFork: "Tumoflip",
+                firmwareAPI: "88.23", hardwareTarget: 7).isEmpty)
+        }
+    }
     private let target = "/ext/apps/Bluetooth/hid_ble.fap"
 
     func testDeviceLibraryRequiresItsExportWithoutRaisingOtherRequirements() {
