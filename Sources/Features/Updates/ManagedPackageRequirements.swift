@@ -26,6 +26,10 @@ enum ManagedPackageRequirements {
                 requirement = ("Bluetooth Remote", 11)
             case "device_library.fap":
                 requirement = ("Device Library", 5)
+            case "field_tools.fap":
+                requirement = ("Field Tools", 23)
+            case "tumo_nfc_sniffer.fap":
+                requirement = ("Passive NFC Sniffer", 23)
             default:
                 continue
             }
