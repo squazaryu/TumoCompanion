@@ -1569,6 +1569,7 @@ final class PluginUpdater: ObservableObject {
         "esp_flasher",
         "esp32_wifi_marauder",
         "field_logger",
+        "field_tools",
         "flipper_companion",
         "flipper_relay",
         "flipper_xremote",
@@ -1582,6 +1583,7 @@ final class PluginUpdater: ObservableObject {
         // keep the Community Pack copy from overwriting the package-owned route.
         "nearby_files",
         "nfc_ccid_bridge",
+        "nfc_sniffer",
         "protocol_compiler",
         "proto_pirate",
         "quac",
@@ -1598,6 +1600,7 @@ final class PluginUpdater: ObservableObject {
         "tumo_acceptance_suite",
         "tumo_ir_lab",
         "tumo_macro_deck",
+        "tumo_nfc_sniffer",
         "tumocard_os",
         "tumofabric_node",
         "tumoflip_xremote",
