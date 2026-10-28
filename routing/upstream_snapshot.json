@@ -1,5 +1,5 @@
 {
-  "release_tag": "25oct2026",
+  "release_tag": "27oct2026",
   "stems": {
     "24cxxprog": "Programmers",
     "4inrow": "Board",
@@ -340,6 +340,7 @@
     "usb_midi": "Instruments",
     "usping": "GPIO",
     "vario": "Sensors",
+    "varta": "RFID",
     "vb_migrate": "Gaming",
     "vgm_air_mouse": "VGM",
     "video_game_module_console": "VGM",
