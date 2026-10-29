@@ -1,14 +1,6 @@
 import Foundation
 import Combine
 
-struct FlipperFile: Identifiable, Equatable {
-    var id: String { path }
-    let name: String
-    let path: String
-    let isDirectory: Bool
-    let size: UInt32
-}
-
 struct UploadProgress: Equatable {
     var currentFile: String = ""
     var filesDone: Int = 0
