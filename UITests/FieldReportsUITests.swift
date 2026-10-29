@@ -10,6 +10,7 @@ final class FieldReportsUITests: XCTestCase {
         session.tap()
         XCTAssertTrue(app.staticTexts["SESSION HISTORY"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Objects · Garage"].exists)
+        XCTAssertTrue(app.staticTexts["sensors_123_0.csv"].exists)
         let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         shot.name = "Field Reports Sensor Watch"; shot.lifetime = .keepAlways; add(shot)
         for _ in 0..<8 where !app.buttons["field-report-export"].isHittable { app.swipeUp() }

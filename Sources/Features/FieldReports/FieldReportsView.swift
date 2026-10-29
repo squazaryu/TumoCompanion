@@ -135,7 +135,9 @@ struct FieldReportDetailView: View {
                 Text(snapshot.document.kind == .uhf ? "observed EPCs" : "observations").foregroundStyle(.secondary)
                 Spacer(minLength: 0)
             }
-            Text(file.name).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+            Label(snapshot.file.name, systemImage: "doc.text")
+                .font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                .accessibilityIdentifier("field-report-source-file")
             if !snapshot.document.objects.isEmpty {
                 Text("Objects · " + snapshot.document.objects.joined(separator: ", ")).font(.subheadline)
             } else {
