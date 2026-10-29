@@ -64,6 +64,7 @@ struct DevicesView: View {
         case .airadar:       AIRadarView()
         case .wifi:          TumoSurveyView()
         case .fieldServices: FieldServicesView()
+        case .fieldReports: FieldReportsView()
         case .spectrum:      TumoSpectrumView()
         case .relay:         BridgeView()
         case .tumonet:       TumoNetView()

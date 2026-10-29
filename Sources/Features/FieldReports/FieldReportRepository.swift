@@ -37,7 +37,10 @@ struct FieldReportRepository {
         return Array(found.values.sorted {
             let left = UInt32($0.name.split(separator: "_")[1]) ?? 0
             let right = UInt32($1.name.split(separator: "_")[1]) ?? 0
-            return left == right ? $0.name > $1.name : left > right
+            if left != right { return left > right }
+            let leftRevision = UInt8($0.name.dropLast(4).split(separator: "_")[2]) ?? 0
+            let rightRevision = UInt8($1.name.dropLast(4).split(separator: "_")[2]) ?? 0
+            return leftRevision == rightRevision ? $0.name > $1.name : leftRevision > rightRevision
         }.prefix(256))
     }
 

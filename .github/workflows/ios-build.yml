@@ -35,6 +35,8 @@ jobs:
         run: python3 scripts/test_ble_gatt_contract_host.py
       - name: Verify explicit finite preview height policy
         run: python3 scripts/test_console_preview_metrics_host.py
+      - name: Verify bounded read-only field reports
+        run: python3 scripts/test_field_reports_host.py
       - name: Build unsigned IPA
         run: scripts/build_ipa.sh
 
@@ -77,6 +79,8 @@ jobs:
             -only-testing:UnleashedTests/ConnectionMonitorTests \
             -only-testing:UnleashedTests/RPCConnectionProbeTests \
             -only-testing:UnleashedTests/ProtocolTests \
+            -only-testing:UnleashedTests/FieldReportTests \
+            -only-testing:UnleashedUITests/FieldReportsUITests \
             -only-testing:UnleashedUITests/ConnectionStatusUITests \
             -only-testing:UnleashedTests/ESP32InstallerZIPTests \
             -only-testing:UnleashedTests/ESP32UpdaterTests \

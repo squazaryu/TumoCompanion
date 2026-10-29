@@ -93,6 +93,10 @@ struct RootView: View {
                                    fixture: ProductPreviewFixtures.waveformA,
                                    fixtureB: ProductPreviewFixtures.waveformB)
             }.preferredColorScheme(.dark)
+        } else if ProcessInfo.processInfo.arguments.contains("-field-reports-qa") {
+            NavigationStack { FieldReportsView(repository: .init(reader: FieldReportFixtureReader())) }
+                .preferredColorScheme(.dark)
+                .dynamicTypeSize(ProcessInfo.processInfo.arguments.contains("-field-reports-large-qa") ? .accessibility3 : .large)
         } else if ProcessInfo.processInfo.arguments.contains("-update-assistant-qa") {
             NavigationStack { UpdateAssistantView(fixture: true) }.preferredColorScheme(.dark)
         } else if ProcessInfo.processInfo.arguments.contains("-remote-id-qa") {
