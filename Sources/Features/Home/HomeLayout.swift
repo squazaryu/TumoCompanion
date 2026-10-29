@@ -2,7 +2,7 @@ import SwiftUI
 
 /// A destination that can live as a tile on the Home screen (and double as a deep-link route).
 enum HomeTileID: String, Codable, CaseIterable, Identifiable, Hashable {
-    case info, apps, files, airadar, wifi, fieldServices, spectrum, relay, tumonet, esp32, updates, backup, remotes, media, screen
+    case info, apps, files, airadar, wifi, fieldServices, spectrum, relay, tumonet, esp32, updates, backup, remotes, media, screen, fieldReports
     // Source-specific routes live in the Home navigation stack but are not
     // configurable dashboard tiles.
     case firmware, packages, communityApps
@@ -16,6 +16,7 @@ enum HomeTileID: String, Codable, CaseIterable, Identifiable, Hashable {
         case .airadar: return "AI Radar"
         case .wifi:    return "TumoSurvey"
         case .fieldServices: return "Field Services"
+        case .fieldReports: return "Field Reports"
         case .spectrum: return "TumoSpectrum"
         case .relay:   return "Relay"
         case .tumonet: return "TumoNet"
@@ -39,6 +40,7 @@ enum HomeTileID: String, Codable, CaseIterable, Identifiable, Hashable {
         case .airadar: return "chart.bar.xaxis"
         case .wifi:    return "wifi"
         case .fieldServices: return "location.viewfinder"
+        case .fieldReports: return "chart.xyaxis.line"
         case .spectrum: return "waveform.path.ecg"
         case .relay:   return "antenna.radiowaves.left.and.right"
         case .tumonet: return "point.3.connected.trianglepath.dotted"
@@ -62,6 +64,7 @@ enum HomeTileID: String, Codable, CaseIterable, Identifiable, Hashable {
         case .airadar: return Theme.success
         case .wifi:    return Theme.mint
         case .fieldServices: return Theme.info
+        case .fieldReports: return Theme.accent
         case .spectrum: return Theme.accent
         case .relay:   return Theme.danger
         case .tumonet: return Theme.accent
@@ -98,6 +101,7 @@ struct HomeToolSpec: Identifiable {
 enum HomeToolCatalog {
     static let all: [HomeToolSpec] = [
         .init(id: .fieldServices, title: "Field Services", systemImage: "iphone.and.arrow.forward", tint: Theme.info),
+        .init(id: .fieldReports, title: "Field Reports", systemImage: "chart.xyaxis.line", tint: Theme.accent),
         .init(id: .wifi, title: "WiFi Survey", systemImage: "wifi", tint: Theme.teal),
         .init(id: .airadar, title: "AI Radar", systemImage: "dot.radiowaves.left.and.right", tint: Theme.purple),
         .init(id: .spectrum, title: "Spectrum", systemImage: "waveform.path.ecg", tint: Theme.accent),

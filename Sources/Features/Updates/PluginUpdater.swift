@@ -118,6 +118,7 @@ enum PluginProtectionPolicy {
         ("/ext/apps_data/totp/", "totp"),
         ("/ext/apps_data/hid_ble/", "hid_ble"),
         ("/ext/apps_data/device_library/", "device_library"),
+        ("/ext/apps_data/archive/plugins/", "archive_favorites"),
     ]
 
     static func protectionKeys(name: String, remotePath: String) -> Set<String> {
@@ -1552,6 +1553,7 @@ final class PluginUpdater: ObservableObject {
     private let repo = "xMasterX/all-the-plugins"
     private static let excludedKey = "pluginExcluded"
     static let builtInExcluded: Set<String> = [
+        "archive_favorites",
         "ai_dashboard",
         "app_bridge_terminal",
         "arf_car_emulate",
@@ -1615,6 +1617,7 @@ final class PluginUpdater: ObservableObject {
         "tumovgm_bridge",
         "tumovm_peripherals",
         "tumovm_poc",
+        "usb_cdrom",
         "usb_sd_mode",
         "wifi_map",
         "wifi_mapper",
