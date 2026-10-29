@@ -14,6 +14,7 @@ precondition(sensor.objects == ["Garage"] && sensor.series(column: "temp_tenths"
 precondition(sensor.series(column: "temp_tenths").first?.value == -19.8)
 let uhf = try document(.uhf, "E2000017221101441890ABCD,12288,1,4,123,128,98,45\n")
 precondition(uhf.rows.count == 1)
+precondition(FieldReportKind.uhf.header.joined(separator: ",") == "epc,pc,antenna,hits,first,last,signal_raw,frequency_raw")
 let varta = try document(.varta, "live,123456789A,32,1,0,0,0,0\n")
 precondition(varta.rows.count == 1 && varta.objects.isEmpty)
 for kind in FieldReportKind.allCases {
@@ -35,5 +36,6 @@ rejects { _ = try document(.uhf, "E200,12288,1,1,10,20,98,45\n") }
 rejects { _ = try document(.uhf, "ZZZZ,2048,1,1,10,20,98,45\n") }
 rejects { _ = try document(.varta, "live,123456789A,32,1,0,1,0,0\n") }
 rejects { _ = try FieldReportDocument.parse(Data("wrong\n1\n".utf8), kind: .power) }
-precondition(try document(.power, "123,50,4000,20,250,90000,0,0,99\r\n").rows.count == 1)
+let crlf = try document(.power, "123,50,4000,20,250,90000,0,0,99\r\n")
+precondition(crlf.rows.count == 1)
 print("Field reports: schema, paths, bounds, missing values and unit conversion verified")
