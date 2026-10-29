@@ -7,7 +7,13 @@ actor Reader: FieldReportReading {
     let data = Data("source,id,clock,known_prefix,config_present,config_match,marker_present,marker_match\nlive,123456789A,32,1,0,0,0,0\n".utf8)
     func set(_ value: Int) { mode = value; reads = 0 }
     func list(_ path: String) async throws -> [FlipperFile] {
-        [FlipperFile(name: "varta_123_0.csv", path: path + "/varta_123_0.csv", isDirectory: false, size: UInt32(data.count)),
+        if mode == 5 {
+            return (0..<32).map { i in
+                let name = "varta_123_\(i).csv"
+                return FlipperFile(name: name, path: path + "/" + name, isDirectory: false, size: UInt32(data.count))
+            }
+        }
+        return [FlipperFile(name: "varta_123_0.csv", path: path + "/varta_123_0.csv", isDirectory: false, size: UInt32(data.count)),
          FlipperFile(name: "varta_124_0.csv", path: "/ext/subghz/own.sub", isDirectory: false, size: 4)]
     }
     func read(_ path: String, maximumBytes: Int) async throws -> Data {
@@ -40,6 +46,9 @@ actor Reader: FieldReportReading {
         } catch {}
         let readCount = await reader.reads
         precondition(readCount == 0)
+        await reader.set(5)
+        let ordered = try await subject.index()
+        precondition(ordered.count == 32 && ordered.first?.name == "varta_123_31.csv" && ordered.last?.name == "varta_123_0.csv")
         print("Field report repository: bounded reads, path confinement, checksums and cancellation verified")
     }
 }
