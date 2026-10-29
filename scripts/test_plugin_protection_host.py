@@ -14,7 +14,7 @@ requirements_path = ROOT / "Sources/Features/Updates/ManagedPackageRequirements.
 requirements = requirements_path.read_text() if requirements_path.exists() else ""
 program = "import Foundation\n" + policy + "\nenum PluginRouteReconciliation {\n" + identity + "\n}\nenum PluginUpdater {\n" + builtins + "\n}\n" + requirements + r'''
 var failures = 0
-for (name, path) in [("specter", "/ext/apps/NFC/specter.fap"), ("SPECTER", "/EXT/APPS/NFC/SPECTER.FAP"), ("renamed_entry", "/ext/apps/NFC/Specter.fap")] {
+for (name, path) in [("specter", "/ext/apps/NFC/specter.fap"), ("SPECTER", "/EXT/APPS/NFC/SPECTER.FAP"), ("renamed_entry", "/ext/apps/NFC/Specter.fap"), ("renamed_cd", "/ext/apps/USB/usb_cdrom.fap"), ("usb_cdrom", "/EXT/APPS_DATA/USB_CDROM/own.iso")] {
     if !PluginProtectionPolicy.isProtected(name: name, remotePath: path, excluded: PluginUpdater.builtInExcluded, unprotectedBuiltIns: []) { failures += 1 }
 }
 if PluginProtectionPolicy.isProtected(name: "specter", remotePath: "/ext/apps/NFC/specter.fap", excluded: PluginUpdater.builtInExcluded, unprotectedBuiltIns: ["specter"]) { failures += 1 }
