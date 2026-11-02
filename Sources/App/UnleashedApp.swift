@@ -95,7 +95,7 @@ struct RootView: View {
             }.preferredColorScheme(.dark)
         } else if ProcessInfo.processInfo.arguments.contains("-field-reports-qa") {
             NavigationStack { FieldReportsView(repository: .init(reader: FieldReportFixtureReader())) }
-                .preferredColorScheme(.dark)
+                .preferredColorScheme(ProcessInfo.processInfo.arguments.contains("-field-reports-light-qa") ? .light : .dark)
                 .dynamicTypeSize(ProcessInfo.processInfo.arguments.contains("-field-reports-large-qa") ? .accessibility3 : .large)
         } else if ProcessInfo.processInfo.arguments.contains("-update-assistant-qa") {
             NavigationStack { UpdateAssistantView(fixture: true) }.preferredColorScheme(.dark)
