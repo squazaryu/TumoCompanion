@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.11.32",
-      "versionDate": "2026-10-26",
-      "versionDescription": "Protects managed Field Tools and Passive NFC Sniffer from Community Pack replacement and requires Tumoflip F7 API 88.23 for these apps. Existing app requirements, Home layout and BLE monitoring are unchanged. Install matching firmware before new Field Kit packages. No pairing reset or data migration; verify About shows 1.11.32 (285). Physical acceptance remains pending.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.32/TumoCompanion-unsigned.ipa",
-      "size": 25955738,
+      "version": "1.11.33",
+      "versionDate": "2026-11-02",
+      "versionDescription": "Adds verified read-only Sensor Watch, Power Journal, UHF and Varta reports with graphs and CSV export. Protects managed USB CD-ROM and archive/favorites resources from Community Pack replacement. Tested on iOS 27 in both themes and large text. No BLE behavior change, pairing reset or idle-OOM fix claim. Install iOS 1.11.33 (286), Tumoflip Dev009-034 with native resources, then FW Packages Dev031 Base. Physical acceptance remains pending.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.33/TumoCompanion-unsigned.ipa",
+      "size": 26048770,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.11.33",
+          "date": "2026-11-02",
+          "localizedDescription": "Adds verified read-only Sensor Watch, Power Journal, UHF and Varta reports with graphs and CSV export. Protects managed USB CD-ROM and archive/favorites resources from Community Pack replacement. Tested on iOS 27 in both themes and large text. No BLE behavior change, pairing reset or idle-OOM fix claim. Install iOS 1.11.33 (286), Tumoflip Dev009-034 with native resources, then FW Packages Dev031 Base. Physical acceptance remains pending.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.33/TumoCompanion-unsigned.ipa",
+          "size": 26048770,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.11.32",
           "date": "2026-10-26",
