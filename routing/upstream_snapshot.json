@@ -1,5 +1,5 @@
 {
-  "release_tag": "2nov2026p2",
+  "release_tag": "4nov2026",
   "stems": {
     "24cxxprog": "Programmers",
     "4inrow": "Board",
@@ -291,6 +291,7 @@
     "spectrum_analyzer": "Analyzers",
     "spi_mem_manager": "Programmers",
     "ssd1306_test": "Displays",
+    "ssh_runner": "ESP32",
     "stack_attack": "Arcade",
     "stack_game": "Arcade",
     "stepcounter": "Sensors",
