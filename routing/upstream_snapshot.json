@@ -1,5 +1,5 @@
 {
-  "release_tag": "4nov2026",
+  "release_tag": "4nov2026p3",
   "stems": {
     "24cxxprog": "Programmers",
     "4inrow": "Board",
@@ -285,6 +285,7 @@
     "simultaneous_rfid_reader": "UHF",
     "slotmachine": "Board",
     "snake20": "Arcade",
+    "sniffer_card": "NFC",
     "solitaire": "Board",
     "spaceimpactii985e": "Arcade",
     "specter": "NFC",
