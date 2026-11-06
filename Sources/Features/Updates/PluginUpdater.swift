@@ -1977,6 +1977,7 @@ final class PluginUpdater: ObservableObject {
     func check() async {
         guard transactionGate.begin() else { return }
         defer { transactionGate.end() }
+        let previousPhase = phase
         do {
             phase = .fetching
             let (nextTag, assets) = try await latestRelease()
@@ -2067,7 +2068,7 @@ final class PluginUpdater: ObservableObject {
             await validateCompatibility()
         } catch {
             if UpdateTaskCancellation.isCancellation(error) {
-                if tag.isEmpty { phase = .idle }
+                phase = previousPhase
                 return
             }
             ulog.error("check failed: \(error.localizedDescription, privacy: .public)")
@@ -2203,8 +2204,12 @@ final class PluginUpdater: ObservableObject {
     /// A history entry is not permission to delete. Read only these exact paths,
     /// classify them, and expose migration/review separately from cleanup.
     func reviewPendingRoutes() async {
-        guard !pendingRouteCleanup.isEmpty, !allManifest.isEmpty,
-              transactionGate.begin() else { return }
+        guard !pendingRouteCleanup.isEmpty else { return }
+        guard !allManifest.isEmpty else {
+            phase = .failed("Check the current Community Pack first; cleanup history was preserved.")
+            return
+        }
+        guard transactionGate.begin() else { return }
         defer { transactionGate.end() }
         await refreshCleanupAssessments()
     }
@@ -3051,6 +3056,8 @@ final class PluginUpdater: ObservableObject {
             phase = .failed("Run “Check for updates” first so the pack manifest is loaded.")
             return
         }
+        guard transactionGate.begin() else { return }
+        defer { transactionGate.end() }
         let channel = activeChannel
         guard await fileChannelReady(channel) else {
             phase = .failed("Connect to the Flipper first, or select the SD card over USB.")

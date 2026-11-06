@@ -51,6 +51,8 @@ exit 0
     calls = log.read_text() if log.exists() else ''
     writes = [line for line in calls.splitlines()
               if line.startswith(('release upload ', 'release create '))]
+    if 'release view v99.0.1 ' not in calls:
+        raise SystemExit('FAIL: sandbox did not reach the existing-release guard')
     if result.returncode == 0 or writes:
         raise SystemExit('FAIL: publisher accepted/replaced an existing release: ' + repr(writes))
     print('PASS: real publisher aborts for an existing release without upload/create or Feather changes')

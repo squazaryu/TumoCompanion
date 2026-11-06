@@ -161,7 +161,9 @@ struct PluginUpdatesDetailView: View {
         }
         if busy { return "Checking…" }
         if updater.uncheckedCleanupCount > 0 { return "\(updater.uncheckedCleanupCount) paths not checked" }
-        if updater.cleanupReviewCount > 0 { return "\(updater.cleanupReviewCount) paths need review" }
+        if updater.cleanupReviewCount > 0 {
+            return "\(updater.cleanupReviewCount) path\(updater.cleanupReviewCount == 1 ? " needs" : "s need") review"
+        }
         if updater.cleanupActionCount > 0 { return "\(updater.cleanupActionCount) verified cleanup" }
         return updater.tag.isEmpty ? "Not checked" : "Up to date"
     }
@@ -303,6 +305,12 @@ struct PluginUpdatesDetailView: View {
     }
 
     private var communityDetailsSummary: String {
+        if updater.cleanupReviewCount > 0 {
+            return updater.updates.isEmpty ? "\(updater.cleanupReviewCount) review"
+                : "\(updater.updates.count) updates · \(updater.cleanupReviewCount) review"
+        }
+        if updater.uncheckedCleanupCount > 0 { return "\(updater.uncheckedCleanupCount) to check" }
+        if updater.cleanupActionCount > 0, updater.updates.isEmpty { return "\(updater.cleanupActionCount) cleanup" }
         if updater.phase == .needsBaseline { return "First sync" }
         if !updater.updates.isEmpty {
             return "\(updater.updates.count) update\(updater.updates.count == 1 ? "" : "s")"
@@ -455,7 +463,7 @@ struct PluginUpdatesDetailView: View {
 
     private var cleanupReviewDetails: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label("\(updater.cleanupReviewCount) path\(updater.cleanupReviewCount == 1 ? "" : "s") need review",
+            Label("\(updater.cleanupReviewCount) path\(updater.cleanupReviewCount == 1 ? " needs" : "s need") review",
                   systemImage: "exclamationmark.triangle")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(Theme.warning)
@@ -466,7 +474,8 @@ struct PluginUpdatesDetailView: View {
                         .font(.system(.caption2, design: .monospaced))
                         .foregroundStyle(Theme.warning)
                     if let reason = updater.cleanupAssessment(for: candidate)?.reviewReason {
-                        Text(reason.message).font(.caption2).foregroundStyle(.secondary)
+                        Text(reason.message).font(.caption2)
+                            .foregroundStyle(Color.primary.opacity(0.72))
                     }
                 }
                 .fixedSize(horizontal: false, vertical: true)
@@ -557,7 +566,7 @@ struct PluginUpdatesDetailView: View {
     @ViewBuilder private func cleanupDetail(_ cl: CleanupResult) -> some View {
         if !cl.removed.isEmpty {
             Text("Removed obsolete Community Pack route\(cl.removed.count == 1 ? "" : "s") (verified history):")
-                .font(.caption2).foregroundStyle(.secondary)
+                .font(.caption2).foregroundStyle(Color.primary.opacity(0.72))
                 .accessibilityIdentifier("community-cleanup-removed")
             Text(cl.removed.prefix(12).joined(separator: "\n") + (cl.removed.count > 12 ? "\n…" : ""))
                 .font(.system(.caption2, design: .monospaced)).foregroundStyle(Theme.success)
@@ -566,7 +575,7 @@ struct PluginUpdatesDetailView: View {
         }
         if !cl.kept.isEmpty {
             Text("Kept for review — these paths were not removed:")
-                .font(.caption2).foregroundStyle(.secondary)
+                .font(.caption2).foregroundStyle(Color.primary.opacity(0.72))
                 .accessibilityIdentifier("community-cleanup-kept")
             ForEach(Array(cl.kept.prefix(12)), id: \.self) { path in
                 VStack(alignment: .leading, spacing: 3) {
@@ -574,7 +583,7 @@ struct PluginUpdatesDetailView: View {
                         .foregroundStyle(Theme.warning)
                     Text((cl.keptReasons[PluginRouteReconciliation.pathIdentity(path)]
                           ?? .verificationChanged).message)
-                        .font(.caption2).foregroundStyle(.secondary)
+                        .font(.caption2).foregroundStyle(Color.primary.opacity(0.72))
                 }
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("community-cleanup-kept-paths")
@@ -785,7 +794,7 @@ struct PluginUpdatesDetailView: View {
                     Text(u.name).font(.subheadline)
                     Text(updateSubtitle(u))
                         .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.primary.opacity(0.72))
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 1) {
@@ -812,7 +821,7 @@ struct PluginUpdatesDetailView: View {
         // orthogonal context: which pack it came from (and its original folder if
         // the installer re-routes it somewhere else).
         var s = update.pack == "base" ? "Base pack" : "Extra pack"
-        if update.needsRouteMigration { return s + " · move to " + update.targetPath }
+        if update.needsRouteMigration { return s + " · install at new path: " + update.targetPath }
         if update.isRouted { s += " · from \(update.category)" }
         return s
     }
