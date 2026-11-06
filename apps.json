@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.11.34",
+      "version": "1.11.35",
       "versionDate": "2026-11-06",
-      "versionDescription": "Community Apps cleanup now counts only verified routes and shows kept paths separately with their actual reason. Fix stale case-equivalent paths and pending cleanup history across pack updates. Apps remaining at old locations receive an explicit MOVE installation before separate cleanup; custom or changed files and recovery data stay protected. Refresh Community Apps after installing 1.11.34 (287). No firmware or FW Packages update is required. Validated with 696 unit tests and 5 iOS Simulator UI tests plus GitHub CI; physical-device acceptance remains pending.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.34/TumoCompanion-unsigned.ipa",
-      "size": 26115971,
+      "versionDescription": "Fix a FW Packages recovery loop after a completed installation. Finish only after exact installed-ledger and fresh device-MD5 proof, with no old/stage copies or pending cleanup; no application files are re-uploaded or deleted by this completion. Serialize recovery, catalog/status checks, installation and cleanup; reject stale journal generations. Normal rollback remains protected for genuinely incomplete installs. Update Feather and install 1.11.35 (288). No firmware or FW Packages update is required. Validated by 702 unit and 22 UI tests, GitHub CI, and an explicitly authorized metadata-only device repair confirmed by the owner.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.35/TumoCompanion-unsigned.ipa",
+      "size": 26124127,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.11.35",
+          "date": "2026-11-06",
+          "localizedDescription": "Fix a FW Packages recovery loop after a completed installation. Finish only after exact installed-ledger and fresh device-MD5 proof, with no old/stage copies or pending cleanup; no application files are re-uploaded or deleted by this completion. Serialize recovery, catalog/status checks, installation and cleanup; reject stale journal generations. Normal rollback remains protected for genuinely incomplete installs. Update Feather and install 1.11.35 (288). No firmware or FW Packages update is required. Validated by 702 unit and 22 UI tests, GitHub CI, and an explicitly authorized metadata-only device repair confirmed by the owner.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.35/TumoCompanion-unsigned.ipa",
+          "size": 26124127,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.11.34",
           "date": "2026-11-06",
