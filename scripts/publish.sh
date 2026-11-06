@@ -1,7 +1,7 @@
 #!/bin/bash
 # Build + publish a new TumoCompanion version and update the Feather source.
 #   1. builds the unsigned IPA
-#   2. creates/updates the GitHub release with the IPA
+#   2. creates a NEW immutable GitHub release with the IPA
 #   3. bumps apps.json (top-level + versions history) and pushes it
 # Usage: ./scripts/publish.sh ["release notes"]
 # Bump MARKETING_VERSION in project.yml BEFORE running.
@@ -24,10 +24,29 @@ fi
 git -C "$FEATHER_REPO" fetch -q origin main
 git -C "$FEATHER_REPO" merge -q --ff-only origin/main
 
+VER=$(awk -F'"' '/MARKETING_VERSION:/{print $2; exit}' project.yml)
+SOURCE_COMMIT=$(git rev-parse HEAD)
+if [ -n "${PUBLISH_SOURCE_COMMIT:-}" ] && [ "$PUBLISH_SOURCE_COMMIT" != "$SOURCE_COMMIT" ]; then
+  echo "error: main changed from the validated publication source" >&2
+  exit 1
+fi
+if gh release view "v$VER" --repo "$REPO" >/dev/null 2>&1; then
+  echo "error: release v$VER already exists; never overwrite a published IPA" >&2
+  exit 1
+fi
+TAG_COMMIT=$(git ls-remote origin "refs/tags/v$VER^{}" | awk '{print $1}')
+if [ "$TAG_COMMIT" != "$SOURCE_COMMIT" ]; then
+  echo "error: annotated remote tag v$VER must name the validated source $SOURCE_COMMIT" >&2
+  exit 1
+fi
+
 echo "==> Building IPA"
 ./scripts/build_ipa.sh >/dev/null
 
-VER=$(awk -F'"' '/MARKETING_VERSION:/{print $2; exit}' project.yml)
+if [ "$(git rev-parse HEAD)" != "$SOURCE_COMMIT" ]; then
+  echo "error: source changed during publication build" >&2
+  exit 1
+fi
 IPA="$ROOT/build/$ASSET"
 SIZE=$(stat -f%z "$IPA")
 DATE=$(date +%Y-%m-%d)
@@ -52,17 +71,28 @@ if [ "$(plutil -extract CFBundleShortVersionString raw "$APP/Info.plist")" != "$
   echo "error: IPA version does not match project.yml" >&2
   exit 1
 fi
+codesign --verify --deep --strict "$APP"
 
 echo "==> GitHub release"
 if gh release view "v$VER" --repo "$REPO" >/dev/null 2>&1; then
-  gh release upload "v$VER" "$IPA" --repo "$REPO" --clobber
-else
-  gh release create "v$VER" --repo "$REPO" --title "TumoCompanion $VER" --notes "$NOTES" "$IPA"
+  echo "error: release v$VER appeared during build; publication stopped" >&2
+  exit 1
 fi
+gh release create "v$VER" --repo "$REPO" --verify-tag --target "$SOURCE_COMMIT" \
+  --title "TumoCompanion $VER" --notes "$NOTES" "$IPA"
 ASSET_NAME=$(gh release view "v$VER" --repo "$REPO" --json assets \
   --jq ".assets[] | select(.name == \"$ASSET\") | .name")
 if [ "$ASSET_NAME" != "$ASSET" ]; then
   echo "error: release asset was not published" >&2
+  exit 1
+fi
+gh release download "v$VER" --repo "$REPO" --pattern "$ASSET" --dir "$VERIFY_DIR/downloaded"
+cmp "$IPA" "$VERIFY_DIR/downloaded/$ASSET"
+LOCAL_SHA256=$(shasum -a 256 "$IPA" | awk '{print $1}')
+REMOTE_DIGEST=$(gh api "repos/$REPO/releases/tags/v$VER" \
+  --jq '.assets[] | select(.name == "TumoCompanion-unsigned.ipa") | .digest')
+if [ "$REMOTE_DIGEST" != "sha256:$LOCAL_SHA256" ]; then
+  echo "error: published IPA digest differs from the validated local IPA" >&2
   exit 1
 fi
 
@@ -89,7 +119,7 @@ PY
 echo "==> Pushing apps.json"
 cd "$FEATHER_REPO"
 git add apps.json
-git -c user.email="squazaryu@users.noreply.github.com" -c user.name="squazaryu" commit -q -m "Release $VER" || true
+git -c user.email="squazaryu@users.noreply.github.com" -c user.name="squazaryu" commit -q -m "chore(release): publish Feather metadata for $VER" || true
 git push -q origin main
 git fetch -q origin main
 LOCAL_SHA=$(git rev-parse HEAD)
