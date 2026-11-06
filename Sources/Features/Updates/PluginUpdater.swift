@@ -443,7 +443,10 @@ struct PluginCatalogCache: Codable, Equatable {
     }
 
     mutating func forgetRetiredRoute(_ path: String) {
-        retiredRoutes.removeValue(forKey: path)
+        let identity = PluginRouteReconciliation.pathIdentity(path)
+        retiredRoutes = retiredRoutes.filter {
+            PluginRouteReconciliation.pathIdentity($0.key) != identity
+        }
     }
 
     private static func normalizedMD5s(_ values: [String]) -> [String] {
@@ -489,9 +492,15 @@ struct PluginRouteCleanupJournalStore {
         } else {
             decoded = []
         }
-        return PluginRouteReconciliation.normalizedCandidates(
-            decoded + [activeStagingCandidate()].compactMap { $0 }
-        )
+        guard let active = activeStagingCandidate() else {
+            return PluginRouteReconciliation.normalizedCandidates(decoded)
+        }
+        let identity = PluginRouteReconciliation.pathIdentity(active.legacyPath)
+        // A pending refresh must never make an owned recovery record disappear
+        // as a conflicting hash. The active snapshot is authoritative until healed.
+        return PluginRouteReconciliation.normalizedCandidates(decoded.filter {
+            PluginRouteReconciliation.pathIdentity($0.legacyPath) != identity
+        } + [active])
     }
 
     func recoveryPathIdentities() -> Set<String> {
@@ -521,7 +530,27 @@ struct PluginRouteCleanupJournalStore {
 
     @discardableResult
     func record(_ candidates: [PluginRouteCleanupCandidate]) -> Bool {
-        save(load() + candidates)
+        let incoming = PluginRouteReconciliation.normalizedCandidates(candidates)
+        guard candidates.isEmpty || !incoming.isEmpty else { return false }
+        let active = activeStagingCandidate()
+        let activeIdentity = active.map {
+            PluginRouteReconciliation.pathIdentity($0.legacyPath)
+        }
+        if let active, incoming.contains(where: {
+            PluginRouteReconciliation.pathIdentity($0.legacyPath) == activeIdentity
+                && $0 != active
+        }) {
+            return false
+        }
+        let incomingPaths = Set(incoming.map {
+            PluginRouteReconciliation.pathIdentity($0.legacyPath)
+        })
+        // Replace only unstaged pending contexts. Appending an old and a new hash
+        // would make normalizedCandidates discard both as ambiguous.
+        let retained = load().filter {
+            !incomingPaths.contains(PluginRouteReconciliation.pathIdentity($0.legacyPath))
+        }
+        return save(retained + incoming)
     }
 
     @discardableResult
@@ -1086,6 +1115,40 @@ enum PluginRouteCleanupExecutor {
 /// release-specific deletion list is trusted: a move needs a unique same-name app in
 /// the current catalog, a retired old route, and exact content identities on device.
 enum PluginRouteReconciliation {
+    /// Rebind unstaged work to the selected catalog, while retaining exact active
+    /// crash-recovery snapshots. Unresolvable entries remain available for review.
+    static func reconciledCleanupCandidates(
+        current: [PluginUpdate],
+        journal: [PluginRouteCleanupCandidate],
+        historical: [PluginRouteCleanupCandidate],
+        activePaths: Set<String>,
+        excluded: Set<String>,
+        unprotectedBuiltIns: Set<String>
+    ) -> [PluginRouteCleanupCandidate] {
+        let pending = normalizedCandidates(journal)
+        let journalPaths = Set(pending.map { pathIdentity($0.legacyPath) })
+        var result = historical.filter { !journalPaths.contains(pathIdentity($0.legacyPath)) }
+        for entry in pending {
+            let identity = pathIdentity(entry.legacyPath)
+            guard !activePaths.contains(identity) else {
+                result.append(entry)
+                continue
+            }
+            let known = entry.acceptedLegacyMD5s + historical.filter {
+                pathIdentity($0.legacyPath) == identity
+            }.flatMap(\.acceptedLegacyMD5s)
+            let rebound = candidates(
+                current: current,
+                retiredRoutes: [entry.legacyPath: known],
+                excluded: excluded,
+                unprotectedBuiltIns: unprotectedBuiltIns,
+                includeInstallRoutes: false
+            ).values.flatMap { $0 }.first
+            result.append(rebound ?? entry)
+        }
+        return normalizedCandidates(result)
+    }
+
     /// Stable cache key for a catalog binary. The pack and extension components
     /// prevent same-basename FAP/FAL artifacts from sharing a baseline.
     static func cacheIdentityKey(for update: PluginUpdate) -> String {
@@ -1961,14 +2024,11 @@ final class PluginUpdater: ObservableObject {
         cache: PluginCatalogCache?
     ) -> [PluginRouteCleanupCandidate] {
         let journal = eligibleJournalCleanupCandidates()
-        let journalPaths = Set(journal.map {
-            PluginRouteReconciliation.pathIdentity($0.legacyPath)
-        })
         let historical = cache.map(standaloneCleanupCandidates) ?? []
-        let newHistorical = historical.filter {
-            !journalPaths.contains(PluginRouteReconciliation.pathIdentity($0.legacyPath))
-        }
-        return PluginRouteReconciliation.normalizedCandidates(journal + newHistorical)
+        return PluginRouteReconciliation.reconciledCleanupCandidates(
+            current: Array(allManifest.values), journal: journal, historical: historical,
+            activePaths: cleanupJournalStore.recoveryPathIdentities(),
+            excluded: excluded, unprotectedBuiltIns: unprotectedBuiltIns)
     }
 
     /// Reads every known route for one app. The deliberate Tumoflip target remains
