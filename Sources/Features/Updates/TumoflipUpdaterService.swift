@@ -266,6 +266,10 @@ final class TumoflipUpdater: ObservableObject {
     /// package-only asset replacement under the same firmware tag cannot reuse stale bytes.
     private var cachedSource: (releaseId: String, source: ZipPackageSource)?
     private let transactionGate = TumoflipTransactionGate()
+#if DEBUG
+    /// In-memory transport for transaction-ownership tests; never enabled in Release.
+    var testingFileSystem: (any TumoflipDeviceFS)?
+#endif
 
     private var packageZipURL: URL?
     private var expectedArchiveSHA256: String?
@@ -1158,6 +1162,9 @@ final class TumoflipUpdater: ObservableObject {
     private var activeChannel: TransferChannel { TransferChannelStore.shared.activeChannel }
 
     private func activeFS() -> any TumoflipDeviceFS {
+#if DEBUG
+        if let testingFileSystem { return testingFileSystem }
+#endif
         if let usb = TransferChannelStore.shared.activeStore as? USBSDStorage {
             return USBTumoflipDeviceFS(storage: usb)
         }
