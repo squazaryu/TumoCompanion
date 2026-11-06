@@ -192,6 +192,7 @@ final class PluginProtectionPolicyTests: XCTestCase {
         )
         let updater = PluginUpdater(
             protectedAuditService: auditService,
+            cleanupJournalStore: .init(defaults: defaults, key: "test-cleanup-journal"),
             persistenceDefaults: defaults
         )
         let oldChessMD5 = String(repeating: "1", count: 32)
@@ -505,6 +506,71 @@ final class PluginProtectionPolicyTests: XCTestCase {
         XCTAssertTrue(store.markStaging(original))
         _ = store.record([fresh])
         XCTAssertEqual(store.load(), [original])
+    }
+
+    @MainActor
+    func testSameBytesAtOldRouteAreInstalledAtNewRouteBeforeSeparateCleanup() async throws {
+        let suite = "CommunityRouteMigration.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let oldPath = "/ext/apps/Games/chess.fap"
+        let newPath = "/ext/apps/Games/Board/chess.fap"
+        let checkersPath = "/ext/apps/Games/Board/checkers.fap"
+        let bytes = makeFAP(seed: 0xC1)
+        let checkers = makeFAP(seed: 0xC2)
+        let storage = PluginInstallMemoryStore(initialFiles: [oldPath: bytes, checkersPath: checkers])
+        let fixture = try await makeCacheReconciliationFixture(storage: storage, defaults: defaults)
+        defer {
+            fixture.archives.forEach { try? FileManager.default.removeItem(at: $0) }
+            try? FileManager.default.removeItem(at: fixture.auditDirectory)
+        }
+        fixture.updater.seedCacheForTesting(PluginCatalogCache(tag: "old", map: [
+            oldPath: md5(bytes), checkersPath: md5(checkers),
+        ]))
+        await fixture.updater.check()
+        let migration = try XCTUnwrap(fixture.updater.updates.first { $0.remotePath == newPath })
+        XCTAssertTrue(migration.needsRouteMigration)
+        XCTAssertEqual(fixture.updater.cleanupActionCount, 0)
+        fixture.updater.selectOnly { $0.remotePath == newPath }
+        await fixture.updater.install()
+        let canonical = await storage.data(at: newPath)
+        let legacy = await storage.data(at: oldPath)
+        XCTAssertEqual(canonical, bytes)
+        XCTAssertEqual(legacy, bytes, "Install and cleanup remain separate user actions")
+        XCTAssertEqual(fixture.updater.cleanupActionCount, 1)
+        await fixture.updater.cleanUpPendingRoutes()
+        XCTAssertEqual(fixture.updater.pendingCleanupCount, 0)
+        let after = await storage.data(at: oldPath)
+        XCTAssertNil(after)
+    }
+
+    @MainActor
+    func testUnverifiedLegacyIsReviewNotAnEndlessCleanupAction() async throws {
+        let suite = "CommunityCleanupReview.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let path = "/ext/apps/Games/Board/chess.fap"
+        let legacyPath = "/ext/apps/Games/chess.fap"
+        let current = makeFAP(seed: 0xC1)
+        let custom = Data("custom-owner-build".utf8)
+        let storage = PluginInstallMemoryStore(initialFiles: [path: current, legacyPath: custom])
+        let fixture = try await makeCacheReconciliationFixture(storage: storage, defaults: defaults)
+        defer {
+            fixture.archives.forEach { try? FileManager.default.removeItem(at: $0) }
+            try? FileManager.default.removeItem(at: fixture.auditDirectory)
+        }
+        fixture.updater.seedCacheForTesting(PluginCatalogCache(tag: "old", map: [
+            path: md5(current), fixture.checkersPath: fixture.newCheckersMD5,
+        ], retiredRoutes: [legacyPath: [String(repeating: "1", count: 32)]]))
+        await fixture.updater.check()
+        XCTAssertEqual(fixture.updater.pendingCleanupCount, 1)
+        XCTAssertEqual(fixture.updater.cleanupActionCount, 0)
+        XCTAssertEqual(fixture.updater.cleanupReviewCount, 1)
+        await fixture.updater.cleanUpPendingRoutes()
+        XCTAssertEqual(fixture.updater.cleanupActionCount, 0)
+        XCTAssertEqual(fixture.updater.cleanupReviewCount, 1)
+        let unchanged = await storage.data(at: legacyPath)
+        XCTAssertEqual(unchanged, custom)
     }
 
     func testLegacyV2CacheMigratesRemovedRoutesIntoContentAddressedHistory() throws {

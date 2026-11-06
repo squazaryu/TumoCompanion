@@ -19,13 +19,18 @@ def function(signature):
 
 models = source[source.index('enum PluginInstallRouting {'):source.index('\nenum PluginCatalogMetadata:')]
 core = source[source.index('struct PluginCatalogCache:'):source.index('\nstruct InstallRecord:')]
+extras = ''
+for name in ('enum PluginRouteCleanupKeepReason:', 'enum PluginRouteCleanupAssessment:'):
+    if name in source:
+        start = source.index(name)
+        extras += source[start:source.index('\n}', start) + 2] + '\n'
 methods = '\n'.join(function(name) for name in (
     '    private func standaloneCleanupCandidates(',
     '    private func isCleanupAllowed(',
     '    private func eligibleJournalCleanupCandidates(',
     '    private func cleanupCandidates(',
 ))
-program = 'import Foundation\n' + models + r'''
+program = 'import Foundation\n' + models + extras + r'''
 protocol DeviceFileStore: Sendable {
     func checkedMD5(_ path: String) async throws -> String?
     func move(_ from: String, to: String) async throws
@@ -90,6 +95,36 @@ protocol DeviceFileStore: Sendable {
             "active recovery retains its exact old ownership and hash")
         _ = active.record([fresh])
         check(active.load() == [stale], "pending refresh cannot overwrite active recovery")
+        let migration = PluginRouteCleanupCandidate(catalogPath: current, canonicalPath: current,
+            legacyPath: old, canonicalMD5: now, acceptedLegacyMD5s: [now])
+        check(PluginRouteReconciliation.assessment(for: fresh, canonicalDeviceMD5: now,
+            legacyDeviceMD5: legacy, stagedDeviceMD5: nil, ownsRecovery: false,
+            catalogMatches: true) == .removable, "both content proofs allow cleanup")
+        check(PluginRouteReconciliation.assessment(for: fresh, canonicalDeviceMD5: nil,
+            legacyDeviceMD5: legacy, stagedDeviceMD5: nil, ownsRecovery: false,
+            catalogMatches: true) == .review(.canonicalMissing), "missing replacement is review, not cleanable")
+        check(PluginRouteReconciliation.assessment(for: migration, canonicalDeviceMD5: nil,
+            legacyDeviceMD5: now, stagedDeviceMD5: nil, ownsRecovery: false,
+            catalogMatches: true) == .needsMigration, "same bytes at old route need explicit migration")
+        check(PluginRouteReconciliation.assessment(for: fresh, canonicalDeviceMD5: before,
+            legacyDeviceMD5: legacy, stagedDeviceMD5: nil, ownsRecovery: false,
+            catalogMatches: true) == .review(.canonicalMismatch), "different replacement stays protected")
+        check(PluginRouteReconciliation.assessment(for: fresh, canonicalDeviceMD5: now,
+            legacyDeviceMD5: before, stagedDeviceMD5: nil, ownsRecovery: false,
+            catalogMatches: true) == .review(.legacyUnrecognized), "unknown legacy is not deleted")
+        check(PluginRouteReconciliation.assessment(for: fresh, canonicalDeviceMD5: now,
+            legacyDeviceMD5: nil, stagedDeviceMD5: nil, ownsRecovery: false,
+            catalogMatches: true) == .missing, "absent old path is resolved without deletion")
+        check(PluginRouteReconciliation.assessment(for: fresh, canonicalDeviceMD5: now,
+            legacyDeviceMD5: legacy, stagedDeviceMD5: legacy, ownsRecovery: false,
+            catalogMatches: true) == .review(.unownedRecovery), "unowned marker is never adopted")
+        check(PluginRouteReconciliation.assessment(for: stale, canonicalDeviceMD5: now,
+            legacyDeviceMD5: nil, stagedDeviceMD5: legacy, ownsRecovery: true,
+            catalogMatches: false) == .recovery, "owned recovery can safely roll back stale catalog context")
+        check(!PluginRouteCleanupAssessment.review(.canonicalMissing).isActionable,
+            "kept review does not inflate Clean Up count")
+        check(PluginRouteCleanupAssessment.removable.isActionable
+            && PluginRouteCleanupAssessment.recovery.isActionable, "only cleanup/recovery is actionable")
         print("Cleanup/cache host failures: \(failures)")
         exit(failures == 0 ? 0 : 1)
     }
