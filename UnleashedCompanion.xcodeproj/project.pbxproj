@@ -207,6 +207,7 @@
 		E1C136836BE8EE3CE2B7ACF8 /* TumoSurveyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E686792ED6F1FF78429527CC /* TumoSurveyView.swift */; };
 		E23B527B427E0F06FBA09EA7 /* TumoVMNFCContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18979E931D5ADCCC963ABB98 /* TumoVMNFCContract.swift */; };
 		E266B47A78B89D1F131AC867 /* RemoteIDReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1182D29C123C1F78168038A /* RemoteIDReport.swift */; };
+		E315C13AC25BA1B124D5FB64 /* CommunityCleanupUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A8C4032BB6AD0987C840E4D /* CommunityCleanupUITests.swift */; };
 		E37D4C1411C566C54C6EED88 /* PluginUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87F2C64ACDABA1AEFFB7CCD8 /* PluginUpdater.swift */; };
 		E43809C683427E97F667E269 /* SwiftProtobuf in Frameworks */ = {isa = PBXBuildFile; productRef = 96AC5A38B6EE177D6E846BDB /* SwiftProtobuf */; };
 		E56D897A2B175FCF379B122E /* RPCReadBudgetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EEC053469687E6D198E7859 /* RPCReadBudgetTests.swift */; };
@@ -411,6 +412,7 @@
 		87F2C64ACDABA1AEFFB7CCD8 /* PluginUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginUpdater.swift; sourceTree = "<group>"; };
 		8935260266C922FDBB301B75 /* TransferBackgroundTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferBackgroundTests.swift; sourceTree = "<group>"; };
 		8A54ADE2A988A392B1687C80 /* GitHubAuthStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubAuthStoreTests.swift; sourceTree = "<group>"; };
+		8A8C4032BB6AD0987C840E4D /* CommunityCleanupUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommunityCleanupUITests.swift; sourceTree = "<group>"; };
 		8D70BBAA6C69E3FCD8488170 /* HomeAssistantDiscoveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeAssistantDiscoveryTests.swift; sourceTree = "<group>"; };
 		8EBD710F983D218FB913E435 /* GitHubAuthStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubAuthStore.swift; sourceTree = "<group>"; };
 		8F246F25BA68E90EAD73408E /* MarauderLiveAggregationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarauderLiveAggregationTests.swift; sourceTree = "<group>"; };
@@ -594,6 +596,7 @@
 		1A5A957AFCF284436C396F83 /* UITests */ = {
 			isa = PBXGroup;
 			children = (
+				8A8C4032BB6AD0987C840E4D /* CommunityCleanupUITests.swift */,
 				35AD6DF165DCB025AEBDA6FA /* ConnectionStatusUITests.swift */,
 				24AE55444A9A10FFD0C9F3C5 /* DeviceServicesUITests.swift */,
 				FCB5C504F3756F796BB35073 /* DolphinGalleryUITests.swift */,
@@ -1381,6 +1384,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E315C13AC25BA1B124D5FB64 /* CommunityCleanupUITests.swift in Sources */,
 				542542DC605B167B83ADE8CE /* ConnectionStatusUITests.swift in Sources */,
 				255DDC35E88194CCE38D71CB /* DeviceServicesUITests.swift in Sources */,
 				B384864F1C44B833958723B0 /* DolphinGalleryUITests.swift in Sources */,
@@ -1609,7 +1613,7 @@
 				CODE_SIGNING_REQUIRED = NO;
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 286;
+				CURRENT_PROJECT_VERSION = 287;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -1630,7 +1634,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GITHUB_OAUTH_CLIENT_ID = Ov23liKmKXYcliMvoCgL;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 1.11.33;
+				MARKETING_VERSION = 1.11.34;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -1835,7 +1839,7 @@
 				CODE_SIGNING_REQUIRED = NO;
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 286;
+				CURRENT_PROJECT_VERSION = 287;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = "";
 				ENABLE_NS_ASSERTIONS = NO;
@@ -1850,7 +1854,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GITHUB_OAUTH_CLIENT_ID = Ov23liKmKXYcliMvoCgL;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 1.11.33;
+				MARKETING_VERSION = 1.11.34;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
