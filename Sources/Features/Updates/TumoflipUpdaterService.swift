@@ -1457,6 +1457,10 @@ final class TumoflipUpdater: ObservableObject {
             return "Install failed AND rollback could not restore \(t.count) file(s): \(t.joined(separator: ", ")). Re-open to retry recovery."
         case .statePersistenceFailed(let path):
             return "Could not safely persist transaction state at \(path). Nothing else will be changed."
+        case .recoveryVerificationUnavailable(let path):
+            return "Recovery could not verify \(path). No application files were changed. Reconnect, then retry recovery."
+        case .transactionStateChanged:
+            return "The package journal changed during verification. No stale state was saved. Retry after the other operation finishes."
         case .activeAppCouldNotStop:
             return "Close the running Flipper app and retry. No package files were changed."
         case .cancelled:

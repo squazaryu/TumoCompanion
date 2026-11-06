@@ -192,7 +192,7 @@ func fixture() throws -> (MemoryFS, TumoflipJournal.FileOp) {
             check(fs.state()?.txn == nil, "exact saved device snapshot completes without rollback")
             check(fs.hashes == before && fs.fileMutations.isEmpty, "exact snapshot recovery changes metadata only")
             if failures == 0, CommandLine.arguments.count == 4 {
-                let writes = try fs.writes.map { path -> [String: String] in
+                let writes = fs.writes.map { path -> [String: String] in
                     ["path": path, "base64": fs.slots[path]!.base64EncodedString()]
                 }
                 let encoded = try JSONSerialization.data(withJSONObject: writes, options: [.sortedKeys])

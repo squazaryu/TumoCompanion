@@ -73,6 +73,8 @@ enum TumoflipInstallError: Error, Equatable {
     case incompatible(String)            // device firmware/api/target vs manifest
     case rollbackIncomplete([String])    // targets that could NOT be restored
     case statePersistenceFailed(String)
+    case recoveryVerificationUnavailable(String)
+    case transactionStateChanged
     case activeAppCouldNotStop
     case cancelled                       // user pressed Stop → transaction rolled back to the prior state
 }
@@ -432,7 +434,39 @@ struct TumoflipInstaller {
     func recover() async throws {
         guard var state = try await loadState(), let txn = state.txn,
               txn.phase == .staging || txn.phase == .activating else { return }
+        if try await finalizeVerifiedRecovery(&state) { return }
         try await rollback(&state, txn)
+    }
+
+    /// Complete only the narrow, fully proved installed state. An ordinary interrupted
+    /// install with old backups, a partial stage, unknown bytes or an old ledger still
+    /// takes the original rollback path. No application file is changed here.
+    private func finalizeVerifiedRecovery(_ state: inout TumoflipState) async throws -> Bool {
+        guard TumoflipRecoveryFinalization.isCandidate(state), let journal = state.txn else {
+            return false
+        }
+        let expected = state
+        var observations: [String: TumoflipRecoveryFinalization.Observation] = [:]
+        for op in journal.ops {
+            for path in [op.target, op.backup, op.stage] {
+                do {
+                    observations[path] = try await transactionDeviceMD5(path)
+                        .map(TumoflipRecoveryFinalization.Observation.md5) ?? .missing
+                } catch {
+                    throw TumoflipInstallError.recoveryVerificationUnavailable(path)
+                }
+            }
+        }
+        guard TumoflipRecoveryFinalization.canFinalize(expected, observations: observations) else {
+            return false
+        }
+        // Awaited device reads must never authorize overwriting a newer transaction.
+        guard try await loadState() == expected else {
+            throw TumoflipInstallError.transactionStateChanged
+        }
+        state.txn = nil
+        try await saveState(&state)
+        return true
     }
 
     // MARK: - Up-to-date / divergence status
