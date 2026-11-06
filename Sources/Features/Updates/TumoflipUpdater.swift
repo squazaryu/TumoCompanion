@@ -73,6 +73,9 @@ enum TumoflipInstallError: Error, Equatable {
     case incompatible(String)            // device firmware/api/target vs manifest
     case rollbackIncomplete([String])    // targets that could NOT be restored
     case statePersistenceFailed(String)
+    case recoveryVerificationUnavailable(String)
+    case transactionStateChanged
+    case recoveryRequired
     case activeAppCouldNotStop
     case cancelled                       // user pressed Stop → transaction rolled back to the prior state
 }
@@ -432,7 +435,39 @@ struct TumoflipInstaller {
     func recover() async throws {
         guard var state = try await loadState(), let txn = state.txn,
               txn.phase == .staging || txn.phase == .activating else { return }
+        if try await finalizeVerifiedRecovery(&state) { return }
         try await rollback(&state, txn)
+    }
+
+    /// Complete only the narrow, fully proved installed state. An ordinary interrupted
+    /// install with old backups, a partial stage, unknown bytes or an old ledger still
+    /// takes the original rollback path. No application file is changed here.
+    private func finalizeVerifiedRecovery(_ state: inout TumoflipState) async throws -> Bool {
+        guard TumoflipRecoveryFinalization.isCandidate(state), let journal = state.txn else {
+            return false
+        }
+        let expected = state
+        var observations: [String: TumoflipRecoveryFinalization.Observation] = [:]
+        for op in journal.ops {
+            for path in [op.target, op.backup, op.stage] {
+                do {
+                    observations[path] = try await transactionDeviceMD5(path)
+                        .map(TumoflipRecoveryFinalization.Observation.md5) ?? .missing
+                } catch {
+                    throw TumoflipInstallError.recoveryVerificationUnavailable(path)
+                }
+            }
+        }
+        guard TumoflipRecoveryFinalization.canFinalize(expected, observations: observations) else {
+            return false
+        }
+        // Awaited device reads must never authorize overwriting a newer transaction.
+        guard try await loadState() == expected else {
+            throw TumoflipInstallError.transactionStateChanged
+        }
+        state.txn = nil
+        try await saveState(&state)
+        return true
     }
 
     // MARK: - Up-to-date / divergence status
@@ -636,7 +671,12 @@ struct TumoflipInstaller {
         manifest: TumoflipManifest,
         captureValidationErrors: Bool
     ) async throws -> StatusSnapshot {
-        var state = try await loadState() ?? TumoflipState()
+        let expectedState = try await loadState()
+        if let transaction = expectedState?.txn,
+           transaction.phase == .staging || transaction.phase == .activating {
+            throw TumoflipInstallError.recoveryRequired
+        }
+        var state = expectedState ?? TumoflipState()
         let originalLedger = state.ledger
         var statuses: [String: GroupStatus] = [:]
         var fileStatuses: [String: FileStatus] = [:]
@@ -762,6 +802,12 @@ struct TumoflipInstaller {
             )
         }
 
+        // Device hashing suspends this operation. Never save a status snapshot
+        // over a transaction/generation created while those reads were pending.
+        guard try await loadState() == expectedState else {
+            throw TumoflipInstallError.transactionStateChanged
+        }
+
         // Keep the compatibility projection aligned with every complete group, not
         // merely the last group encountered during adoption. Write it before the
         // authoritative ledger so a projection failure leaves adoption retryable.
@@ -773,6 +819,9 @@ struct TumoflipInstaller {
             )
         }
         if ledgerChanged {
+            guard try await loadState() == expectedState else {
+                throw TumoflipInstallError.transactionStateChanged
+            }
             try await saveState(&state)
         }
         return StatusSnapshot(

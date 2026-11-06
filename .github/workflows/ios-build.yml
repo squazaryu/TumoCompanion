@@ -29,6 +29,8 @@ jobs:
         run: python3 scripts/test_plugin_protection_host.py
       - name: Verify Community route cleanup and recovery without a device
         run: python3 scripts/test_community_cleanup_host.py
+      - name: Verify committed FW Packages recovery without a device
+        run: python3 scripts/test_package_recovery_host.py
       - name: Verify existing releases cannot be overwritten
         run: python3 scripts/test_publish_immutable_host.py
       - name: Verify bounded ranged-read policy without Bluetooth

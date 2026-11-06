@@ -30,6 +30,7 @@ final class TumoflipInstallerTests: XCTestCase {
         var uncheckedMD5FailuresByPath: [String: Int] = [:]
         var checkedMD5CallsByPath: [String: Int] = [:]
         var onCheckedMD5: (() -> Void)?
+        var beforeRead: ((String) async -> Void)?
         var afterMove: ((String, String) -> Void)?
         var cancellableWriteChunkSize: Int?
         var onWriteProgress: ((Int) -> Void)?
@@ -88,6 +89,7 @@ final class TumoflipInstallerTests: XCTestCase {
         }
         func read(_ path: String) async -> Data? {
             recordAccess(path)
+            await beforeRead?(path)
             return files[path]
         }
         func deviceMD5(_ path: String) async -> String? {
@@ -788,6 +790,170 @@ final class TumoflipInstallerTests: XCTestCase {
     }
 
     // MARK: - Crash recovery (out-of-process), considering real fs presence
+
+    private func completedRecoverySnapshot() throws -> (FakeFS, TumoflipState, [String: Data]) {
+        let fs = FakeFS()
+        let fingerprint = String(repeating: "f", count: 64)
+        var ops: [TumoflipJournal.FileOp] = []
+        var ledger: [String: TumoflipState.LedgerEntry] = [:]
+        var live: [String: Data] = [:]
+        for name in ["first", "second"] {
+            let path = "/ext/apps/Tools/\(name).fap"
+            let bytes = Data("new-\(name)".utf8)
+            let md5 = TumoflipHash.md5(bytes)
+            let sha = TumoflipHash.sha256(bytes)
+            ops.append(.init(target: path, stage: path + ".ucnew",
+                backup: "/ext/.tumoflip/rollback/" + fingerprint.prefix(16) + "/"
+                    + TumoflipHash.sha256(Data(path.utf8)),
+                sha256: sha, md5: md5, originalMD5: TumoflipHash.md5(Data("old-\(name)".utf8)),
+                hadOriginal: true, state: .activated))
+            ledger[path] = .init(sha256: sha, md5: md5, releaseId: rid)
+            live[path] = bytes
+            fs.files[path] = bytes
+        }
+        let journal = TumoflipJournal(releaseId: rid, fingerprint: fingerprint,
+            groups: ["base"], phase: .activating, ops: ops, cleanups: [])
+        let state = TumoflipState(generation: 10, ledger: ledger, txn: journal)
+        fs.seedState(state)
+        return (fs, state, live)
+    }
+
+    func testRecoveryFinalizesVerifiedLedgerWithoutReinstallOrFileDeletion() async throws {
+        let (fs, original, live) = try completedRecoverySnapshot()
+        try await TumoflipInstaller(fs: fs, source: FakeSource(data: [:])).recover()
+        let persisted = await fs.readState()
+        let recovered = try XCTUnwrap(persisted)
+        XCTAssertNil(recovered.txn)
+        XCTAssertEqual(recovered.ledger, original.ledger)
+        XCTAssertEqual(recovered.generation, original.generation + 1)
+        XCTAssertEqual(fs.writeCount, 1, "Only the next durable state slot is written")
+        XCTAssertEqual(fs.stagingWriteCount, 0)
+        for (path, bytes) in live { XCTAssertEqual(fs.files[path], bytes) }
+        XCTAssertEqual(Set(fs.files.keys), Set(live.keys).union([
+            TumoflipInstaller.stateSlotA, TumoflipInstaller.stateSlotB]))
+    }
+
+    func testRecoveryFinalizationRequiresEveryExplicitObservation() throws {
+        let (_, state, _) = try completedRecoverySnapshot()
+        let ops = try XCTUnwrap(state.txn?.ops)
+        var observations: [String: TumoflipRecoveryFinalization.Observation] = [:]
+        for op in ops {
+            observations[op.target] = .md5(op.md5)
+            observations[op.backup] = .missing
+            observations[op.stage] = .missing
+        }
+        XCTAssertTrue(TumoflipRecoveryFinalization.canFinalize(state, observations: observations))
+        for path in observations.keys.sorted() {
+            var unknown = observations
+            unknown.removeValue(forKey: path)
+            XCTAssertFalse(TumoflipRecoveryFinalization.canFinalize(state, observations: unknown))
+            unknown[path] = .md5(String(repeating: "0", count: 32))
+            XCTAssertFalse(TumoflipRecoveryFinalization.canFinalize(state, observations: unknown))
+        }
+        var pending = state
+        pending.txn?.ops[0].state = .staged
+        XCTAssertFalse(TumoflipRecoveryFinalization.isCandidate(pending))
+        pending = state
+        pending.txn?.cleanups = [.init(legacy: "/ext/apps/old.fap", backup: "/ext/.tumoflip/rollback/old")]
+        XCTAssertFalse(TumoflipRecoveryFinalization.isCandidate(pending))
+        pending = state
+        pending.ledger.removeValue(forKey: ops[0].target)
+        XCTAssertFalse(TumoflipRecoveryFinalization.isCandidate(pending))
+        pending = state
+        pending.generation = .max
+        XCTAssertFalse(TumoflipRecoveryFinalization.isCandidate(pending))
+    }
+
+    func testRecoveryDoesNotFinalizeAfterStateChangesDuringMD5Reads() async throws {
+        let (fs, original, _) = try completedRecoverySnapshot()
+        var newer = original
+        newer.generation += 2
+        fs.onCheckedMD5 = {
+            fs.onCheckedMD5 = nil
+            fs.seedState(newer)
+        }
+        do {
+            try await TumoflipInstaller(fs: fs, source: FakeSource(data: [:])).recover()
+            XCTFail("A newer snapshot must be re-evaluated, not overwritten")
+        } catch {}
+        let after = await fs.readState()
+        XCTAssertEqual(after, newer)
+        XCTAssertEqual(fs.writeCount, 0)
+    }
+
+    func testStatusReconciliationDoesNotAdoptWhileRecoveryIsPending() async throws {
+        let (fs, original, live) = try completedRecoverySnapshot()
+        var pending = original
+        pending.ledger = [:]
+        fs.seedState(pending)
+        let files = live.keys.sorted().map { bundledFile(String($0.dropFirst(5)), $0, live[$0]!) }
+        do {
+            _ = try await TumoflipInstaller(fs: fs, source: FakeSource(data: [:]))
+                .reconcilePackageStatus(manifest: manifest(files))
+            XCTFail("Status refresh must not write over an active transaction")
+        } catch {}
+        let after = await fs.readState()
+        XCTAssertEqual(after, pending)
+        XCTAssertEqual(fs.writeCount, 0)
+        XCTAssertEqual(fs.mutationCount, 0)
+    }
+
+    func testStatusReconciliationDoesNotOverwriteANewerStateGeneration() async throws {
+        let (fs, original, live) = try completedRecoverySnapshot()
+        var initial = original
+        initial.generation = 40
+        initial.ledger = [:]
+        initial.txn = nil
+        fs.seedState(initial)
+        var newer = original
+        newer.generation = 41
+        let newerBytes = try TumoflipInstaller.encodeStateSlot(newer)
+        fs.onCheckedMD5 = {
+            fs.onCheckedMD5 = nil
+            fs.files[TumoflipInstaller.stateSlotB] = newerBytes
+        }
+        let files = live.keys.sorted().map { bundledFile(String($0.dropFirst(5)), $0, live[$0]!) }
+        do {
+            _ = try await TumoflipInstaller(fs: fs, source: FakeSource(data: [:]))
+                .reconcilePackageStatus(manifest: manifest(files))
+            XCTFail("A stale status snapshot must not persist")
+        } catch {}
+        XCTAssertEqual(fs.files[TumoflipInstaller.stateSlotB], newerBytes)
+        XCTAssertEqual(fs.writeCount, 0)
+    }
+
+    private actor FirstReadPause {
+        let started: XCTestExpectation
+        var paused = false
+        var continuation: CheckedContinuation<Void, Never>?
+        init(_ started: XCTestExpectation) { self.started = started }
+        func waitOnce() async {
+            guard !paused else { return }
+            paused = true
+            started.fulfill()
+            await withCheckedContinuation { continuation = $0 }
+        }
+        func resume() { continuation?.resume(); continuation = nil }
+    }
+
+    @MainActor
+    func testRecoveryOwnsTheSameTransactionGateAsInstallAndCleanup() async throws {
+        let (fs, _, _) = try completedRecoverySnapshot()
+        let started = expectation(description: "first recovery reads state")
+        let pause = FirstReadPause(started)
+        fs.beforeRead = { _ in await pause.waitOnce() }
+        let updater = TumoflipUpdater()
+        updater.testingFileSystem = fs
+        let first = Task { await updater.recoverIfNeeded() }
+        await fulfillment(of: [started], timeout: 3)
+        XCTAssertTrue(updater.busy, "Recovery must own the gate before its first await")
+        await updater.recoverIfNeeded()
+        XCTAssertEqual(fs.writeCount, 0, "The second recovery must not enter the active transaction")
+        await pause.resume()
+        await first.value
+        XCTAssertFalse(updater.busy)
+        XCTAssertEqual(fs.writeCount, 1)
+    }
 
     /// Build a persisted state representing a crash partway through activation, plus the
     /// matching filesystem snapshot, then return a fresh installer over the same FS.
