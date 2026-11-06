@@ -599,6 +599,43 @@ final class PluginProtectionPolicyTests: XCTestCase {
     }
 
     @MainActor
+    func testChangedCanonicalIsNotHiddenByCacheOrSelectedForOverwrite() async throws {
+        let suite = "CommunityChangedCanonical.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let oldPath = "/ext/apps/Games/chess.fap"
+        let currentPath = "/ext/apps/Games/Board/chess.fap"
+        let old = makeFAP(seed: 0x91)
+        let custom = Data("owner-modified-canonical-build".utf8)
+        let storage = PluginInstallMemoryStore(initialFiles: [currentPath: custom, oldPath: old])
+        let fixture = try await makeCacheReconciliationFixture(storage: storage, defaults: defaults)
+        defer {
+            fixture.archives.forEach { try? FileManager.default.removeItem(at: $0) }
+            try? FileManager.default.removeItem(at: fixture.auditDirectory)
+        }
+        fixture.updater.seedCacheForTesting(PluginCatalogCache(tag: "cached-current", map: [
+            currentPath: fixture.newChessMD5,
+            fixture.checkersPath: fixture.newCheckersMD5,
+        ], retiredRoutes: [oldPath: [md5(old)]]))
+        for _ in 0..<2 {
+            await fixture.updater.check()
+            let update = try XCTUnwrap(fixture.updater.updates.first { $0.remotePath == currentPath })
+            XCTAssertEqual(update.oldMD5, md5(custom))
+            XCTAssertFalse(update.selected, "Unknown observed bytes never become trusted pack history")
+            XCTAssertFalse(update.needsRouteMigration)
+            XCTAssertEqual(fixture.updater.cleanupActionCount, 0)
+            XCTAssertEqual(fixture.updater.cleanupReviewCount, 1)
+            let candidate = try XCTUnwrap(fixture.updater.pendingRouteCleanup.first)
+            XCTAssertEqual(fixture.updater.cleanupAssessment(for: candidate), .review(.canonicalMismatch))
+        }
+        await fixture.updater.cleanUpPendingRoutes()
+        let canonicalAfter = await storage.data(at: currentPath)
+        let legacyAfter = await storage.data(at: oldPath)
+        XCTAssertEqual(canonicalAfter, custom)
+        XCTAssertEqual(legacyAfter, old)
+    }
+
+    @MainActor
     func testFreshCanonicalCanCleanAnUnstagedJournalFromAnOlderPack() async throws {
         let suite = "CommunityFreshCleanup.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
