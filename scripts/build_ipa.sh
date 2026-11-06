@@ -8,6 +8,10 @@ ROOT="$(pwd)"
 XCODE="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}/usr/bin/xcodebuild"
 PATH="/opt/homebrew/bin:$PATH"
 XCODE_JOBS="${XCODE_JOBS:-2}"
+XCODE_ARGS=(-project UnleashedCompanion.xcodeproj -scheme UnleashedCompanion)
+if [ -n "${TUMO_DERIVED_DATA_PATH:-}" ]; then
+  XCODE_ARGS+=(-derivedDataPath "$TUMO_DERIVED_DATA_PATH")
+fi
 
 VERSION=$(awk -F'"' '/MARKETING_VERSION:/{print $2; exit}' project.yml)
 STAMP="${BUILD_STAMP:-$(date +%Y%m%d-%H%M)}"
@@ -37,17 +41,17 @@ xcodegen generate
 
 echo "==> Resolving Swift packages"
 "$XCODE" -resolvePackageDependencies \
-  -project UnleashedCompanion.xcodeproj -scheme UnleashedCompanion >/dev/null
+  "${XCODE_ARGS[@]}" >/dev/null
 
 echo "==> Building (Release, iphoneos, unsigned)"
 mkdir -p "$ROOT/build"
 "$XCODE" build \
-  -project UnleashedCompanion.xcodeproj -scheme UnleashedCompanion \
+  "${XCODE_ARGS[@]}" \
   -sdk iphoneos -configuration Release -destination 'generic/platform=iOS' \
   -jobs "$XCODE_JOBS" \
   CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO 2>&1 | tee "$ROOT/build/ipa-build.log"
 
-APP=$("$XCODE" -project UnleashedCompanion.xcodeproj -scheme UnleashedCompanion \
+APP=$("$XCODE" "${XCODE_ARGS[@]}" \
   -sdk iphoneos -configuration Release -showBuildSettings -json 2>/dev/null \
   | python3 -c '
 import json

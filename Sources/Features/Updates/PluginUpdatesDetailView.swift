@@ -14,6 +14,7 @@ struct PluginUpdatesDetailView: View {
     @State private var incompatibleExpanded = false
     @State private var showHelp = false
     @State private var showCleanupConfirmation = false
+    @State private var cleanupConfirmedPaths: Set<String> = []
     @State private var detailsDrawerExpanded = false
 
     var body: some View {
@@ -66,7 +67,12 @@ struct PluginUpdatesDetailView: View {
                 .disabled(busy)
             }
         }
-        .onAppear { if case .idle = updater.phase, updater.updates.isEmpty { Task { await updater.check() } } }
+        .task {
+            if updater.shouldLoadCatalog { await updater.check() }
+            else if !busy, hasFileChannel, updater.uncheckedCleanupCount > 0 {
+                await updater.reviewPendingRoutes()
+            }
+        }
         .sheet(isPresented: $showReleasePicker) {
             NavigationStack { PluginReleasePickerView(updater: updater) }
         }
@@ -154,6 +160,11 @@ struct PluginUpdatesDetailView: View {
             return "\(updater.updates.count) changed · \(updater.selectedCount) selected"
         }
         if busy { return "Checking…" }
+        if updater.uncheckedCleanupCount > 0 { return "\(updater.uncheckedCleanupCount) paths not checked" }
+        if updater.cleanupReviewCount > 0 {
+            return "\(updater.cleanupReviewCount) path\(updater.cleanupReviewCount == 1 ? " needs" : "s need") review"
+        }
+        if updater.cleanupActionCount > 0 { return "\(updater.cleanupActionCount) verified cleanup" }
         return updater.tag.isEmpty ? "Not checked" : "Up to date"
     }
 
@@ -194,9 +205,9 @@ struct PluginUpdatesDetailView: View {
                         .disabled(!hasFileChannel || updater.validating)
                         .accessibilityIdentifier("community-install-action")
                     }
-                    if updater.pendingCleanupCount > 0, !showCleanupConfirmation {
+                    if updater.cleanupActionCount > 0, !showCleanupConfirmation {
                         compactCommunityAction(
-                            title: "Clean Up \(updater.pendingCleanupCount)",
+                            title: "Clean Up \(updater.cleanupActionCount)",
                             systemImage: "trash",
                             tint: Theme.warning,
                             role: .destructive,
@@ -205,13 +216,25 @@ struct PluginUpdatesDetailView: View {
                         .disabled(!hasFileChannel)
                         .accessibilityIdentifier("community-cleanup-action")
                     }
+                    let checkCount = updater.uncheckedCleanupCount + updater.cleanupReviewCount
+                    if checkCount > 0, !showCleanupConfirmation {
+                        compactCommunityAction(
+                            title: updater.uncheckedCleanupCount > 0
+                                ? "Check paths \(checkCount)" : "Recheck \(checkCount)",
+                            systemImage: "checkmark.shield",
+                            tint: Theme.warning,
+                            action: { Task { await updater.reviewPendingRoutes() } }
+                        )
+                        .disabled(!hasFileChannel)
+                        .accessibilityIdentifier("community-cleanup-recheck")
+                    }
                 }
                 .padding(.horizontal, 2)
                 .padding(.vertical, 2)
 
                 if showCleanupConfirmation {
                     InlineActionConfirmationRow(
-                        title: "\(updater.pendingCleanupCount) old route\(updater.pendingCleanupCount == 1 ? "" : "s")",
+                        title: "\(cleanupConfirmedPaths.count) verified old route\(cleanupConfirmedPaths.count == 1 ? "" : "s")",
                         detail: "Custom, modified and protected files stay untouched",
                         systemImage: "trash.slash.fill",
                         iconColor: Theme.warning,
@@ -231,25 +254,31 @@ struct PluginUpdatesDetailView: View {
     }
 
     private func requestCleanup() {
-        guard updater.pendingCleanupCount > 0 else { return }
+        cleanupConfirmedPaths = Set(updater.pendingRouteCleanup.filter {
+            updater.cleanupAssessment(for: $0)?.isActionable == true
+        }.map { PluginRouteReconciliation.pathIdentity($0.legacyPath) })
+        guard !cleanupConfirmedPaths.isEmpty else { return }
         withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) {
             showCleanupConfirmation = true
         }
     }
 
     private func cancelCleanup() {
+        cleanupConfirmedPaths = []
         withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) {
             showCleanupConfirmation = false
         }
     }
 
     private func confirmCleanup() {
-        guard updater.pendingCleanupCount > 0 else {
+        guard !cleanupConfirmedPaths.isEmpty else {
             showCleanupConfirmation = false
             return
         }
+        let confirmed = cleanupConfirmedPaths
+        cleanupConfirmedPaths = []
         showCleanupConfirmation = false
-        Task { await updater.cleanUpPendingRoutes() }
+        Task { await updater.cleanUpPendingRoutes(confirmedPaths: confirmed) }
     }
 
     private func compactCommunityAction(
@@ -276,6 +305,12 @@ struct PluginUpdatesDetailView: View {
     }
 
     private var communityDetailsSummary: String {
+        if updater.cleanupReviewCount > 0 {
+            return updater.updates.isEmpty ? "\(updater.cleanupReviewCount) review"
+                : "\(updater.updates.count) updates · \(updater.cleanupReviewCount) review"
+        }
+        if updater.uncheckedCleanupCount > 0 { return "\(updater.uncheckedCleanupCount) to check" }
+        if updater.cleanupActionCount > 0, updater.updates.isEmpty { return "\(updater.cleanupActionCount) cleanup" }
         if updater.phase == .needsBaseline { return "First sync" }
         if !updater.updates.isEmpty {
             return "\(updater.updates.count) update\(updater.updates.count == 1 ? "" : "s")"
@@ -289,7 +324,8 @@ struct PluginUpdatesDetailView: View {
         let categoryRows = CGFloat(min(max(installCategories.count, 1), 4)) * 40
         let updateSection: CGFloat = updater.updates.isEmpty ? 36 : 42 + categoryRows
         let lastRunSection: CGFloat = updater.verifyResult != nil || updater.lastCleanup != nil ? 110 : 0
-        return min(420, max(240, releaseSection + baselineSection + updateSection + lastRunSection))
+        let reviewSection: CGFloat = updater.cleanupReviewCount > 0 ? 110 : 0
+        return min(420, max(240, releaseSection + baselineSection + updateSection + lastRunSection + reviewSection))
     }
 
     private var communityDetailsPanel: some View {
@@ -342,6 +378,10 @@ struct PluginUpdatesDetailView: View {
             if updater.verifyResult != nil || updater.lastCleanup != nil {
                 Divider().opacity(0.45)
                 lastRunDetails
+            }
+            if updater.cleanupReviewCount > 0 {
+                Divider().opacity(0.45)
+                cleanupReviewDetails
             }
         }
     }
@@ -421,6 +461,28 @@ struct PluginUpdatesDetailView: View {
         }
     }
 
+    private var cleanupReviewDetails: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("\(updater.cleanupReviewCount) path\(updater.cleanupReviewCount == 1 ? " needs" : "s need") review",
+                  systemImage: "exclamationmark.triangle")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Theme.warning)
+                .accessibilityIdentifier("community-cleanup-review-count")
+            ForEach(updater.cleanupReviewCandidates, id: \.legacyPath) { candidate in
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(candidate.legacyPath)
+                        .font(.system(.caption2, design: .monospaced))
+                        .foregroundStyle(Theme.warning)
+                    if let reason = updater.cleanupAssessment(for: candidate)?.reviewReason {
+                        Text(reason.message).font(.caption2)
+                            .foregroundStyle(Color.primary.opacity(0.72))
+                    }
+                }
+                .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
     /// Bulk-selection menu used in the bottom app-details drawer.
     private var selectMenu: some View {
         Menu {
@@ -465,7 +527,7 @@ struct PluginUpdatesDetailView: View {
     private var busy: Bool {
         if updater.validating { return true }
         switch updater.phase {
-        case .fetching, .downloading, .scanning, .installing, .cleaning, .verifying:
+        case .fetching, .downloading, .scanning, .installing, .cleaning, .verifying, .reviewingRoutes:
             return true
         default: return false
         }
@@ -504,7 +566,7 @@ struct PluginUpdatesDetailView: View {
     @ViewBuilder private func cleanupDetail(_ cl: CleanupResult) -> some View {
         if !cl.removed.isEmpty {
             Text("Removed obsolete Community Pack route\(cl.removed.count == 1 ? "" : "s") (verified history):")
-                .font(.caption2).foregroundStyle(.secondary)
+                .font(.caption2).foregroundStyle(Color.primary.opacity(0.72))
                 .accessibilityIdentifier("community-cleanup-removed")
             Text(cl.removed.prefix(12).joined(separator: "\n") + (cl.removed.count > 12 ? "\n…" : ""))
                 .font(.system(.caption2, design: .monospaced)).foregroundStyle(Theme.success)
@@ -512,16 +574,20 @@ struct PluginUpdatesDetailView: View {
                 .accessibilityIdentifier("community-cleanup-removed-paths")
         }
         if !cl.kept.isEmpty {
-            Text(
-                "Kept legacy file\(cl.kept.count == 1 ? "" : "s") for review "
-                + "(not verified as an old pack build — possible custom/modified file):"
-            )
-                .font(.caption2).foregroundStyle(.secondary)
+            Text("Kept for review — these paths were not removed:")
+                .font(.caption2).foregroundStyle(Color.primary.opacity(0.72))
                 .accessibilityIdentifier("community-cleanup-kept")
-            Text(cl.kept.prefix(12).joined(separator: "\n") + (cl.kept.count > 12 ? "\n…" : ""))
-                .font(.system(.caption2, design: .monospaced)).foregroundStyle(Theme.warning)
+            ForEach(Array(cl.kept.prefix(12)), id: \.self) { path in
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(path).font(.system(.caption2, design: .monospaced))
+                        .foregroundStyle(Theme.warning)
+                    Text((cl.keptReasons[PluginRouteReconciliation.pathIdentity(path)]
+                          ?? .verificationChanged).message)
+                        .font(.caption2).foregroundStyle(Color.primary.opacity(0.72))
+                }
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("community-cleanup-kept-paths")
+            }
         }
     }
 
@@ -668,6 +734,7 @@ struct PluginUpdatesDetailView: View {
         case .verifying: EmptyView()
         case .installing(let i, let n): installingRow(i, n)
         case .cleaning(let i, let n): progress("Cleaning old routes… \(i)/\(n)")
+        case .reviewingRoutes(let i, let n): progress("Checking old paths… \(i)/\(n)")
         case .done(let m):
             Label(m, systemImage: "checkmark.circle.fill").foregroundStyle(Theme.success)
                 .fixedSize(horizontal: false, vertical: true)
@@ -727,13 +794,14 @@ struct PluginUpdatesDetailView: View {
                     Text(u.name).font(.subheadline)
                     Text(updateSubtitle(u))
                         .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.primary.opacity(0.72))
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 1) {
-                    Text(u.isNew ? "NEW" : "UPD")
+                    Text(u.needsRouteMigration ? "MOVE" : (u.isNew ? "NEW" : "UPD"))
                         .font(.caption2).bold()
                         .foregroundStyle(u.isNew ? Theme.success : Theme.warning)
+                        .accessibilityIdentifier(u.needsRouteMigration ? "community-route-move" : "community-update-kind")
                     Text(byteStr(u.size))
                         .font(.caption2).foregroundStyle(.secondary)
                 }
@@ -753,6 +821,7 @@ struct PluginUpdatesDetailView: View {
         // orthogonal context: which pack it came from (and its original folder if
         // the installer re-routes it somewhere else).
         var s = update.pack == "base" ? "Base pack" : "Extra pack"
+        if update.needsRouteMigration { return s + " · install at new path: " + update.targetPath }
         if update.isRouted { s += " · from \(update.category)" }
         return s
     }
