@@ -75,6 +75,7 @@ enum TumoflipInstallError: Error, Equatable {
     case statePersistenceFailed(String)
     case recoveryVerificationUnavailable(String)
     case transactionStateChanged
+    case recoveryRequired
     case activeAppCouldNotStop
     case cancelled                       // user pressed Stop → transaction rolled back to the prior state
 }
@@ -670,7 +671,12 @@ struct TumoflipInstaller {
         manifest: TumoflipManifest,
         captureValidationErrors: Bool
     ) async throws -> StatusSnapshot {
-        var state = try await loadState() ?? TumoflipState()
+        let expectedState = try await loadState()
+        if let transaction = expectedState?.txn,
+           transaction.phase == .staging || transaction.phase == .activating {
+            throw TumoflipInstallError.recoveryRequired
+        }
+        var state = expectedState ?? TumoflipState()
         let originalLedger = state.ledger
         var statuses: [String: GroupStatus] = [:]
         var fileStatuses: [String: FileStatus] = [:]
@@ -796,6 +802,12 @@ struct TumoflipInstaller {
             )
         }
 
+        // Device hashing suspends this operation. Never save a status snapshot
+        // over a transaction/generation created while those reads were pending.
+        guard try await loadState() == expectedState else {
+            throw TumoflipInstallError.transactionStateChanged
+        }
+
         // Keep the compatibility projection aligned with every complete group, not
         // merely the last group encountered during adoption. Write it before the
         // authoritative ledger so a projection failure leaves adoption retryable.
@@ -807,6 +819,9 @@ struct TumoflipInstaller {
             )
         }
         if ledgerChanged {
+            guard try await loadState() == expectedState else {
+                throw TumoflipInstallError.transactionStateChanged
+            }
             try await saveState(&state)
         }
         return StatusSnapshot(

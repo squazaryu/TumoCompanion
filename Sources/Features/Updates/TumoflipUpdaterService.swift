@@ -388,12 +388,14 @@ final class TumoflipUpdater: ObservableObject {
     }
 
     func setManualChannelOverride(_ channel: TumoflipFirmwareChannel) {
+        guard !transactionGate.isActive else { return }
         requestedCatalogRevision = nil
         manualChannelOverride = channel
         firmwareRoute = TumoflipFirmwareRouter.route(identity: deviceIdentity, manualOverride: manualChannelOverride)
     }
 
     func clearManualChannelOverride() {
+        guard !transactionGate.isActive else { return }
         requestedCatalogRevision = nil
         manualChannelOverride = nil
         firmwareRoute = TumoflipFirmwareRouter.route(identity: deviceIdentity, manualOverride: nil)
@@ -404,14 +406,16 @@ final class TumoflipUpdater: ObservableObject {
     /// recheck pins the same revision, so selecting an older package is a real
     /// rollback rather than an accidental refresh back to latest.
     func selectCatalogRevision(_ revision: Int?) async {
+        guard transactionGate.begin() else { return }
+        defer { transactionGate.end() }
         requestedCatalogRevision = revision
         guard let selection = catalogSelections.first(where: { $0.revision == revision }) else {
-            await check()
+            await checkWithinTransaction()
             return
         }
         do {
             try adoptCatalogSelection(selection)
-            await refreshStatus()
+            await refreshStatusWithinTransaction()
             phase = .ready
         } catch {
             phase = .failed(friendly(error))
@@ -430,6 +434,12 @@ final class TumoflipUpdater: ObservableObject {
     /// Compare the durable ledger to the latest manifest and, when the manifest has
     /// expected MD5s, safely adopt complete firmware-bundled groups from the device.
     func refreshStatus() async {
+        guard transactionGate.begin() else { return }
+        defer { transactionGate.end() }
+        await refreshStatusWithinTransaction()
+    }
+
+    private func refreshStatusWithinTransaction() async {
         guard let manifest = managedManifest else { return }
         transferChannel = activeChannel
         let inst = TumoflipInstaller(fs: activeFS(), source: ZipPackageSource(entries: [:]))
@@ -462,6 +472,8 @@ final class TumoflipUpdater: ObservableObject {
     /// the ledger, so the badges reflect the ACTUAL SD contents (catches files deleted
     /// or changed outside the app). Needs a connected Flipper; slower than `refreshStatus`.
     func verifyOnDevice() async {
+        guard transactionGate.begin() else { return }
+        defer { transactionGate.end() }
         guard let manifest = managedManifest else { return }
         verifying = true
         defer { verifying = false }
@@ -590,15 +602,23 @@ final class TumoflipUpdater: ObservableObject {
     /// shows instantly — even while the slower device-recover step runs (which otherwise
     /// left the phase untouched, so the screen looked frozen) — then fetches the release.
     func reload(recover: Bool) async {
+        guard transactionGate.begin() else { return }
+        defer { transactionGate.end() }
         phase = .checking
-        if recover { await recoverIfNeeded() }
+        if recover { await recoverWithinTransaction() }
         if case .failed = phase { return }   // recover surfaced a real install error → stop here
-        await check()
+        await checkWithinTransaction()
     }
 
     /// Discover the latest tumoflip release, decode + validate its manifest, and note
     /// whether the install archive is published.
     func check() async {
+        guard transactionGate.begin() else { return }
+        defer { transactionGate.end() }
+        await checkWithinTransaction()
+    }
+
+    private func checkWithinTransaction() async {
         phase = .checking
         do {
             await refreshRoutingIdentity()
@@ -629,7 +649,7 @@ final class TumoflipUpdater: ObservableObject {
                 )
             }
             try adoptCatalogSelection(selection)
-            await refreshStatus()
+            await refreshStatusWithinTransaction()
             phase = .ready
             // FAP/FAL API validation needs the package zip; it's triggered from the FW
             // Packages detail screen (where the user installs) rather than here, so just
@@ -705,7 +725,7 @@ final class TumoflipUpdater: ObservableObject {
             }
 
             try adoptCatalogSelection(selection)
-            await refreshStatus()
+            await refreshStatusWithinTransaction()
             phase = .done("Catalog synchronized — no FAP files changed.")
         } catch let error as TumoflipInstallError {
             phase = .failed(installErrorText(error))
@@ -989,7 +1009,7 @@ final class TumoflipUpdater: ObservableObject {
                     detail: "Firmware packages installed"
                 )
             }
-            await refreshStatus()
+            await refreshStatusWithinTransaction()
         } catch TumoflipInstallError.cancelled {
             // Stop requested: the transaction rolled back, so the device is exactly as
             // before — every prior version intact and fully functional.
@@ -999,7 +1019,7 @@ final class TumoflipUpdater: ObservableObject {
                 total: activityTotal,
                 detail: "Rolled back"
             )
-            if enteredDeviceMutationPhase { await refreshStatus() }
+            if enteredDeviceMutationPhase { await refreshStatusWithinTransaction() }
         } catch let e as TumoflipInstallError {
             phase = .failed(installErrorText(e))
             await live.fail(
@@ -1007,7 +1027,7 @@ final class TumoflipUpdater: ObservableObject {
                 total: activityTotal,
                 detail: installErrorText(e)
             )
-            if enteredDeviceMutationPhase { await refreshStatus() }
+            if enteredDeviceMutationPhase { await refreshStatusWithinTransaction() }
         } catch {
             phase = .failed(friendly(error))
             await live.fail(
@@ -1015,7 +1035,7 @@ final class TumoflipUpdater: ObservableObject {
                 total: activityTotal,
                 detail: friendly(error)
             )
-            if enteredDeviceMutationPhase { await refreshStatus() }
+            if enteredDeviceMutationPhase { await refreshStatusWithinTransaction() }
         }
     }
 
@@ -1076,7 +1096,7 @@ final class TumoflipUpdater: ObservableObject {
             )
             guard !plan.cleanup.isEmpty else {
                 phase = .done("No legacy files remain.")
-                await refreshStatus()
+                await refreshStatusWithinTransaction()
                 return
             }
             if channel == .ble {
@@ -1119,7 +1139,7 @@ final class TumoflipUpdater: ObservableObject {
                 removed == 0
                     ? "No legacy files remain."
                     : "Removed \(removed) legacy file\(removed == 1 ? "" : "s").")
-            await refreshStatus()
+            await refreshStatusWithinTransaction()
         } catch TumoflipInstallError.cancelled {
             phase = .done("Stopped — cleanup rolled back, nothing changed.")
             await live.stop(
@@ -1127,7 +1147,7 @@ final class TumoflipUpdater: ObservableObject {
                 total: selection.entries.count,
                 detail: "Cleanup rolled back"
             )
-            await refreshStatus()
+            await refreshStatusWithinTransaction()
         } catch let error as TumoflipInstallError {
             phase = .failed(installErrorText(error))
             await live.fail(
@@ -1135,7 +1155,7 @@ final class TumoflipUpdater: ObservableObject {
                 total: selection.entries.count,
                 detail: installErrorText(error)
             )
-            await refreshStatus()
+            await refreshStatusWithinTransaction()
         } catch {
             phase = .failed(friendly(error))
             await live.fail(
@@ -1143,20 +1163,28 @@ final class TumoflipUpdater: ObservableObject {
                 total: selection.entries.count,
                 detail: friendly(error)
             )
-            await refreshStatus()
+            await refreshStatusWithinTransaction()
         }
     }
 
     /// Roll back any transaction left half-applied by a previous crash/disconnect.
     /// Safe to call on appear; needs a connected Flipper to read its state.
     func recoverIfNeeded() async {
+        guard transactionGate.begin() else { return }
+        defer { transactionGate.end() }
+        await recoverWithinTransaction()
+    }
+
+    private func recoverWithinTransaction() async {
         beginTransactionGuards()
         defer { endTransactionGuards() }
         transferChannel = activeChannel
         let inst = TumoflipInstaller(fs: activeFS(), source: ZipPackageSource(entries: [:]))
         do { try await inst.recover() }
         catch let e as TumoflipInstallError { phase = .failed(installErrorText(e)) }
-        catch { /* not connected / nothing to recover */ }
+        catch {
+            phase = .failed("Could not read package recovery state: \(error.localizedDescription). Reconnect, then retry recovery.")
+        }
     }
 
     private var activeChannel: TransferChannel { TransferChannelStore.shared.activeChannel }
@@ -1468,6 +1496,8 @@ final class TumoflipUpdater: ObservableObject {
             return "Recovery could not verify \(path). No application files were changed. Reconnect, then retry recovery."
         case .transactionStateChanged:
             return "The package journal changed during verification. No stale state was saved. Retry after the other operation finishes."
+        case .recoveryRequired:
+            return "An unfinished package transaction needs recovery before status can be updated. Reconnect and retry recovery."
         case .activeAppCouldNotStop:
             return "Close the running Flipper app and retry. No package files were changed."
         case .cancelled:
