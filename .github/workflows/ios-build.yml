@@ -27,6 +27,8 @@ jobs:
         run: brew install xcodegen
       - name: Verify package overwrite protection
         run: python3 scripts/test_plugin_protection_host.py
+      - name: Verify Community route cleanup and recovery without a device
+        run: python3 scripts/test_community_cleanup_host.py
       - name: Verify bounded ranged-read policy without Bluetooth
         run: python3 scripts/test_rpc_read_budget_host.py
       - name: Verify BLE readiness and RPC evidence without Bluetooth

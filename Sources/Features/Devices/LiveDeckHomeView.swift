@@ -614,7 +614,7 @@ private struct LiveDeckSourcesCard: View {
                 progressText: Self.countText(done: done, total: total),
                 label: "Cleaning"
             ))
-        case .verifying(let done, let total):
+        case .verifying(let done, let total), .reviewingRoutes(let done, let total):
             return .loading(.init(
                 kind: .checking,
                 progress: Self.fraction(done: done, total: total),
@@ -626,6 +626,9 @@ private struct LiveDeckSourcesCard: View {
             return .attention("Review")
         case .done:
             if !updates.plugins.pendingProtectedReview.isEmpty { return .attention("Review") }
+            if updates.plugins.cleanupReviewCount > 0 || updates.plugins.uncheckedCleanupCount > 0 {
+                return .attention("Review")
+            }
             return updates.plugins.updates.isEmpty ? .ready("Ready") : .ready("Updates")
         case .idle:
             if updates.plugins.validating { return .loading(.init(kind: .checking)) }
@@ -1189,7 +1192,7 @@ private extension PluginUpdater {
     var isBusy: Bool {
         if validating { return true }
         switch phase {
-        case .fetching, .downloading, .scanning, .installing, .cleaning, .verifying:
+        case .fetching, .downloading, .scanning, .installing, .cleaning, .verifying, .reviewingRoutes:
             return true
         default:
             return false
