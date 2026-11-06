@@ -97,6 +97,11 @@ protocol DeviceFileStore: Sendable {
         check(active.load() == [stale], "pending refresh cannot overwrite active recovery")
         let migration = PluginRouteCleanupCandidate(catalogPath: current, canonicalPath: current,
             legacyPath: old, canonicalMD5: now, acceptedLegacyMD5s: [now])
+        let catalogCandidate = PluginRouteReconciliation.candidates(current: [update],
+            retiredRoutes: [old: [legacy]], excluded: [], unprotectedBuiltIns: [],
+            includeInstallRoutes: false).values.flatMap { $0 }.first
+        check(catalogCandidate?.acceptedLegacyMD5s.contains(now) == true,
+            "a current immutable pack binary at a retired route is a known duplicate")
         check(PluginRouteReconciliation.assessment(for: fresh, canonicalDeviceMD5: now,
             legacyDeviceMD5: legacy, stagedDeviceMD5: nil, ownsRecovery: false,
             catalogMatches: true) == .removable, "both content proofs allow cleanup")

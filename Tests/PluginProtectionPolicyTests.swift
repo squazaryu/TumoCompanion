@@ -573,6 +573,83 @@ final class PluginProtectionPolicyTests: XCTestCase {
         XCTAssertEqual(unchanged, custom)
     }
 
+    @MainActor
+    func testAbsentCanonicalAndLegacyRemainAMissingAppAcrossChecks() async throws {
+        let suite = "CommunityMissingRoute.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let oldPath = "/ext/apps/Games/chess.fap"
+        let storage = PluginInstallMemoryStore()
+        let fixture = try await makeCacheReconciliationFixture(storage: storage, defaults: defaults)
+        defer {
+            fixture.archives.forEach { try? FileManager.default.removeItem(at: $0) }
+            try? FileManager.default.removeItem(at: fixture.auditDirectory)
+        }
+        fixture.updater.seedCacheForTesting(PluginCatalogCache(tag: "old", map: [
+            fixture.chessPath: fixture.newChessMD5,
+            fixture.checkersPath: fixture.newCheckersMD5,
+        ], retiredRoutes: [oldPath: [fixture.newChessMD5]]))
+        for _ in 0..<2 {
+            await fixture.updater.check()
+            let missing = try XCTUnwrap(fixture.updater.updates.first { $0.remotePath == fixture.chessPath })
+            XCTAssertTrue(missing.isNew)
+            XCTAssertFalse(missing.selected)
+            XCTAssertEqual(fixture.updater.pendingCleanupCount, 0)
+        }
+    }
+
+    @MainActor
+    func testFreshCanonicalCanCleanAnUnstagedJournalFromAnOlderPack() async throws {
+        let suite = "CommunityFreshCleanup.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let oldPath = "/ext/apps/Games/chess.fap"
+        let currentPath = "/ext/apps/Games/Board/chess.fap"
+        let current = makeFAP(seed: 0xC1)
+        let old = makeFAP(seed: 0x91)
+        let storage = PluginInstallMemoryStore(initialFiles: [currentPath: current, oldPath: old])
+        let fixture = try await makeCacheReconciliationFixture(storage: storage, defaults: defaults)
+        defer {
+            fixture.archives.forEach { try? FileManager.default.removeItem(at: $0) }
+            try? FileManager.default.removeItem(at: fixture.auditDirectory)
+        }
+        fixture.updater.seedCacheForTesting(PluginCatalogCache(tag: "new", map: [
+            currentPath: md5(current), fixture.checkersPath: fixture.newCheckersMD5,
+        ], retiredRoutes: [oldPath: [md5(old)]]))
+        let journal = PluginRouteCleanupJournalStore(defaults: defaults, key: "test-cleanup-journal")
+        XCTAssertTrue(journal.record([PluginRouteCleanupCandidate(
+            catalogPath: currentPath, canonicalPath: currentPath, legacyPath: oldPath,
+            canonicalMD5: String(repeating: "5", count: 32), acceptedLegacyMD5s: [md5(old)])]))
+        await fixture.updater.check()
+        XCTAssertEqual(fixture.updater.cleanupActionCount, 1)
+        await fixture.updater.cleanUpPendingRoutes()
+        XCTAssertEqual(fixture.updater.pendingCleanupCount, 0)
+        let legacyAfter = await storage.data(at: oldPath)
+        let canonicalAfter = await storage.data(at: currentPath)
+        XCTAssertNil(legacyAfter)
+        XCTAssertEqual(canonicalAfter, current)
+        XCTAssertTrue(journal.load().isEmpty)
+    }
+
+    @MainActor
+    func testMigrationCommitNeverOverwritesATargetThatAppearedWhileStaging() async throws {
+        let path = "/ext/apps/Games/Board/chess.fap"
+        let custom = Data("new-path-owner-build".utf8)
+        let bytes = makeFAP(seed: 0xC1)
+        let store = PluginInstallMemoryStore(initialFiles: [path: custom, path + ".ucnew": bytes])
+        let updater = PluginUpdater()
+        let update = PluginUpdate(remotePath: path, name: "chess", category: "Board", pack: "extra",
+            newMD5: md5(bytes), oldMD5: md5(bytes), size: bytes.count, needsRouteMigration: true)
+        do {
+            _ = try await updater.commitStagedInstallForTesting(update, tempPath: path + ".ucnew", storage: store)
+            XCTFail("Migration must not overwrite an appeared target")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("no file was overwritten"))
+        }
+        let after = await store.data(at: path)
+        XCTAssertEqual(after, custom)
+    }
+
     func testLegacyV2CacheMigratesRemovedRoutesIntoContentAddressedHistory() throws {
         let oldPath = "/ext/apps/Games/4inrow.fap"
         let oldMD5 = "67067213b636a3a5f3bba182390c0bde"
