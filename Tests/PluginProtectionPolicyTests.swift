@@ -717,7 +717,7 @@ final class PluginProtectionPolicyTests: XCTestCase {
         })
         XCTAssertEqual(rebuilt.canonicalPath, "/ext/apps/GPIO/Programmers/24cxxprog.fap")
         XCTAssertEqual(rebuilt.canonicalMD5, rebuiltNewMD5)
-        XCTAssertEqual(rebuilt.acceptedLegacyMD5s, [rebuiltOldMD5])
+        XCTAssertEqual(rebuilt.acceptedLegacyMD5s, [rebuiltOldMD5, rebuiltNewMD5].sorted())
         XCTAssertFalse(candidates.contains { $0.legacyPath.contains("esp_flasher") })
     }
 

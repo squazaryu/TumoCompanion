@@ -453,6 +453,14 @@ struct PluginCatalogCache: Codable, Equatable {
         appHashes[PluginRouteReconciliation.cacheIdentityKey(for: update)] = update.newMD5
     }
 
+    /// Unknown observed bytes are not trusted pack history. Invalidate only the
+    /// accepted current identity when its physical target is missing/different.
+    mutating func forgetCurrentIdentity(for update: PluginUpdate) {
+        let identity = PluginRouteReconciliation.pathIdentity(update.remotePath)
+        map = map.filter { PluginRouteReconciliation.pathIdentity($0.key) != identity }
+        appHashes.removeValue(forKey: PluginRouteReconciliation.cacheIdentityKey(for: update))
+    }
+
     /// Historical paths retained when an immutable catalog moved an artifact. They
     /// are read-only aliases for verification; deletion still requires the separate
     /// content-addressed cleanup gate.
@@ -1280,7 +1288,9 @@ enum PluginRouteReconciliation {
                 canonicalPath: update.targetPath,
                 legacyPath: legacyPath,
                 canonicalMD5: update.newMD5,
-                acceptedLegacyMD5s: historicalMD5s,
+                // Current immutable pack bytes are also a known duplicate at a
+                // retired route. Both physical copies still require exact proof.
+                acceptedLegacyMD5s: historicalMD5s + [update.newMD5],
                 to: &proposals
             )
         }
@@ -2248,15 +2258,30 @@ final class PluginUpdater: ObservableObject {
                         // Physical proof, not a hash inherited from an old route.
                         cache?.record(update)
                         reconciledUpdates.removeAll { $0.remotePath == update.remotePath }
-                    } else if assessment == .needsMigration {
+                    } else if canonical == nil, staged == nil, !active.contains(identity) {
                         let old = reconciledUpdates.first { $0.remotePath == update.remotePath }
+                        let trusted = legacy.map {
+                            candidate.acceptedLegacyMD5s.contains($0.lowercased())
+                        } ?? false
                         let migration = PluginUpdate(
                             remotePath: update.remotePath, name: update.name,
                             category: update.category, pack: update.pack, newMD5: update.newMD5,
-                            oldMD5: legacy, size: update.size, selected: old?.selected ?? true,
-                            needsRouteMigration: true)
+                            oldMD5: legacy, size: update.size, selected: trusted && (old?.selected ?? true),
+                            needsRouteMigration: legacy != nil)
+                        cache?.forgetCurrentIdentity(for: update)
                         reconciledUpdates.removeAll { $0.remotePath == update.remotePath }
                         reconciledUpdates.append(migration)
+                    } else if let canonical, staged == nil, !active.contains(identity) {
+                        let old = reconciledUpdates.first { $0.remotePath == update.remotePath }
+                        let trusted = candidate.acceptedLegacyMD5s.contains(canonical.lowercased())
+                            || cache?.md5(for: update)?.lowercased() == canonical.lowercased()
+                        cache?.forgetCurrentIdentity(for: update)
+                        let mismatch = PluginUpdate(
+                            remotePath: update.remotePath, name: update.name,
+                            category: update.category, pack: update.pack, newMD5: update.newMD5,
+                            oldMD5: canonical, size: update.size, selected: trusted && (old?.selected ?? true))
+                        reconciledUpdates.removeAll { $0.remotePath == update.remotePath }
+                        reconciledUpdates.append(mismatch)
                     } else {
                         reconciledUpdates.removeAll {
                             $0.remotePath == update.remotePath && $0.needsRouteMigration
