@@ -473,6 +473,40 @@ final class PluginProtectionPolicyTests: XCTestCase {
         }
     }
 
+    func testRetiredHistoryRemovalUsesFATPathIdentityForEveryAlias() {
+        let path = "/ext/apps/GPIO/gpio_7segment_output.fap"
+        let md5 = String(repeating: "1", count: 32)
+        var cache = PluginCatalogCache(tag: "test", map: [:], retiredRoutes: [
+            path: [md5], path.uppercased(): [md5],
+        ])
+        cache.forgetRetiredRoute(path.lowercased())
+        XCTAssertTrue(cache.retiredRoutes.isEmpty)
+    }
+
+    @MainActor
+    func testPendingCleanupJournalCanRefreshWithoutLosingActiveRecovery() {
+        let suite = "PluginCleanupPendingRefresh.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = PluginRouteCleanupJournalStore(defaults: defaults, key: "journal")
+        let original = PluginRouteCleanupCandidate(
+            catalogPath: "/ext/apps/Sub-GHz/Sensors/tpms_bridge.fap",
+            canonicalPath: "/ext/apps/Sub-GHz/Sensors/tpms_bridge.fap",
+            legacyPath: "/ext/apps/Sub-GHz/tpms_bridge.fap",
+            canonicalMD5: String(repeating: "1", count: 32),
+            acceptedLegacyMD5s: [String(repeating: "3", count: 32)])
+        let fresh = PluginRouteCleanupCandidate(
+            catalogPath: original.catalogPath, canonicalPath: original.canonicalPath,
+            legacyPath: original.legacyPath, canonicalMD5: String(repeating: "2", count: 32),
+            acceptedLegacyMD5s: original.acceptedLegacyMD5s)
+        XCTAssertTrue(store.record([original]))
+        XCTAssertTrue(store.record([fresh]))
+        XCTAssertEqual(store.load(), [fresh])
+        XCTAssertTrue(store.markStaging(original))
+        _ = store.record([fresh])
+        XCTAssertEqual(store.load(), [original])
+    }
+
     func testLegacyV2CacheMigratesRemovedRoutesIntoContentAddressedHistory() throws {
         let oldPath = "/ext/apps/Games/4inrow.fap"
         let oldMD5 = "67067213b636a3a5f3bba182390c0bde"
