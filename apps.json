@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.11.33",
-      "versionDate": "2026-11-02",
-      "versionDescription": "Adds verified read-only Sensor Watch, Power Journal, UHF and Varta reports with graphs and CSV export. Protects managed USB CD-ROM and archive/favorites resources from Community Pack replacement. Tested on iOS 27 in both themes and large text. No BLE behavior change, pairing reset or idle-OOM fix claim. Install iOS 1.11.33 (286), Tumoflip Dev009-034 with native resources, then FW Packages Dev031 Base. Physical acceptance remains pending.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.33/TumoCompanion-unsigned.ipa",
-      "size": 26048770,
+      "version": "1.11.34",
+      "versionDate": "2026-11-06",
+      "versionDescription": "Community Apps cleanup now counts only verified routes and shows kept paths separately with their actual reason. Fix stale case-equivalent paths and pending cleanup history across pack updates. Apps remaining at old locations receive an explicit MOVE installation before separate cleanup; custom or changed files and recovery data stay protected. Refresh Community Apps after installing 1.11.34 (287). No firmware or FW Packages update is required. Validated with 696 unit tests and 5 iOS Simulator UI tests plus GitHub CI; physical-device acceptance remains pending.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.34/TumoCompanion-unsigned.ipa",
+      "size": 26115971,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.11.34",
+          "date": "2026-11-06",
+          "localizedDescription": "Community Apps cleanup now counts only verified routes and shows kept paths separately with their actual reason. Fix stale case-equivalent paths and pending cleanup history across pack updates. Apps remaining at old locations receive an explicit MOVE installation before separate cleanup; custom or changed files and recovery data stay protected. Refresh Community Apps after installing 1.11.34 (287). No firmware or FW Packages update is required. Validated with 696 unit tests and 5 iOS Simulator UI tests plus GitHub CI; physical-device acceptance remains pending.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.34/TumoCompanion-unsigned.ipa",
+          "size": 26115971,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.11.33",
           "date": "2026-11-02",
