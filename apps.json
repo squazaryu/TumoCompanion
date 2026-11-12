@@ -19,13 +19,21 @@
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/settings.png",
         "https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/screenshots/onboarding.png"
       ],
-      "version": "1.11.35",
-      "versionDate": "2026-11-06",
-      "versionDescription": "Fix a FW Packages recovery loop after a completed installation. Finish only after exact installed-ledger and fresh device-MD5 proof, with no old/stage copies or pending cleanup; no application files are re-uploaded or deleted by this completion. Serialize recovery, catalog/status checks, installation and cleanup; reject stale journal generations. Normal rollback remains protected for genuinely incomplete installs. Update Feather and install 1.11.35 (288). No firmware or FW Packages update is required. Validated by 702 unit and 22 UI tests, GitHub CI, and an explicitly authorized metadata-only device repair confirmed by the owner.",
-      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.35/TumoCompanion-unsigned.ipa",
-      "size": 26124127,
+      "version": "1.11.36",
+      "versionDate": "2026-11-12",
+      "versionDescription": "# TumoCompanion 1.11.36 \u2014 Firmware channel navigation\n\n- Fix the empty-Dev dead end after a newer Stable promotion: the Firmware releases drawer and channel selector remain available even when the selected channel has no builds.\n- Label the release channel explicitly as **Stable** rather than Main. Install the existing Tumoflip Stable010 / v1.0.10 from **Firmware \u2192 Firmware releases \u2192 Stable**.\n- Keep an explicit channel choice when the installed Flipper identity is refreshed; choosing Stable while running Dev no longer silently switches back to Dev.\n- Cancel a pending updater-preparation confirmation when changing channels, and retain empty-channel guidance in the drawer.\n\nNo firmware/FW Packages rebuild, factory reset, SD cleanup, BLE re-pairing or data migration is required. Stable010 and FW Packages Stable007 are unchanged. This fixes navigation only, not a claim about unrelated BLE or idle-OOM symptoms.\n\nThe unsigned IPA is for signing with your existing certificate in Feather/AltStore. Refresh the existing Feather source rather than adding a duplicate source. Physical installation and acceptance remain with the user; no attached Flipper is flashed by this task.",
+      "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.36/TumoCompanion-unsigned.ipa",
+      "size": 26127589,
       "minOSVersion": "17.0",
       "versions": [
+        {
+          "version": "1.11.36",
+          "date": "2026-11-12",
+          "localizedDescription": "# TumoCompanion 1.11.36 \u2014 Firmware channel navigation\n\n- Fix the empty-Dev dead end after a newer Stable promotion: the Firmware releases drawer and channel selector remain available even when the selected channel has no builds.\n- Label the release channel explicitly as **Stable** rather than Main. Install the existing Tumoflip Stable010 / v1.0.10 from **Firmware \u2192 Firmware releases \u2192 Stable**.\n- Keep an explicit channel choice when the installed Flipper identity is refreshed; choosing Stable while running Dev no longer silently switches back to Dev.\n- Cancel a pending updater-preparation confirmation when changing channels, and retain empty-channel guidance in the drawer.\n\nNo firmware/FW Packages rebuild, factory reset, SD cleanup, BLE re-pairing or data migration is required. Stable010 and FW Packages Stable007 are unchanged. This fixes navigation only, not a claim about unrelated BLE or idle-OOM symptoms.\n\nThe unsigned IPA is for signing with your existing certificate in Feather/AltStore. Refresh the existing Feather source rather than adding a duplicate source. Physical installation and acceptance remain with the user; no attached Flipper is flashed by this task.",
+          "downloadURL": "https://github.com/squazaryu/TumoCompanion/releases/download/v1.11.36/TumoCompanion-unsigned.ipa",
+          "size": 26127589,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "1.11.35",
           "date": "2026-11-06",
