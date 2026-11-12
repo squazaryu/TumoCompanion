@@ -208,6 +208,7 @@ final class FirmwareLibrary: ObservableObject {
     private let deviceInfoReader: () async throws -> [(String, String)]
     private var loadTask: Task<Void, Never>?
     private var identityTask: Task<Void, Never>?
+    private var hasManualChannelSelection = false
     private var operationRunning = false
     private let stopToken = StopToken()
     private let backgroundGuard = BackgroundTransferGuard(name: "firmware-stage")
@@ -253,6 +254,7 @@ final class FirmwareLibrary: ObservableObject {
     }
 
     func setChannel(_ channel: TumoflipFirmwareChannel) {
+        hasManualChannelSelection = true
         selectedChannel = channel
     }
 
@@ -543,7 +545,9 @@ final class FirmwareLibrary: ObservableObject {
     func applyInstalledIdentity(_ identity: TumoflipDeviceIdentity) {
         installedVersion = identity.firmwareVersion
         installedAPI = identity.firmwareAPI
-        if let channel = identity.inferredChannel { selectedChannel = channel }
+        if !hasManualChannelSelection, let channel = identity.inferredChannel {
+            selectedChannel = channel
+        }
     }
 
     private func cachedArchive(for release: FirmwareRelease) async throws -> Data {
@@ -621,7 +625,8 @@ extension FirmwareLibrary {
     static func layoutQAFixture(
         phase: Phase = .ready,
         selectedChannel: TumoflipFirmwareChannel = .stable,
-        devHistoryPromoted: Bool = false
+        devHistoryPromoted: Bool = false,
+        devLineSuperseded: Bool = false
     ) -> FirmwareLibrary {
         let library = FirmwareLibrary()
         let baseDate = Date(timeIntervalSince1970: 1_787_875_200)
@@ -656,6 +661,15 @@ extension FirmwareLibrary {
         ]
         library.installedVersion = devHistoryPromoted ? "t-dev-008-027" : "t-flppr-fw-007"
         library.installedAPI = devHistoryPromoted ? "88.7" : "88.4"
+        if devLineSuperseded {
+            library.releases = [
+                release("t-flppr-fw-010", channel: .stable, daysAgo: 0, size: 4_692_676),
+                release("t-dev-009-039", channel: .dev, daysAgo: 5, size: 4_670_000),
+                release("t-flppr-fw-008", channel: .stable, daysAgo: 30, size: 4_574_925),
+            ]
+            library.installedVersion = "t-dev-009-039"
+            library.installedAPI = "88.23"
+        }
         library.selectedChannel = selectedChannel
         library.phase = phase
         return library
