@@ -122,6 +122,11 @@ struct RootView: View {
                 phase: .preparing(version: "t-dev-008-003"),
                 selectedChannel: .dev
             )
+        } else if ProcessInfo.processInfo.arguments.contains("-firmware-library-empty-dev-qa") {
+            FirmwareLibraryLayoutQAView(
+                selectedChannel: .dev,
+                devLineSuperseded: true
+            )
         } else if ProcessInfo.processInfo.arguments.contains("-firmware-library-dev-fallback-qa") {
             FirmwareLibraryLayoutQAView(
                 selectedChannel: .dev,
@@ -232,13 +237,15 @@ private struct FirmwareLibraryLayoutQAView: View {
     init(
         phase: FirmwareLibrary.Phase = .ready,
         selectedChannel: TumoflipFirmwareChannel = .stable,
-        devHistoryPromoted: Bool = false
+        devHistoryPromoted: Bool = false,
+        devLineSuperseded: Bool = false
     ) {
         _library = StateObject(
             wrappedValue: FirmwareLibrary.layoutQAFixture(
                 phase: phase,
                 selectedChannel: selectedChannel,
-                devHistoryPromoted: devHistoryPromoted
+                devHistoryPromoted: devHistoryPromoted,
+                devLineSuperseded: devLineSuperseded
             )
         )
     }

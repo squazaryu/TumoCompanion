@@ -621,7 +621,8 @@ extension FirmwareLibrary {
     static func layoutQAFixture(
         phase: Phase = .ready,
         selectedChannel: TumoflipFirmwareChannel = .stable,
-        devHistoryPromoted: Bool = false
+        devHistoryPromoted: Bool = false,
+        devLineSuperseded: Bool = false
     ) -> FirmwareLibrary {
         let library = FirmwareLibrary()
         let baseDate = Date(timeIntervalSince1970: 1_787_875_200)
@@ -656,6 +657,15 @@ extension FirmwareLibrary {
         ]
         library.installedVersion = devHistoryPromoted ? "t-dev-008-027" : "t-flppr-fw-007"
         library.installedAPI = devHistoryPromoted ? "88.7" : "88.4"
+        if devLineSuperseded {
+            library.releases = [
+                release("t-flppr-fw-010", channel: .stable, daysAgo: 0, size: 4_692_676),
+                release("t-dev-009-039", channel: .dev, daysAgo: 5, size: 4_670_000),
+                release("t-flppr-fw-008", channel: .stable, daysAgo: 30, size: 4_574_925),
+            ]
+            library.installedVersion = "t-dev-009-039"
+            library.installedAPI = "88.23"
+        }
         library.selectedChannel = selectedChannel
         library.phase = phase
         return library

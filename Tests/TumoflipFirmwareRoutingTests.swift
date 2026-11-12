@@ -158,6 +158,58 @@ final class TumoflipFirmwareRoutingTests: XCTestCase {
     }
 
     @MainActor
+    func testManualStableChoiceSurvivesInstalledDevIdentityRefresh() async {
+        let library = FirmwareLibrary(
+            isDeviceReady: { true },
+            deviceInfoReader: {
+                [
+                    ("firmware_version", "t-dev-009-039"),
+                    ("firmware_origin_fork", "tumoflip"),
+                    ("firmware_api_major", "88"),
+                    ("firmware_api_minor", "23"),
+                ]
+            }
+        )
+        library.setChannel(.stable)
+
+        await library.refreshInstalledIdentity()
+
+        XCTAssertEqual(library.installedVersion, "t-dev-009-039")
+        XCTAssertEqual(library.installedAPI, "88.23")
+        XCTAssertEqual(library.selectedChannel, .stable)
+    }
+
+    @MainActor
+    func testManualDevChoiceSurvivesInstalledStableIdentityRefresh() {
+        let library = FirmwareLibrary()
+        library.setChannel(.dev)
+
+        library.applyInstalledIdentity(TumoflipDeviceIdentity(deviceInfo: [
+            ("firmware_version", "t-flppr-fw-010"),
+            ("firmware_origin_fork", "tumoflip"),
+        ]))
+
+        XCTAssertEqual(library.installedVersion, "t-flppr-fw-010")
+        XCTAssertEqual(library.selectedChannel, .dev)
+    }
+
+    @MainActor
+    func testAutomaticChannelFollowsIdentityUntilUserChoosesAChannel() {
+        let library = FirmwareLibrary()
+        library.applyInstalledIdentity(TumoflipDeviceIdentity(deviceInfo: [
+            ("firmware_version", "t-flppr-fw-010"),
+            ("firmware_origin_fork", "tumoflip"),
+        ]))
+        XCTAssertEqual(library.selectedChannel, .stable)
+
+        library.applyInstalledIdentity(TumoflipDeviceIdentity(deviceInfo: [
+            ("firmware_version", "t-dev-009-039"),
+            ("firmware_origin_fork", "tumoflip"),
+        ]))
+        XCTAssertEqual(library.selectedChannel, .dev)
+    }
+
+    @MainActor
     func testFirmwareReadyStatusRequiresCatalogAndDeviceIdentity() {
         let library = FirmwareLibrary()
         XCTAssertFalse(library.canShowReadyStatus)

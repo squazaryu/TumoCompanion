@@ -411,6 +411,41 @@ final class UpdateSourceLayoutUITests: XCTestCase {
         attach("Firmware Dev history after stable promotion")
     }
 
+    func testEmptyDevCatalogCanSwitchToStableInLightMode() {
+        verifyEmptyDevCatalogCanSwitchToStable(appearance: "light")
+    }
+
+    func testEmptyDevCatalogCanSwitchToStableInDarkMode() {
+        verifyEmptyDevCatalogCanSwitchToStable(appearance: "dark")
+    }
+
+    private func verifyEmptyDevCatalogCanSwitchToStable(appearance: String) {
+        let app = launch("-firmware-library-empty-dev-qa", appearance: appearance)
+        XCTAssertTrue(app.staticTexts["NO RELEASES"].waitForExistence(timeout: 3))
+        attach("Firmware empty Dev catalog - \(appearance)")
+
+        let drawer = app.buttons["firmware-releases-drawer-toggle"]
+        XCTAssertTrue(drawer.waitForExistence(timeout: 3),
+                      "An empty selected channel must not hide the only channel switch")
+        drawer.tap()
+        let picker = app.segmentedControls["firmware-channel-picker"]
+        XCTAssertTrue(picker.waitForExistence(timeout: 3))
+        picker.buttons["Stable"].tap()
+        XCTAssertTrue(app.staticTexts["Version 010"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["Prepare t-flppr-fw-010"].isHittable)
+        attach("Firmware Stable010 accessible from empty Dev - \(appearance)")
+
+        app.buttons["Prepare t-flppr-fw-010"].tap()
+        XCTAssertTrue(app.buttons["Confirm prepare t-flppr-fw-010"].waitForExistence(timeout: 3))
+        picker.buttons["Dev"].tap()
+        XCTAssertTrue(picker.buttons["Stable"].isHittable,
+                      "The open drawer must survive switching back to an empty channel")
+        picker.buttons["Stable"].tap()
+        XCTAssertTrue(app.buttons["Prepare t-flppr-fw-010"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.buttons["Confirm prepare t-flppr-fw-010"].exists,
+                       "Changing channel must cancel a pending preparation")
+    }
+
     func testFirmwareFailureReplacesDrawerInDarkMode() {
         let app = launch("-firmware-library-error-qa", appearance: "dark")
         XCTAssertTrue(app.staticTexts["Firmware transfer failed"].waitForExistence(timeout: 3))
