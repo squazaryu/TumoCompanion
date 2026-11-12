@@ -208,6 +208,7 @@ final class FirmwareLibrary: ObservableObject {
     private let deviceInfoReader: () async throws -> [(String, String)]
     private var loadTask: Task<Void, Never>?
     private var identityTask: Task<Void, Never>?
+    private var hasManualChannelSelection = false
     private var operationRunning = false
     private let stopToken = StopToken()
     private let backgroundGuard = BackgroundTransferGuard(name: "firmware-stage")
@@ -253,6 +254,7 @@ final class FirmwareLibrary: ObservableObject {
     }
 
     func setChannel(_ channel: TumoflipFirmwareChannel) {
+        hasManualChannelSelection = true
         selectedChannel = channel
     }
 
@@ -543,7 +545,9 @@ final class FirmwareLibrary: ObservableObject {
     func applyInstalledIdentity(_ identity: TumoflipDeviceIdentity) {
         installedVersion = identity.firmwareVersion
         installedAPI = identity.firmwareAPI
-        if let channel = identity.inferredChannel { selectedChannel = channel }
+        if !hasManualChannelSelection, let channel = identity.inferredChannel {
+            selectedChannel = channel
+        }
     }
 
     private func cachedArchive(for release: FirmwareRelease) async throws -> Data {

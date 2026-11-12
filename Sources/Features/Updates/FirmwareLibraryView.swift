@@ -113,9 +113,12 @@ struct FirmwareLibraryView: View {
     private var channelPicker: some View {
         Picker("Channel", selection: Binding(
             get: { library.selectedChannel },
-            set: { library.setChannel($0) }
+            set: {
+                cancelPreparation()
+                library.setChannel($0)
+            }
         )) {
-            Text("Main").tag(TumoflipFirmwareChannel.stable)
+            Text("Stable").tag(TumoflipFirmwareChannel.stable)
             Text("Dev").tag(TumoflipFirmwareChannel.dev)
         }
         .pickerStyle(.segmented)
@@ -133,6 +136,12 @@ struct FirmwareLibraryView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                if !library.releases.isEmpty {
+                    Text("Open Firmware releases below to choose Stable or Dev.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
     }
@@ -140,9 +149,9 @@ struct FirmwareLibraryView: View {
     private var emptyMessage: String {
         if library.busy { return "Loading releases..." }
         if library.selectedChannel == .dev {
-            return "No Dev builds are available for the latest Main line."
+            return "No Dev builds are available for the latest Stable line."
         }
-        return "No Main firmware releases found."
+        return "No Stable firmware releases found."
     }
 
     private var catalogOverviewCard: some View {
@@ -150,7 +159,7 @@ struct FirmwareLibraryView: View {
             title: "Release catalog",
             systemImage: "memorychip.fill",
             accessory: AnyView(StatusPill(
-                text: library.selectedChannel == .stable ? "Main" : "Dev",
+                text: library.selectedChannel.label,
                 color: library.selectedChannel == .stable ? Theme.success : Theme.purple,
                 systemImage: library.selectedChannel == .stable
                     ? "checkmark.seal.fill" : "hammer.fill"
@@ -207,7 +216,9 @@ struct FirmwareLibraryView: View {
     }
 
     private var canShowReleaseDrawer: Bool {
-        !library.visibleGroups.isEmpty
+        // The picker lives inside this drawer. An empty selected channel must
+        // not make the other channel's releases unreachable.
+        !library.releases.isEmpty
             && !library.busy
             && !library.hasTerminalFeedback
     }
@@ -233,7 +244,7 @@ struct FirmwareLibraryView: View {
                     .foregroundStyle(Color.primary.opacity(0.62))
                     .tracking(0.8)
                 Spacer(minLength: 8)
-                Text(library.selectedChannel == .stable ? "Main" : "Dev")
+                Text(library.selectedChannel.label)
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(.secondary)
             }
@@ -253,8 +264,15 @@ struct FirmwareLibraryView: View {
             }
 
             VStack(alignment: .leading, spacing: 7) {
-                ForEach(library.visibleGroups) { group in
-                    releaseGroupSection(group)
+                if library.visibleGroups.isEmpty {
+                    Text(emptyMessage)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    ForEach(library.visibleGroups) { group in
+                        releaseGroupSection(group)
+                    }
                 }
             }
         }
@@ -394,7 +412,8 @@ struct FirmwareLibraryView: View {
 
     private var hasTransferChannel: Bool {
         #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("-firmware-library-layout-qa") {
+        if ProcessInfo.processInfo.arguments.contains("-firmware-library-layout-qa")
+            || ProcessInfo.processInfo.arguments.contains("-firmware-library-empty-dev-qa") {
             return true
         }
         #endif
@@ -610,7 +629,7 @@ private struct FirmwareReleaseDetailsView: View {
                     LabeledContent("Version", value: release.version)
                     LabeledContent(
                         "Channel",
-                        value: release.channel == .stable ? "Main" : "Dev")
+                        value: release.channel.label)
                     LabeledContent(
                         "Published",
                         value: release.publishedAt.formatted(date: .long, time: .shortened))
@@ -642,8 +661,8 @@ private struct FirmwareHelpView: View {
     var body: some View {
         NavigationStack {
             List {
-                Label("Choose Main or Dev, then select a release.", systemImage: "list.bullet")
-                Label("Dev shows only builds published after the latest Main release.", systemImage: "clock.badge.checkmark")
+                Label("Choose Stable or Dev, then select a release.", systemImage: "list.bullet")
+                Label("Dev shows newer builds or the history promoted to the same Stable line. An empty channel still lets you switch to Stable.", systemImage: "clock.badge.checkmark")
                 Label("The updater is verified with SHA-256 before transfer.", systemImage: "checkmark.shield")
                 Label("Files are staged atomically; update.fuf is written last.", systemImage: "doc.badge.gearshape")
                 Label("Start installation from Archive > update on the Flipper.", systemImage: "hand.tap")
@@ -665,7 +684,7 @@ struct UpdatesHelpView: View {
     var body: some View {
         NavigationStack {
             List {
-                Label("Firmware prepares a full Main or Dev updater.", systemImage: "memorychip")
+                Label("Firmware prepares a full Stable or Dev updater.", systemImage: "memorychip")
                 Label("FW Packages refresh Tumoflip apps and resources.", systemImage: "shippingbox")
                 Label("Community apps installs compatible All The Plugins apps.", systemImage: "puzzlepiece.extension")
                 Label("ESP32 stages verified Marauder packages for ESP Flasher.", systemImage: "memorychip")

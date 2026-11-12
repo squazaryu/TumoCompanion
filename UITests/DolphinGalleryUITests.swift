@@ -401,7 +401,7 @@ final class UpdateSourceLayoutUITests: XCTestCase {
     func testFirmwareDevHistoryRemainsVisibleAfterStablePromotion() {
         let app = launch("-firmware-library-dev-fallback-qa", appearance: "dark")
         XCTAssertTrue(app.staticTexts["RELEASE CATALOG"].waitForExistence(timeout: 3))
-        XCTAssertFalse(app.staticTexts["No Dev builds are available for the latest Main line."].exists)
+        XCTAssertFalse(app.staticTexts["No Dev builds are available for the latest Stable line."].exists)
         let drawer = app.buttons["firmware-releases-drawer-toggle"]
         XCTAssertTrue(drawer.exists)
         drawer.tap()
@@ -433,6 +433,7 @@ final class UpdateSourceLayoutUITests: XCTestCase {
         picker.buttons["Stable"].tap()
         XCTAssertTrue(app.staticTexts["Version 010"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.buttons["Prepare t-flppr-fw-010"].isHittable)
+        XCTAssertTrue(app.buttons["Prepare t-flppr-fw-010"].isEnabled)
         attach("Firmware Stable010 accessible from empty Dev - \(appearance)")
 
         app.buttons["Prepare t-flppr-fw-010"].tap()
