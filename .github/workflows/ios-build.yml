@@ -53,7 +53,7 @@ jobs:
           name: ios-build-diagnostics
           path: build/ipa-build.log
           retention-days: 3
-      - name: Test managed package protection and installation
+      - name: Test managed packages, firmware channels and device services
         run: |
           set -euo pipefail
           SIMULATOR_ID="$(xcrun simctl list devices available --json | python3 -c '
@@ -72,6 +72,10 @@ jobs:
             -jobs "$XCODE_JOBS" -parallel-testing-enabled NO \
             -only-testing:UnleashedTests/ManagedPackageRequirementsTests \
             -only-testing:UnleashedTests/PluginProtectionPolicyTests \
+            -only-testing:UnleashedTests/FirmwareCatalogTests \
+            -only-testing:UnleashedTests/TumoflipFirmwareRoutingTests \
+            -only-testing:UnleashedUITests/UpdateSourceLayoutUITests/testEmptyDevCatalogCanSwitchToStableInLightMode \
+            -only-testing:UnleashedUITests/UpdateSourceLayoutUITests/testEmptyDevCatalogCanSwitchToStableInDarkMode \
             -only-testing:UnleashedUITests/CommunityCleanupUITests \
             -only-testing:UnleashedTests/TumoflipInstallerTests \
             -only-testing:UnleashedTests/RuntimeDiagnosticsTests \
