@@ -1,5 +1,5 @@
 {
-  "release_tag": "13nov2026",
+  "release_tag": "16nov2026",
   "stems": {
     "24cxxprog": "Programmers",
     "4inrow": "Board",
@@ -346,6 +346,7 @@
     "usb_cdrom": "USB",
     "usb_floppy": "USB",
     "usb_hid_autofire": "USB",
+    "usb_i2s": "USB",
     "usb_midi": "Instruments",
     "usping": "GPIO",
     "vario": "Sensors",
