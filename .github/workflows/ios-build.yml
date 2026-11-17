@@ -55,7 +55,7 @@ jobs:
           name: ios-build-diagnostics
           path: build/ipa-build.log
           retention-days: 3
-      - name: Test managed packages, firmware channels and device services
+      - name: Test complete unit target and critical package/channel UI
         run: |
           set -euo pipefail
           SIMULATOR_ID="$(xcrun simctl list devices available --json | python3 -c '
@@ -72,6 +72,7 @@ jobs:
             -scheme UnleashedCompanion -configuration Debug \
             -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
             -jobs "$XCODE_JOBS" -parallel-testing-enabled NO \
+            -only-testing:UnleashedTests \
             -only-testing:UnleashedTests/ManagedPackageRequirementsTests \
             -only-testing:UnleashedTests/PluginProtectionPolicyTests \
             -only-testing:UnleashedTests/FirmwareCatalogTests \
