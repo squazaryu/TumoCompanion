@@ -491,6 +491,43 @@ final class TumoflipManifestPackageReleaseTests: XCTestCase {
         XCTAssertEqual(manifest.packageManagedManifest().packages["base"]?.count, 2)
     }
 
+    func testExplicitDevSnapshotIsExactAndInstallableOnlyOnItsCleanBuild() throws {
+        let payload = firmwareSnapshotPackageRelease(explicitScope: true)
+            .replacingOccurrences(of: "fw-packages-stable-003", with: "fw-packages-dev-032")
+            .replacingOccurrences(of: "\"catalog_channel\": \"stable\"", with: "\"catalog_channel\": \"dev\"")
+            .replacingOccurrences(of: "v1.0.4", with: "t-dev-011-001")
+        let data = String(decoding: fixture(packageRelease: payload), as: UTF8.self)
+            .replacingOccurrences(of: "t-flppr-fw-004", with: "t-dev-011-001")
+        let manifest = try TumoflipManifest.decode(Data(data.utf8))
+        try manifest.validate()
+        XCTAssertTrue(manifest.isFirmwareSnapshotCatalog)
+        XCTAssertFalse(manifest.isReferenceOnlyCatalog)
+        XCTAssertEqual(manifest.packageManagedManifest().packages["base"]?.count, 2)
+        try TumoflipCompat.check(deviceTarget: 7, deviceAPI: "88.0",
+                                deviceVersion: "t-dev-011-001", deviceOriginFork: "tumoflip",
+                                deviceCommit: String(repeating: "1", count: 40), deviceCommitDirty: false,
+                                manifest: manifest)
+        for (version, commit, dirty, api) in [
+            ("t-dev-009-039", String(repeating: "1", count: 40), false, "88.0"),
+            ("t-dev-011-001", String(repeating: "2", count: 40), false, "88.0"),
+            ("t-dev-011-001", String(repeating: "1", count: 40), true, "88.0"),
+            ("t-dev-011-001", String(repeating: "1", count: 40), false, "88.1"),
+        ] {
+            XCTAssertThrowsError(try TumoflipCompat.check(
+                deviceTarget: 7, deviceAPI: api, deviceVersion: version,
+                deviceOriginFork: "tumoflip", deviceCommit: commit,
+                deviceCommitDirty: dirty, manifest: manifest))
+        }
+    }
+
+    func testDevChannelCannotRelabelAStableFirmwareSnapshot() throws {
+        let payload = firmwareSnapshotPackageRelease(explicitScope: true)
+            .replacingOccurrences(of: "fw-packages-stable-003", with: "fw-packages-dev-032")
+            .replacingOccurrences(of: "\"catalog_channel\": \"stable\"", with: "\"catalog_channel\": \"dev\"")
+        let manifest = try TumoflipManifest.decode(fixture(packageRelease: payload))
+        XCTAssertThrowsError(try manifest.validate())
+    }
+
     func testExplicitEmptyDeltaCannotMasqueradeAsSnapshot() throws {
         let invalid = firmwareSnapshotPackageRelease(explicitScope: true)
             .replacingOccurrences(
