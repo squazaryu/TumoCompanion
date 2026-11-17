@@ -110,6 +110,14 @@ Most integrations talk to a small BLE service in the [tumoflip](https://github.c
 
 ## Firmware packages (atomic updater)
 
+Version1.11.37 adds explicitly pinned **Dev firmware snapshots** (including
+FW Packages Dev032 for firmware011-001). Update the app first. Snapshot installs
+still require the exact clean firmware commit, version, API and F7 target;
+matching an API major alone is not sufficient for private FAL compatibility.
+Firmware staging, FW Packages, Community Apps and ESP32 recovery metadata now
+have independent keys. The last recoverable old checkpoint is read without
+rewriting it or touching the device-side rollback journal.
+
 **Updates → Firmware packages** installs the Base / ARF / Module One / Protocol Pack files from the independent [Tumoflip FW Packages](https://github.com/squazaryu/tumoflip-fw-packages) catalog onto the Flipper SD over BLE or USB SD Mode as one **crash-consistent transaction**:
 
 - the release manifest (schema v2) is validated and every target path is sanitised;

@@ -31,6 +31,8 @@ jobs:
         run: python3 scripts/test_community_cleanup_host.py
       - name: Verify committed FW Packages recovery without a device
         run: python3 scripts/test_package_recovery_host.py
+      - name: Verify exact Dev snapshots and isolated recovery metadata
+        run: python3 scripts/test_snapshot_recovery_host.py
       - name: Verify existing releases cannot be overwritten
         run: python3 scripts/test_publish_immutable_host.py
       - name: Verify bounded ranged-read policy without Bluetooth
@@ -78,6 +80,8 @@ jobs:
             -only-testing:UnleashedUITests/UpdateSourceLayoutUITests/testEmptyDevCatalogCanSwitchToStableInDarkMode \
             -only-testing:UnleashedUITests/CommunityCleanupUITests \
             -only-testing:UnleashedTests/TumoflipInstallerTests \
+            -only-testing:UnleashedTests/TumoflipManifestPackageReleaseTests \
+            -only-testing:UnleashedTests/TransferBackgroundTests \
             -only-testing:UnleashedTests/RuntimeDiagnosticsTests \
             -only-testing:UnleashedTests/FlipperBackupTests \
             -only-testing:UnleashedTests/SignalTimelineTests \
