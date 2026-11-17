@@ -31,6 +31,8 @@ jobs:
         run: python3 scripts/test_community_cleanup_host.py
       - name: Verify committed FW Packages recovery without a device
         run: python3 scripts/test_package_recovery_host.py
+      - name: Verify exact Dev snapshots and isolated recovery metadata
+        run: python3 scripts/test_snapshot_recovery_host.py
       - name: Verify existing releases cannot be overwritten
         run: python3 scripts/test_publish_immutable_host.py
       - name: Verify bounded ranged-read policy without Bluetooth
@@ -53,7 +55,7 @@ jobs:
           name: ios-build-diagnostics
           path: build/ipa-build.log
           retention-days: 3
-      - name: Test managed packages, firmware channels and device services
+      - name: Test complete unit target and critical package/channel UI
         run: |
           set -euo pipefail
           SIMULATOR_ID="$(xcrun simctl list devices available --json | python3 -c '
@@ -70,6 +72,7 @@ jobs:
             -scheme UnleashedCompanion -configuration Debug \
             -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
             -jobs "$XCODE_JOBS" -parallel-testing-enabled NO \
+            -only-testing:UnleashedTests \
             -only-testing:UnleashedTests/ManagedPackageRequirementsTests \
             -only-testing:UnleashedTests/PluginProtectionPolicyTests \
             -only-testing:UnleashedTests/FirmwareCatalogTests \
@@ -78,6 +81,8 @@ jobs:
             -only-testing:UnleashedUITests/UpdateSourceLayoutUITests/testEmptyDevCatalogCanSwitchToStableInDarkMode \
             -only-testing:UnleashedUITests/CommunityCleanupUITests \
             -only-testing:UnleashedTests/TumoflipInstallerTests \
+            -only-testing:UnleashedTests/TumoflipManifestPackageReleaseTests \
+            -only-testing:UnleashedTests/TransferBackgroundTests \
             -only-testing:UnleashedTests/RuntimeDiagnosticsTests \
             -only-testing:UnleashedTests/FlipperBackupTests \
             -only-testing:UnleashedTests/SignalTimelineTests \

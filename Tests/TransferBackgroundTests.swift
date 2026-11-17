@@ -3,6 +3,60 @@ import XCTest
 
 @MainActor
 final class TransferBackgroundTests: XCTestCase {
+    private func recoveryDefaults() throws -> (UserDefaults, String) {
+        let name = "transfer-recovery-isolation-\(UUID().uuidString)"
+        return (try XCTUnwrap(UserDefaults(suiteName: name)), name)
+    }
+
+    func testRecoveryKindsAndStorePrefixesDoNotOverwriteEachOther() throws {
+        let (defaults, name) = try recoveryDefaults()
+        defer { defaults.removePersistentDomain(forName: name) }
+        let first = TransferRecoveryStore(defaults: defaults, key: "first")
+        let second = TransferRecoveryStore(defaults: defaults, key: "second")
+        let firmware = TransferRecoveryCheckpoint(kind: .firmware, completed: 1, total: 3, detail: "firmware")
+        let packages = TransferRecoveryCheckpoint(kind: .packages, completed: 2, total: 4, detail: "packages")
+        XCTAssertTrue(first.save(firmware))
+        XCTAssertTrue(first.save(packages))
+        XCTAssertEqual(first.load(kind: .firmware), firmware)
+        XCTAssertEqual(first.load(kind: .packages), packages)
+        XCTAssertEqual(Set(first.loadAll().map { $0.kind.rawValue }), ["firmware", "packages"])
+        XCTAssertTrue(second.loadAll().isEmpty)
+        first.clear(kind: .firmware)
+        XCTAssertNil(first.load(kind: .firmware))
+        XCTAssertEqual(first.load(kind: .packages), packages)
+    }
+
+    func testKnownBrokenLegacyKeyIsReadOnlyForDefaultStoreAndMatchingKind() throws {
+        let (defaults, name) = try recoveryDefaults()
+        defer { defaults.removePersistentDomain(forName: name) }
+        let checkpoint = TransferRecoveryCheckpoint(kind: .packages, completed: 1, total: 2, detail: "old")
+        let broken = "(key).(kind.rawValue)"
+        defaults.set(try JSONEncoder().encode(checkpoint), forKey: broken)
+        let standard = TransferRecoveryStore(defaults: defaults)
+        let custom = TransferRecoveryStore(defaults: defaults, key: "other")
+        XCTAssertEqual(standard.load(kind: .packages), checkpoint)
+        XCTAssertNil(standard.load(kind: .firmware))
+        XCTAssertTrue(custom.loadAll().isEmpty)
+        standard.clear(kind: .firmware)
+        XCTAssertNotNil(defaults.data(forKey: broken))
+        standard.clear(kind: .packages)
+        XCTAssertNil(defaults.data(forKey: broken))
+    }
+
+    func testScopedCheckpointRejectsWrongKindAndClearAllDropsOwnedLegacyKeys() throws {
+        let (defaults, name) = try recoveryDefaults()
+        defer { defaults.removePersistentDomain(forName: name) }
+        let checkpoint = TransferRecoveryCheckpoint(kind: .packages, completed: 1, total: 2, detail: "old")
+        defaults.set(try JSONEncoder().encode(checkpoint), forKey: "checkpoint.firmware")
+        defaults.set(try JSONEncoder().encode(checkpoint), forKey: "checkpoint")
+        let store = TransferRecoveryStore(defaults: defaults, key: "checkpoint")
+        XCTAssertNil(store.load(kind: .firmware))
+        XCTAssertEqual(store.load(kind: .packages), checkpoint)
+        store.clear()
+        XCTAssertTrue(store.loadAll().isEmpty)
+        XCTAssertNil(defaults.data(forKey: "checkpoint"))
+    }
+
     func testBackgroundAssertionBalancesBeginAndEnd() {
         let application = FakeBackgroundApplication()
         let guarder = BackgroundTransferGuard(

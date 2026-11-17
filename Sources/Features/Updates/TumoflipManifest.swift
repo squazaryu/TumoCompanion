@@ -291,7 +291,11 @@ struct TumoflipManifest: Codable, Equatable {
         func hasFirmwareSnapshotIdentity(
             manifestFirmwareVersion: String
         ) -> Bool {
-            guard catalogChannel == TumoflipFirmwareChannel.stable.rawValue,
+            let explicitDev = catalogChannel == TumoflipFirmwareChannel.dev.rawValue &&
+                catalogInstallScope == .firmwareSnapshot &&
+                TumoflipFirmwareChannel.infer(version: manifestFirmwareVersion) == .dev &&
+                targetReleaseTag == manifestFirmwareVersion
+            guard (catalogChannel == TumoflipFirmwareChannel.stable.rawValue || explicitDev),
                   sourceFirmwareVersion == manifestFirmwareVersion,
                   overlayTargets?.isEmpty == true,
                   catalogModifiedTargets == nil,

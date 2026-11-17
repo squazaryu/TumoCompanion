@@ -66,18 +66,22 @@ final class TransferRecoveryStore {
     }
 
     func load(kind: TransferRecoveryKind) -> TransferRecoveryCheckpoint? {
-        guard let data = defaults.data(forKey: key(for: kind)) else {
-            // Read the pre-scoped key once so a checkpoint written by an earlier
-            // build is not silently lost after upgrading this feature.
-            guard let legacy = defaults.data(forKey: key),
-                  let checkpoint = try? JSONDecoder().decode(
-                    TransferRecoveryCheckpoint.self,
-                    from: legacy
-                  ),
+        if let data = defaults.data(forKey: key(for: kind)) {
+            guard let checkpoint = try? JSONDecoder().decode(TransferRecoveryCheckpoint.self, from: data),
                   checkpoint.kind == kind else { return nil }
             return checkpoint
         }
-        return try? JSONDecoder().decode(TransferRecoveryCheckpoint.self, from: data)
+        // Read old metadata without rewriting it during a status refresh. The
+        // interpolation-bug key belongs only to the shipped default store;
+        // adopting it for arbitrary prefixes would recreate the collision.
+        for legacyKey in legacyKeys {
+            if let data = defaults.data(forKey: legacyKey),
+               let checkpoint = try? JSONDecoder().decode(TransferRecoveryCheckpoint.self, from: data),
+               checkpoint.kind == kind {
+                return checkpoint
+            }
+        }
+        return nil
     }
 
     func loadAll() -> [TransferRecoveryCheckpoint] {
@@ -95,15 +99,18 @@ final class TransferRecoveryStore {
         for kind in TransferRecoveryKind.allCases {
             defaults.removeObject(forKey: key(for: kind))
         }
-        defaults.removeObject(forKey: key)
+        for legacyKey in legacyKeys { defaults.removeObject(forKey: legacyKey) }
         _ = defaults.synchronize()
     }
 
     func clear(kind: TransferRecoveryKind) {
         defaults.removeObject(forKey: key(for: kind))
-        if load(kind: kind) != nil,
-           defaults.data(forKey: key) != nil {
-            defaults.removeObject(forKey: key)
+        for legacyKey in legacyKeys {
+            if let data = defaults.data(forKey: legacyKey),
+               let checkpoint = try? JSONDecoder().decode(TransferRecoveryCheckpoint.self, from: data),
+               checkpoint.kind == kind {
+                defaults.removeObject(forKey: legacyKey)
+            }
         }
         _ = defaults.synchronize()
     }
@@ -125,7 +132,13 @@ final class TransferRecoveryStore {
     }
 
     private func key(for kind: TransferRecoveryKind) -> String {
-        "(key).(kind.rawValue)"
+        "\(key).\(kind.rawValue)"
+    }
+
+    private var legacyKeys: [String] {
+        key == "transfer.recovery.checkpoint.v1"
+            ? [key, "(key).(kind.rawValue)"]
+            : [key]
     }
 }
 
