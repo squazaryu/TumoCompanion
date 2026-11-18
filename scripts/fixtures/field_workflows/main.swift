@@ -24,6 +24,11 @@ expectFailure("bad note") { _ = try FieldRoundDocument.parse(Data(roundText.repl
 let firstBytes = inventory([("/ext/subghz/one.sub",3,Data("one".utf8))])
 let first = try CaptureInventory.parse(firstBytes)
 precondition(first.entries.count == 1 && first.entries[0].size == 3)
+let paddedInventory = Data([1,2,3])+firstBytes
+let slicedInventory = try CaptureInventory.parse(paddedInventory.dropFirst(3))
+precondition(slicedInventory == first)
+let caseOnly = try CaptureInventory.parse(inventory([("/ext/subghz/ONE.SUB",3,Data("one".utf8))]))
+precondition(first.compare(to:caseOnly).map(\.state) == [.unchanged], "FAT case-only spelling is not a deleted signal")
 let second = try CaptureInventory.parse(inventory([("/ext/subghz/one.sub",3,Data("two".utf8)),("/ext/nfc/new.nfc",1,Data([1]))]))
 precondition(first.compare(to: second).map(\.state) == [.changed,.added])
 precondition(second.compare(to:first).contains { $0.state == .missing })
@@ -109,6 +114,11 @@ print("Portable object wire format and guarded Sub-GHz profile editing passed")
     fs.failWrite = false
     let records = try service.records()
     guard let pending = records.first(where:{$0.phase == .needsRecovery || $0.phase == .writing}) else { fatalError("no durable recovery intent") }
+    fs.files[VerifiedUserFiles.profilePath] = fresh.data
+    let pendingSnapshot = try await service.readProfile()
+    let writesBeforeRecovery = fs.writes
+    do { _ = try await service.applyProfile(edited,expected:pendingSnapshot);fatalError("unresolved recovery was bypassed") } catch { }
+    precondition(fs.writes == writesBeforeRecovery)
     let current = try await fs.checksum(VerifiedUserFiles.profilePath)
     try await service.restoreProfileBackup(pending,expectedCurrentMD5:current)
     precondition(fs.files[VerifiedUserFiles.profilePath] == fresh.data)
