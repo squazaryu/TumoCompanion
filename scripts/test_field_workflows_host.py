@@ -8,7 +8,9 @@ sources = sorted((root / 'Sources/Features/FieldWorkflows').glob('*.swift'))
 sources = [p for p in sources if not p.name.endswith('View.swift') and p.name in {
     'FieldWire.swift', 'FieldEvidence.swift', 'PortableObject.swift', 'SubGhzProfile.swift',
     'VerifiedUserFiles.swift',
+    'FieldEvidenceRepository.swift',
 }]
+sources.append(root / 'Sources/FlipperKit/Storage/FlipperFile.swift')
 gate = root / 'Sources/FlipperKit/Storage/DeviceFileMutationGate.swift'
 if gate.exists(): sources.append(gate)
 with tempfile.TemporaryDirectory(prefix='tumo-field-workflows-') as directory:

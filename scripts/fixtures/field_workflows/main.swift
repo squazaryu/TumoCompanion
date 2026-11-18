@@ -131,3 +131,27 @@ try await DeviceFileMutationGate.withLease {
 }
 try await DeviceFileMutationGate.withMutation { }
 print("Exclusive user-write lease rejects foreign writers and releases correctly")
+
+@MainActor final class EvidenceMemoryReader: FieldEvidenceReading {
+    let root = FieldEvidenceRepository.root
+    var bytes = Data("Field round\nStarted UTC epoch: 100\nExplicit user results; opening a file is not a test.\nObject\tResult\tUTC epoch\tNote\nGate\tPASS\t101\tOwned\n".utf8)
+    var corrupt = false
+    func list(_ path: String) async throws -> [FlipperFile] {
+        guard path == root+"/reports" else { return [] }
+        let name = "round-100-0123456789abcdef.txt"
+        return [.init(name:name,path:path+"/"+name,isDirectory:false,size:UInt32(bytes.count))]
+    }
+    func read(_ path: String, maximumBytes: Int) async throws -> Data { corrupt ? bytes+Data([0]) : bytes }
+    func checksum(_ path: String) async throws -> String? { FieldWire.md5(bytes) }
+}
+@MainActor func repositoryTests() async throws {
+    let reader = EvidenceMemoryReader();let repository = FieldEvidenceRepository(reader:reader)
+    let files = try await repository.index();precondition(files.count == 1)
+    let snapshot = try await repository.load(files[0])
+    guard case .round(let report) = snapshot.document else { fatalError("wrong evidence kind") }
+    precondition(report.rows.count == 1)
+    reader.corrupt = true
+    do { _ = try await repository.load(files[0]);fatalError("changed bytes accepted") } catch { }
+}
+try await repositoryTests()
+print("Read-only evidence repository validates paths, sizes and device checksums")
