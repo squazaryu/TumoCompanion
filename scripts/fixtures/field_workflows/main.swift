@@ -95,7 +95,8 @@ print("Portable object wire format and guarded Sub-GHz profile editing passed")
     var edited = try SubGhzProfile.parse(profileData);edited.frequencies.append(868350000)
     let receipt = try await service.applyProfile(edited, expected:snapshot)
     precondition(receipt.phase == .committed && receipt.original == profileData)
-    precondition(try service.records().count == 1)
+    let initialRecords = try service.records()
+    precondition(initialRecords.count == 1)
     let count = fs.writes
     do { _ = try await service.applyProfile(edited,expected:snapshot);fatalError("stale write accepted") } catch { }
     precondition(fs.writes == count)
