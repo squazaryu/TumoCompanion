@@ -58,6 +58,11 @@ enum FieldWire {
         let extensions = ["subghz":"sub","infrared":"ir","nfc":"nfc","lfrfid":"rfid","ibutton":"ibtn"]
         return extensions[String(parts[2])] == (path as NSString).pathExtension.lowercased()
     }
+    static func linkPath(_ path: String) -> Bool {
+        guard path.hasPrefix("/ext/"), path.utf8.count < 256, printable(path), !path.contains("\\"),
+              path.split(separator:"/",omittingEmptySubsequences:false).dropFirst().allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }) else { return false }
+        return ["sub","ir","nfc","rfid","ibtn"].contains((path as NSString).pathExtension.lowercased())
+    }
     static func cString(_ text: String, capacity: Int) throws -> Data {
         guard printable(text), text.utf8.count < capacity else { throw FieldWorkflowError.invalid("text is too long or has controls") }
         var result = Data(text.utf8)
