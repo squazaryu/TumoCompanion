@@ -77,9 +77,9 @@ final class FlipperBackup: ObservableObject {
     @Published var status: String?
     @Published var backups: [URL] = []
 
-    private static let manifestName = ".tumoflip-backup.json"
-    private static let maxFileBytes: UInt64 = 64 * 1024 * 1024
-    private static let maxArchiveBytes: UInt64 = 512 * 1024 * 1024
+    nonisolated private static let manifestName = ".tumoflip-backup.json"
+    nonisolated private static let maxFileBytes: UInt64 = 64 * 1024 * 1024
+    nonisolated private static let maxArchiveBytes: UInt64 = 512 * 1024 * 1024
     private let storage: any FlipperBackupStorage
     private let directory: URL
 
@@ -194,6 +194,13 @@ final class FlipperBackup: ObservableObject {
     }
 
     func restore(_ zipURL: URL) async throws {
+        try await DeviceFileMutationGate.withMutation {
+            try await self.restoreUnlocked(zipURL)
+        }
+    }
+
+    private func restoreUnlocked(_ zipURL: URL) async throws {
+        guard !running else { throw FlipperBackupError.invalidArchive("another backup operation is active") }
         running = true
         status = "Verifying backup…"
         defer { running = false }

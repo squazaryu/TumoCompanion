@@ -297,6 +297,13 @@ final class FlipperStorage {
     /// creating subdirectories as needed and reporting progress.
     func uploadFolder(localURL: URL, to destination: String,
                       progress: @escaping (UploadProgress) -> Void) async throws {
+        try await DeviceFileMutationGate.withMutation {
+            try await self.uploadFolderUnlocked(localURL:localURL,to:destination,progress:progress)
+        }
+    }
+
+    private func uploadFolderUnlocked(localURL: URL, to destination: String,
+                                     progress: @escaping (UploadProgress) -> Void) async throws {
         let fm = FileManager.default
         var fileURLs: [URL] = []
         var totalBytes = 0

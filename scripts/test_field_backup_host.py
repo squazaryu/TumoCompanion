@@ -6,7 +6,8 @@ import tempfile
 root = Path(__file__).resolve().parents[1]
 sources = [root / "Sources/Features/Backup/FlipperBackup.swift",
            root / "Sources/Features/FieldWorkflows/FieldWire.swift",
-           root / "Sources/FlipperKit/Storage/FlipperFile.swift"]
+           root / "Sources/FlipperKit/Storage/FlipperFile.swift",
+           root / "Sources/FlipperKit/Storage/DeviceFileMutationGate.swift"]
 with tempfile.TemporaryDirectory(prefix="tumo-field-backup-") as directory:
     project = Path(directory)
     for source in sources:
@@ -18,7 +19,7 @@ let package = Package(name: "FieldBackupHost", platforms: [.macOS(.v13)],
  dependencies: [.package(url: "https://github.com/weichsel/ZIPFoundation.git",
  revision: "22787ffb59de99e5dc1fbfe80b19c97a904ad48d")],
  targets: [.executableTarget(name: "FieldBackupHost", dependencies: ["ZIPFoundation"],
- path: ".", sources: ["main.swift", "FlipperBackup.swift", "FieldWire.swift", "FlipperFile.swift"])])
+ path: ".", sources: ["main.swift", "FlipperBackup.swift", "FieldWire.swift", "FlipperFile.swift", "DeviceFileMutationGate.swift"])])
 ''')
     subprocess.run(["xcrun", "swift", "run", "--package-path", str(project),
                     "--scratch-path", str(project / "build"), "--jobs", "2",
