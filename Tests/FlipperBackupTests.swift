@@ -14,6 +14,7 @@ final class FlipperBackupTests: XCTestCase {
         var directories = Set<String>()
         var readCount = 0
         var afterRead: (() -> Void)?
+        var afterWrite: (() async throws -> Void)?
 
         func list(_ path: String) async throws -> [FlipperFile] {
             let prefix = path + "/"
@@ -49,6 +50,7 @@ final class FlipperBackupTests: XCTestCase {
             progress: (@Sendable (Int) -> Void)?
         ) async throws {
             files[path] = data
+            try await afterWrite?()
         }
     }
 
@@ -188,6 +190,24 @@ final class FlipperBackupTests: XCTestCase {
         XCTAssertEqual(storage.files.count, 1)
         try Data("corrupt".utf8).write(to: receipt.url)
         XCTAssertThrowsError(try FlipperBackup.captureData(from: index, path: "subghz/one.sub"))
+    }
+
+    func testWholeRestoreExcludesCheckedEditsBetweenFileWrites() async throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storage = FakeStorage()
+        storage.files = ["/ext/subghz/one.sub": Data([1]), "/ext/subghz/two.sub": Data([2])]
+        let backup = FlipperBackup(storage: storage, directory: directory)
+        let receipt = try await backup.backup(folders: ["subghz"], stamp: "job-lease")
+        storage.files.removeAll()
+        var excluded: [Bool] = []
+        storage.afterWrite = {
+            do { try await DeviceFileMutationGate.withLease { }; excluded.append(false) }
+            catch { excluded.append(true) }
+        }
+        try await backup.restore(receipt.url)
+        XCTAssertEqual(excluded, [true, true], "A whole restore must not be interrupted by a checked profile edit between files")
+        try await DeviceFileMutationGate.withLease { }
     }
 
     func testRestorePathRejectsTraversalAndAbsolutePaths() {
