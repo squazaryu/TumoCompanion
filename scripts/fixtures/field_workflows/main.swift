@@ -119,3 +119,15 @@ print("Portable object wire format and guarded Sub-GHz profile editing passed")
 }
 try await userFileTests()
 print("Bound device, durable backup, conflict/recovery and copy-only restore passed")
+
+try await DeviceFileMutationGate.withLease {
+    try await DeviceFileMutationGate.withMutation { }
+    let foreignWrite = await Task.detached { () -> Bool in
+        do { try await DeviceFileMutationGate.withMutation { };return false }
+        catch { return true }
+    }.value
+    precondition(foreignWrite)
+    do { try await DeviceFileMutationGate.withLease { };fatalError("second lease accepted") } catch { }
+}
+try await DeviceFileMutationGate.withMutation { }
+print("Exclusive user-write lease rejects foreign writers and releases correctly")

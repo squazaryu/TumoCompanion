@@ -9,6 +9,8 @@ sources = [p for p in sources if not p.name.endswith('View.swift') and p.name in
     'FieldWire.swift', 'FieldEvidence.swift', 'PortableObject.swift', 'SubGhzProfile.swift',
     'VerifiedUserFiles.swift',
 }]
+gate = root / 'Sources/FlipperKit/Storage/DeviceFileMutationGate.swift'
+if gate.exists(): sources.append(gate)
 with tempfile.TemporaryDirectory(prefix='tumo-field-workflows-') as directory:
     binary = Path(directory) / 'field-workflows'
     subprocess.run(['xcrun', 'swiftc', '-swift-version', '5', '-Onone',
