@@ -6,7 +6,7 @@
 
 **A native iOS companion for Flipper Zero** — BLE/USB SD file access, screen mirror, Sub-GHz/NFC, a Sber smart-relay failsafe, Marauder log analysis, ESP32 firmware flashing, and live Claude Code status on your Flipper.
 
-![version](https://img.shields.io/badge/version-1.11.36-F36E12)
+![version](https://img.shields.io/badge/version-1.12.0-F36E12)
 ![platform](https://img.shields.io/badge/iOS-17%2B-black?logo=apple)
 ![SwiftUI](https://img.shields.io/badge/SwiftUI-5.9-orange?logo=swift)
 ![transport](https://img.shields.io/badge/transport-BLE%20%2B%20USB%20SD-blue?logo=bluetooth)
@@ -21,6 +21,7 @@
 - [Install](#install-feather--altstore)
 - [Screenshots](#screenshots)
 - [Features](#features)
+- [Field Kit](#field-kit)
 - [Field Services](#field-services)
 - [App Bridge (FAB1 / FAB2)](#app-bridge-fab1--fab2)
 - [Firmware packages (atomic updater)](#firmware-packages-atomic-updater)
@@ -62,6 +63,16 @@ https://raw.githubusercontent.com/squazaryu/TumoCompanion/main/apps.json
 ### 📡 Sub-GHz · NFC · RFID
 - Transmit saved Sub-GHz signals and emulate NFC / RFID via the companion `.fap`.
 - Remotes list for your everyday captures.
+
+### Field Kit
+
+- **Home → Tools → Field Kit:** inspect exported object rounds and recording inventories, compare two saved snapshots, and export verified copies.
+- Edit Sub-GHz frequency/hopping settings with explicit review, device/file identity checks, a local original backup and write intent, verified readback and explicit recovery.
+- Create/edit portable `.tobj` object packages, then import a **new** card with new recording copies in Flipper Field Tools; installed card storage is not overwritten in place.
+- Recover one supported recording from a manifest-backed backup to a **new** file under `Restored`, never over the original recording.
+- Uses existing Tumoflip Dev011-001 / FW Packages Dev032 file formats and RPC; those releases are unchanged. No automatic transmission, SD cleanup or path migration is added.
+
+See the [Field Kit guide](docs/field-kit.md) and [1.12.0 release notes](docs/releases/1.12.0.md) for paths, limits and recovery behavior.
 
 ### 📶 WiFi / Marauder analysis
 - **Auto-aggregates every** Marauder scan, sniff and Evil Portal log on the SD into one **Overview** — networks → clients → vendors (OUI-resolved), with channel-distribution and top-vendor charts.
