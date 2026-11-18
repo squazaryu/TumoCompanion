@@ -1,6 +1,9 @@
 import XCTest
 
 final class FieldWorkflowsUITests: XCTestCase {
+  override func setUpWithError() throws {
+    continueAfterFailure = false
+  }
   func testRoundsInventoriesAndIncompleteLogInBothAppearances() {
     for appearance in ["dark", "light"] {
       let app = launch(appearance)
@@ -32,12 +35,22 @@ final class FieldWorkflowsUITests: XCTestCase {
   func testProfilePreviewAndCheckedApplyOnSyntheticDevice() {
     let app = launch("light")
     app.buttons["field-kit-profile"].tap()
+    let frequency = app.textFields["field-profile-default"]
+    XCTAssertTrue(frequency.waitForExistence(timeout: 5))
+    frequency.tap()
+    let oldValue = frequency.value as? String ?? ""
+    frequency.typeText(
+      String(repeating: XCUIKeyboardKey.delete.rawValue, count: oldValue.count) + "868.350000")
     let review = app.buttons["field-profile-review"]
     reveal(review, in: app)
     XCTAssertTrue(review.waitForExistence(timeout: 5))
     review.tap()
     let confirm = app.buttons["field-profile-confirm"]
     XCTAssertTrue(confirm.waitForExistence(timeout: 5))
+    XCTAssertTrue(
+      app.staticTexts.containing(
+        NSPredicate(format: "label CONTAINS %@", "Default_frequency: 868350000")
+      ).firstMatch.exists)
     shot("Profile confirmation before write")
     confirm.tap()
     XCTAssertTrue(
@@ -70,6 +83,10 @@ final class FieldWorkflowsUITests: XCTestCase {
     reveal(review, in: app)
     review.tap()
     XCTAssertTrue(app.navigationBars["Review object package"].waitForExistence(timeout: 5))
+    let largeAction = app.buttons["Prepare copy to Flipper"]
+    reveal(largeAction, in: app)
+    XCTAssertGreaterThan(
+      largeAction.frame.height, 60, "The sheet must inherit the accessibility text size")
     shot("Object package large text")
     app.terminate()
     let failed = launch("light", extra: ["-field-workflows-fail-qa"])

@@ -2,6 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct PortableObjectEditorView: View {
+  @Environment(\.dynamicTypeSize) private var textSize
   let context: FieldWorkflowContext
   @State private var card = PortableObjectCard(
     name: "Object", notes: "", tags: "", checkedAt: "", links: [])
@@ -105,10 +106,11 @@ struct PortableObjectEditorView: View {
             payloads[file.path] = bytes
             picker = false
           }
-        }
+        }.dynamicTypeSize(textSize)
       }
       .sheet(item: $preview) { value in
         NavigationStack { ObjectPackagePreviewView(context: context, preview: value) }
+          .dynamicTypeSize(textSize)
       }
   }
   private func refresh() {
@@ -172,7 +174,7 @@ struct CapturePickerView: View {
           .disabled(operation.busy)
         }
       }
-      if files.isEmpty && !operation.busy {
+      if files.isEmpty && !operation.busy && operation.error == nil {
         Text("No supported recordings here.").foregroundStyle(.secondary)
       }
     }.navigationTitle(depth == 0 ? "Choose recording" : (directory as NSString).lastPathComponent)

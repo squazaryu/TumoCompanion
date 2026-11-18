@@ -14,6 +14,7 @@ struct BackupCapturesHomeView: View {
 }
 
 struct BackupCaptureListView: View {
+  @Environment(\.dynamicTypeSize) private var textSize
   let url: URL
   let context: FieldWorkflowContext
   @State private var index: BackupCaptureIndex?
@@ -59,7 +60,8 @@ struct BackupCaptureListView: View {
     }.navigationTitle("Recover one recording").navigationBarTitleDisplayMode(.inline)
       .task { if index == nil { load() } }.onDisappear { operation.cancel() }
       .sheet(item: $preview) { value in
-        NavigationStack { CaptureRestoreView(context: context, preview: value) }
+        NavigationStack { CaptureRestoreView(context: context, preview: value) }.dynamicTypeSize(
+          textSize)
       }
   }
   private func load() {
@@ -77,7 +79,9 @@ private enum FieldBackgroundRead {
     let worker = Task.detached(priority: .userInitiated, operation: action)
     return try await withTaskCancellationHandler {
       try await worker.value
-    } onCancel: { worker.cancel() }
+    } onCancel: {
+      worker.cancel()
+    }
   }
 }
 

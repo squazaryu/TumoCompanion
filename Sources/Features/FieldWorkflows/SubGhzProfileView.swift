@@ -53,6 +53,7 @@ private struct ProfilePreview: Identifiable {
 }
 
 private struct ProfileFormView: View {
+  @Environment(\.dynamicTypeSize) private var textSize
   let context: FieldWorkflowContext
   let snapshot: UserFileSnapshot
   let original: SubGhzProfile
@@ -133,7 +134,7 @@ private struct ProfileFormView: View {
       NavigationStack {
         ProfileApplyView(service: context.writes, snapshot: snapshot, preview: value) {
           applied = true
-        }
+        }.dynamicTypeSize(textSize)
       }
     }
   }
@@ -217,6 +218,7 @@ private struct ProfileRecoveryPreview: Identifiable {
 }
 
 struct ProfileRecoveryView: View {
+  @Environment(\.dynamicTypeSize) private var textSize
   let service: VerifiedUserFiles
   @State private var records: [UserProfileWriteRecord] = []
   @State private var preview: ProfileRecoveryPreview?
@@ -254,7 +256,9 @@ struct ProfileRecoveryView: View {
           }
         }
       }
-      if records.isEmpty { Text("No local profile backups.").foregroundStyle(.secondary) }
+      if records.isEmpty && !operation.busy && operation.error == nil {
+        Text("No local profile backups.").foregroundStyle(.secondary)
+      }
     }.navigationTitle("Profile recovery").navigationBarTitleDisplayMode(.inline)
       .task { refresh() }.onDisappear { operation.cancel() }
       .fileExporter(
@@ -264,7 +268,8 @@ struct ProfileRecoveryView: View {
         if case .failure(let error) = result { operation.run { throw error } }
       }
       .sheet(item: $preview, onDismiss: refresh) { value in
-        NavigationStack { ProfileRestoreView(service: service, preview: value) }
+        NavigationStack { ProfileRestoreView(service: service, preview: value) }.dynamicTypeSize(
+          textSize)
       }
   }
   private func refresh() {

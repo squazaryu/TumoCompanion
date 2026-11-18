@@ -75,7 +75,8 @@ struct UserProfileWriteRecord: Codable, Equatable, Identifiable {
     let url = recordURL(record.id)
     if !FileManager.default.fileExists(atPath: url.path) {
       guard try records().count < 256 else {
-        throw FieldWorkflowError.invalid("recovery storage is full; export and manage completed records in Files")
+        throw FieldWorkflowError.invalid(
+          "recovery storage is full; export and manage completed records in Files")
       }
     }
     try data.write(to: url, options: .atomic)
@@ -99,7 +100,8 @@ struct UserProfileWriteRecord: Codable, Equatable, Identifiable {
     )
     .filter { $0.pathExtension == "json" }
     guard files.count <= 256 else {
-      throw FieldWorkflowError.invalid("too many recovery records; export and manage completed records in Files")
+      throw FieldWorkflowError.invalid(
+        "too many recovery records; export and manage completed records in Files")
     }
     return try files.map { url in
       let values = try url.resourceValues(forKeys: [

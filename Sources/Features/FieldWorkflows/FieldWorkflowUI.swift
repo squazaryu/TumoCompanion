@@ -1,5 +1,6 @@
 import Observation
 import SwiftUI
+import UIKit
 import UniformTypeIdentifiers
 
 @MainActor @Observable final class FieldOperation {
@@ -51,10 +52,31 @@ struct FieldOperationSection: View {
 struct FieldDigestView: View {
   let title: String
   let digest: String
+  private var grouped: String {
+    guard [32, 64].contains(digest.utf8.count),
+      digest.utf8.allSatisfy({ (48...57).contains($0) || (97...102).contains($0) })
+    else { return digest }
+    var groups: [String] = []
+    var rest = digest[...]
+    while !rest.isEmpty {
+      groups.append(String(rest.prefix(8)))
+      rest = rest.dropFirst(8)
+    }
+    return groups.joined(separator: " ")
+  }
   var body: some View {
     VStack(alignment: .leading, spacing: 4) {
-      Text(title).font(.caption).foregroundStyle(.secondary)
-      Text(digest).font(.system(.caption2, design: .monospaced))
+      HStack(alignment: .firstTextBaseline) {
+        Text(title).font(.caption).foregroundStyle(.secondary)
+        Spacer(minLength: 8)
+        Button {
+          UIPasteboard.general.string = digest
+        } label: {
+          Image(systemName: "doc.on.doc")
+        }
+        .buttonStyle(.borderless).font(.caption).accessibilityLabel("Copy \(title)")
+      }
+      Text(verbatim: grouped).font(.system(.caption2, design: .monospaced))
         .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
     }
   }

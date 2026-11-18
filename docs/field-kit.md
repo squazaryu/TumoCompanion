@@ -11,6 +11,8 @@ Export a round or inventory in **Field Tools** on Flipper, then refresh **Object
 rounds & inventories** on iPhone. The app checks size and device MD5 before/after
 the read and validates the native format. Local exports include a SHA256 digest.
 These are integrity checks, not proof of authenticity or a successful field test.
+Hashes are displayed in short groups to avoid inserted visual hyphens; the copy
+button copies the exact ungrouped value.
 
 The viewer accepts native manual-result TXT and TIV1 `.tinv` snapshots. Choose two
 inventories to compare saved states; this does not scan the current SD or identify
@@ -69,7 +71,8 @@ than 16 MiB or outside the five capture roots are not offered for selective rest
 
 - No automatic on-open writes, delete operation, app execution or transmission.
 - BLE mutation leases exclude competing app-side writes and refuse to begin in
-  the middle of a streaming write. This is not a global lock against the device,
+  the middle of a streaming write, whole folder upload or whole backup restore.
+  This is not a global lock against the device,
   USB or other clients, nor a power-loss-atomic remote filesystem transaction.
 - Background time is finite. Cancellation/expiry stops streaming and preserves
   the recovery intent when a profile write cannot be verified.
@@ -81,7 +84,9 @@ than 16 MiB or outside the five capture roots are not offered for selective rest
   produced by the actual Swift encoder, and checks standard-frequency parity.
 - XCTest and UI suites are included in CI. Synthetic QA fixtures never create a
   live field BLE adapter. Hardware acceptance and iOS 27 visual acceptance are
-  separate from compilation/host tests.
+  separate from compilation/host tests. The first complete CI run passed 722 unit
+  and 29 UI tests on an iPhone 16 Pro Max Simulator with iOS 26.2; follow-up checks
+  also cover between-file exclusion and inherited accessibility text in sheets.
 
 Upstream audit on 2026-11-18 found no new changes since the last review in official
 firmware (release 1.5.1), Unleashed (095/dev `53818b18`), ARF (`7e3d1081`), Momentum

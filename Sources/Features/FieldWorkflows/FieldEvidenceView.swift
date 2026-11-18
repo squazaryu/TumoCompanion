@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct FieldEvidenceListView: View {
+  @Environment(\.dynamicTypeSize) private var textSize
   let context: FieldWorkflowContext
   @State private var files: [FlipperFile] = []
   @State private var older = ""
@@ -36,8 +37,11 @@ struct FieldEvidenceListView: View {
           .font(.caption).foregroundStyle(.secondary)
         }
       }
-      Section("Exports (\(files.count))") {
-        if files.isEmpty && !operation.busy {
+      Section(
+        operation.error != nil && files.isEmpty
+          ? "Exports · not checked" : "Exports (\(files.count))"
+      ) {
+        if files.isEmpty && !operation.busy && operation.error == nil {
           Text("No matching exports on this Flipper.").foregroundStyle(.secondary)
         }
         ForEach(files) { file in
@@ -59,7 +63,7 @@ struct FieldEvidenceListView: View {
     .task { if files.isEmpty { refresh() } }
     .onDisappear { operation.cancel() }
     .sheet(item: $comparison) { value in
-      NavigationStack { InventoryComparisonView(comparison: value) }
+      NavigationStack { InventoryComparisonView(comparison: value) }.dynamicTypeSize(textSize)
     }
   }
   @ViewBuilder private var inventoryOptions: some View {
