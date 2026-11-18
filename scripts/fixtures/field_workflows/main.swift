@@ -65,3 +65,56 @@ expectFailure("explicit RX profile in ordinary hopping") { _ = try profile.encod
 expectFailure("unsupported profile version") { _ = try SubGhzProfile.parse(Data("Filetype: Flipper SubGhz Setting File\nVersion: 2\n".utf8)) }
 expectFailure("frequency outside radio ranges") { _ = try SubGhzProfile.parse(Data(String(decoding:profileData,as:UTF8.self).replacingOccurrences(of:"433920000",with:"100000000").utf8)) }
 print("Portable object wire format and guarded Sub-GHz profile editing passed")
+
+@MainActor final class MemoryUserFiles: UserFileAccess {
+    var device = "owned-device-A"
+    var files: [String:Data] = [:]
+    var writes = 0
+    var failWrite = false
+    func deviceID() async throws -> String { device }
+    func read(_ path: String, maximumBytes: Int) async throws -> Data {
+        guard let data = files[path], data.count <= maximumBytes else { throw FieldWorkflowError.invalid("read") }
+        return data
+    }
+    func checksum(_ path: String) async throws -> String? { files[path].map(FieldWire.md5) }
+    func write(_ path: String, data: Data) async throws {
+        writes += 1
+        if failWrite { files[path] = data.prefix(data.count/2);throw FieldWorkflowError.invalid("injected write failure") }
+        files[path] = data
+    }
+    func makeDirectory(_ path: String) async throws { }
+}
+@MainActor func userFileTests() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at:directory) }
+    let fs = MemoryUserFiles()
+    fs.files[VerifiedUserFiles.profilePath] = profileData
+    fs.files["/ext/subghz/original.sub"] = Data("keep".utf8)
+    let service = VerifiedUserFiles(access:fs,backupDirectory:directory)
+    let snapshot = try await service.readProfile()
+    var edited = try SubGhzProfile.parse(profileData);edited.frequencies.append(868350000)
+    let receipt = try await service.applyProfile(edited, expected:snapshot)
+    precondition(receipt.phase == .committed && receipt.original == profileData)
+    precondition(try service.records().count == 1)
+    let count = fs.writes
+    do { _ = try await service.applyProfile(edited,expected:snapshot);fatalError("stale write accepted") } catch { }
+    precondition(fs.writes == count)
+    fs.device = "other"
+    do { _ = try await service.applyProfile(edited,expected:snapshot);fatalError("other device accepted") } catch { }
+    precondition(fs.writes == count);fs.device = snapshot.deviceID
+    let fresh = try await service.readProfile()
+    fs.failWrite = true
+    do { _ = try await service.applyProfile(try SubGhzProfile.parse(profileData),expected:fresh);fatalError("write failure hidden") } catch { }
+    fs.failWrite = false
+    let records = try service.records()
+    guard let pending = records.first(where:{$0.phase == .needsRecovery || $0.phase == .writing}) else { fatalError("no durable recovery intent") }
+    let current = try await fs.checksum(VerifiedUserFiles.profilePath)
+    try await service.restoreProfileBackup(pending,expectedCurrentMD5:current)
+    precondition(fs.files[VerifiedUserFiles.profilePath] == fresh.data)
+    let copy = try await service.copyCapture(Data("copy".utf8), originalPath:"/ext/subghz/original.sub",deviceID:fs.device)
+    precondition(copy != "/ext/subghz/original.sub" && fs.files[copy] == Data("copy".utf8))
+    precondition(fs.files["/ext/subghz/original.sub"] == Data("keep".utf8))
+    do { _ = try await service.copyCapture(Data([1]),originalPath:"/ext/apps/not-a-signal.fap",deviceID:fs.device);fatalError("unsafe restore accepted") } catch { }
+}
+try await userFileTests()
+print("Bound device, durable backup, conflict/recovery and copy-only restore passed")
