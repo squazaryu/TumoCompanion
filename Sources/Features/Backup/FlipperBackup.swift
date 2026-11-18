@@ -25,6 +25,19 @@ struct FlipperBackupReceipt {
     var reusedFiles: Int = 0
 }
 
+struct BackupCapture: Equatable, Identifiable, Sendable {
+    let path: String
+    let size: Int
+    let sha256: String
+    var id: String { path }
+}
+
+struct BackupCaptureIndex: Equatable, Sendable {
+    let archiveURL: URL
+    let archiveSHA256: String
+    let files: [BackupCapture]
+}
+
 private enum FlipperBackupError: LocalizedError {
     case invalidPath(String)
     case noFiles
@@ -221,7 +234,7 @@ final class FlipperBackup: ObservableObject {
 
     // MARK: - Helpers
 
-    static func safeDestination(for relativePath: String) throws -> String {
+    nonisolated static func safeDestination(for relativePath: String) throws -> String {
         let parts = relativePath.split(separator: "/", omittingEmptySubsequences: false)
         guard !relativePath.isEmpty,
               !relativePath.hasPrefix("/"),
@@ -235,7 +248,7 @@ final class FlipperBackup: ObservableObject {
         return "/ext/\(relativePath)"
     }
 
-    private static func sha256(_ data: Data) -> String {
+    nonisolated private static func sha256(_ data: Data) -> String {
         SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 
@@ -334,7 +347,7 @@ final class FlipperBackup: ObservableObject {
 
     /// Validate the entire ZIP before restoring any file. Old archives without a
     /// manifest remain readable, but still require safe paths and valid ZIP CRCs.
-    private static func validateArchive(at url: URL) throws -> FlipperBackupManifest? {
+    nonisolated private static func validateArchive(at url: URL) throws -> FlipperBackupManifest? {
         let archive: Archive
         do { archive = try Archive(url: url, accessMode: .read) }
         catch { throw FlipperBackupError.invalidArchive("cannot open ZIP") }
@@ -384,6 +397,71 @@ final class FlipperBackup: ObservableObject {
             throw FlipperBackupError.invalidArchive("manifest does not match files")
         }
         return manifest
+    }
+
+    /// Local, read-only inspection. A manifest and complete archive verification
+    /// are required for selective recovery; legacy whole-archive restore is unchanged.
+    nonisolated static func captureIndex(at url: URL) throws -> BackupCaptureIndex {
+        let before = try archiveDigest(url)
+        guard let manifest = try validateArchive(at: url) else {
+            throw FlipperBackupError.invalidArchive("selective recovery needs a verified manifest")
+        }
+        let folded = manifest.files.map { $0.path.precomposedStringWithCanonicalMapping.lowercased() }
+        guard Set(folded).count == folded.count else {
+            throw FlipperBackupError.invalidArchive("ambiguous case-insensitive paths")
+        }
+        let files = manifest.files.filter {
+            $0.size <= 16 * 1024 * 1024 && FieldWire.capturePath("/ext/" + $0.path)
+        }.map { BackupCapture(path: $0.path, size: $0.size, sha256: $0.sha256) }
+            .sorted { $0.path < $1.path }
+        guard try archiveDigest(url) == before else { throw FlipperBackupError.invalidArchive("archive changed") }
+        return BackupCaptureIndex(archiveURL: url, archiveSHA256: before, files: files)
+    }
+
+    nonisolated static func captureData(from index: BackupCaptureIndex, path: String) throws -> Data {
+        guard let expected = index.files.first(where: { $0.path == path }),
+              FieldWire.capturePath("/ext/" + path), expected.size <= 16 * 1024 * 1024,
+              try archiveDigest(index.archiveURL) == index.archiveSHA256 else {
+            throw FlipperBackupError.invalidArchive("capture or archive identity changed")
+        }
+        let archive = try Archive(url: index.archiveURL, accessMode: .read)
+        guard let entry = archive[path], entry.type == .file,
+              entry.uncompressedSize == UInt64(expected.size) else {
+            throw FlipperBackupError.invalidArchive("capture entry changed")
+        }
+        var data = Data()
+        _ = try archive.extract(entry) { chunk in
+            try Task.checkCancellation()
+            guard chunk.count <= expected.size - data.count else {
+                throw FlipperBackupError.invalidArchive("capture exceeds declared size")
+            }
+            data.append(chunk)
+        }
+        guard data.count == expected.size, sha256(data) == expected.sha256,
+              try archiveDigest(index.archiveURL) == index.archiveSHA256 else {
+            throw FlipperBackupError.checksumMismatch(path)
+        }
+        return data
+    }
+
+    nonisolated private static func archiveDigest(_ url: URL) throws -> String {
+        let values = try url.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey, .isSymbolicLinkKey])
+        guard values.isRegularFile == true, values.isSymbolicLink != true,
+              let size = values.fileSize, size <= 600 * 1024 * 1024 else {
+            throw FlipperBackupError.invalidArchive("archive size/type")
+        }
+        let file = try FileHandle(forReadingFrom: url)
+        defer { try? file.close() }
+        var hash = SHA256()
+        var total = 0
+        while let data = try file.read(upToCount: 256 * 1024), !data.isEmpty {
+            try Task.checkCancellation()
+            total += data.count
+            guard total <= size else { throw FlipperBackupError.invalidArchive("archive grew") }
+            hash.update(data: data)
+        }
+        guard total == size else { throw FlipperBackupError.invalidArchive("archive changed") }
+        return hash.finalize().map { String(format: "%02x", $0) }.joined()
     }
 
     /// Create every intermediate directory for a file path under /ext.
