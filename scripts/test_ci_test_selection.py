@@ -11,5 +11,8 @@ assert len(unit) == 1 and unit[0] == {'UnleashedTests'}, (
 ui = [values for values in selections if any(value.startswith('UnleashedUITests/') for value in values)]
 assert len(ui) == 1 and not any(value.startswith('UnleashedTests') for value in ui[0])
 assert {'UnleashedUITests/CommunityCleanupUITests', 'UnleashedUITests/FieldReportsUITests',
+        'UnleashedUITests/FieldWorkflowsUITests',
         'UnleashedUITests/ConnectionStatusUITests'} <= ui[0]
+assert 'name: Test complete unit target\n' in text
+assert 'name: Test critical package channel and field UI\n' in text
 print('Complete unit target and critical UI use independent Xcode invocations')

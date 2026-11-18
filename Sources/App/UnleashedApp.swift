@@ -86,7 +86,11 @@ struct RootView: View {
     @ViewBuilder
     var body: some View {
 #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("-signal-timeline-qa") {
+        if ProcessInfo.processInfo.arguments.contains("-field-workflows-qa") {
+            FieldWorkflowsQAView()
+            .preferredColorScheme(ProcessInfo.processInfo.arguments.contains("-field-workflows-light-qa") ? .light : .dark)
+            .dynamicTypeSize(ProcessInfo.processInfo.arguments.contains("-field-workflows-large-qa") ? .accessibility3 : .large)
+        } else if ProcessInfo.processInfo.arguments.contains("-signal-timeline-qa") {
             NavigationStack {
                 SignalTimelineView(sourceA: "/ext/subghz/own_remote_press_A.sub",
                                    sourceB: "/ext/subghz/own_remote_press_B.sub",
