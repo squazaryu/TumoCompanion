@@ -34,6 +34,7 @@ expectFailure("traversal") { _ = try CaptureInventory.parse(inventory([("/ext/su
 expectFailure("FAT duplicate") { _ = try CaptureInventory.parse(inventory([("/ext/nfc/A.nfc",1,Data([1])),("/ext/nfc/a.nfc",1,Data([1]))])) }
 let comparison = try FieldComparisonDocument.parse(Data("MISSING\t/ext/subghz/one.sub\nADDED\t/ext/nfc/new.nfc\n".utf8))
 precondition(comparison.rows.count == 2 && !comparison.provesCompleteScan)
-precondition(try FieldComparisonDocument.parse(Data()).rows.isEmpty)
+let emptyComparison = try FieldComparisonDocument.parse(Data())
+precondition(emptyComparison.rows.isEmpty)
 expectFailure("untrusted compare path") { _ = try FieldComparisonDocument.parse(Data("MISSING\t/ext/apps/data.fap\n".utf8)) }
 print("Field round, inventory integrity/diff and incomplete-comparison evidence passed")
