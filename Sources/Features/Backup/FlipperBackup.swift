@@ -424,7 +424,7 @@ final class FlipperBackup: ObservableObject {
 
     nonisolated static func captureData(from index: BackupCaptureIndex, path: String) throws -> Data {
         guard let expected = index.files.first(where: { $0.path == path }),
-              FieldWire.capturePath("/ext/" + path), expected.size <= 16 * 1024 * 1024,
+              FieldWire.capturePath("/ext/" + path), expected.size >= 0, expected.size <= 16 * 1024 * 1024,
               try archiveDigest(index.archiveURL) == index.archiveSHA256 else {
             throw FlipperBackupError.invalidArchive("capture or archive identity changed")
         }

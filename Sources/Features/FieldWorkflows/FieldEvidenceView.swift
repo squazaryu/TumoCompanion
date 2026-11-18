@@ -67,7 +67,7 @@ struct FieldEvidenceListView: View {
   private func kindTitle(_ file: FlipperFile) -> String {
     switch FieldEvidenceRepository.kind(file) {
     case .round: return "Manual object round"
-    case .inventory: return "Verified inventory snapshot"
+    case .inventory: return "Saved inventory snapshot"
     case .comparison: return "Difference log · completeness unknown"
     case nil: return "Unsupported"
     }

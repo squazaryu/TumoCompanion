@@ -227,7 +227,7 @@ struct ProfileRecoveryView: View {
     Form {
       Section {
         Text(
-          "Backups are local to this iPhone and bound to a device and firmware. Ambiguous writes must be reviewed here before a new profile change."
+          "Backups are local to this iPhone and bound to a device and firmware. Ambiguous writes must be reviewed here before a new profile change. Export completed records before managing them in Files → TumoCompanion → ProfileBackups; keep unresolved records."
         )
         Button("Refresh recovery records") { refresh() }.disabled(operation.busy)
       }

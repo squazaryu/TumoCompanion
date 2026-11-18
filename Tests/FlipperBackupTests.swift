@@ -182,6 +182,9 @@ final class FlipperBackupTests: XCTestCase {
         XCTAssertEqual(index.files.map(\.path), ["subghz/one.sub"])
         XCTAssertEqual(try FlipperBackup.captureData(from: index, path: "subghz/one.sub"), Data("own signal".utf8))
         XCTAssertThrowsError(try FlipperBackup.captureData(from: index, path: "../one.sub"))
+        let invalid = BackupCaptureIndex(archiveURL: index.archiveURL, archiveSHA256: index.archiveSHA256,
+                                         files: [.init(path: "subghz/one.sub", size: -1, sha256: "")])
+        XCTAssertThrowsError(try FlipperBackup.captureData(from: invalid, path: "subghz/one.sub"))
         XCTAssertEqual(storage.files.count, 1)
         try Data("corrupt".utf8).write(to: receipt.url)
         XCTAssertThrowsError(try FlipperBackup.captureData(from: index, path: "subghz/one.sub"))
