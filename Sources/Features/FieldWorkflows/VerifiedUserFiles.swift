@@ -57,6 +57,9 @@ struct UserProfileWriteRecord: Codable, Equatable, Identifiable {
         #endif
         let data = try JSONEncoder().encode(record)
         let url = recordURL(record.id)
+        if !FileManager.default.fileExists(atPath:url.path) {
+            guard try records().count < 256 else { throw FieldWorkflowError.invalid("recovery storage is full; export records first") }
+        }
         try data.write(to:url,options:.atomic)
         let handle = try FileHandle(forWritingTo:url)
         do { try handle.synchronize(); try handle.close() } catch { try? handle.close(); throw error }
@@ -87,6 +90,9 @@ struct UserProfileWriteRecord: Codable, Equatable, Identifiable {
         running = true
     }
     func applyProfile(_ profile: SubGhzProfile, expected: UserFileSnapshot) async throws -> UserProfileWriteRecord {
+        try await DeviceFileMutationGate.withLease { try await self.applyProfileUnlocked(profile,expected:expected) }
+    }
+    private func applyProfileUnlocked(_ profile: SubGhzProfile, expected: UserFileSnapshot) async throws -> UserProfileWriteRecord {
         let data = try profile.encoded()
         guard expected.path == Self.profilePath, expected.data.count <= SubGhzProfile.maximumBytes,
               expected.sha256 == FieldWire.sha256(expected.data) else { throw FieldWorkflowError.invalid("profile preview identity") }
@@ -115,6 +121,9 @@ struct UserProfileWriteRecord: Codable, Equatable, Identifiable {
         }
     }
     func restoreProfileBackup(_ selected: UserProfileWriteRecord, expectedCurrentMD5: String?) async throws {
+        try await DeviceFileMutationGate.withLease { try await self.restoreProfileBackupUnlocked(selected,expectedCurrentMD5:expectedCurrentMD5) }
+    }
+    private func restoreProfileBackupUnlocked(_ selected: UserProfileWriteRecord, expectedCurrentMD5: String?) async throws {
         guard let stored = try records().first(where:{$0.id == selected.id}), stored == selected else { throw FieldWorkflowError.conflict }
         try begin(); defer { running = false }
         try await bound(stored.deviceID)
@@ -123,6 +132,7 @@ struct UserProfileWriteRecord: Codable, Equatable, Identifiable {
         record.phase = .restoring; try persist(record)
         do {
             try await bound(stored.deviceID)
+            guard try await access.checksum(Self.profilePath) == expectedCurrentMD5 else { throw FieldWorkflowError.conflict }
             try await access.write(Self.profilePath,data:stored.original)
             try await bound(stored.deviceID)
             guard try await access.checksum(Self.profilePath) == FieldWire.md5(stored.original) else { throw FieldWorkflowError.recoveryRequired }
@@ -136,10 +146,12 @@ struct UserProfileWriteRecord: Codable, Equatable, Identifiable {
         let parts = originalPath.split(separator:"/")
         let folder = "/ext/\(parts[1])/Restored"
         let target = folder+"/"+UUID().uuidString+"."+(originalPath as NSString).pathExtension.lowercased()
-        return try await createCopy(data,target:target,deviceID:deviceID)
+        return try await DeviceFileMutationGate.withLease { try await self.createCopy(data,target:target,deviceID:deviceID) }
     }
     func uploadObject(_ document: PortableObjectDocument, deviceID: String) async throws -> String {
-        try await createCopy(document.encoded(),target:"/ext/apps_data/device_library/exports/phone-\(UUID().uuidString).tobj",deviceID:deviceID)
+        try await DeviceFileMutationGate.withLease {
+            try await self.createCopy(document.encoded(),target:"/ext/apps_data/device_library/exports/phone-\(UUID().uuidString).tobj",deviceID:deviceID)
+        }
     }
     private func createCopy(_ data: Data, target: String, deviceID: String) async throws -> String {
         try begin(); defer { running = false }

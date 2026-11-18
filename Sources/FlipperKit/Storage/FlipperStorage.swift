@@ -119,6 +119,9 @@ final class FlipperStorage {
     }
 
     func makeDirectory(_ path: String) async throws {
+        try await DeviceFileMutationGate.withMutation { try await self.makeDirectoryUnlocked(path) }
+    }
+    private func makeDirectoryUnlocked(_ path: String) async throws {
         do {
             _ = try await rpc.command { main in
                 main.content = .storageMkdirRequest({
@@ -131,6 +134,9 @@ final class FlipperStorage {
     }
 
     func delete(_ path: String, recursive: Bool = false) async throws {
+        try await DeviceFileMutationGate.withMutation { try await self.deleteUnlocked(path,recursive:recursive) }
+    }
+    private func deleteUnlocked(_ path: String, recursive: Bool) async throws {
         // Recursive deletes (staging / rollback trees) can touch many files; give the
         // device generous time so a busy SD doesn't trip the default 30 s ceiling.
         _ = try await rpc.command(timeout: 90) { main in
@@ -145,6 +151,9 @@ final class FlipperStorage {
     /// Move / rename a file or folder (Flipper `storage rename` = move when the
     /// destination is in another directory). Same-SD only; destination dir must exist.
     func move(_ from: String, to newPath: String) async throws {
+        try await DeviceFileMutationGate.withMutation { try await self.moveUnlocked(from,to:newPath) }
+    }
+    private func moveUnlocked(_ from: String, to newPath: String) async throws {
         // Flipper `rename` is copy + remove on the SD, so a large file (≈300 KB) over a
         // loaded BLE link can exceed the default 30 s ceiling. Give it room — this was a
         // cause of "command timed out" mid-install.
@@ -226,6 +235,14 @@ final class FlipperStorage {
         _ path: String,
         data: Data,
         progress: (@Sendable (Int) -> Void)?,
+        isStopRequested: @escaping @Sendable () -> Bool
+    ) async throws {
+        try await DeviceFileMutationGate.withMutation {
+            try await self.writeUnlocked(path,data:data,progress:progress,isStopRequested:isStopRequested)
+        }
+    }
+    private func writeUnlocked(
+        _ path: String, data: Data, progress: (@Sendable (Int) -> Void)?,
         isStopRequested: @escaping @Sendable () -> Bool
     ) async throws {
         if isStopRequested() { throw CancellationError() }
