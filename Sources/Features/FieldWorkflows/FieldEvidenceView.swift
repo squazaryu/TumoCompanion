@@ -24,7 +24,9 @@ struct FieldEvidenceListView: View {
       if inventories.count > 1 {
         Section("Compare saved inventories") {
           Picker("Earlier snapshot", selection: $older) { inventoryOptions }
+            .pickerStyle(.menu).accessibilityIdentifier("field-inventory-older")
           Picker("Later snapshot", selection: $newer) { inventoryOptions }
+            .pickerStyle(.menu).accessibilityIdentifier("field-inventory-newer")
           Button("Compare snapshots") { compare() }
             .disabled(operation.busy || older.isEmpty || newer.isEmpty || older == newer)
             .accessibilityIdentifier("field-inventory-compare")
