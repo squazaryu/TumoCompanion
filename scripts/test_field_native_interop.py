@@ -18,7 +18,7 @@ table = re.sub(r"/\*.*?\*/", "", table, flags=re.S)
 frequencies = {int(value) for value in re.findall(r"\b[0-9]{9}\b", table)}
 swift = (app / "Sources/Features/FieldWorkflows/SubGhzProfile.swift").read_text()
 swift_table = swift.split("standardFrequencies: Set<UInt32> = [", 1)[1].split("]", 1)[0]
-assert frequencies == set(map(int, re.findall(r"\d+", swift_table))), "Native standard frequency table drift"
+assert frequencies == set(map(int, re.findall(r"\d+", swift_table.replace("_", "")))), "Native standard frequency table drift"
 
 sys.path.insert(0, str(firmware))
 from tools.tumoflip.test_field_wallet import storage_native
