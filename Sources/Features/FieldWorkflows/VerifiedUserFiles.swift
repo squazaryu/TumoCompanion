@@ -98,6 +98,9 @@ struct UserProfileWriteRecord: Codable, Equatable, Identifiable {
               expected.sha256 == FieldWire.sha256(expected.data) else { throw FieldWorkflowError.invalid("profile preview identity") }
         try begin(); defer { running = false }
         try await bound(expected.deviceID)
+        guard try !records().contains(where: {
+            $0.deviceID == expected.deviceID && [.prepared, .writing, .needsRecovery, .restoring].contains($0.phase)
+        }) else { throw FieldWorkflowError.recoveryRequired }
         guard try await access.checksum(Self.profilePath) == FieldWire.md5(expected.data) else { throw FieldWorkflowError.conflict }
         var record = UserProfileWriteRecord(id:UUID(),deviceID:expected.deviceID,original:expected.data,
                                           originalSHA256:expected.sha256,expectedSHA256:FieldWire.sha256(data),phase:.prepared)
@@ -133,6 +136,7 @@ struct UserProfileWriteRecord: Codable, Equatable, Identifiable {
         do {
             try await bound(stored.deviceID)
             guard try await access.checksum(Self.profilePath) == expectedCurrentMD5 else { throw FieldWorkflowError.conflict }
+            try Task.checkCancellation()
             try await access.write(Self.profilePath,data:stored.original)
             try await bound(stored.deviceID)
             guard try await access.checksum(Self.profilePath) == FieldWire.md5(stored.original) else { throw FieldWorkflowError.recoveryRequired }
@@ -162,6 +166,7 @@ struct UserProfileWriteRecord: Codable, Equatable, Identifiable {
         }
         try await bound(deviceID)
         guard try await access.checksum(target) == nil else { throw FieldWorkflowError.conflict }
+        try Task.checkCancellation()
         try await access.write(target,data:data)
         try await bound(deviceID)
         guard try await access.checksum(target) == FieldWire.md5(data) else { throw FieldWorkflowError.recoveryRequired }

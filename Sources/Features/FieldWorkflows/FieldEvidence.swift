@@ -61,7 +61,8 @@ struct CaptureInventory: Equatable {
     let entries: [Entry]
     let digest: String
 
-    static func parse(_ data: Data) throws -> Self {
+    static func parse(_ input: Data) throws -> Self {
+        let data = Data(input)
         guard data.count >= 56, data.count <= maximumBytes, (data.count-56)%292 == 0,
               try FieldWire.u32(data,0) == 0x31564954, try FieldWire.u32(data,4) == 1,
               try FieldWire.u32(data,8) == 292, try FieldWire.u32(data,12) == 0 else {
@@ -92,14 +93,15 @@ struct CaptureInventory: Equatable {
     }
     /// Comparison of two saved snapshots, not a scan or proof of the current SD.
     func compare(to newer: Self) -> [CaptureDifference] {
-        let current = Dictionary(uniqueKeysWithValues:newer.entries.map { ($0.path,$0) })
-        let old = Set(entries.map(\.path))
+        func key(_ path: String) -> String { path.precomposedStringWithCanonicalMapping.lowercased() }
+        let current = Dictionary(uniqueKeysWithValues:newer.entries.map { (key($0.path),$0) })
+        let old = Set(entries.map { key($0.path) })
         return entries.map { entry in
             let state: CaptureDifference.State
-            if let observed = current[entry.path] { state = observed == entry ? .unchanged : .changed }
+            if let observed = current[key(entry.path)] { state = observed.size == entry.size && observed.sha256 == entry.sha256 ? .unchanged : .changed }
             else { state = .missing }
             return CaptureDifference(path:entry.path,state:state)
-        } + newer.entries.filter { !old.contains($0.path) }.map { CaptureDifference(path:$0.path,state:.added) }
+        } + newer.entries.filter { !old.contains(key($0.path)) }.map { CaptureDifference(path:$0.path,state:.added) }
     }
 }
 

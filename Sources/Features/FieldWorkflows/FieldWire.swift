@@ -36,7 +36,7 @@ enum FieldWire {
         guard offset >= 0, length > 0, offset <= data.count, length <= data.count-offset else {
             throw FieldWorkflowError.invalid("truncated string")
         }
-        let bytes = data.subdata(in:offset..<offset+length)
+        let bytes = data.dropFirst(offset).prefix(length)
         guard let end = bytes.firstIndex(of:0),
               let value = String(data:bytes.prefix(upTo:end),encoding:.utf8),
               printable(value) else { throw FieldWorkflowError.invalid("unterminated or invalid text") }
