@@ -38,3 +38,29 @@ let emptyComparison = try FieldComparisonDocument.parse(Data())
 precondition(emptyComparison.rows.isEmpty)
 expectFailure("untrusted compare path") { _ = try FieldComparisonDocument.parse(Data("MISSING\t/ext/apps/data.fap\n".utf8)) }
 print("Field round, inventory integrity/diff and incomplete-comparison evidence passed")
+
+let card = PortableObjectCard(name:"Gate",notes:"Owned receiver",tags:"home",checkedAt:"",links:[.init(path:"/ext/subghz/one.sub",label:"Open")])
+let bundle = try PortableObjectDocument(card:card,files:["/ext/subghz/one.sub":Data("one".utf8)])
+let encodedBundle = try bundle.encoded()
+precondition(encodedBundle.count == 2891 && encodedBundle.prefix(4) == u32(0x31424F54))
+let decodedBundle = try PortableObjectDocument.decode(encodedBundle)
+precondition(decodedBundle.card == card && decodedBundle.files[card.links[0].path] == Data("one".utf8))
+var badBundle = encodedBundle; badBundle[badBundle.count-1] ^= 1
+expectFailure("payload digest") { _ = try PortableObjectDocument.decode(badBundle) }
+expectFailure("bundle trailing data") { _ = try PortableObjectDocument.decode(encodedBundle+Data([0])) }
+expectFailure("unknown capture type") { _ = try PortableObjectDocument(card:.init(name:"Gate",notes:"",tags:"",checkedAt:"",links:[.init(path:"/ext/apps/bad.fap",label:"")]),files:["/ext/apps/bad.fap":Data([0])]).encoded() }
+expectFailure("object name overflow") { _ = try PortableObjectDocument(card:.init(name:String(repeating:"A",count:25),notes:"",tags:"",checkedAt:"",links:[]),files:[:]).encoded() }
+
+let profileData = Data("# original\nFiletype: Flipper SubGhz Setting File\nVersion: 1\nAdd_standard_frequencies: true\nFrequency: 433920000\nHopper_frequency: 433920000\nDefault_frequency: 433920000\nHopping_Preset: AM650\nCustom_preset_name: Owned\nCustom_preset_module: CC1101\nCustom_preset_data: 00 00 C0\nFuture_field: preserved\n".utf8)
+var profile = try SubGhzProfile.parse(profileData)
+profile.frequencies.append(868350000);profile.hopperFrequencies=[433920000,868350000]
+profile.defaultFrequency=868350000;profile.hoppingPresets=["AM650","FM476"]
+let renderedProfile = try profile.encoded()
+let profileText = String(decoding:renderedProfile,as:UTF8.self)
+precondition(profileText.contains("Future_field: preserved") && profileText.contains("Custom_preset_data: 00 00 C0"))
+precondition(try SubGhzProfile.parse(renderedProfile).defaultFrequency == 868350000)
+profile.hoppingPresets=["TumoHonda"]
+expectFailure("explicit RX profile in ordinary hopping") { _ = try profile.encoded() }
+expectFailure("unsupported profile version") { _ = try SubGhzProfile.parse(Data("Filetype: Flipper SubGhz Setting File\nVersion: 2\n".utf8)) }
+expectFailure("frequency outside radio ranges") { _ = try SubGhzProfile.parse(Data(String(decoding:profileData,as:UTF8.self).replacingOccurrences(of:"433920000",with:"100000000").utf8)) }
+print("Portable object wire format and guarded Sub-GHz profile editing passed")
