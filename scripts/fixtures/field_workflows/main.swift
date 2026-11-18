@@ -58,7 +58,8 @@ profile.defaultFrequency=868350000;profile.hoppingPresets=["AM650","FM476"]
 let renderedProfile = try profile.encoded()
 let profileText = String(decoding:renderedProfile,as:UTF8.self)
 precondition(profileText.contains("Future_field: preserved") && profileText.contains("Custom_preset_data: 00 00 C0"))
-precondition(try SubGhzProfile.parse(renderedProfile).defaultFrequency == 868350000)
+let reloadedProfile = try SubGhzProfile.parse(renderedProfile)
+precondition(reloadedProfile.defaultFrequency == 868350000)
 profile.hoppingPresets=["TumoHonda"]
 expectFailure("explicit RX profile in ordinary hopping") { _ = try profile.encoded() }
 expectFailure("unsupported profile version") { _ = try SubGhzProfile.parse(Data("Filetype: Flipper SubGhz Setting File\nVersion: 2\n".utf8)) }
