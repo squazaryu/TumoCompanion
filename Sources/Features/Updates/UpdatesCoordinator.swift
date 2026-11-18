@@ -17,6 +17,16 @@ final class UpdatesCoordinator: ObservableObject {
     private var revalidationTask: Task<Void, Never>?
     private var observations = Set<AnyCancellable>()
 
+    /// Checked user edits must not race an app-owned package/firmware transfer.
+    /// The storage mutation gate additionally excludes unrelated BLE file writes.
+    var hasActiveDeviceTransfer: Bool {
+        if packages.busy || firmware.busy || esp32.busy { return true }
+        switch plugins.phase {
+        case .idle, .needsBaseline, .done, .failed: return false
+        default: return true
+        }
+    }
+
     init() {
         interruptedTransfer = TransferRecoveryStore.shared.load()
         Publishers.Merge4(

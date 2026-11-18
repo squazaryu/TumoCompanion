@@ -47,6 +47,12 @@ jobs:
         run: python3 scripts/test_console_preview_metrics_host.py
       - name: Verify bounded read-only field reports
         run: python3 scripts/test_field_reports_host.py
+      - name: Verify checked field workflows with measured logic coverage
+        run: python3 scripts/test_field_workflows_host.py --coverage-dir build/field-coverage
+      - name: Verify selective backup ZIP handling and Foundation XCTest regressions
+        run: |
+          python3 scripts/test_field_backup_host.py
+          python3 scripts/test_field_unit_host.py
       - name: Build unsigned IPA
         run: scripts/build_ipa.sh
 
@@ -85,6 +91,7 @@ jobs:
             -only-testing:UnleashedUITests/UpdateSourceLayoutUITests/testEmptyDevCatalogCanSwitchToStableInDarkMode \
             -only-testing:UnleashedUITests/CommunityCleanupUITests \
             -only-testing:UnleashedUITests/FieldReportsUITests \
+            -only-testing:UnleashedUITests/FieldWorkflowsUITests \
             -only-testing:UnleashedUITests/ConnectionStatusUITests \
             -resultBundlePath build/ManagedPackages.xcresult \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
@@ -96,6 +103,7 @@ jobs:
           path: |
             build/AllUnitTests.xcresult
             build/ManagedPackages.xcresult
+            build/field-coverage/coverage.json
           if-no-files-found: warn
           retention-days: 7
       - name: Upload candidate (not a release)

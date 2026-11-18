@@ -64,6 +64,12 @@ struct BackupView: View {
                 }
                 ForEach(Array(bk.backups.enumerated()), id: \.element) { index, url in
                     backupRow(url)
+                    NavigationLink {
+                        BackupCapturesHomeView(url: url)
+                    } label: {
+                        Label("Recover one recording as a new copy", systemImage: "doc.badge.arrow.up")
+                            .font(.subheadline)
+                    }.disabled(bk.running)
                     if index < bk.backups.count - 1 { Divider().opacity(0.4) }
                 }
             }

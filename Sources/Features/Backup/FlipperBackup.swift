@@ -355,6 +355,7 @@ final class FlipperBackup: ObservableObject {
         var actual: [String: FlipperBackupManifest.File] = [:]
         var totalBytes: UInt64 = 0
         for entry in archive where entry.type == .file {
+            try Task.checkCancellation()
             guard actual.count < 20_000 else {
                 throw FlipperBackupError.invalidArchive("too many files")
             }
@@ -380,7 +381,10 @@ final class FlipperBackup: ObservableObject {
                 throw FlipperBackupError.invalidArchive("duplicate file \(entry.path)")
             }
             var data = Data()
-            _ = try archive.extract(entry) { data.append($0) }
+            _ = try archive.extract(entry) { chunk in
+                try Task.checkCancellation()
+                data.append(chunk)
+            }
             actual[entry.path] = .init(
                 path: entry.path, size: data.count, sha256: sha256(data))
         }

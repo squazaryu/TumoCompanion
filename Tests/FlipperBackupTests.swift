@@ -171,6 +171,22 @@ final class FlipperBackupTests: XCTestCase {
         XCTAssertEqual(backup.backups.count, 2)
     }
 
+    func testSelectiveCaptureExtractionDoesNotRestoreOrWriteAnyFile() async throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storage = FakeStorage()
+        storage.files = ["/ext/subghz/one.sub": Data("own signal".utf8)]
+        let backup = FlipperBackup(storage: storage, directory: directory)
+        let receipt = try await backup.backup(folders: ["subghz"], stamp: "selective")
+        let index = try FlipperBackup.captureIndex(at: receipt.url)
+        XCTAssertEqual(index.files.map(\.path), ["subghz/one.sub"])
+        XCTAssertEqual(try FlipperBackup.captureData(from: index, path: "subghz/one.sub"), Data("own signal".utf8))
+        XCTAssertThrowsError(try FlipperBackup.captureData(from: index, path: "../one.sub"))
+        XCTAssertEqual(storage.files.count, 1)
+        try Data("corrupt".utf8).write(to: receipt.url)
+        XCTAssertThrowsError(try FlipperBackup.captureData(from: index, path: "subghz/one.sub"))
+    }
+
     func testRestorePathRejectsTraversalAndAbsolutePaths() {
         XCTAssertThrowsError(try FlipperBackup.safeDestination(for: "../secret"))
         XCTAssertThrowsError(try FlipperBackup.safeDestination(for: "subghz/../secret"))
