@@ -1,5 +1,5 @@
 {
-  "release_tag": "16nov2026",
+  "release_tag": "19nov2026",
   "stems": {
     "24cxxprog": "Programmers",
     "4inrow": "Board",
@@ -301,7 +301,6 @@
     "subghz_bruteforcer": "Sub-GHz",
     "subghz_playlist": "Sub-GHz",
     "subghz_playlist_creator": "Sub-GHz",
-    "subghz_raw_edit": "Sub-GHz",
     "subghz_scheduler": "Sub-GHz",
     "subghz_signal_gen": "Sub-GHz",
     "subghz_wardriving": "Sub-GHz",
