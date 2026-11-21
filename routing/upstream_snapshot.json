@@ -1,5 +1,5 @@
 {
-  "release_tag": "20nov2026",
+  "release_tag": "21nov2026",
   "stems": {
     "24cxxprog": "Programmers",
     "4inrow": "Board",
@@ -121,6 +121,7 @@
     "furious_birds": "Arcade",
     "fuzzer_ibtn": "iButton",
     "fuzzer_rfid": "RFID",
+    "fzreader": "Tools",
     "game15": "Puzzle",
     "game_2048": "Puzzle",
     "game_vexed": "Puzzle",
