@@ -1,5 +1,5 @@
 {
-  "release_tag": "21nov2026",
+  "release_tag": "22nov2026",
   "stems": {
     "24cxxprog": "Programmers",
     "4inrow": "Board",
@@ -380,6 +380,7 @@
     "xremote": "Infrared",
     "yatzee": "Board",
     "yrm100x_pro": "UHF",
+    "z5flip": "Programmers",
     "zero_buster": "USB",
     "zero_tracker": "Players",
     "zerofido": "Tools",
