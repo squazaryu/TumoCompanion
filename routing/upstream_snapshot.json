@@ -1,5 +1,5 @@
 {
-  "release_tag": "23nov2026",
+  "release_tag": "24nov2026",
   "stems": {
     "24cxxprog": "Programmers",
     "4inrow": "Board",
@@ -140,6 +140,7 @@
     "gps_rpc": "Tools",
     "gps_track": "GPS",
     "gree_ac_remote": "ACs",
+    "gta_vi_companion": "NFC",
     "haier_ac_remote": "ACs",
     "hangman": "Puzzle",
     "hc_sr04": "Sensors",
